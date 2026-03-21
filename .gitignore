@@ -1,0 +1,52 @@
+# ─── Credenciales y secretos ─────────────────────────────────────────────────
+.env
+*.env
+.env.*
+!.env.example
+
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ─── Next.js / Node ──────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.npm
+frontend/.cache
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ─── IDEs ────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+
+# ─── Alembic ─────────────────────────────────────────────────────────────────
+# Mantener versiones pero no el directorio __pycache__
+backend/alembic/versions/__pycache__/
+
+# ─── Docs temporales ─────────────────────────────────────────────────────────
+temp/
