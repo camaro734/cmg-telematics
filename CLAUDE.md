@@ -25,8 +25,10 @@ carpeta, lee su CLAUDE.md antes de tocar cualquier fichero.
 │   └── CLAUDE.md                ← agente API REST (endpoints, auth, permisos)
 ├── frontend/
 │   └── CLAUDE.md                ← agente frontend (Next.js, PWA, componentes)
-└── tests/
-    └── CLAUDE.md                ← agente testing (simulador FMC650, pytest)
+├── tests/
+│   └── CLAUDE.md                ← agente testing (simulador FMC650, pytest)
+└── agents/hydraulics/
+    └── CLAUDE.md                ← agente experto hidráulica (KPIs, alertas, desgaste)
 ```
 
 ## Reglas globales — aplican a todos los agentes
