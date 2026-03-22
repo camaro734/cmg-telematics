@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearToken, alerts as alertsApi } from "@/lib/api";
+import { useBranding } from "@/context/BrandingContext";
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "Superadmin",
@@ -182,6 +183,7 @@ const adminNav = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const branding = useBranding();
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
   const [activeAlerts, setActiveAlerts] = useState(0);
@@ -246,6 +248,14 @@ export default function Sidebar() {
     <>
       {/* Brand */}
       <div className="px-5 py-5 flex items-center gap-3 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+        {branding.logo_url ? (
+          <img
+            src={branding.logo_url}
+            alt={branding.brand_name}
+            className="h-7 max-w-[120px] object-contain flex-shrink-0"
+            style={{ filter: "brightness(0) invert(1)" }}
+          />
+        ) : (
         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
              style={{ background: "var(--accent)" }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
@@ -254,10 +264,17 @@ export default function Sidebar() {
             <circle cx="12" cy="12" r="2.5" fill="white" />
           </svg>
         </div>
-        <div className="flex-1">
-          <div className="text-sm font-bold text-white leading-tight">CMG</div>
-          <div className="text-xs leading-tight" style={{ color: "var(--muted)" }}>Telematics</div>
-        </div>
+        )}
+        {!branding.logo_url && (
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-white leading-tight truncate">
+              {branding.is_custom ? branding.brand_name : "CMG"}
+            </div>
+            <div className="text-xs leading-tight" style={{ color: "var(--muted)" }}>
+              {branding.is_custom ? "Fleet Management" : "Telematics"}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Nav */}

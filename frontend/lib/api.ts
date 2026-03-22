@@ -346,6 +346,10 @@ export interface TenantOut {
   type: string;
   parent_id: string | null;
   active: boolean;
+  brand_name: string | null;
+  brand_color: string | null;
+  logo_url: string | null;
+  custom_domain: string | null;
 }
 
 export interface UserOut {

@@ -44,6 +44,10 @@ class TenantOut(BaseModel):
     type: str
     parent_id: Optional[uuid.UUID]
     active: bool
+    brand_name: Optional[str] = None
+    brand_color: Optional[str] = None
+    logo_url: Optional[str] = None
+    custom_domain: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -102,6 +106,14 @@ async def update_tenant(
         tenant.name = body["name"]
     if "active" in body:
         tenant.active = body["active"]
+    if "brand_name" in body:
+        tenant.brand_name = body["brand_name"] or None
+    if "brand_color" in body:
+        tenant.brand_color = body["brand_color"] or None
+    if "logo_url" in body:
+        tenant.logo_url = body["logo_url"] or None
+    if "custom_domain" in body:
+        tenant.custom_domain = body["custom_domain"].lower().strip() if body["custom_domain"] else None
     await db.commit()
     return {"id": str(tenant.id), "name": tenant.name, "active": tenant.active}
 

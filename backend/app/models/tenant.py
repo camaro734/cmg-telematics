@@ -22,6 +22,12 @@ class Tenant(Base):
     )
     active: Mapped[bool] = mapped_column(default=True)
 
+    # White-label branding (solo para tenants tipo "manufacturer")
+    brand_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    brand_color: Mapped[str | None] = mapped_column(String(7), nullable=True)   # hex, e.g. #1D9E75
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    custom_domain: Mapped[str | None] = mapped_column(String(200), nullable=True, unique=True)
+
     parent = relationship("Tenant", remote_side=[id], backref="children")
     users = relationship("User", back_populates="tenant")
     vehicles = relationship("Vehicle", foreign_keys="Vehicle.tenant_id", back_populates="tenant")

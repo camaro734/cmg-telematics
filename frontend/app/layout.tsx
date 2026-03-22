@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { BrandingProvider } from "@/context/BrandingContext";
 
 export const metadata: Metadata = {
   title: "CMG Telematics",
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="CMG Telematics" />
       </head>
-      <body className="h-full antialiased">{children}</body>
+      <body className="h-full antialiased">
+        <BrandingProvider>{children}</BrandingProvider>
+      </body>
     </html>
   );
 }
