@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { admin, type TenantOut } from "@/lib/api";
+import { admin, uploadLogo, type TenantOut } from "@/lib/api";
 import Modal from "@/components/Modal";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -443,7 +443,24 @@ function BrandingForm({
   onClose: () => void;
   tenantName: string;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const previewColor = form.brand_color || "#1D9E75";
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const { url } = await uploadLogo(file);
+      setForm((f) => ({ ...f, logo_url: url }));
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : "Error al subir");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -558,40 +575,85 @@ function BrandingForm({
         </div>
       </Field>
 
-      <Field label="URL del logo (PNG/SVG, fondo transparente)">
-        <input
-          value={form.logo_url}
-          onChange={(e) => setForm((f) => ({ ...f, logo_url: e.target.value }))}
-          placeholder="https://cdn.empresa.com/logo-blanco.png"
-          className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
+      <Field label="Logo (PNG, SVG, JPG — máx 2 MB)">
+        <label
+          className="flex flex-col items-center gap-3 px-4 py-5 rounded-xl cursor-pointer transition-colors"
           style={{
+            border: `2px dashed ${uploading ? "var(--accent)" : "var(--border)"}`,
             background: "var(--sidebar)",
-            border: "1px solid var(--border)",
           }}
-        />
-        <p className="text-xs mt-1.5" style={{ color: "var(--muted)" }}>
-          Recomendado: logo blanco sobre transparente, mínimo 300px ancho
-        </p>
+        >
+          <input
+            type="file"
+            accept="image/png,image/svg+xml,image/jpeg,image/webp"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={uploading}
+          />
+          {uploading ? (
+            <div className="flex items-center gap-2 text-sm" style={{ color: "var(--accent)" }}>
+              <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity="0.3" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              Subiendo…
+            </div>
+          ) : form.logo_url ? (
+            <div className="flex flex-col items-center gap-2">
+              <img
+                src={form.logo_url}
+                alt="logo preview"
+                className="h-10 max-w-[160px] object-contain"
+                style={{ filter: "brightness(0) invert(1)" }}
+              />
+              <span className="text-xs" style={{ color: "var(--accent)" }}>
+                ✓ Logo subido — haz clic para cambiar
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1 text-center">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" style={{ color: "var(--muted)" }}>
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-sm text-white">Haz clic para subir el logo</span>
+              <span className="text-xs" style={{ color: "var(--muted)" }}>
+                PNG o SVG blanco sobre transparente, mín. 300px
+              </span>
+            </div>
+          )}
+        </label>
+        {uploadError && (
+          <p className="text-xs mt-1.5" style={{ color: "var(--danger)" }}>{uploadError}</p>
+        )}
+        {form.logo_url && (
+          <button
+            onClick={() => setForm((f) => ({ ...f, logo_url: "" }))}
+            className="text-xs mt-1.5"
+            style={{ color: "var(--muted)" }}
+          >
+            × Eliminar logo
+          </button>
+        )}
       </Field>
 
-      <Field label="Dominio personalizado (sin https://)">
-        <div className="flex items-center gap-2">
+      <Field label="Dominio personalizado">
+        <div className="flex items-center rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+          <span className="px-3 py-2.5 text-sm flex-shrink-0" style={{ background: "rgba(29,158,117,0.1)", color: "var(--accent)" }}>
+            https://
+          </span>
           <input
             value={form.custom_domain}
             onChange={(e) =>
-              setForm((f) => ({ ...f, custom_domain: e.target.value }))
+              setForm((f) => ({ ...f, custom_domain: e.target.value.replace(/^https?:\/\//, "") }))
             }
             placeholder="connect.empresa.com"
-            className="flex-1 px-3 py-2.5 rounded-lg text-sm text-white font-mono"
-            style={{
-              background: "var(--sidebar)",
-              border: "1px solid var(--border)",
-            }}
+            className="flex-1 px-3 py-2.5 text-sm text-white font-mono outline-none"
+            style={{ background: "var(--sidebar)" }}
           />
         </div>
-        <p className="text-xs mt-1.5" style={{ color: "var(--muted)" }}>
-          El fabricante apunta su subdominio con CNAME →{" "}
-          <span className="font-mono">213.210.20.183</span>
+        <p className="text-xs mt-1.5 leading-relaxed" style={{ color: "var(--muted)" }}>
+          HTTPS automático vía Let&apos;s Encrypt. El fabricante solo necesita
+          añadir un registro DNS: <span className="font-mono text-white">connect.empresa.com A 213.210.20.183</span>
         </p>
       </Field>
 

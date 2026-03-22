@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -82,6 +83,9 @@ app.add_middleware(
 
 # API routes
 app.include_router(api_router)
+
+# Static files (logos, uploads)
+app.mount("/static", StaticFiles(directory="/opt/cmg-telematics/backend/static"), name="static")
 
 # WebSocket
 app.add_api_websocket_route("/ws/fleet", fleet_websocket)

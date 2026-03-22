@@ -680,6 +680,22 @@ export const maintenance = {
   summary: () => request<MaintenanceSummary>("/api/v1/maintenance/summary"),
 };
 
+export async function uploadLogo(file: File): Promise<{ url: string }> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/api/v1/upload/logo`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export const admin = {
   // Tenants
   listTenants: () => request<TenantOut[]>("/api/v1/admin/tenants"),
