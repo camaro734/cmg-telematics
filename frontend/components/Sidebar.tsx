@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { clearToken, alerts as alertsApi } from "@/lib/api";
+import { clearToken, alerts as alertsApi, fetchMyBranding } from "@/lib/api";
 import { useBranding } from "@/context/BrandingContext";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -188,6 +188,7 @@ export default function Sidebar() {
   const [userRole, setUserRole] = useState("");
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [userBranding, setUserBranding] = useState<{ brand_name: string; brand_color: string; logo_url: string | null; is_custom: boolean } | null>(null);
 
   useEffect(() => {
     try {
@@ -198,6 +199,11 @@ export default function Sidebar() {
         setUserName(parsed.full_name || parsed.email?.split("@")[0] || "");
       }
     } catch { /* ignore */ }
+
+    // Fetch user-specific branding for all roles
+    fetchMyBranding().then(b => {
+      if (b.is_custom) setUserBranding(b);
+    }).catch(() => {});
   }, []);
 
   // Close "Más" sheet on route change
@@ -247,35 +253,39 @@ export default function Sidebar() {
   const desktopSidebar = (
     <>
       {/* Brand */}
-      <div className="px-5 py-5 flex items-center gap-3 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
-        {branding.logo_url ? (
-          <img
-            src={branding.logo_url}
-            alt={branding.brand_name}
-            className="h-7 max-w-[120px] object-contain flex-shrink-0"
-            style={{ filter: "brightness(0) invert(1)" }}
-          />
-        ) : (
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-             style={{ background: "var(--accent)" }}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-            <path d="M12 2L2 7v10l10 5 10-5V7L12 2z" stroke="white" strokeWidth="1.5"
-                  strokeLinejoin="round" fill="rgba(255,255,255,0.2)" />
-            <circle cx="12" cy="12" r="2.5" fill="white" />
-          </svg>
-        </div>
-        )}
-        {!branding.logo_url && (
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-white leading-tight truncate">
-              {branding.is_custom ? branding.brand_name : "CMG"}
-            </div>
-            <div className="text-xs leading-tight" style={{ color: "var(--muted)" }}>
-              {branding.is_custom ? "Fleet Management" : "Telematics"}
-            </div>
+      {(() => {
+        // User-specific branding takes priority over domain branding
+        const effectiveLogo = userBranding?.logo_url || branding.logo_url;
+        const effectiveName = userBranding?.brand_name || (branding.is_custom ? branding.brand_name : "CMG");
+        const effectiveSubtitle = (userBranding?.is_custom || branding.is_custom) ? "Fleet Management" : "Telematics";
+        return (
+          <div className="px-5 py-5 flex items-center gap-3 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+            {effectiveLogo ? (
+              <img
+                src={effectiveLogo}
+                alt={effectiveName}
+                className="h-7 max-w-[120px] object-contain flex-shrink-0"
+                style={{ filter: "brightness(0) invert(1)" }}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                   style={{ background: "var(--accent)" }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 2L2 7v10l10 5 10-5V7L12 2z" stroke="white" strokeWidth="1.5"
+                        strokeLinejoin="round" fill="rgba(255,255,255,0.2)" />
+                  <circle cx="12" cy="12" r="2.5" fill="white" />
+                </svg>
+              </div>
+            )}
+            {!effectiveLogo && (
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-white leading-tight truncate">{effectiveName}</div>
+                <div className="text-xs leading-tight" style={{ color: "var(--muted)" }}>{effectiveSubtitle}</div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -295,10 +305,14 @@ export default function Sidebar() {
           <DesktopNavItem key={item.href} href={item.href} label={item.label} icon={item.icon} />
         ))}
 
-        <p className="text-xs px-3 pt-4 pb-1 font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
-          Administración
-        </p>
-        {adminNav.map(item => <DesktopNavItem key={item.href} {...item} />)}
+        {(userRole === "superadmin" || userRole === "admin") && (
+          <>
+            <p className="text-xs px-3 pt-4 pb-1 font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+              Administración
+            </p>
+            {adminNav.map(item => <DesktopNavItem key={item.href} {...item} />)}
+          </>
+        )}
       </nav>
 
       {/* User footer */}

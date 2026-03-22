@@ -8,6 +8,7 @@ import {
   getVehicles,
   type MaintenanceTaskOut,
   type MaintenanceLogCreate,
+  type IoKeyOption,
   type Vehicle,
 } from "@/lib/api";
 
@@ -32,28 +33,62 @@ function triggerLabel(type: string): string {
   return { km: "Por km", hours: "Por horas", days: "Por días", date: "Fecha fija" }[type] ?? type;
 }
 
+// ─── Engine hours progress bar ────────────────────────────────────────────────
+function HoursProgress({ task }: { task: MaintenanceTaskOut }) {
+  if (task.trigger_type !== "hours") return null;
+  const current = task.current_hours ?? 0;
+  const due = task.next_due_hours;
+  const dateDue = task.next_due_date;
+
+  const pct = due ? Math.min(100, (current / due) * 100) : 0;
+  const color = pct >= 100 ? "#f87171" : pct >= 80 ? "#fb923c" : "var(--success)";
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-xs font-mono">
+        <span style={{ color: color }}>{current.toFixed(1)}h</span>
+        {due != null && <span style={{ color: "var(--muted)" }}>/ {due.toLocaleString("es-ES")}h</span>}
+      </div>
+      {due != null && (
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)", width: "100px" }}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+        </div>
+      )}
+      {dateDue && (
+        <div className="text-xs" style={{ color: "var(--muted)" }}>
+          hasta {new Date(dateDue).toLocaleDateString("es-ES")}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Format next due ──────────────────────────────────────────────────────────
 function formatNextDue(task: MaintenanceTaskOut): string {
   if (task.trigger_type === "km" && task.next_due_km != null)
     return `${task.next_due_km.toLocaleString("es-ES")} km`;
-  if (task.trigger_type === "hours" && task.next_due_hours != null)
-    return `${task.next_due_hours.toLocaleString("es-ES")} h`;
+  if (task.trigger_type === "hours")
+    return ""; // shown via HoursProgress
   if ((task.trigger_type === "days" || task.trigger_type === "date") && task.next_due_date)
     return new Date(task.next_due_date).toLocaleDateString("es-ES");
   return "—";
 }
 
 // ─── Field helper ─────────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <div>
       <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--muted)" }}>
         {label}
       </label>
       {children}
+      {hint && <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{hint}</p>}
     </div>
   );
 }
+
+const INPUT_CLASS = "w-full px-3 py-2.5 rounded-lg text-sm text-white";
+const INPUT_STYLE = { background: "var(--sidebar)", border: "1px solid var(--border)" };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function MaintenancePage() {
@@ -62,6 +97,7 @@ export default function MaintenancePage() {
 
   const [tasks, setTasks] = useState<MaintenanceTaskOut[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [ioKeys, setIoKeys] = useState<IoKeyOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -86,7 +122,9 @@ export default function MaintenancePage() {
     next_due_km: "",
     next_due_hours: "",
     next_due_date: "",
+    next_due_date_fallback: "", // calendar fallback for "hours" tasks
     warn_before: "50",
+    pto_io_key: "ignition",
   });
 
   // Complete task modal
@@ -112,6 +150,11 @@ export default function MaintenancePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Load IO keys once
+  useEffect(() => {
+    maintenance.fetchIoKeys().then(setIoKeys).catch(() => {});
+  }, []);
+
   // Pre-fill vehicle when coming from vehicle detail
   useEffect(() => {
     if (vehicleIdParam) setFilterVehicle(vehicleIdParam);
@@ -130,8 +173,18 @@ export default function MaintenancePage() {
       if (createForm.interval_value) body.interval_value = parseFloat(createForm.interval_value);
       if (createForm.trigger_type === "km" && createForm.next_due_km)
         body.next_due_km = parseFloat(createForm.next_due_km);
-      if (createForm.trigger_type === "hours" && createForm.next_due_hours)
-        body.next_due_hours = parseFloat(createForm.next_due_hours);
+      if (createForm.trigger_type === "hours") {
+        if (createForm.next_due_hours) body.next_due_hours = parseFloat(createForm.next_due_hours);
+        // calendar fallback: use explicit date or default to 1 year from today
+        if (createForm.next_due_date_fallback) {
+          body.next_due_date = createForm.next_due_date_fallback;
+        } else {
+          const oneYear = new Date();
+          oneYear.setFullYear(oneYear.getFullYear() + 1);
+          body.next_due_date = oneYear.toISOString().split("T")[0];
+        }
+        body.pto_io_key = createForm.pto_io_key;
+      }
       if ((createForm.trigger_type === "days" || createForm.trigger_type === "date") && createForm.next_due_date)
         body.next_due_date = createForm.next_due_date;
 
@@ -172,7 +225,9 @@ export default function MaintenancePage() {
       next_due_km: "",
       next_due_hours: "",
       next_due_date: "",
+      next_due_date_fallback: "",
       warn_before: "50",
+      pto_io_key: "ignition",
     });
     setCreateError("");
     setShowCreate(true);
@@ -185,6 +240,8 @@ export default function MaintenancePage() {
   }
 
   const vehicleMap = Object.fromEntries(vehicles.map(v => [v.id, v.name]));
+  const ioKeyLabel = (key: string) =>
+    ioKeys.find(k => k.key === key)?.label ?? key;
 
   return (
     <div className="px-6 py-6 max-w-5xl">
@@ -255,7 +312,7 @@ export default function MaintenancePage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
-                {["Vehículo", "Tarea", "Tipo", "Próximo vencimiento", "Estado", ""].map(h => (
+                {["Vehículo", "Tarea", "Tipo", "Progreso / Vencimiento", "Estado", ""].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold"
                       style={{ color: "var(--muted)" }}>{h}</th>
                 ))}
@@ -278,6 +335,11 @@ export default function MaintenancePage() {
                         {task.description}
                       </div>
                     )}
+                    {task.trigger_type === "hours" && task.pto_io_key && (
+                      <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                        Señal: {ioKeyLabel(task.pto_io_key)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>
                     {triggerLabel(task.trigger_type)}
@@ -288,8 +350,14 @@ export default function MaintenancePage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs font-mono" style={{ color: "var(--muted)" }}>
-                    {formatNextDue(task)}
+                  <td className="px-4 py-3">
+                    {task.trigger_type === "hours" ? (
+                      <HoursProgress task={task} />
+                    ) : (
+                      <span className="text-xs font-mono" style={{ color: "var(--muted)" }}>
+                        {formatNextDue(task)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={task.status} />
@@ -339,8 +407,8 @@ export default function MaintenancePage() {
               <select
                 value={createForm.vehicle_id}
                 onChange={e => setCreateForm(f => ({ ...f, vehicle_id: e.target.value }))}
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={INPUT_CLASS}
+                style={INPUT_STYLE}
               >
                 <option value="">Selecciona un vehículo</option>
                 {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -352,8 +420,8 @@ export default function MaintenancePage() {
                 value={createForm.name}
                 onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Ej: Cambio aceite hidráulico"
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={INPUT_CLASS}
+                style={INPUT_STYLE}
               />
             </Field>
 
@@ -363,8 +431,8 @@ export default function MaintenancePage() {
                 onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))}
                 placeholder="Notas adicionales..."
                 rows={2}
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white resize-none"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={`${INPUT_CLASS} resize-none`}
+                style={INPUT_STYLE}
               />
             </Field>
 
@@ -372,24 +440,74 @@ export default function MaintenancePage() {
               <select
                 value={createForm.trigger_type}
                 onChange={e => setCreateForm(f => ({ ...f, trigger_type: e.target.value }))}
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={INPUT_CLASS}
+                style={INPUT_STYLE}
               >
                 <option value="km">Por km</option>
-                <option value="hours">Por horas de motor</option>
+                <option value="hours">Por horas de motor / toma de fuerza</option>
                 <option value="days">Por días</option>
                 <option value="date">Fecha fija</option>
               </select>
             </Field>
+
+            {/* Hours-specific fields */}
+            {createForm.trigger_type === "hours" && (
+              <>
+                <Field
+                  label="Señal de la toma de fuerza (PTO)"
+                  hint="Escribe el nombre de la variable del FMC650 (p.ej. dout1, din2, ignition). Puedes elegir de las sugerencias o escribir la tuya."
+                >
+                  <input
+                    list="io-key-suggestions"
+                    value={createForm.pto_io_key}
+                    onChange={e => setCreateForm(f => ({ ...f, pto_io_key: e.target.value }))}
+                    placeholder="Ej: dout1, ignition, din2..."
+                    className={INPUT_CLASS}
+                    style={INPUT_STYLE}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <datalist id="io-key-suggestions">
+                    {ioKeys.map(k => (
+                      <option key={k.key} value={k.key}>{k.label}</option>
+                    ))}
+                  </datalist>
+                </Field>
+
+                <Field label="Umbral de horas (p.ej. 1000h)">
+                  <input
+                    type="number"
+                    value={createForm.next_due_hours}
+                    onChange={e => setCreateForm(f => ({ ...f, next_due_hours: e.target.value }))}
+                    placeholder="1000"
+                    className={INPUT_CLASS}
+                    style={INPUT_STYLE}
+                  />
+                </Field>
+
+                <Field
+                  label="Límite por fecha (opcional)"
+                  hint="Vence también en esta fecha, lo que ocurra primero. Si se deja en blanco, se aplica 1 año automáticamente."
+                >
+                  <input
+                    type="date"
+                    value={createForm.next_due_date_fallback}
+                    onChange={e => setCreateForm(f => ({ ...f, next_due_date_fallback: e.target.value }))}
+                    className={INPUT_CLASS}
+                    style={INPUT_STYLE}
+                  />
+                </Field>
+              </>
+            )}
 
             <Field label={`Intervalo (${createForm.trigger_type === "km" ? "km" : createForm.trigger_type === "hours" ? "horas" : "días"})`}>
               <input
                 type="number"
                 value={createForm.interval_value}
                 onChange={e => setCreateForm(f => ({ ...f, interval_value: e.target.value }))}
-                placeholder={createForm.trigger_type === "km" ? "500" : createForm.trigger_type === "hours" ? "250" : "90"}
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                placeholder={createForm.trigger_type === "km" ? "500" : createForm.trigger_type === "hours" ? "1000" : "90"}
+                className={INPUT_CLASS}
+                style={INPUT_STYLE}
               />
             </Field>
 
@@ -400,21 +518,8 @@ export default function MaintenancePage() {
                   value={createForm.next_due_km}
                   onChange={e => setCreateForm(f => ({ ...f, next_due_km: e.target.value }))}
                   placeholder="Ej: 15000"
-                  className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                  style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
-                />
-              </Field>
-            )}
-
-            {createForm.trigger_type === "hours" && (
-              <Field label="Próximo vencimiento (horas)">
-                <input
-                  type="number"
-                  value={createForm.next_due_hours}
-                  onChange={e => setCreateForm(f => ({ ...f, next_due_hours: e.target.value }))}
-                  placeholder="Ej: 1000"
-                  className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                  style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                  className={INPUT_CLASS}
+                  style={INPUT_STYLE}
                 />
               </Field>
             )}
@@ -425,8 +530,8 @@ export default function MaintenancePage() {
                   type="date"
                   value={createForm.next_due_date}
                   onChange={e => setCreateForm(f => ({ ...f, next_due_date: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                  style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                  className={INPUT_CLASS}
+                  style={INPUT_STYLE}
                 />
               </Field>
             )}
@@ -437,8 +542,8 @@ export default function MaintenancePage() {
                 value={createForm.warn_before}
                 onChange={e => setCreateForm(f => ({ ...f, warn_before: e.target.value }))}
                 placeholder="50"
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={INPUT_CLASS}
+                style={INPUT_STYLE}
               />
             </Field>
 
@@ -473,23 +578,31 @@ export default function MaintenancePage() {
               </span>
               {" · "}
               {triggerLabel(completing.trigger_type)}
-              {" · "}
-              Vence: {formatNextDue(completing)}
+              {completing.trigger_type === "hours" && completing.current_hours != null && (
+                <span> · <span className="text-white font-mono">{completing.current_hours.toFixed(1)}h</span> acumuladas</span>
+              )}
+              {completing.trigger_type !== "hours" && (
+                <>{" · "}Vence: {formatNextDue(completing)}</>
+              )}
             </div>
 
-            <Field label="Lectura odómetro (km, opcional)">
+            {completing.trigger_type === "hours" && (
+              <div className="rounded-lg px-3 py-2 text-xs" style={{ background: "rgba(29,158,117,0.1)", color: "#34d399" }}>
+                Al marcar como completado, el contador de horas se reiniciará desde este momento.
+              </div>
+            )}
+
+            <Field label="Lectura odómetro (km, opcional)"
+                   hint="Si no se indica, se usa el odómetro del GPS.">
               <input
                 type="number"
                 step="0.1"
                 value={completeForm.odometer_km}
                 onChange={e => setCompleteForm(f => ({ ...f, odometer_km: e.target.value }))}
                 placeholder="Lectura actual del odómetro"
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={INPUT_CLASS}
+                style={INPUT_STYLE}
               />
-              <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-                Si no se indica, se usa el odómetro del GPS.
-              </p>
             </Field>
 
             <Field label="Notas (opcional)">
@@ -498,8 +611,8 @@ export default function MaintenancePage() {
                 onChange={e => setCompleteForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Ej: Aceite Castrol 15W-40, filtro original..."
                 rows={3}
-                className="w-full px-3 py-2.5 rounded-lg text-sm text-white resize-none"
-                style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+                className={`${INPUT_CLASS} resize-none`}
+                style={INPUT_STYLE}
               />
             </Field>
 

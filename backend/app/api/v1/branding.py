@@ -14,6 +14,8 @@ from typing import Optional
 
 from app.core.database import get_db
 from app.models.tenant import Tenant
+from app.models.user import User
+from app.api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/branding", tags=["branding"])
 
@@ -68,3 +70,38 @@ async def get_branding(
         logo_url=tenant.logo_url,
         is_custom=True,
     )
+
+
+@router.get("/me", response_model=BrandingOut)
+async def get_my_branding(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns the branding for the manufacturer in the current user's tenant hierarchy.
+    Accessible to all authenticated roles (operator, viewer, driver, admin, superadmin).
+    """
+    # Walk up the tenant tree until we find a manufacturer (or exhaust the tree)
+    tenant_id = current_user.tenant_id
+    visited = set()
+
+    while tenant_id and tenant_id not in visited:
+        visited.add(tenant_id)
+        result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            break
+
+        if tenant.type == "manufacturer" and (tenant.brand_name or tenant.logo_url or tenant.brand_color):
+            return BrandingOut(
+                tenant_id=str(tenant.id),
+                brand_name=tenant.brand_name or tenant.name,
+                brand_color=tenant.brand_color or "#1D9E75",
+                logo_url=tenant.logo_url,
+                is_custom=True,
+            )
+
+        # Go up to parent
+        tenant_id = tenant.parent_id
+
+    return DEFAULT_BRANDING

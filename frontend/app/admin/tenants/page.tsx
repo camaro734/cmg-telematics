@@ -27,6 +27,14 @@ export default function TenantsPage() {
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({ name: "", type: "end_client", parent_id: "" });
+
+  // Current user info from localStorage
+  const currentUser = (() => {
+    if (typeof window === "undefined") return { role: "", tenant_id: "" };
+    try { return JSON.parse(localStorage.getItem("cmg_user") ?? "{}"); }
+    catch { return { role: "", tenant_id: "" }; }
+  })();
+  const isSuperadmin = currentUser.role === "superadmin";
   const [brandForm, setBrandForm] = useState({
     brand_name: "",
     brand_color: "#1D9E75",
@@ -50,7 +58,7 @@ export default function TenantsPage() {
   function openCreate() {
     setEditing(null);
     setMode("create");
-    setForm({ name: "", type: "end_client", parent_id: "" });
+    setForm({ name: "", type: "end_client", parent_id: isSuperadmin ? "" : currentUser.tenant_id });
     setError("");
     setShowModal(true);
   }
@@ -108,9 +116,12 @@ export default function TenantsPage() {
   }
 
   // Build tree structure for display
+  // Treat as root any tenant whose parent is not in the returned list
+  // (for non-superadmin, the manufacturer itself has a parent outside their subtree)
+  const tenantIdSet = new Set(tenants.map((t) => t.id));
   const byParent: Record<string, TenantOut[]> = {};
   tenants.forEach((t) => {
-    const key = t.parent_id ?? "root";
+    const key = !t.parent_id || !tenantIdSet.has(t.parent_id) ? "root" : t.parent_id;
     (byParent[key] ??= []).push(t);
   });
 
@@ -245,8 +256,9 @@ export default function TenantsPage() {
         <div>
           <h1 className="text-lg font-bold text-white">Clientes y Fabricantes</h1>
           <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-            Jerarquía: CMG → Fabricante → Cliente Final. Los fabricantes pueden
-            tener portal white-label propio.
+            {isSuperadmin
+              ? "Jerarquía: CMG → Fabricante → Cliente Final. Los fabricantes pueden tener portal white-label propio."
+              : "Gestión de los clientes finales de tu organización."}
           </p>
         </div>
         <button
@@ -268,29 +280,33 @@ export default function TenantsPage() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-5">
-        {Object.entries(TYPE_LABELS).map(([k, v]) => (
+        {Object.entries(TYPE_LABELS)
+          .filter(([k]) => isSuperadmin || k !== "cmg")
+          .map(([k, v]) => (
+            <div
+              key={k}
+              className="flex items-center gap-1.5 text-xs"
+              style={{ color: "var(--muted)" }}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ background: TYPE_COLORS[k] }}
+              />
+              {v}
+            </div>
+          ))}
+        {isSuperadmin && (
           <div
-            key={k}
             className="flex items-center gap-1.5 text-xs"
             style={{ color: "var(--muted)" }}
           >
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: TYPE_COLORS[k] }}
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ background: "#8b5cf6" }}
             />
-            {v}
+            White-label activo
           </div>
-        ))}
-        <div
-          className="flex items-center gap-1.5 text-xs"
-          style={{ color: "var(--muted)" }}
-        >
-          <span
-            className="inline-block w-2.5 h-2.5 rounded-full"
-            style={{ background: "#8b5cf6" }}
-          />
-          White-label activo
-        </div>
+        )}
       </div>
 
       {loading ? (
@@ -336,6 +352,8 @@ export default function TenantsPage() {
               error={error}
               onSave={handleSave}
               onClose={() => setShowModal(false)}
+              isSuperadmin={isSuperadmin}
+              currentUserTenantId={currentUser.tenant_id}
             />
           )}
         </Modal>
@@ -354,6 +372,8 @@ function OrgForm({
   error,
   onSave,
   onClose,
+  isSuperadmin,
+  currentUserTenantId,
 }: {
   form: { name: string; type: string; parent_id: string };
   setForm: React.Dispatch<React.SetStateAction<{ name: string; type: string; parent_id: string }>>;
@@ -362,7 +382,14 @@ function OrgForm({
   error: string;
   onSave: () => void;
   onClose: () => void;
+  isSuperadmin: boolean;
+  currentUserTenantId: string;
 }) {
+  // For non-superadmin: exclude CMG root from parent options (API already scopes to subtree)
+  const parentOptions = tenants.filter(
+    (t) => t.active && (isSuperadmin || t.type !== "cmg")
+  );
+
   return (
     <div className="space-y-4">
       <Field label="Nombre">
@@ -380,20 +407,22 @@ function OrgForm({
 
       {!editing && (
         <>
-          <Field label="Tipo">
-            <select
-              value={form.type}
-              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-              className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
-              style={{
-                background: "var(--sidebar)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <option value="manufacturer">Fabricante</option>
-              <option value="end_client">Cliente Final</option>
-            </select>
-          </Field>
+          {isSuperadmin && (
+            <Field label="Tipo">
+              <select
+                value={form.type}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
+                style={{
+                  background: "var(--sidebar)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <option value="manufacturer">Fabricante</option>
+                <option value="end_client">Cliente Final</option>
+              </select>
+            </Field>
+          )}
           <Field label="Depende de">
             <select
               value={form.parent_id}
@@ -406,14 +435,12 @@ function OrgForm({
                 border: "1px solid var(--border)",
               }}
             >
-              <option value="">— Raíz (CMG) —</option>
-              {tenants
-                .filter((t) => t.active)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({TYPE_LABELS[t.type]})
-                  </option>
-                ))}
+              {isSuperadmin && <option value="">— Raíz (CMG) —</option>}
+              {parentOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({TYPE_LABELS[t.type]})
+                </option>
+              ))}
             </select>
           </Field>
         </>

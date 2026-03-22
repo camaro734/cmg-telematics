@@ -28,6 +28,10 @@ class MaintenanceTask(Base):
     # Warning threshold: alert X km/hours/days before due
     warn_before: Mapped[float] = mapped_column(Float, default=50.0)
 
+    # IO signal used to count engine/PTO hours from telemetry
+    # e.g. "ignition", "din1", "din2", "dout1", "dout2", etc.
+    pto_io_key: Mapped[str] = mapped_column(String(20), default="ignition")
+
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), default=lambda: datetime.utcnow()

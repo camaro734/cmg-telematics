@@ -15,6 +15,9 @@ class AlertLog(Base):
     vehicle_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("vehicle.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    rule_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("alert_rule.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     io_key: Mapped[str] = mapped_column(String(20), nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     level: Mapped[str] = mapped_column(String(10), nullable=False)  # "high" | "low"

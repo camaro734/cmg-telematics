@@ -19,6 +19,7 @@ from app.core.database import AsyncSessionLocal
 from app.models.device import Device
 from app.models.telemetry import TelemetryRecord
 from app.models.variable_map import VariableMap
+from app.models.alert_rule import AlertRule
 from app.models.alert_log import AlertLog
 from app.models.geofence import Geofence, GeofenceEvent
 from app.models.vehicle import Vehicle
@@ -301,86 +302,122 @@ class TeltonikaServer:
 
     async def _check_alerts(self, device: Device, avl: AVLRecord):
         """
-        Evaluate alert thresholds for each configured VariableMap on this vehicle.
-        Fires new AlertLog records when values cross thresholds, and resolves open
-        alerts when values return to normal range.
-        Runs as an independent asyncio task — never blocks the ACK path.
+        Evaluate AlertRule thresholds for the vehicle.
+        Fires AlertLog when condition is met (with cooldown).
+        Resolves open alerts when condition clears.
+        Runs as fire-and-forget task — never blocks the ACK path.
         """
         if device.vehicle_id is None:
             return
 
+        # Mapping from column name to numeric IO ID for direct lookup
+        IO_NAME_TO_ID: dict[str, int] = {
+            "ignition": 1, "din1": 1, "din2": 2, "din3": 3, "din4": 4,
+            "gsm_signal": 21,
+            "ain1_mv": 9, "ain2_mv": 10, "ain3_mv": 11,
+            "dout1": 179, "dout2": 180, "dout3": 181, "dout4": 182,
+            "ext_voltage_mv": 66, "battery_mv": 67,
+            "speed": 24,
+        }
+
+        def _resolve_value(io_key: str, io: dict) -> float | None:
+            """Get raw value from AVL IO dict by column name or numeric string."""
+            # Try named lookup first
+            if io_key in IO_NAME_TO_ID:
+                v = io.get(IO_NAME_TO_ID[io_key])
+                return float(v) if v is not None else None
+            # Try numeric string (e.g. "300" for CAN J1939)
+            try:
+                v = io.get(int(io_key))
+                return float(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        def _eval_condition(value: float, condition: str, threshold: float) -> bool:
+            return {
+                "gt": value > threshold, "lt": value < threshold,
+                "gte": value >= threshold, "lte": value <= threshold,
+                "eq": abs(value - threshold) < 1e-9,
+                "neq": abs(value - threshold) >= 1e-9,
+            }.get(condition, False)
+
         try:
             async with AsyncSessionLocal() as db:
+                # Get all active rules for this vehicle OR fleet-wide (vehicle_id IS NULL)
                 result = await db.execute(
-                    select(VariableMap)
-                    .where(VariableMap.vehicle_id == device.vehicle_id)
+                    select(AlertRule)
+                    .where(AlertRule.active == True)
+                    .where(
+                        (AlertRule.vehicle_id == device.vehicle_id) |
+                        (AlertRule.vehicle_id.is_(None))
+                    )
                 )
-                variable_maps = result.scalars().all()
-
-                if not variable_maps:
+                rules = result.scalars().all()
+                if not rules:
                     return
 
-                io = avl.io  # dict[int, int|float]
+                io = avl.io
                 now = datetime.now(timezone.utc)
 
-                for vm in variable_maps:
-                    # Resolve raw value from the AVL IO dict
-                    raw_value = None
-                    try:
-                        io_id = int(vm.io_key)
-                        raw_value = io.get(io_id)
-                    except ValueError:
-                        # Named key not present in the io dict — skip
-                        pass
-
-                    if raw_value is None:
+                for rule in rules:
+                    raw = _resolve_value(rule.io_key, io)
+                    if raw is None:
                         continue
 
-                    converted = float(raw_value) * vm.scale_factor + (vm.offset or 0.0)
+                    converted = raw * rule.scale_factor + rule.offset
+                    condition_met = _eval_condition(converted, rule.condition, rule.threshold)
 
-                    # Find open (unresolved) alert for this device + io_key
+                    # Find last open alert for this rule + vehicle
                     open_result = await db.execute(
                         select(AlertLog)
                         .where(AlertLog.device_id == device.id)
-                        .where(AlertLog.io_key == vm.io_key)
+                        .where(AlertLog.io_key == rule.io_key)
+                        .where(AlertLog.rule_id == rule.id)
                         .where(AlertLog.resolved_at.is_(None))
                         .order_by(AlertLog.fired_at.desc())
                         .limit(1)
                     )
                     open_alert = open_result.scalar_one_or_none()
 
-                    should_fire_high = vm.alert_high is not None and converted > vm.alert_high
-                    should_fire_low = vm.alert_low is not None and converted < vm.alert_low
-                    in_normal_range = (
-                        (vm.alert_high is None or converted <= vm.alert_high)
-                        and (vm.alert_low is None or converted >= vm.alert_low)
-                    )
-
-                    if open_alert and in_normal_range:
+                    if open_alert and not condition_met:
+                        # Condition cleared — resolve
                         open_alert.resolved_at = now
                         await db.commit()
 
-                    elif not open_alert and (should_fire_high or should_fire_low):
-                        level = "high" if should_fire_high else "low"
-                        threshold = vm.alert_high if should_fire_high else vm.alert_low
+                    elif not open_alert and condition_met:
+                        # Check cooldown: was there a recent alert for this rule on this device?
+                        from datetime import timedelta
+                        cooldown_cutoff = now - timedelta(minutes=rule.cooldown_minutes)
+                        recent_result = await db.execute(
+                            select(AlertLog)
+                            .where(AlertLog.device_id == device.id)
+                            .where(AlertLog.rule_id == rule.id)
+                            .where(AlertLog.fired_at >= cooldown_cutoff)
+                            .limit(1)
+                        )
+                        if recent_result.scalar_one_or_none():
+                            continue  # Still in cooldown
+
                         alert = AlertLog(
                             id=uuid.uuid4(),
                             device_id=device.id,
                             vehicle_id=device.vehicle_id,
-                            io_key=vm.io_key,
-                            display_name=vm.display_name,
-                            level=level,
-                            raw_value=float(raw_value),
+                            rule_id=rule.id,
+                            io_key=rule.io_key,
+                            display_name=rule.display_name,
+                            level=rule.level,
+                            raw_value=raw,
                             converted_value=converted,
-                            threshold=threshold,
-                            unit=vm.unit or "",
+                            threshold=rule.threshold,
+                            unit=rule.unit or "",
                             fired_at=now,
                         )
                         db.add(alert)
                         await db.commit()
                         logger.warning(
-                            f"ALERT {level.upper()}: {vm.display_name} = {converted:.2f} {vm.unit or ''} "
-                            f"(threshold: {threshold}) for device {device.imei}"
+                            f"ALERT {rule.level.upper()}: {rule.display_name} = {converted:.2f} {rule.unit} "
+                            f"(rule={rule.name}, condition={rule.condition} {rule.threshold}) "
+                            f"for device {device.imei}"
                         )
                         alert_payload = {
                             "type": "alert",
@@ -388,15 +425,16 @@ class TeltonikaServer:
                             "device_id": str(device.id),
                             "vehicle_id": str(device.vehicle_id),
                             "imei": device.imei,
-                            "io_key": vm.io_key,
-                            "display_name": vm.display_name,
-                            "level": level,
+                            "io_key": rule.io_key,
+                            "display_name": rule.display_name,
+                            "level": rule.level,
                             "converted_value": round(converted, 2),
-                            "threshold": threshold,
-                            "unit": vm.unit or "",
+                            "threshold": rule.threshold,
+                            "unit": rule.unit or "",
                             "fired_at": now.isoformat(),
                         }
                         await device_registry.publish_alert(str(device.id), alert_payload)
+
         except Exception as e:
             logger.error(f"Error in _check_alerts for device {device.imei}: {e}")
 

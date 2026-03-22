@@ -81,6 +81,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    if (Array.isArray(err.detail)) {
+      const messages = err.detail.map((e: { loc?: string[]; msg: string }) => {
+        const field = e.loc ? e.loc.filter((p: string) => p !== "body").join(".") : "";
+        return field ? `${field}: ${e.msg}` : e.msg;
+      });
+      throw new Error(messages.join(" · "));
+    }
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
 
@@ -141,6 +148,7 @@ export async function login(email: string, password: string) {
       email: data.email,
       role: data.role,
       full_name: me.full_name,
+      tenant_id: me.tenant_id,
     }));
   } catch {
     localStorage.setItem("cmg_user", JSON.stringify({ email: data.email, role: data.role }));
@@ -444,6 +452,31 @@ export interface AlertLogOut {
   vehicle_name: string | null;
 }
 
+export interface AlertRuleOut {
+  id: string;
+  tenant_id: string;
+  vehicle_id: string | null;
+  name: string;
+  description: string | null;
+  io_key: string;
+  display_name: string;
+  condition: string; // "gt" | "lt" | "gte" | "lte" | "eq" | "neq"
+  threshold: number;
+  scale_factor: number;
+  offset: number;
+  unit: string;
+  level: string; // "high" | "medium" | "low"
+  cooldown_minutes: number;
+  active: boolean;
+  created_at: string;
+  vehicle_name: string | null;
+}
+
+export interface ConditionOption {
+  key: string;
+  label: string;
+}
+
 export const alerts = {
   list: (params?: {
     vehicle_id?: string;
@@ -606,6 +639,14 @@ export interface MaintenanceTaskOut {
   created_at: string;
   status: string; // "ok" | "warning" | "overdue"
   vehicle_name: string | null;
+  pto_io_key: string; // IO signal used to count engine hours
+  current_hours: number | null; // accumulated hours since last maintenance
+  last_maintenance_at: string | null; // when last maintenance was done
+}
+
+export interface IoKeyOption {
+  key: string;
+  label: string;
 }
 
 export interface MaintenanceLogOut {
@@ -650,11 +691,13 @@ export const maintenance = {
     next_due_hours?: number;
     next_due_date?: string;
     warn_before?: number;
+    pto_io_key?: string;
   }) =>
     request<MaintenanceTaskOut>("/api/v1/maintenance/tasks", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  fetchIoKeys: () => request<IoKeyOption[]>("/api/v1/maintenance/io-keys"),
   updateTask: (id: string, body: object) =>
     request<MaintenanceTaskOut>(`/api/v1/maintenance/tasks/${id}`, {
       method: "PATCH",
@@ -696,6 +739,16 @@ export async function uploadLogo(file: File): Promise<{ url: string }> {
   return res.json();
 }
 
+export function fetchMyBranding(): Promise<{
+  tenant_id: string | null;
+  brand_name: string;
+  brand_color: string;
+  logo_url: string | null;
+  is_custom: boolean;
+}> {
+  return request("/api/v1/branding/me");
+}
+
 export const admin = {
   // Tenants
   listTenants: () => request<TenantOut[]>("/api/v1/admin/tenants"),
@@ -713,7 +766,7 @@ export const admin = {
 
   // Vehicles
   listVehicles: () => request<VehicleAdminOut[]>("/api/v1/admin/vehicles"),
-  createVehicle: (body: { name: string; license_plate?: string; tenant_id: string; imei?: string }) =>
+  createVehicle: (body: { name: string; license_plate?: string; tenant_id?: string; manufacturer_id?: string; imei?: string }) =>
     request("/api/v1/admin/vehicles", { method: "POST", body: JSON.stringify(body) }),
   updateVehicle: (id: string, body: object) =>
     request(`/api/v1/admin/vehicles/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -735,3 +788,53 @@ export async function getRecentEvents(hours = 24, vehicleId?: string): Promise<E
   if (vehicleId) qs.set("vehicle_id", vehicleId);
   return request<EventEntry[]>(`/api/v1/events?${qs.toString()}`);
 }
+
+// ─── Alert Rules ──────────────────────────────────────────────────────────────
+
+export const alertRules = {
+  list: (params?: { vehicle_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.vehicle_id) qs.set("vehicle_id", params.vehicle_id);
+    const q = qs.toString();
+    return request<AlertRuleOut[]>(`/api/v1/alert-rules${q ? "?" + q : ""}`);
+  },
+  create: (body: {
+    vehicle_id?: string | null;
+    name: string;
+    description?: string;
+    io_key: string;
+    display_name: string;
+    condition: string;
+    threshold: number;
+    scale_factor?: number;
+    offset?: number;
+    unit?: string;
+    level: string;
+    cooldown_minutes?: number;
+  }) =>
+    request<AlertRuleOut>("/api/v1/alert-rules", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  update: (id: string, body: Partial<{
+    name: string;
+    description: string;
+    io_key: string;
+    display_name: string;
+    condition: string;
+    threshold: number;
+    scale_factor: number;
+    offset: number;
+    unit: string;
+    level: string;
+    cooldown_minutes: number;
+    active: boolean;
+  }>) =>
+    request<AlertRuleOut>(`/api/v1/alert-rules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  delete: (id: string) =>
+    request<void>(`/api/v1/alert-rules/${id}`, { method: "DELETE" }),
+  listConditions: () => request<ConditionOption[]>("/api/v1/alert-rules/conditions"),
+};
