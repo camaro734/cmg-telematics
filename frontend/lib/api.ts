@@ -392,6 +392,7 @@ export interface UserOut {
   role: string;
   tenant_id: string;
   active: boolean;
+  notify_email: boolean;
 }
 
 export interface VehicleAdminOut {
@@ -788,6 +789,8 @@ export const admin = {
     request<UserOut>("/api/v1/admin/users", { method: "POST", body: JSON.stringify(body) }),
   updateUser: (id: string, body: object) =>
     request<UserOut>(`/api/v1/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  toggleNotifyEmail: (id: string, value: boolean) =>
+    request(`/api/v1/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ notify_email: value }) }),
 
   // Vehicles
   listVehicles: () => request<VehicleAdminOut[]>("/api/v1/admin/vehicles"),

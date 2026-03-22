@@ -120,6 +120,7 @@ export default function NotificationsAdminPage() {
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [recipients, setRecipients] = useState<UserOut[]>([]);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -137,6 +138,18 @@ export default function NotificationsAdminPage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function toggleRecipient(user: UserOut) {
+    setTogglingId(user.id);
+    try {
+      await admin.toggleNotifyEmail(user.id, !user.notify_email);
+      setRecipients(prev => prev.map(u => u.id === user.id ? { ...u, notify_email: !u.notify_email } : u));
+    } catch {
+      // ignore
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   function applyProvider(idx: number) {
     const p = PROVIDERS[idx];
@@ -260,21 +273,47 @@ export default function NotificationsAdminPage() {
                 <a href="/admin/users" style={{ color: "var(--accent)" }}>Administración → Usuarios</a>.
               </p>
             ) : (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {recipients.map(u => (
-                  <div key={u.id} className="flex items-center gap-2">
+                  <div key={u.id} className="flex items-center gap-2 py-1">
                     <div className="rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{ width: 28, height: 28, background: "rgba(29,158,117,0.15)", color: "var(--accent)" }}>
+                      style={{
+                        width: 28, height: 28,
+                        background: u.notify_email ? "rgba(29,158,117,0.15)" : "rgba(255,255,255,0.05)",
+                        color: u.notify_email ? "var(--accent)" : "var(--muted)",
+                        transition: "all 0.2s",
+                      }}>
                       {u.full_name.charAt(0).toUpperCase()}
                     </div>
-                    <div className="min-w-0">
-                      <span className="text-sm text-white">{u.full_name}</span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm" style={{ color: u.notify_email ? "white" : "var(--muted)" }}>{u.full_name}</span>
                       <span className="text-xs ml-2" style={{ color: "var(--muted)" }}>{u.email}</span>
                     </div>
-                    <span className="text-xs px-1.5 py-0.5 rounded ml-auto flex-shrink-0"
+                    <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
                       style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)", border: "1px solid var(--border)" }}>
                       {u.role}
                     </span>
+                    {/* Toggle email */}
+                    <button
+                      onClick={() => toggleRecipient(u)}
+                      disabled={togglingId === u.id}
+                      title={u.notify_email ? "Desactivar email para este usuario" : "Activar email para este usuario"}
+                      className="flex-shrink-0 rounded-full transition-colors duration-200"
+                      style={{
+                        width: 36, height: 20, padding: 0, border: "none", cursor: "pointer",
+                        background: u.notify_email ? "var(--accent)" : "rgba(255,255,255,0.1)",
+                        opacity: togglingId === u.id ? 0.5 : 1,
+                        position: "relative",
+                      }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: "50%", background: "white",
+                        position: "absolute", top: 2,
+                        left: u.notify_email ? 18 : 2,
+                        transition: "left 0.2s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                      }} />
+                    </button>
                   </div>
                 ))}
               </div>

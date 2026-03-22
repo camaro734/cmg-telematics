@@ -135,6 +135,7 @@ class UserOut(BaseModel):
     role: str
     tenant_id: uuid.UUID
     active: bool
+    notify_email: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -209,6 +210,8 @@ async def update_user(
         user.role = body["role"]
     if "active" in body:
         user.active = body["active"]
+    if "notify_email" in body:
+        user.notify_email = bool(body["notify_email"])
     if "password" in body and body["password"]:
         user.hashed_password = hash_password(body["password"])
     await db.commit()

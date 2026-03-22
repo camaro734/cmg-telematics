@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 async def _get_tenant_users(db: AsyncSession, tenant_id) -> list:
-    """Get all active operator+ users in the same tenant."""
+    """Get all active operator+ users in the same tenant that have email notifications enabled."""
     result = await db.execute(
         select(User).where(
             User.tenant_id == tenant_id,
             User.active == True,
             User.role.in_(["superadmin", "admin", "operator"]),
+            User.notify_email == True,
         )
     )
     return result.scalars().all()
