@@ -39,5 +39,18 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://213.210.20.183"
     CORS_ORIGINS: List[str] = ["*"]
 
+    # Email SMTP (optional — leave empty to disable)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "alertas@cmg-telematics.es"
+    SMTP_TLS: bool = True
+
+    # Web Push VAPID (optional — leave empty to disable)
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@cmg.es"
+
 
 settings = Settings()

@@ -331,7 +331,15 @@ class TeltonikaServer:
                 v = io.get(int(io_key))
                 return float(v) if v is not None else None
             except (ValueError, TypeError):
-                return None
+                pass
+            # Handle "io_300" style prefix (VariableMap convention)
+            if io_key.startswith("io_"):
+                try:
+                    v = io.get(int(io_key[3:]))
+                    return float(v) if v is not None else None
+                except (ValueError, TypeError):
+                    return None
+            return None
 
         def _eval_condition(value: float, condition: str, threshold: float) -> bool:
             return {
@@ -419,6 +427,42 @@ class TeltonikaServer:
                             f"(rule={rule.name}, condition={rule.condition} {rule.threshold}) "
                             f"for device {device.imei}"
                         )
+
+                        # Send email + push notifications (fire-and-forget)
+                        try:
+                            from app.services.notifications import send_email_alert, send_push_alert
+                            vehicle_result = await db.execute(
+                                select(Vehicle).where(Vehicle.id == device.vehicle_id)
+                            )
+                            vehicle_obj = vehicle_result.scalar_one_or_none()
+                            vehicle_name = vehicle_obj.name if vehicle_obj else device.imei
+
+                            asyncio.create_task(send_email_alert(
+                                db=AsyncSessionLocal(),
+                                tenant_id=rule.tenant_id,
+                                vehicle_name=vehicle_name,
+                                display_name=rule.display_name,
+                                converted_value=converted,
+                                threshold=rule.threshold,
+                                unit=rule.unit or "",
+                                level=rule.level,
+                                fired_at=alert.fired_at.isoformat() if alert.fired_at else now.isoformat(),
+                                condition=rule.condition,
+                            ))
+                            asyncio.create_task(send_push_alert(
+                                db=AsyncSessionLocal(),
+                                tenant_id=rule.tenant_id,
+                                vehicle_name=vehicle_name,
+                                display_name=rule.display_name,
+                                converted_value=converted,
+                                threshold=rule.threshold,
+                                unit=rule.unit or "",
+                                level=rule.level,
+                                alert_id=str(alert.id),
+                            ))
+                        except Exception as e:
+                            logger.error(f"Failed to dispatch notifications: {e}")
+
                         alert_payload = {
                             "type": "alert",
                             "alert_id": str(alert.id),

@@ -6,10 +6,12 @@ import Modal from "@/components/Modal";
 import {
   maintenance,
   getVehicles,
+  getLiveSignals,
   type MaintenanceTaskOut,
   type MaintenanceLogCreate,
   type IoKeyOption,
   type Vehicle,
+  type LiveSignal,
 } from "@/lib/api";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -100,6 +102,8 @@ export default function MaintenancePage() {
   const [ioKeys, setIoKeys] = useState<IoKeyOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [liveSignals, setLiveSignals] = useState<LiveSignal[] | null>(null);
+  const [loadingSignals, setLoadingSignals] = useState(false);
 
   // Summary counts
   const overdue = tasks.filter(t => t.status === "overdue").length;
@@ -160,6 +164,25 @@ export default function MaintenancePage() {
     if (vehicleIdParam) setFilterVehicle(vehicleIdParam);
   }, [vehicleIdParam]);
 
+  useEffect(() => {
+    if (!createForm.vehicle_id || createForm.trigger_type !== "hours") {
+      setLiveSignals(null);
+      return;
+    }
+    setLoadingSignals(true);
+    getLiveSignals(createForm.vehicle_id)
+      .then(res => {
+        // Only boolean/digital signals make sense for hour counting
+        const boolSignals = res.signals.filter(
+          s => s.data_type === "boolean" ||
+            ["ignition","din1","din2","din3","din4","dout1","dout2","dout3","dout4"].includes(s.io_key)
+        );
+        setLiveSignals(boolSignals);
+      })
+      .catch(() => setLiveSignals([]))
+      .finally(() => setLoadingSignals(false));
+  }, [createForm.vehicle_id, createForm.trigger_type]);
+
   async function handleCreate() {
     setCreateError("");
     try {
@@ -215,6 +238,7 @@ export default function MaintenancePage() {
   }
 
   function openCreate() {
+    setLiveSignals(null);
     const firstVehicle = vehicles[0];
     setCreateForm({
       vehicle_id: filterVehicle || firstVehicle?.id || "",
@@ -455,23 +479,61 @@ export default function MaintenancePage() {
               <>
                 <Field
                   label="Señal de la toma de fuerza (PTO)"
-                  hint="Escribe el nombre de la variable del FMC650 (p.ej. dout1, din2, ignition). Puedes elegir de las sugerencias o escribir la tuya."
+                  hint={
+                    loadingSignals
+                      ? "Cargando señales del dispositivo..."
+                      : liveSignals && liveSignals.length > 0
+                        ? `${liveSignals.length} señales digitales detectadas`
+                        : "Escribe el nombre de la señal manualmente"
+                  }
                 >
-                  <input
-                    list="io-key-suggestions"
-                    value={createForm.pto_io_key}
-                    onChange={e => setCreateForm(f => ({ ...f, pto_io_key: e.target.value }))}
-                    placeholder="Ej: dout1, ignition, din2..."
-                    className={INPUT_CLASS}
-                    style={INPUT_STYLE}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <datalist id="io-key-suggestions">
-                    {ioKeys.map(k => (
-                      <option key={k.key} value={k.key}>{k.label}</option>
-                    ))}
-                  </datalist>
+                  {liveSignals && liveSignals.length > 0 ? (
+                    <select
+                      value={createForm.pto_io_key}
+                      onChange={e => setCreateForm(f => ({ ...f, pto_io_key: e.target.value }))}
+                      className={INPUT_CLASS}
+                      style={INPUT_STYLE}
+                    >
+                      {liveSignals.filter(s => s.is_configured).length > 0 && (
+                        <optgroup label="Señales configuradas">
+                          {liveSignals.filter(s => s.is_configured).map(s => (
+                            <option key={s.io_key} value={s.io_key}>
+                              {s.display_name}
+                              {s.raw_value !== null ? ` (activa: ${s.raw_value === 1 ? "SÍ" : "NO"})` : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {liveSignals.filter(s => !s.is_configured).length > 0 && (
+                        <optgroup label="Señales sin configurar">
+                          {liveSignals.filter(s => !s.is_configured).map(s => (
+                            <option key={s.io_key} value={s.io_key}>
+                              IO {s.io_key}
+                              {s.raw_value !== null ? ` (${s.raw_value === 1 ? "SÍ" : "NO"})` : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  ) : (
+                    <>
+                      <input
+                        list="io-key-suggestions"
+                        value={createForm.pto_io_key}
+                        onChange={e => setCreateForm(f => ({ ...f, pto_io_key: e.target.value }))}
+                        placeholder="Ej: dout1, ignition, din2..."
+                        className={INPUT_CLASS}
+                        style={INPUT_STYLE}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <datalist id="io-key-suggestions">
+                        {ioKeys.map(k => (
+                          <option key={k.key} value={k.key}>{k.label}</option>
+                        ))}
+                      </datalist>
+                    </>
+                  )}
                 </Field>
 
                 <Field label="Umbral de horas (p.ej. 1000h)">

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.core.database import get_db
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.models.device import Device
@@ -37,12 +38,28 @@ class TrackPoint(BaseModel):
     speed: int
 
 
+async def _get_subtree(db: AsyncSession, root_id: UUID) -> set[UUID]:
+    result = await db.execute(select(Tenant).where(Tenant.active == True))
+    all_tenants = result.scalars().all()
+    by_parent: dict[UUID, list[UUID]] = {}
+    for t in all_tenants:
+        if t.parent_id:
+            by_parent.setdefault(t.parent_id, []).append(t.id)
+    visited: set[UUID] = set()
+    queue = [root_id]
+    while queue:
+        tid = queue.pop()
+        visited.add(tid)
+        queue.extend(by_parent.get(tid, []))
+    return visited
+
+
 async def _get_device_for_vehicle(
     vehicle_id: UUID,
     db: AsyncSession,
     current_user: User,
 ) -> Device:
-    """Validate vehicle belongs to user's tenant and return its active device."""
+    """Validate vehicle is in user's subtree and return its active device."""
     vehicle_result = await db.execute(
         select(Vehicle).where(
             Vehicle.id == vehicle_id,
@@ -53,10 +70,9 @@ async def _get_device_for_vehicle(
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
 
-    # Superadmin can access all vehicles; others are restricted to their tenant subtree
-    if current_user.role != "superadmin":
-        if vehicle.tenant_id != current_user.tenant_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+    allowed = await _get_subtree(db, current_user.tenant_id)
+    if vehicle.tenant_id not in allowed:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
 
     device_result = await db.execute(
         select(Device).where(

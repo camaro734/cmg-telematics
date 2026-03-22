@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { admin, type UserOut, type TenantOut } from "@/lib/api";
 import Modal from "@/components/Modal";
 
@@ -24,6 +24,18 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserOut[]>([]);
   const [tenants, setTenants] = useState<TenantOut[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const currentUserRole = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    try { return JSON.parse(localStorage.getItem("cmg_user") ?? "{}").role ?? ""; }
+    catch { return ""; }
+  }, []);
+
+  // Roles creables según el rol del usuario actual
+  const creatableRoles = useMemo(() => {
+    if (currentUserRole === "superadmin") return ["admin", "operator", "viewer", "driver"];
+    return ["operator", "viewer", "driver"]; // admin no puede crear otros admins
+  }, [currentUserRole]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<UserOut | null>(null);
   const [error, setError] = useState("");
@@ -45,7 +57,7 @@ export default function UsersPage() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ email: "", password: "", full_name: "", role: "viewer", tenant_id: tenants[0]?.id ?? "" });
+    setForm({ email: "", password: "", full_name: "", role: creatableRoles[creatableRoles.length - 2] ?? "viewer", tenant_id: tenants[0]?.id ?? "" });
     setShowModal(true);
     setError("");
   }
@@ -232,8 +244,8 @@ export default function UsersPage() {
               <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                       className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
                       style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}>
-                {Object.entries(ROLE_LABELS).filter(([k]) => k !== "superadmin").map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
+                {creatableRoles.map(k => (
+                  <option key={k} value={k}>{ROLE_LABELS[k] ?? k}</option>
                 ))}
               </select>
             </Field>

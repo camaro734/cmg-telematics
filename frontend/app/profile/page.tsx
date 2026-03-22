@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getMe, updateMe, changePassword, type MeResponse } from "@/lib/api";
+import { setupPushNotifications, unregisterPushSubscription, getPushPermissionStatus } from "@/lib/push";
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "Superadmin",
@@ -60,9 +61,19 @@ export default function ProfilePage() {
   // Session info
   const [tokenExp, setTokenExp] = useState<Date | null>(null);
 
+  // Push notifications
+  const [pushStatus, setPushStatus] = useState<string>("default");
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushMessage, setPushMessage] = useState("");
+
   useEffect(() => {
     const token = localStorage.getItem("cmg_token");
     if (token) setTokenExp(parseJwtExp(token));
+
+    // Check push permission status
+    if (typeof window !== "undefined") {
+      setPushStatus(getPushPermissionStatus());
+    }
 
     getMe()
       .then((data) => {
@@ -114,6 +125,48 @@ export default function ProfilePage() {
       setPwError(e instanceof Error ? e.message : "Error al cambiar contraseña");
     } finally {
       setPwSaving(false);
+    }
+  }
+
+  async function handleEnablePush() {
+    const token = localStorage.getItem("cmg_token");
+    if (!token) return;
+    setPushLoading(true);
+    setPushMessage("");
+    try {
+      const ok = await setupPushNotifications(token);
+      if (ok) {
+        setPushStatus("granted");
+        setPushMessage("Notificaciones push activadas correctamente.");
+      } else {
+        const status = getPushPermissionStatus();
+        setPushStatus(status);
+        if (status === "denied") {
+          setPushMessage("Permiso denegado. Actívalo manualmente en los ajustes del navegador.");
+        } else {
+          setPushMessage("No se pudieron activar las notificaciones push.");
+        }
+      }
+    } catch (e) {
+      setPushMessage("Error al activar notificaciones push.");
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    const token = localStorage.getItem("cmg_token");
+    if (!token) return;
+    setPushLoading(true);
+    setPushMessage("");
+    try {
+      await unregisterPushSubscription(token);
+      setPushStatus("default");
+      setPushMessage("Notificaciones push desactivadas.");
+    } catch (e) {
+      setPushMessage("Error al desactivar notificaciones push.");
+    } finally {
+      setPushLoading(false);
     }
   }
 
@@ -241,6 +294,84 @@ export default function ProfilePage() {
             {nameSaving ? "Guardando..." : "Guardar"}
           </button>
         </div>
+      </div>
+
+      {/* Push notifications */}
+      <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+        <h2 className="text-sm font-semibold text-white mb-1">Notificaciones push</h2>
+        <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
+          Recibe alertas de la flota directamente en tu dispositivo, incluso con el navegador cerrado.
+        </p>
+        <div className="flex items-center gap-3 mb-3">
+          <span
+            className="text-xs px-2 py-0.5 rounded-full font-medium"
+            style={{
+              background:
+                pushStatus === "granted"
+                  ? "rgba(34,197,94,0.15)"
+                  : pushStatus === "denied"
+                  ? "rgba(239,68,68,0.15)"
+                  : "rgba(100,116,139,0.15)",
+              color:
+                pushStatus === "granted"
+                  ? "var(--success)"
+                  : pushStatus === "denied"
+                  ? "var(--danger)"
+                  : "var(--muted)",
+            }}
+          >
+            {pushStatus === "granted"
+              ? "Activadas"
+              : pushStatus === "denied"
+              ? "Bloqueadas"
+              : pushStatus === "unsupported"
+              ? "No soportadas"
+              : "Desactivadas"}
+          </span>
+        </div>
+        {pushStatus !== "unsupported" && (
+          <div className="flex gap-2">
+            {pushStatus !== "granted" ? (
+              <button
+                onClick={handleEnablePush}
+                disabled={pushLoading || pushStatus === "denied"}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity"
+                style={{
+                  background: "var(--accent)",
+                  opacity: pushLoading || pushStatus === "denied" ? 0.6 : 1,
+                  cursor: pushLoading || pushStatus === "denied" ? "not-allowed" : "pointer",
+                }}
+              >
+                {pushLoading ? "Activando..." : "Activar notificaciones"}
+              </button>
+            ) : (
+              <button
+                onClick={handleDisablePush}
+                disabled={pushLoading}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity"
+                style={{
+                  background: "rgba(239,68,68,0.2)",
+                  border: "1px solid rgba(239,68,68,0.4)",
+                  opacity: pushLoading ? 0.6 : 1,
+                  cursor: pushLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {pushLoading ? "Desactivando..." : "Desactivar notificaciones"}
+              </button>
+            )}
+          </div>
+        )}
+        {pushMessage && (
+          <div
+            className="text-xs px-3 py-2 rounded-lg mt-3"
+            style={{
+              background: pushStatus === "granted" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+              color: pushStatus === "granted" ? "var(--success)" : "#fca5a5",
+            }}
+          >
+            {pushMessage}
+          </div>
+        )}
       </div>
 
       {/* Change password */}

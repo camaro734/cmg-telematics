@@ -44,10 +44,11 @@ async def fleet_status(
     current_user: User = Depends(get_current_user),
 ):
     """Overview of all vehicles with last known status."""
+    tenant_ids = await _get_subtree(db, current_user.tenant_id)
     result = await db.execute(
         select(Vehicle, Device)
         .outerjoin(Device, Device.vehicle_id == Vehicle.id)
-        .where(Vehicle.active == True)
+        .where(Vehicle.active == True, Vehicle.tenant_id.in_(list(tenant_ids)))
     )
     rows = result.all()
 

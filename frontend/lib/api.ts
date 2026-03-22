@@ -169,6 +169,31 @@ export async function getVehicles() {
   return request<Vehicle[]>("/api/v1/vehicles");
 }
 
+export interface LiveSignal {
+  io_key: string;
+  display_name: string;
+  raw_value: number | null;
+  converted_value: number | null;
+  unit: string;
+  scale_factor: number;
+  offset: number;
+  data_type: string; // "boolean" | "gauge" | "counter" | "hours"
+  is_configured: boolean;
+  source: string; // "named_column" | "io_data"
+}
+
+export interface LiveSignalsResponse {
+  vehicle_id: string;
+  device_id: string | null;
+  imei: string | null;
+  as_of: string | null;
+  signals: LiveSignal[];
+}
+
+export function getLiveSignals(vehicleId: string): Promise<LiveSignalsResponse> {
+  return request<LiveSignalsResponse>(`/api/v1/vehicles/${vehicleId}/live-signals`);
+}
+
 export async function getLastTelemetry(vehicleId: string) {
   return request<LastTelemetry>(`/api/v1/vehicles/${vehicleId}/last`);
 }
@@ -788,6 +813,39 @@ export async function getRecentEvents(hours = 24, vehicleId?: string): Promise<E
   if (vehicleId) qs.set("vehicle_id", vehicleId);
   return request<EventEntry[]>(`/api/v1/events?${qs.toString()}`);
 }
+
+// ─── Notification Config ──────────────────────────────────────────────────────
+
+export interface NotificationConfig {
+  id: string;
+  tenant_id: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_password: string;
+  smtp_from: string;
+  smtp_from_name: string;
+  smtp_tls: boolean;
+  smtp_ssl: boolean;
+  notify_level_high: boolean;
+  notify_level_medium: boolean;
+  notify_level_low: boolean;
+  active: boolean;
+}
+
+export const notificationConfig = {
+  get: () => request<NotificationConfig>("/api/v1/notification-config"),
+  save: (data: Partial<NotificationConfig>) =>
+    request<NotificationConfig>("/api/v1/notification-config", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  test: (email: string) =>
+    request<{ status: string; message: string }>("/api/v1/notification-config/test", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+};
 
 // ─── Alert Rules ──────────────────────────────────────────────────────────────
 

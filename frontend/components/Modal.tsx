@@ -19,10 +19,15 @@ export default function Modal({ title, onClose, children }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: "rgba(0,0,0,0.6)" }}
          onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl p-6"
-           style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+      <div className="w-full max-w-md rounded-2xl flex flex-col"
+           style={{
+             background: "var(--card)",
+             border: "1px solid var(--border)",
+             maxHeight: "calc(100vh - 2rem)",
+           }}
            onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
+        {/* Header fijo */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
           <h2 className="text-base font-semibold text-white">{title}</h2>
           <button onClick={onClose} style={{ color: "var(--muted)" }}>
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
@@ -30,7 +35,10 @@ export default function Modal({ title, onClose, children }: Props) {
             </svg>
           </button>
         </div>
-        {children}
+        {/* Contenido con scroll */}
+        <div className="overflow-y-auto px-6 pb-6">
+          {children}
+        </div>
       </div>
     </div>
   );

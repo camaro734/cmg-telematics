@@ -6,11 +6,13 @@ import {
   alertRules,
   maintenance,
   getVehicles,
+  getLiveSignals,
   type AlertLogOut,
   type AlertRuleOut,
   type IoKeyOption,
   type ConditionOption,
   type Vehicle,
+  type LiveSignal,
 } from "@/lib/api";
 import { useFleetWebSocket, type WsTelemetryMessage, type WsAlertMessage } from "@/lib/websocket";
 import Toast from "@/components/Toast";
@@ -155,6 +157,8 @@ export default function AlertsPage() {
   });
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [liveSignals, setLiveSignals] = useState<LiveSignal[] | null>(null);
+  const [loadingSignals, setLoadingSignals] = useState(false);
 
   const loadAlerts = useCallback(async () => {
     try {
@@ -208,6 +212,18 @@ export default function AlertsPage() {
     const interval = setInterval(loadAlerts, 30_000);
     return () => clearInterval(interval);
   }, [loadAlerts]);
+
+  useEffect(() => {
+    if (!createForm.vehicle_id) {
+      setLiveSignals(null);
+      return;
+    }
+    setLoadingSignals(true);
+    getLiveSignals(createForm.vehicle_id)
+      .then(res => setLiveSignals(res.signals))
+      .catch(() => setLiveSignals([]))
+      .finally(() => setLoadingSignals(false));
+  }, [createForm.vehicle_id]);
 
   const { toasts, addToast, dismiss } = useToast();
   useFleetWebSocket(
@@ -277,6 +293,7 @@ export default function AlertsPage() {
   }
 
   function openCreate() {
+    setLiveSignals(null);
     setCreateForm({
       vehicle_id: "", name: "", description: "",
       io_key: "", display_name: "", condition: "gt",
@@ -521,21 +538,80 @@ export default function AlertsPage() {
               </select>
             </Field>
 
-            <Field label="Variable del FMC650 / PLC"
-                   hint="Nombre de la columna en telemetría (ain1_mv, dout1, ignition...) o ID numérico del IO (300, 9...)">
-              <input list="rule-io-key-suggestions"
-                     value={createForm.io_key}
-                     onChange={e => setCreateForm(f => ({
-                       ...f,
-                       io_key: e.target.value,
-                       display_name: f.display_name || e.target.value,
-                     }))}
-                     placeholder="Ej: ain1_mv, dout1, 300..."
-                     className={INPUT_CLASS} style={INPUT_STYLE}
-                     autoComplete="off" spellCheck={false} />
-              <datalist id="rule-io-key-suggestions">
-                {ioKeys.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}
-              </datalist>
+            <Field
+              label="Variable del FMC650 / PLC"
+              hint={
+                createForm.vehicle_id
+                  ? loadingSignals
+                    ? "Cargando señales del dispositivo..."
+                    : liveSignals && liveSignals.length > 0
+                      ? `${liveSignals.length} señales detectadas en este vehículo`
+                      : "Sin datos recientes — escribe el IO key manualmente"
+                  : "Selecciona un vehículo para ver sus señales activas, o escribe el key manualmente"
+              }
+            >
+              {createForm.vehicle_id && liveSignals && liveSignals.length > 0 ? (
+                <select
+                  value={createForm.io_key}
+                  onChange={e => {
+                    const sig = liveSignals.find(s => s.io_key === e.target.value);
+                    setCreateForm(f => ({
+                      ...f,
+                      io_key: e.target.value,
+                      display_name: sig?.display_name || f.display_name || e.target.value,
+                      scale_factor: sig ? String(sig.scale_factor) : f.scale_factor,
+                      offset: sig ? String(sig.offset) : f.offset,
+                      unit: sig?.unit || f.unit,
+                    }));
+                  }}
+                  className={INPUT_CLASS}
+                  style={INPUT_STYLE}
+                >
+                  <option value="">— Selecciona una señal —</option>
+                  {liveSignals.filter(s => s.is_configured).length > 0 && (
+                    <optgroup label="Señales configuradas">
+                      {liveSignals.filter(s => s.is_configured).map(s => (
+                        <option key={s.io_key} value={s.io_key}>
+                          {s.display_name}
+                          {s.converted_value !== null
+                            ? ` — ${s.converted_value} ${s.unit}`.trimEnd()
+                            : s.raw_value !== null ? ` — ${s.raw_value} (raw)` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {liveSignals.filter(s => !s.is_configured).length > 0 && (
+                    <optgroup label="Señales sin configurar (IO ID)">
+                      {liveSignals.filter(s => !s.is_configured).map(s => (
+                        <option key={s.io_key} value={s.io_key}>
+                          IO {s.io_key}
+                          {s.raw_value !== null ? ` — valor actual: ${s.raw_value}` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              ) : (
+                <>
+                  <input
+                    list="rule-io-key-suggestions"
+                    value={createForm.io_key}
+                    onChange={e => setCreateForm(f => ({
+                      ...f,
+                      io_key: e.target.value,
+                      display_name: f.display_name || e.target.value,
+                    }))}
+                    placeholder="Ej: ain1_mv, dout1, 300..."
+                    className={INPUT_CLASS}
+                    style={INPUT_STYLE}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <datalist id="rule-io-key-suggestions">
+                    {ioKeys.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}
+                  </datalist>
+                </>
+              )}
             </Field>
 
             <Field label="Nombre para mostrar en alertas">

@@ -220,8 +220,9 @@ async def update_user(
 class VehicleCreate(BaseModel):
     name: str
     license_plate: Optional[str] = None
-    tenant_id: uuid.UUID
-    imei: Optional[str] = None  # asignar FMC650 al crear
+    tenant_id: Optional[uuid.UUID] = None        # end_client propietario; None = stock del fabricante
+    manufacturer_id: Optional[uuid.UUID] = None  # fabricante; si no se indica, se usa el tenant del usuario
+    imei: Optional[str] = None     # asignar FMC650 al crear
 
 
 class VehicleAdminOut(BaseModel):
@@ -289,9 +290,23 @@ async def create_vehicle(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    # Determine manufacturer: explicit (superadmin) or current user's tenant (admin)
+    manufacturer_id = body.manufacturer_id or current_user.tenant_id
+
+    # If no client specified, vehicle belongs to manufacturer (stock)
+    tenant_id = body.tenant_id or manufacturer_id
+
+    # Validate manufacturer and client are in admin's subtree (superadmin can use any)
+    if current_user.role != "superadmin":
+        allowed = await _get_subtree(db, current_user.tenant_id)
+        if manufacturer_id not in allowed:
+            raise HTTPException(403, "Manufacturer not in your subtree")
+        if tenant_id not in allowed:
+            raise HTTPException(403, "Client not in your subtree")
+
     vehicle = Vehicle(
-        tenant_id=body.tenant_id,
-        manufacturer_id=current_user.tenant_id,
+        tenant_id=tenant_id,
+        manufacturer_id=manufacturer_id,
         name=body.name,
         license_plate=body.license_plate,
     )
@@ -303,7 +318,7 @@ async def create_vehicle(
             raise HTTPException(400, "IMEI must be exactly 15 digits")
         existing = await db.execute(select(Device).where(Device.imei == body.imei))
         if existing.scalar_one_or_none():
-            raise HTTPException(409, f"IMEI {body.imei} already registered")
+            raise HTTPException(409, f"IMEI {body.imei} already en uso")
         device = Device(vehicle_id=vehicle.id, imei=body.imei, model="FMC650")
         db.add(device)
 
@@ -325,9 +340,42 @@ async def update_vehicle(
     if "name" in body:
         vehicle.name = body["name"]
     if "license_plate" in body:
-        vehicle.license_plate = body["license_plate"]
+        vehicle.license_plate = body["license_plate"] or None
     if "active" in body:
         vehicle.active = body["active"]
+    if "tenant_id" in body and body["tenant_id"]:
+        new_tenant_id = uuid.UUID(str(body["tenant_id"]))
+        # Validate the target tenant is in the admin's subtree
+        if current_user.role != "superadmin":
+            allowed = await _get_subtree(db, current_user.tenant_id)
+            if new_tenant_id not in allowed:
+                raise HTTPException(403, "Target tenant not in your subtree")
+        vehicle.tenant_id = new_tenant_id
+
+    # IMEI: assign or replace device
+    if "imei" in body:
+        imei = (body["imei"] or "").strip()
+        # Get existing device for this vehicle
+        dev_result = await db.execute(select(Device).where(Device.vehicle_id == vehicle_id))
+        existing_device = dev_result.scalar_one_or_none()
+
+        if imei:
+            if len(imei) != 15 or not imei.isdigit():
+                raise HTTPException(400, "IMEI must be exactly 15 digits")
+            # Check IMEI not used by another vehicle
+            conflict = await db.execute(select(Device).where(Device.imei == imei))
+            conflict_device = conflict.scalar_one_or_none()
+            if conflict_device and conflict_device.vehicle_id != vehicle_id:
+                raise HTTPException(409, f"IMEI {imei} ya está asignado a otro vehículo")
+            if existing_device:
+                existing_device.imei = imei
+            else:
+                db.add(Device(vehicle_id=vehicle_id, imei=imei, model="FMC650"))
+        else:
+            # Remove device assignment
+            if existing_device:
+                await db.delete(existing_device)
+
     await db.commit()
     return {"id": str(vehicle.id), "name": vehicle.name}
 
