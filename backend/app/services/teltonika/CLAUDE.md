@@ -90,15 +90,19 @@ def crc16_ibm(data: bytes) -> int:
 ```python
 # 1-byte IOs (valor uint8)
 IO_1BYTE = {
-    1:   "din1_ignition",    # 0/1
+    1:   "din1",             # 0/1 entrada digital 1
     2:   "din2",             # 0/1
     3:   "din3",             # 0/1
     4:   "din4",             # 0/1
     21:  "gsm_signal",       # 0-5
+    22:  "rssi",             # señal radio
     179: "dout1",            # 0/1 estado salida digital 1
     180: "dout2",            # 0/1
     181: "dout3",            # 0/1
     182: "dout4",            # 0/1
+    200: "sleep_mode",       # 0=activo, 1=sleep
+    239: "ignition",         # 0/1 — FUENTE PRIMARIA de ignición en FMC650
+    240: "movement",         # 0/1 — movimiento detectado
 }
 
 # 2-byte IOs (valor uint16 BE)
@@ -112,13 +116,22 @@ IO_2BYTE = {
 # 4-byte IOs (valor uint32 BE)
 IO_4BYTE = {
     16:  "odometer_m",       # metros acumulados
-    66:  "ext_voltage_mv",   # mV tensión alimentación
+    66:  "ext_voltage_mv",   # mV tensión alimentación externa (0 si solo batería)
     67:  "battery_mv",       # mV batería interna
+    68:  "battery_current",  # corriente batería
 }
 
 # IOs CAN J1939 (configurables) — van de 300 a 399
 # Se almacenan en io_data JSONB tal como llegan, con clave str(io_id)
 ```
+
+### Mapeo de ignición (CRÍTICO)
+El campo `ignition` en `TelemetryRecord` se rellena así (en orden de prioridad):
+1. IO 239 → fuente primaria (parámetro "Ignition" estándar Teltonika FMC650)
+2. IO 1 (DIN1) → fallback si el dispositivo no envía IO 239
+
+**Sin contacto/ignition conectado**: el dispositivo transmite igualmente pero en intervalos
+largos (~1h en sleep). IO 239 reportará `null` hasta que se conecte el cable de ignición.
 
 ### Comando DOUT (servidor → FMC650)
 ```python

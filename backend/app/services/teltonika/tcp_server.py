@@ -251,7 +251,7 @@ class TeltonikaServer:
             angle=avl.angle,
             satellites=avl.satellites,
             priority=avl.priority,
-            ignition=bool(io.get(1)) if 1 in io else None,
+            ignition=bool(io[239]) if 239 in io else (bool(io[1]) if 1 in io else None),
             ext_voltage_mv=io.get(66),
             battery_mv=io.get(67),
             dout1=bool(io.get(179)) if 179 in io else None,

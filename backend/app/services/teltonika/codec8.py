@@ -13,7 +13,7 @@ from typing import Optional
 
 # Known IO ID mappings
 IO_IDS = {
-    1:   ("din1_ignition",    "bool"),
+    1:   ("din1",             "bool"),
     2:   ("din2",             "bool"),
     3:   ("din3",             "bool"),
     4:   ("din4",             "bool"),
@@ -22,13 +22,19 @@ IO_IDS = {
     11:  ("analog_3_mv",      "uint16"),
     16:  ("total_odometer_m", "uint32"),
     21:  ("gsm_signal",       "uint8"),
+    22:  ("rssi",             "uint8"),
     24:  ("speed_kmh",        "uint16"),
     66:  ("ext_voltage_mv",   "uint32"),
     67:  ("battery_mv",       "uint32"),
+    68:  ("battery_current",  "uint32"),
+    71:  ("dallas_temp_1",    "uint8"),
     179: ("dout1_status",     "bool"),
     180: ("dout2_status",     "bool"),
     181: ("dout3_status",     "bool"),
     182: ("dout4_status",     "bool"),
+    200: ("sleep_mode",       "uint8"),
+    239: ("ignition",         "bool"),
+    240: ("movement",         "bool"),
 }
 
 

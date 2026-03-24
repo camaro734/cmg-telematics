@@ -122,11 +122,15 @@ journalctl -u cmg-telematics -f
 - [x] Admin variable-maps: UI con dos pestañas (Plantillas / Excepciones)
 - [x] Admin vehículos: muestra jerarquía completa (fabricante → cliente → vehículo)
 - [x] Código en GitHub (repo: camaro734/cmg-telematics)
+- [x] FMC650 real conectado y transmitiendo (IMEI: 864275075510100, vehículo OT98976)
+- [x] Ignición mapeada desde IO 239 (estándar Teltonika) con fallback a IO 1 (DIN1)
+- [x] WebSocket con ping/keepalive cada 30s (elimina conexiones zombie)
 
 ## Qué falta / próximos pasos sugeridos
 
 - [ ] Caddy: verificar proxy 80/443 → 3000/8010 desde exterior
-- [ ] Conectar dispositivo FMC650 real (piloto en campo)
+- [ ] Conectar alimentación externa 12V/24V al FMC650 (actualmente solo batería interna)
+- [ ] Conectar cable de ignición al FMC650 (IO 239) para detección de motor encendido
 - [ ] Configurar variable_map para las IOs del IFM CR2530 real
 - [ ] Crear tenant/usuario real para el cliente piloto
 - [ ] Configurar alertas de umbrales reales (presión hidráulica, voltaje)

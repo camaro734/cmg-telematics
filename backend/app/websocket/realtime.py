@@ -41,24 +41,39 @@ async def fleet_websocket(websocket: WebSocket, token: str = Query(default=None)
 
     r = await get_redis()
     pubsub = r.pubsub()
-
-    # Subscribe to patterns: telemetry:* (all devices) and alert:* (alert events)
     await pubsub.psubscribe("telemetry:*", "alert:*")
 
-    try:
+    async def _pubsub_listener():
         async for message in pubsub.listen():
             if message["type"] == "pmessage":
-                try:
-                    data = json.loads(message["data"])
-                    await websocket.send_json(data)
-                except Exception as e:
-                    logger.warning(f"WS send error: {e}")
-                    break
+                data = json.loads(message["data"])
+                await websocket.send_json(data)
+
+    async def _keepalive():
+        """Ping every 30s to detect dead connections quickly."""
+        while True:
+            await asyncio.sleep(30)
+            await websocket.send_json({"type": "ping"})
+
+    listener_task = asyncio.create_task(_pubsub_listener())
+    keepalive_task = asyncio.create_task(_keepalive())
+
+    try:
+        done, pending = await asyncio.wait(
+            [listener_task, keepalive_task],
+            return_when=asyncio.FIRST_EXCEPTION,
+        )
+        for task in done:
+            exc = task.exception()
+            if exc:
+                raise exc
     except WebSocketDisconnect:
         logger.info(f"WebSocket client disconnected: {websocket.client}")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}", exc_info=True)
+        logger.warning(f"WS closed ({websocket.client}): {type(e).__name__}")
     finally:
+        listener_task.cancel()
+        keepalive_task.cancel()
         await pubsub.punsubscribe("telemetry:*", "alert:*")
         await pubsub.aclose()
         try:
