@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 import uuid
 
 from app.core.database import get_db
@@ -63,7 +64,10 @@ async def list_vehicles(
             license_plate=vehicle.license_plate,
             tenant_id=vehicle.tenant_id,
             device_imei=device.imei if device else None,
-            device_online=device.online if device else None,
+            device_online=(
+                device.last_seen is not None and
+                (datetime.now(timezone.utc) - (device.last_seen if device.last_seen.tzinfo else device.last_seen.replace(tzinfo=timezone.utc))) < timedelta(minutes=10)
+            ) if device else None,
         )
         out.append(v)
     return out

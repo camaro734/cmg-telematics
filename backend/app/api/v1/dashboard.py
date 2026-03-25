@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 import uuid
 
 from app.core.database import get_db
@@ -17,6 +18,15 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
+
+ONLINE_THRESHOLD = timedelta(minutes=10)
+
+def _is_online(last_seen) -> bool:
+    """Device is considered online if it sent data in the last 10 minutes."""
+    if last_seen is None:
+        return False
+    ts = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - ts) < ONLINE_THRESHOLD
 
 async def _get_subtree(db: AsyncSession, root_id: uuid.UUID) -> set[uuid.UUID]:
     """Return root_id plus all descendant tenant IDs."""
@@ -62,7 +72,7 @@ async def fleet_status(
         if device:
             entry["device"] = {
                 "imei": device.imei,
-                "online": device.online,
+                "online": _is_online(device.last_seen),
                 "last_seen": device.last_seen.isoformat() if device.last_seen else None,
             }
 
@@ -199,7 +209,7 @@ async def vehicle_stats(
         SELECT
             v.id                                                                AS vehicle_id,
             v.name                                                              AS vehicle_name,
-            d.online                                                            AS online,
+            (d.last_seen IS NOT NULL AND d.last_seen > NOW() - INTERVAL '10 minutes') AS online,
             COUNT(tr.time)                                                      AS records,
             COALESCE(COUNT(*) FILTER (WHERE tr.ignition = TRUE) * 30.0 / 3600.0, 0)
                                                                                 AS ignition_hours,

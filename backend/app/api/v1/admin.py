@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 import uuid
 
 from app.core.database import get_db
@@ -281,7 +282,10 @@ async def list_vehicles_admin(
             manufacturer_id=v.manufacturer_id,
             manufacturer_name=tenant_names.get(v.manufacturer_id, "") if v.manufacturer_id else "",
             device_imei=d.imei if d else None,
-            device_online=d.online if d else None,
+            device_online=(
+                d.last_seen is not None and
+                (datetime.now(timezone.utc) - (d.last_seen if d.last_seen.tzinfo else d.last_seen.replace(tzinfo=timezone.utc))) < timedelta(minutes=10)
+            ) if d else None,
         )
         for v, d in rows
     ]

@@ -18,6 +18,12 @@ from app.api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/vehicles", tags=["telemetry"])
 
+def _is_online(last_seen) -> bool:
+    if last_seen is None:
+        return False
+    ts = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - ts) < timedelta(minutes=10)
+
 
 async def _get_subtree(db: AsyncSession, root_id: uuid.UUID) -> set[uuid.UUID]:
     result = await db.execute(select(Tenant).where(Tenant.active == True))
@@ -91,14 +97,14 @@ async def get_last_telemetry(
     )
     record = result.scalar_one_or_none()
     if not record:
-        return {"device_id": str(device.id), "imei": device.imei, "vehicle_name": vehicle_obj.name, "online": device.online, "data": None}
+        return {"device_id": str(device.id), "imei": device.imei, "vehicle_name": vehicle_obj.name, "online": _is_online(device.last_seen), "data": None}
 
     return {
         "device_id": str(device.id),
         "imei": device.imei,
         "vehicle_name": vehicle_obj.name,
         "license_plate": vehicle_obj.license_plate,
-        "online": device.online,
+        "online": _is_online(device.last_seen),
         "last_seen": device.last_seen.isoformat() if device.last_seen else None,
         "data": {
             "time": record.time.isoformat(),

@@ -125,14 +125,26 @@ journalctl -u cmg-telematics -f
 - [x] FMC650 real conectado y transmitiendo (IMEI: 864275075510100, vehículo OT98976)
 - [x] Ignición mapeada desde IO 239 (estándar Teltonika) con fallback a IO 1 (DIN1)
 - [x] WebSocket con ping/keepalive cada 30s (elimina conexiones zombie)
+- [x] FMC650 con alimentación externa 12V del vehículo (ext_voltage_mv ~14.7V, cargando)
+- [x] Ignición ON correctamente detectada: Ignition Source = DIN1 en Teltonika Configurator (pin 15)
+- [x] Lógica online basada en last_seen (<10 min) en vez de TCP activa — el FMC650 conecta/desconecta cada 5 min y antes siempre aparecía offline
+- [x] FleetMap race condition corregida: marcadores se añaden aunque la API responda antes que Leaflet inicialice
+
+## Comportamiento del FMC650 en campo
+
+- **Modo actual**: conecta al TCP cada ~5 min, manda registro, cierra conexión (modo "On Stop" con periodo 300s)
+- **IO 239 = 1** → ignición ON; **IO 239 = 0** → ignición OFF (configurar Ignition Source = DIN 1 en Teltonika Configurator)
+- **IO 200 = 0** → dispositivo activo (no en sleep); **IO 200 = 1** → sleep mode
+- **ext_voltage_mv** → tensión batería externa del vehículo (~12.4V parado, ~14.7V cargando/motor en marcha)
+- **K-Line (pin 20)** → solo para tacógrafo digital (VDO/Stoneridge), no es OBD general
+- Para datos más frecuentes: `Data Acquisition → On Road Min Period` = 10-30s en Teltonika Configurator
 
 ## Qué falta / próximos pasos sugeridos
 
 - [ ] Caddy: verificar proxy 80/443 → 3000/8010 desde exterior
-- [ ] Conectar alimentación externa 12V/24V al FMC650 (actualmente solo batería interna)
-- [ ] Conectar cable de ignición al FMC650 (IO 239) para detección de motor encendido
 - [ ] Configurar variable_map para las IOs del IFM CR2530 real
 - [ ] Crear tenant/usuario real para el cliente piloto
 - [ ] Configurar alertas de umbrales reales (presión hidráulica, voltaje)
+- [ ] Reducir On Road Min Period a 10-30s en Teltonika Configurator para tracking en tiempo real
 - [ ] Test de carga con múltiples dispositivos simultáneos
 - [ ] Hypertable compression: verificar con `SELECT * FROM timescaledb_information.compression_settings`

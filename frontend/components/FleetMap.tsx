@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FleetVehicle, GeofenceOut } from "@/lib/api";
 
 interface Props {
@@ -56,6 +56,7 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
   const initialFitDone = useRef(false);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -78,6 +79,7 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
       map.zoomControl.setPosition("bottomright");
 
       mapRef.current = map;
+      setMapReady(true);
     });
 
     return () => {
@@ -86,6 +88,7 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
         mapRef.current = null;
         markersRef.current = {};
         initialFitDone.current = false;
+        setMapReady(false);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,7 +203,7 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fleet, selectedId]);
+  }, [fleet, selectedId, mapReady]);
 
   // Update geofence layers
   useEffect(() => {
@@ -239,7 +242,7 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geofences]);
+  }, [geofences, mapReady]);
 
   return (
     <>
