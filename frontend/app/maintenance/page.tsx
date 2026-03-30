@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Modal from "@/components/Modal";
+import { exportExcel, exportPdf } from "@/lib/export";
 import {
   maintenance,
   getVehicles,
@@ -267,8 +268,69 @@ export default function MaintenancePage() {
   const ioKeyLabel = (key: string) =>
     ioKeys.find(k => k.key === key)?.label ?? key;
 
+  const statusLabel = (s: string) =>
+    s === "overdue" ? "Vencida" : s === "warning" ? "Aviso" : "OK";
+
+  const triggerLabelEs = (type: string) =>
+    ({ km: "Kilómetros", hours: "Horas", days: "Días", date: "Fecha" }[type] ?? type);
+
+  function handleExportExcel() {
+    const rows = tasks.map((t) => ({
+      "Vehículo": t.vehicle_name ?? vehicleMap[t.vehicle_id] ?? "—",
+      "Tarea": t.name,
+      "Tipo activación": triggerLabelEs(t.trigger_type),
+      "Intervalo": t.interval_value != null
+        ? `${t.interval_value} ${t.trigger_type === "km" ? "km" : t.trigger_type === "hours" ? "h" : "días"}`
+        : "—",
+      "Estado": statusLabel(t.status),
+      "Próximo vencimiento": formatNextDue(t) || (t.trigger_type === "hours" && t.next_due_hours != null ? `${t.next_due_hours} h` : "—"),
+      "Horas actuales": t.current_hours != null ? t.current_hours.toFixed(1) : "—",
+      "Último mantenimiento": t.last_maintenance_at
+        ? new Date(t.last_maintenance_at).toLocaleDateString("es-ES")
+        : "—",
+    }));
+    const now = new Date().toLocaleDateString("es-ES").replace(/\//g, "-");
+    exportExcel(
+      [{ name: "Mantenimiento", rows }],
+      `mantenimiento-${now}.xlsx`
+    );
+  }
+
+  async function handleExportPdf() {
+    const now = new Date().toLocaleString("es-ES");
+    const summary = `Total tareas: ${tasks.length} | Vencidas: ${overdue} | Avisos: ${warning} | OK: ${ok}`;
+    await exportPdf(
+      "Informe de Mantenimiento",
+      `Fecha: ${now}`,
+      [
+        { text: summary },
+        {
+          title: "Tareas de Mantenimiento",
+          table: {
+            head: [["Vehículo", "Tarea", "Tipo activación", "Intervalo", "Estado", "Próximo vencimiento", "Horas actuales", "Último mantenimiento"]],
+            body: tasks.map((t) => [
+              t.vehicle_name ?? vehicleMap[t.vehicle_id] ?? "—",
+              t.name,
+              triggerLabelEs(t.trigger_type),
+              t.interval_value != null
+                ? `${t.interval_value} ${t.trigger_type === "km" ? "km" : t.trigger_type === "hours" ? "h" : "días"}`
+                : "—",
+              statusLabel(t.status),
+              formatNextDue(t) || (t.trigger_type === "hours" && t.next_due_hours != null ? `${t.next_due_hours} h` : "—"),
+              t.current_hours != null ? t.current_hours.toFixed(1) : "—",
+              t.last_maintenance_at
+                ? new Date(t.last_maintenance_at).toLocaleDateString("es-ES")
+                : "—",
+            ]),
+          },
+        },
+      ],
+      `informe-mantenimiento-${now.replace(/[/:, ]/g, "-")}.pdf`
+    );
+  }
+
   return (
-    <div className="px-6 py-6 max-w-5xl">
+    <div className="px-6 py-6 max-w-none w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -277,14 +339,40 @@ export default function MaintenancePage() {
             Seguimiento de tareas de mantenimiento preventivo de la flota
           </p>
         </div>
-        <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
-                style={{ background: "var(--accent)" }}>
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          Nueva tarea
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportExcel}
+            disabled={loading}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)" }}
+          >
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M14 2v6h6M8 13h8M8 17h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Excel
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={loading}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)" }}
+          >
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M14 2v6h6M9 13h1.5a1.5 1.5 0 010 3H9v-3zm0 3v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            PDF
+          </button>
+          <button onClick={openCreate}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+                  style={{ background: "var(--accent)" }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Nueva tarea
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}

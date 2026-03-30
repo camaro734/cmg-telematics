@@ -7,17 +7,22 @@ import {
   maintenance,
   getVehicles,
   getLiveSignals,
+  notificationConfig,
+  admin,
   type AlertLogOut,
   type AlertRuleOut,
   type IoKeyOption,
   type ConditionOption,
   type Vehicle,
   type LiveSignal,
+  type NotificationConfig,
+  type UserOut,
 } from "@/lib/api";
 import { useFleetWebSocket, type WsTelemetryMessage, type WsAlertMessage } from "@/lib/websocket";
 import Toast from "@/components/Toast";
 import Modal from "@/components/Modal";
 import { useToast } from "@/lib/toast";
+import { exportExcel } from "@/lib/export";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +32,21 @@ function formatDateTime(iso: string): string {
     hour: "2-digit", minute: "2-digit",
   });
 }
+
+const LEVEL_ES: Record<string, string> = {
+  high: "Alta",
+  medium: "Media",
+  low: "Baja",
+};
+
+const CONDITION_ES: Record<string, string> = {
+  gt: ">",
+  lt: "<",
+  gte: "≥",
+  lte: "≤",
+  eq: "=",
+  neq: "≠",
+};
 
 function LevelBadge({ level }: { level: string }) {
   const cfg: Record<string, { label: string; bg: string; color: string }> = {
@@ -111,20 +131,581 @@ function RuleRow({
   );
 }
 
+// ─── Notifications tab sub-components ────────────────────────────────────────
+
+const PROVIDERS = [
+  { label: "Personalizado", host: "", port: 587, tls: true, ssl: false },
+  { label: "Gmail", host: "smtp.gmail.com", port: 587, tls: true, ssl: false },
+  { label: "Outlook / Hotmail", host: "smtp-mail.outlook.com", port: 587, tls: true, ssl: false },
+  { label: "Yahoo", host: "smtp.mail.yahoo.com", port: 587, tls: true, ssl: false },
+];
+
+const PORT_PRESETS = [
+  { port: 25, tls: false, ssl: false },
+  { port: 465, tls: false, ssl: true },
+  { port: 587, tls: true, ssl: false },
+  { port: 2525, tls: true, ssl: false },
+];
+
+const DEFAULT_NOTIF_CONFIG: NotificationConfig = {
+  id: "00000000-0000-0000-0000-000000000000",
+  tenant_id: "",
+  smtp_host: "",
+  smtp_port: 587,
+  smtp_user: "",
+  smtp_password: "",
+  smtp_from: "",
+  smtp_from_name: "CMG Telematics",
+  smtp_tls: true,
+  smtp_ssl: false,
+  notify_level_high: true,
+  notify_level_medium: false,
+  notify_level_low: false,
+  active: false,
+};
+
+const NOTIFY_ROLES = ["superadmin", "admin", "operator"];
+
+const notifInputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "rgba(255,255,255,0.05)",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  padding: "9px 12px",
+  color: "white",
+  fontSize: 14,
+  outline: "none",
+};
+
+function NotifToggle({
+  checked,
+  onChange,
+  label,
+  description,
+  accent,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  description?: string;
+  accent?: string;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 cursor-pointer py-2">
+      <div>
+        <div className="text-sm font-medium text-white">{label}</div>
+        {description && (
+          <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+            {description}
+          </div>
+        )}
+      </div>
+      <div
+        onClick={() => onChange(!checked)}
+        className="relative flex-shrink-0"
+        style={{ width: 44, height: 24 }}
+      >
+        <div
+          className="rounded-full transition-colors duration-200"
+          style={{
+            width: 44,
+            height: 24,
+            background: checked ? (accent || "var(--accent)") : "rgba(255,255,255,0.1)",
+          }}
+        />
+        <div
+          className="absolute top-0.5 rounded-full transition-transform duration-200"
+          style={{
+            width: 20,
+            height: 20,
+            background: "white",
+            left: 2,
+            transform: checked ? "translateX(20px)" : "translateX(0)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+          }}
+        />
+      </div>
+    </label>
+  );
+}
+
+function NotifFieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--muted)" }}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function NotificationsTabContent() {
+  const [cfg, setCfg] = useState<NotificationConfig>(DEFAULT_NOTIF_CONFIG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [recipients, setRecipients] = useState<UserOut[]>([]);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [c, users] = await Promise.all([
+        notificationConfig.get(),
+        admin.listUsers(),
+      ]);
+      setCfg(c);
+      setRecipients(users.filter((u: UserOut) => u.active && NOTIFY_ROLES.includes(u.role)));
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  async function toggleRecipient(user: UserOut) {
+    setTogglingId(user.id);
+    try {
+      await admin.toggleNotifyEmail(user.id, !user.notify_email);
+      setRecipients(prev => prev.map(u => u.id === user.id ? { ...u, notify_email: !u.notify_email } : u));
+    } catch {
+      // ignore
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  function applyProvider(idx: number) {
+    const p = PROVIDERS[idx];
+    setCfg(prev => ({
+      ...prev,
+      smtp_host: p.host,
+      smtp_port: p.port,
+      smtp_tls: p.tls,
+      smtp_ssl: p.ssl,
+    }));
+  }
+
+  function applyPortPreset(p: typeof PORT_PRESETS[0]) {
+    setCfg(prev => ({ ...prev, smtp_port: p.port, smtp_tls: p.tls, smtp_ssl: p.ssl }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const saved = await notificationConfig.save({
+        smtp_host: cfg.smtp_host,
+        smtp_port: cfg.smtp_port,
+        smtp_user: cfg.smtp_user,
+        smtp_password: cfg.smtp_password,
+        smtp_from: cfg.smtp_from,
+        smtp_from_name: cfg.smtp_from_name,
+        smtp_tls: cfg.smtp_tls,
+        smtp_ssl: cfg.smtp_ssl,
+        notify_level_high: cfg.notify_level_high,
+        notify_level_medium: cfg.notify_level_medium,
+        notify_level_low: cfg.notify_level_low,
+        active: cfg.active,
+      });
+      setCfg(saved);
+      setSaveMsg({ type: "ok", text: "Configuración guardada correctamente." });
+    } catch (e: unknown) {
+      setSaveMsg({ type: "err", text: e instanceof Error ? e.message : "Error al guardar." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    if (!testEmail.trim()) return;
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const res = await notificationConfig.test(testEmail.trim());
+      setTestMsg({ type: "ok", text: res.message });
+    } catch (e: unknown) {
+      setTestMsg({ type: "err", text: e instanceof Error ? e.message : "Error al enviar correo de prueba." });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const card: React.CSSProperties = {
+    background: "var(--card)",
+    border: "1px solid var(--border)",
+    borderRadius: 12,
+    padding: 24,
+  };
+
+  const sectionTitle: React.CSSProperties = {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "var(--muted)",
+    textTransform: "uppercase",
+    letterSpacing: "0.07em",
+    marginBottom: 16,
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center" style={{ height: 300, color: "var(--muted)" }}>
+        Cargando configuración...
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 720, padding: "0 0 48px" }}>
+      <div className="space-y-5">
+        {/* Enable toggle + recipients */}
+        <div style={card}>
+          <NotifToggle
+            checked={cfg.active}
+            onChange={v => setCfg(prev => ({ ...prev, active: v }))}
+            label="Activar notificaciones por email"
+            description="Cuando se dispare una alerta, se enviará un correo a los usuarios de abajo."
+          />
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--muted)" }}>
+              Destinatarios ({recipients.length})
+            </p>
+            {recipients.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--muted)" }}>
+                No hay usuarios con acceso a esta flota. Crea usuarios en{" "}
+                <a href="/admin/users" style={{ color: "var(--accent)" }}>Administración → Usuarios</a>.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {recipients.map(u => (
+                  <div key={u.id} className="flex items-center gap-2 py-1">
+                    <div className="rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      style={{
+                        width: 28, height: 28,
+                        background: u.notify_email ? "rgba(29,158,117,0.15)" : "rgba(255,255,255,0.05)",
+                        color: u.notify_email ? "var(--accent)" : "var(--muted)",
+                        transition: "all 0.2s",
+                      }}>
+                      {u.full_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm" style={{ color: u.notify_email ? "white" : "var(--muted)" }}>{u.full_name}</span>
+                      <span className="text-xs ml-2" style={{ color: "var(--muted)" }}>{u.email}</span>
+                    </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)", border: "1px solid var(--border)" }}>
+                      {u.role}
+                    </span>
+                    {/* Toggle email */}
+                    <button
+                      onClick={() => toggleRecipient(u)}
+                      disabled={togglingId === u.id}
+                      title={u.notify_email ? "Desactivar email para este usuario" : "Activar email para este usuario"}
+                      className="flex-shrink-0 rounded-full transition-colors duration-200"
+                      style={{
+                        width: 36, height: 20, padding: 0, border: "none", cursor: "pointer",
+                        background: u.notify_email ? "var(--accent)" : "rgba(255,255,255,0.1)",
+                        opacity: togglingId === u.id ? 0.5 : 1,
+                        position: "relative",
+                      }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: "50%", background: "white",
+                        position: "absolute", top: 2,
+                        left: u.notify_email ? 18 : 2,
+                        transition: "left 0.2s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                      }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>
+              Para añadir más destinatarios, crea usuarios con rol <strong style={{ color: "white" }}>operador</strong> o <strong style={{ color: "white" }}>admin</strong> en{" "}
+              <a href="/admin/users" style={{ color: "var(--accent)" }}>Administración → Usuarios</a>.
+            </p>
+          </div>
+        </div>
+
+        {/* Provider presets */}
+        <div style={card}>
+          <p style={sectionTitle}>Proveedor de email</p>
+          <div className="flex flex-wrap gap-2">
+            {PROVIDERS.map((p, i) => (
+              <button
+                key={p.label}
+                onClick={() => applyProvider(i)}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  background: cfg.smtp_host === p.host
+                    ? "rgba(29,158,117,0.2)"
+                    : "rgba(255,255,255,0.06)",
+                  border: `1px solid ${cfg.smtp_host === p.host ? "rgba(29,158,117,0.5)" : "var(--border)"}`,
+                  color: cfg.smtp_host === p.host ? "#1D9E75" : "var(--muted)",
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {cfg.smtp_host === "smtp.gmail.com" && (
+            <p className="text-xs mt-3 p-2 rounded" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.2)" }}>
+              Gmail requiere una <strong>contraseña de aplicación</strong> si tienes 2FA activado. Genérala en myaccount.google.com/apppasswords.
+            </p>
+          )}
+        </div>
+
+        {/* SMTP Settings */}
+        <div style={card}>
+          <p style={sectionTitle}>Configuración SMTP</p>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "1fr auto" }}>
+            <NotifFieldGroup label="Servidor SMTP (host)">
+              <input
+                style={notifInputStyle}
+                placeholder="smtp.ejemplo.com"
+                value={cfg.smtp_host}
+                onChange={e => setCfg(prev => ({ ...prev, smtp_host: e.target.value }))}
+              />
+            </NotifFieldGroup>
+            <NotifFieldGroup label="Puerto">
+              <div className="flex flex-col gap-1">
+                <input
+                  style={{ ...notifInputStyle, width: 90 }}
+                  type="number"
+                  value={cfg.smtp_port}
+                  onChange={e => setCfg(prev => ({ ...prev, smtp_port: Number(e.target.value) }))}
+                />
+                <div className="flex gap-1 flex-wrap">
+                  {PORT_PRESETS.map(p => (
+                    <button
+                      key={p.port}
+                      onClick={() => applyPortPreset(p)}
+                      className="text-xs px-2 py-0.5 rounded transition-colors"
+                      style={{
+                        background: cfg.smtp_port === p.port
+                          ? "rgba(29,158,117,0.2)"
+                          : "rgba(255,255,255,0.06)",
+                        border: `1px solid ${cfg.smtp_port === p.port ? "rgba(29,158,117,0.4)" : "var(--border)"}`,
+                        color: cfg.smtp_port === p.port ? "#1D9E75" : "var(--muted)",
+                      }}
+                    >
+                      {p.port}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </NotifFieldGroup>
+          </div>
+
+          <div className="grid gap-4 mt-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <NotifFieldGroup label="Usuario SMTP">
+              <input
+                style={notifInputStyle}
+                placeholder="usuario@ejemplo.com"
+                value={cfg.smtp_user}
+                onChange={e => setCfg(prev => ({ ...prev, smtp_user: e.target.value }))}
+                autoComplete="username"
+              />
+            </NotifFieldGroup>
+            <NotifFieldGroup label="Contraseña">
+              <div className="relative">
+                <input
+                  style={{ ...notifInputStyle, paddingRight: 40 }}
+                  type={showPassword ? "text" : "password"}
+                  placeholder={cfg.smtp_password === "••••••••" ? "Guardada (dejar en blanco para mantener)" : "Contraseña SMTP"}
+                  value={cfg.smtp_password === "••••••••" ? "" : cfg.smtp_password}
+                  onChange={e => setCfg(prev => ({ ...prev, smtp_password: e.target.value }))}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", padding: 4 }}
+                >
+                  {showPassword ? (
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.5" />
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </NotifFieldGroup>
+          </div>
+
+          <div className="grid gap-4 mt-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <NotifFieldGroup label="Email remitente">
+              <input
+                style={notifInputStyle}
+                placeholder="alertas@miempresa.es"
+                value={cfg.smtp_from}
+                onChange={e => setCfg(prev => ({ ...prev, smtp_from: e.target.value }))}
+              />
+            </NotifFieldGroup>
+            <NotifFieldGroup label="Nombre remitente">
+              <input
+                style={notifInputStyle}
+                placeholder="CMG Telematics"
+                value={cfg.smtp_from_name}
+                onChange={e => setCfg(prev => ({ ...prev, smtp_from_name: e.target.value }))}
+              />
+            </NotifFieldGroup>
+          </div>
+
+          <div className="grid gap-0 mt-5 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+            <NotifToggle
+              checked={cfg.smtp_tls}
+              onChange={v => setCfg(prev => ({ ...prev, smtp_tls: v }))}
+              label="STARTTLS"
+              description="Cifrado TLS al conectar (puerto 587). Desactivar si usas SSL directo."
+            />
+            <NotifToggle
+              checked={cfg.smtp_ssl}
+              onChange={v => setCfg(prev => ({ ...prev, smtp_ssl: v }))}
+              label="SSL directo"
+              description="Conexión SSL desde el inicio (puerto 465). No compatible con STARTTLS."
+            />
+          </div>
+        </div>
+
+        {/* Alert level toggles */}
+        <div style={card}>
+          <p style={sectionTitle}>Niveles que generan email</p>
+          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+            <NotifToggle
+              checked={cfg.notify_level_high}
+              onChange={v => setCfg(prev => ({ ...prev, notify_level_high: v }))}
+              label="Alertas ALTAS"
+              description="Situaciones críticas: presión excesiva, fallo de sistema, etc."
+              accent="#ef4444"
+            />
+            <NotifToggle
+              checked={cfg.notify_level_medium}
+              onChange={v => setCfg(prev => ({ ...prev, notify_level_medium: v }))}
+              label="Alertas MEDIAS"
+              description="Advertencias: valores próximos al límite, batería baja, etc."
+              accent="#f59e0b"
+            />
+            <NotifToggle
+              checked={cfg.notify_level_low}
+              onChange={v => setCfg(prev => ({ ...prev, notify_level_low: v }))}
+              label="Alertas BAJAS"
+              description="Información: eventos de rutina que requieren atención menor."
+              accent="#3b82f6"
+            />
+          </div>
+        </div>
+
+        {/* Save button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-opacity"
+            style={{
+              background: "var(--accent)",
+              color: "white",
+              opacity: saving ? 0.6 : 1,
+              border: "none",
+              cursor: saving ? "not-allowed" : "pointer",
+            }}
+          >
+            {saving ? "Guardando..." : "Guardar configuración"}
+          </button>
+          {saveMsg && (
+            <span
+              className="text-sm"
+              style={{ color: saveMsg.type === "ok" ? "var(--accent)" : "#ef4444" }}
+            >
+              {saveMsg.text}
+            </span>
+          )}
+        </div>
+
+        {/* Test email section */}
+        <div style={card}>
+          <p style={sectionTitle}>Enviar correo de prueba</p>
+          <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
+            Envía un correo de prueba usando la configuración SMTP actual para verificar que está funcionando correctamente. La configuración debe estar guardada y activa.
+          </p>
+          <div className="flex gap-3 items-start flex-wrap">
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <input
+                style={notifInputStyle}
+                type="email"
+                placeholder="tu@email.com"
+                value={testEmail}
+                onChange={e => setTestEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleTest()}
+              />
+            </div>
+            <button
+              onClick={handleTest}
+              disabled={testing || !testEmail.trim()}
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold transition-opacity flex-shrink-0"
+              style={{
+                background: "rgba(29,158,117,0.15)",
+                color: "#1D9E75",
+                border: "1px solid rgba(29,158,117,0.3)",
+                opacity: testing || !testEmail.trim() ? 0.5 : 1,
+                cursor: testing || !testEmail.trim() ? "not-allowed" : "pointer",
+              }}
+            >
+              {testing ? "Enviando..." : "Enviar prueba"}
+            </button>
+          </div>
+          {testMsg && (
+            <p
+              className="text-sm mt-3 p-3 rounded-lg"
+              style={{
+                background: testMsg.type === "ok" ? "rgba(29,158,117,0.1)" : "rgba(239,68,68,0.1)",
+                color: testMsg.type === "ok" ? "#1D9E75" : "#ef4444",
+                border: `1px solid ${testMsg.type === "ok" ? "rgba(29,158,117,0.2)" : "rgba(239,68,68,0.2)"}`,
+              }}
+            >
+              {testMsg.text}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AlertsPage() {
-  const [tab, setTab] = useState<"history" | "rules">("history");
+  const [tab, setTab] = useState<"history" | "rules" | "notifications">("history");
 
-  // Role check — only admin/superadmin can create/delete rules
+  // Role check — only admin/superadmin can create/delete rules and see notifications tab
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [canManageRules, setCanManageRules] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem("cmg_user");
       const role = raw ? JSON.parse(raw).role : null;
+      setUserRole(role);
       setCanManageRules(role === "admin" || role === "superadmin");
-    } catch { setCanManageRules(false); }
+    } catch {
+      setUserRole(null);
+      setCanManageRules(false);
+    }
   }, []);
+
+  const isAdminOrSuperadmin = userRole === "admin" || userRole === "superadmin";
 
   // History state
   const [alertList, setAlertList] = useState<AlertLogOut[]>([]);
@@ -309,7 +890,7 @@ export default function AlertsPage() {
     conditions.find(c => c.key === k)?.label?.split(" ").slice(1).join(" ") ?? k;
 
   return (
-    <div className="px-6 py-6 max-w-6xl">
+    <div className="px-6 py-6 max-w-none w-full">
       <Toast toasts={toasts} onDismiss={dismiss} />
 
       {/* Header */}
@@ -337,7 +918,7 @@ export default function AlertsPage() {
             </svg>
             Nueva regla
           </button>
-        ) : (
+        ) : tab !== "notifications" ? (
           <button onClick={() => { setLoadingAlerts(true); loadAlerts(); }}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
                   style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--muted)" }}>
@@ -347,7 +928,7 @@ export default function AlertsPage() {
             </svg>
             Actualizar
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Tabs */}
@@ -355,10 +936,11 @@ export default function AlertsPage() {
         {[
           { key: "history", label: "Historial" },
           { key: "rules",   label: `Reglas (${rules.length})` },
+          ...(isAdminOrSuperadmin ? [{ key: "notifications", label: "Notificaciones" }] : []),
         ].map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key as "history" | "rules")}
+            onClick={() => setTab(t.key as "history" | "rules" | "notifications")}
             className="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
             style={tab === t.key
               ? { background: "var(--accent)", color: "#fff" }
@@ -393,6 +975,49 @@ export default function AlertsPage() {
               <input type="checkbox" checked={activeOnly} onChange={e => setActiveOnly(e.target.checked)} />
               Solo activas
             </label>
+            <button
+              onClick={() => {
+                exportExcel(
+                  [
+                    {
+                      name: "Historial Alertas",
+                      rows: alertList.map(a => ({
+                        "Vehículo": a.vehicle_name ?? a.vehicle_id.slice(0, 8),
+                        "Señal": a.display_name,
+                        "Nivel": LEVEL_ES[a.level] ?? a.level,
+                        "Valor": a.converted_value,
+                        "Umbral": a.threshold,
+                        "Unidad": a.unit ?? "",
+                        "Disparada": formatDateTime(a.fired_at),
+                        "Resuelta": a.resolved_at ? formatDateTime(a.resolved_at) : "Activa",
+                        "Reconocida": a.acknowledged_at ? formatDateTime(a.acknowledged_at) : "-",
+                      })),
+                    },
+                    {
+                      name: "Reglas Activas",
+                      rows: rules.map(r => ({
+                        "Nombre": r.name,
+                        "Señal": r.display_name,
+                        "Condición": CONDITION_ES[r.condition] ?? r.condition,
+                        "Umbral": r.threshold,
+                        "Unidad": r.unit ?? "",
+                        "Nivel": LEVEL_ES[r.level] ?? r.level,
+                        "Vehículo": r.vehicle_name ?? "Todos",
+                        "Activa": r.active ? "Sí" : "No",
+                      })),
+                    },
+                  ],
+                  `alertas_${new Date().toISOString().slice(0, 10)}.xlsx`
+                );
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium"
+              style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)", cursor: "pointer" }}
+            >
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Exportar Excel
+            </button>
           </div>
 
           {loadingAlerts ? (
@@ -471,6 +1096,53 @@ export default function AlertsPage() {
       {/* ── RULES TAB ── */}
       {tab === "rules" && (
         <>
+          {!loadingRules && rules.length > 0 && (
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={() => {
+                  exportExcel(
+                    [
+                      {
+                        name: "Reglas Activas",
+                        rows: rules.map(r => ({
+                          "Nombre": r.name,
+                          "Señal": r.display_name,
+                          "Condición": CONDITION_ES[r.condition] ?? r.condition,
+                          "Umbral": r.threshold,
+                          "Unidad": r.unit ?? "",
+                          "Nivel": LEVEL_ES[r.level] ?? r.level,
+                          "Vehículo": r.vehicle_name ?? "Todos",
+                          "Activa": r.active ? "Sí" : "No",
+                        })),
+                      },
+                      {
+                        name: "Historial Alertas",
+                        rows: alertList.map(a => ({
+                          "Vehículo": a.vehicle_name ?? a.vehicle_id.slice(0, 8),
+                          "Señal": a.display_name,
+                          "Nivel": LEVEL_ES[a.level] ?? a.level,
+                          "Valor": a.converted_value,
+                          "Umbral": a.threshold,
+                          "Unidad": a.unit ?? "",
+                          "Disparada": formatDateTime(a.fired_at),
+                          "Resuelta": a.resolved_at ? formatDateTime(a.resolved_at) : "Activa",
+                          "Reconocida": a.acknowledged_at ? formatDateTime(a.acknowledged_at) : "-",
+                        })),
+                      },
+                    ],
+                    `reglas_alertas_${new Date().toISOString().slice(0, 10)}.xlsx`
+                  );
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium"
+                style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)", cursor: "pointer" }}
+              >
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Exportar Excel
+              </button>
+            </div>
+          )}
           {loadingRules ? (
             <div className="space-y-2">
               {[1,2,3].map(i => <div key={i} className="h-14 rounded-lg animate-pulse" style={{ background: "var(--card)" }} />)}
@@ -515,6 +1187,11 @@ export default function AlertsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── NOTIFICATIONS TAB ── */}
+      {tab === "notifications" && isAdminOrSuperadmin && (
+        <NotificationsTabContent />
       )}
 
       {/* ── Create rule modal ── */}

@@ -146,7 +146,7 @@ export default function TripsPage() {
   }
 
   return (
-    <div className="px-6 py-6 max-w-7xl">
+    <div className="px-6 py-6 max-w-none w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-lg font-bold text-white">Historial de Rutas</h1>

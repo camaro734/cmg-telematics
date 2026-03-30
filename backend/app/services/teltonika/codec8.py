@@ -67,8 +67,14 @@ def _crc16_ibm(data: bytes) -> int:
 
 def parse_codec8(data: bytes) -> list[AVLRecord]:
     """
-    Parse a Codec 8 payload (without the TCP length framing).
+    Parse a Codec 8 (0x08) or Codec 8 Extended (0x8E) payload.
     data starts at the preamble (4 zero bytes).
+
+    Codec 8 Extended is identical to Codec 8 except IO element IDs
+    are 2 bytes (uint16 BE) instead of 1 byte — allowing IDs > 255.
+    The FMC650 uses 0x8E automatically when Manual CAN slots 10–69
+    are configured (AVL IDs 380–389, 10298–10347).
+
     Raises ValueError on CRC mismatch or malformed data.
     """
     if len(data) < 12:
@@ -82,8 +88,12 @@ def parse_codec8(data: bytes) -> list[AVLRecord]:
     data_length = struct.unpack_from(">I", data, 4)[0]
     codec_id = data[8]
 
-    if codec_id != 0x08:
-        raise ValueError(f"Unsupported codec ID: {codec_id:#04x} (only Codec 8 supported)")
+    if codec_id not in (0x08, 0x8E):
+        raise ValueError(
+            f"Unsupported codec ID: {codec_id:#04x} (supported: 0x08 Codec8, 0x8E Codec8Extended)"
+        )
+
+    extended = (codec_id == 0x8E)
 
     # CRC covers from codec_id to end of last num_records byte
     crc_data = data[8: 8 + data_length]
@@ -101,7 +111,7 @@ def parse_codec8(data: bytes) -> list[AVLRecord]:
 
     records = []
     for _ in range(num_records):
-        record, offset = _parse_avl_record(data, offset)
+        record, offset = _parse_avl_record(data, offset, extended=extended)
         records.append(record)
 
     # Verify num_records_2
@@ -114,7 +124,7 @@ def parse_codec8(data: bytes) -> list[AVLRecord]:
     return records
 
 
-def _parse_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
+def _parse_avl_record(data: bytes, offset: int, extended: bool = False) -> tuple[AVLRecord, int]:
     # Timestamp (8 bytes, ms)
     timestamp_ms = struct.unpack_from(">Q", data, offset)[0]
     offset += 8
@@ -148,12 +158,23 @@ def _parse_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
 
     io_data = {}
 
+    # In Codec 8 Extended (0x8E), IO IDs are 2 bytes (uint16 BE).
+    # In Codec 8 standard (0x08), IO IDs are 1 byte (uint8).
+    def read_io_id() -> tuple[int, int]:
+        nonlocal offset
+        if extended:
+            io_id = struct.unpack_from(">H", data, offset)[0]
+            offset += 2
+        else:
+            io_id = data[offset]
+            offset += 1
+        return io_id
+
     # 1-byte IOs
     count = data[offset]
     offset += 1
     for _ in range(count):
-        io_id = data[offset]
-        offset += 1
+        io_id = read_io_id()
         value = data[offset]
         offset += 1
         io_data[io_id] = value
@@ -162,8 +183,7 @@ def _parse_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
     count = data[offset]
     offset += 1
     for _ in range(count):
-        io_id = data[offset]
-        offset += 1
+        io_id = read_io_id()
         value = struct.unpack_from(">H", data, offset)[0]
         offset += 2
         io_data[io_id] = value
@@ -172,8 +192,7 @@ def _parse_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
     count = data[offset]
     offset += 1
     for _ in range(count):
-        io_id = data[offset]
-        offset += 1
+        io_id = read_io_id()
         value = struct.unpack_from(">I", data, offset)[0]
         offset += 4
         io_data[io_id] = value
@@ -182,8 +201,7 @@ def _parse_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
     count = data[offset]
     offset += 1
     for _ in range(count):
-        io_id = data[offset]
-        offset += 1
+        io_id = read_io_id()
         value = struct.unpack_from(">Q", data, offset)[0]
         offset += 8
         io_data[io_id] = value
@@ -203,18 +221,31 @@ def _parse_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
     return record, offset
 
 
-def build_codec8_packet(records: list[dict]) -> bytes:
+def build_codec8_packet(records: list[dict], extended: bool = False) -> bytes:
     """
-    Build a valid Codec 8 packet from a list of record dicts.
-    Each dict: timestamp_ms, priority, lat, lng, altitude, angle,
-               satellites, speed, io (dict of {io_id: value}).
+    Build a valid Codec 8 (0x08) or Codec 8 Extended (0x8E) packet.
+
+    extended=True is required when any IO ID > 255 (e.g. Manual CAN
+    slots 10–69 → AVL IDs 380–389, 10298–10347).
+
+    Each record dict: timestamp_ms, priority, lat, lng, altitude, angle,
+                      satellites, speed, io (dict of {io_id: value}).
     """
     payload = bytearray()
 
-    # Codec ID
-    payload.append(0x08)
-    # Number of records
+    codec_id = 0x8E if extended else 0x08
+    payload.append(codec_id)
     payload.append(len(records))
+
+    def append_io_id(io_id: int):
+        if extended:
+            payload.extend(struct.pack(">H", io_id))
+        else:
+            if io_id > 255:
+                raise ValueError(
+                    f"IO ID {io_id} > 255 requires extended=True (Codec 8 Extended)"
+                )
+            payload.append(io_id)
 
     for rec in records:
         payload += struct.pack(">Q", rec["timestamp_ms"])
@@ -229,7 +260,7 @@ def build_codec8_packet(records: list[dict]) -> bytes:
         payload += struct.pack(">H", rec.get("speed", 0))
 
         io = rec.get("io", {})
-        # Classify IOs by size
+        # Classify IOs by value size
         b1, b2, b4, b8 = [], [], [], []
         for io_id, value in io.items():
             if value < 0x100:
@@ -241,41 +272,36 @@ def build_codec8_packet(records: list[dict]) -> bytes:
             else:
                 b8.append((io_id, value))
 
-        # Event IO ID (0 = periodic)
         payload.append(rec.get("event_io_id", 0))
-        # Total IO count
         payload.append(len(b1) + len(b2) + len(b4) + len(b8))
 
         payload.append(len(b1))
         for io_id, v in b1:
-            payload.append(io_id)
+            append_io_id(io_id)
             payload.append(v)
 
         payload.append(len(b2))
         for io_id, v in b2:
-            payload.append(io_id)
+            append_io_id(io_id)
             payload += struct.pack(">H", v)
 
         payload.append(len(b4))
         for io_id, v in b4:
-            payload.append(io_id)
+            append_io_id(io_id)
             payload += struct.pack(">I", v)
 
         payload.append(len(b8))
         for io_id, v in b8:
-            payload.append(io_id)
+            append_io_id(io_id)
             payload += struct.pack(">Q", v)
 
-    # Number of records (footer)
     payload.append(len(records))
 
-    # CRC
     crc = _crc16_ibm(bytes(payload))
 
-    # Full packet: preamble + data_length + payload + crc
     packet = bytearray()
-    packet += struct.pack(">I", 0)              # preamble
-    packet += struct.pack(">I", len(payload))   # data length
+    packet += struct.pack(">I", 0)
+    packet += struct.pack(">I", len(payload))
     packet += payload
     packet += struct.pack(">I", crc)
 

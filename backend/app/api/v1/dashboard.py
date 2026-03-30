@@ -85,12 +85,13 @@ async def fleet_status(
             )
             record = tr_result.scalar_one_or_none()
             if record:
+                is_online = _is_online(device.last_seen)
                 entry["last_position"] = {
                     "time": record.time.isoformat(),
                     "lat": record.lat,
                     "lng": record.lng,
-                    "speed": record.speed,
-                    "ignition": record.ignition,
+                    "speed": record.speed if is_online else None,
+                    "ignition": record.ignition if is_online else None,
                     "ext_voltage_mv": record.ext_voltage_mv,
                     "dout1": record.dout1,
                     "dout2": record.dout2,
@@ -225,7 +226,7 @@ async def vehicle_stats(
            AND tr.time >= NOW() - :hours * INTERVAL '1 hour'
         WHERE v.tenant_id::text = ANY(:tenant_ids)
           AND v.active = TRUE
-        GROUP BY v.id, v.name, d.online
+        GROUP BY v.id, v.name, d.last_seen
         ORDER BY ignition_hours DESC
     """)
 

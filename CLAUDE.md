@@ -92,11 +92,43 @@ journalctl -u cmg-telematics -f
 - **cmg-telematics-frontend** → Next.js producción puerto 3000
 
 ### Credenciales piloto
-- Admin: `admin@cmg.es` / `admin123` (role: superadmin)
+- Admin: `admin@cmg.es` / `admin123` (role: superadmin — solo gestión técnica)
 - DB: `cmg` / `cmg_pilot_2024` / `cmg_telematics`
 - SECRET_KEY: en `/opt/cmg-telematics/backend/.env`
 
-## Estado actual del piloto ✅
+### Jerarquía de tenants actual
+
+```
+CMG Metalhidráulica S.L.  (superadmin — gestión técnica)
+├── VACUUM  (fabricante real)
+│   └── aguas de valencia
+│       └── OT98976 · IMEI 864275075510100  ← FMC650 real en campo
+│
+└── Hidráulica Industrial S.L.  (fabricante demo)
+    ├── Construcciones García S.L.   ← 3 vehículos demo
+    └── Obras Públicas Levante S.A.  ← 3 vehículos demo
+```
+
+### Credenciales demo (para presentaciones a clientes)
+
+| Rol | Email | Contraseña | Ve |
+|-----|-------|-----------|-----|
+| Admin fabricante demo | `admin@hidraulica-ind.es` | `Demo2024!` | 6 vehículos demo (aislado del real) |
+| Operador demo García  | `operador@garcia.es`      | `Demo2024!` | 3 vehículos (Construcciones García) |
+| Visualizador demo     | `vista@garcia.es`         | `Demo2024!` | solo lectura, García |
+| Operador demo OPL     | `operador@obras-levante.es` | `Demo2024!` | 3 vehículos (OPL) |
+
+> El usuario demo **no puede ver** OT98976 ni ningún dato real. Aislamiento garantizado por tenant.
+
+### Regenerar entorno demo
+
+```bash
+cd /opt/cmg-telematics/backend
+source venv/bin/activate
+python scripts/seed_demo.py   # idempotente — no duplica si ya existe
+```
+
+## Estado actual ✅
 
 - [x] PASO 0: Reconocimiento VPS completado
 - [x] PostgreSQL/TimescaleDB nativo corriendo (puerto 5432)
@@ -104,7 +136,7 @@ journalctl -u cmg-telematics -f
 - [x] Docker Compose levantado (Mosquitto MQTT)
 - [x] Backend instalado y corriendo como systemd service (puerto 8010)
 - [x] Puerto 5027 TCP abierto y escuchando (Teltonika TCP server)
-- [x] Migraciones aplicadas — 12 tablas creadas
+- [x] Migraciones aplicadas — todas las tablas creadas
 - [x] Hypertable telemetry_record con compresión automática
 - [x] Simulador FMC650 conecta y envía datos con ACK correcto
 - [x] Datos aparecen en PostgreSQL/TimescaleDB
@@ -114,7 +146,7 @@ journalctl -u cmg-telematics -f
 - [x] Frontend Next.js 16 corriendo en producción (puerto 3000)
 - [x] PWA instalable (manifest.json + service worker)
 - [x] Autenticación JWT con roles funcionando
-- [x] Todas las páginas implementadas (15 rutas)
+- [x] Todas las páginas implementadas (15+ rutas)
 - [x] Navegación móvil: bottom tab bar (5 tabs + sheet "Más")
 - [x] Mapa con tiles CartoDB Voyager (moderno, gratuito)
 - [x] Marcadores de vehículos con icono de camión SVG
@@ -127,24 +159,28 @@ journalctl -u cmg-telematics -f
 - [x] WebSocket con ping/keepalive cada 30s (elimina conexiones zombie)
 - [x] FMC650 con alimentación externa 12V del vehículo (ext_voltage_mv ~14.7V, cargando)
 - [x] Ignición ON correctamente detectada: Ignition Source = DIN1 en Teltonika Configurator (pin 15)
-- [x] Lógica online basada en last_seen (<10 min) en vez de TCP activa — el FMC650 conecta/desconecta cada 5 min y antes siempre aparecía offline
-- [x] FleetMap race condition corregida: marcadores se añaden aunque la API responda antes que Leaflet inicialice
+- [x] Lógica online basada en last_seen (<10 min) en vez de TCP activa
+- [x] FleetMap race condition corregida
+- [x] Tarjeta "Con GPS" en dashboard solo cuenta vehículos online (no histórico)
+- [x] Motor de automatizaciones: reglas trigger→acción, sesiones con trazado GPS posición
+- [x] Exportación PDF de sesiones de automatización con **mapa real CartoDB** (tiles vectoriales)
+- [x] Entorno demo completo y aislado: 6 vehículos, alertas, automatizaciones, geocercas, mantenimiento
+- [x] script `backend/scripts/seed_demo.py` idempotente para regenerar demo
 
 ## Comportamiento del FMC650 en campo
 
 - **Modo actual**: conecta al TCP cada ~5 min, manda registro, cierra conexión (modo "On Stop" con periodo 300s)
-- **IO 239 = 1** → ignición ON; **IO 239 = 0** → ignición OFF (configurar Ignition Source = DIN 1 en Teltonika Configurator)
+- **IO 239 = 1** → ignición ON; **IO 239 = 0** → ignición OFF (Ignition Source = DIN 1 en Teltonika Configurator)
 - **IO 200 = 0** → dispositivo activo (no en sleep); **IO 200 = 1** → sleep mode
-- **ext_voltage_mv** → tensión batería externa del vehículo (~12.4V parado, ~14.7V cargando/motor en marcha)
+- **ext_voltage_mv** → tensión batería externa (~12.4V parado, ~14.7V cargando/motor en marcha)
 - **K-Line (pin 20)** → solo para tacógrafo digital (VDO/Stoneridge), no es OBD general
 - Para datos más frecuentes: `Data Acquisition → On Road Min Period` = 10-30s en Teltonika Configurator
 
 ## Qué falta / próximos pasos sugeridos
 
 - [ ] Caddy: verificar proxy 80/443 → 3000/8010 desde exterior
-- [ ] Configurar variable_map para las IOs del IFM CR2530 real
-- [ ] Crear tenant/usuario real para el cliente piloto
-- [ ] Configurar alertas de umbrales reales (presión hidráulica, voltaje)
+- [ ] Configurar variable_map para las IOs del IFM CR2530 real (tenant VACUUM)
+- [ ] Configurar alertas de umbrales reales (presión hidráulica, voltaje) en tenant VACUUM
 - [ ] Reducir On Road Min Period a 10-30s en Teltonika Configurator para tracking en tiempo real
 - [ ] Test de carga con múltiples dispositivos simultáneos
 - [ ] Hypertable compression: verificar con `SELECT * FROM timescaledb_information.compression_settings`

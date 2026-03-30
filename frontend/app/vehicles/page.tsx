@@ -5,6 +5,13 @@ import Link from "next/link";
 import { getFleet, type FleetVehicle } from "@/lib/api";
 import { useFleetWebSocket, type WsTelemetryMessage } from "@/lib/websocket";
 
+const ONLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 min
+
+function isOnlineNow(lastSeen: string | null | undefined): boolean {
+  if (!lastSeen) return false;
+  return Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
+}
+
 function timeSince(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return `${diff}s`;
@@ -33,6 +40,13 @@ export default function VehiclesPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "online" | "offline">("all");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [, setTick] = useState(0);
+
+  // Recalculate online status every 60s without API call
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -55,7 +69,7 @@ export default function VehiclesPage() {
         if (v.vehicle_id !== msg.vehicle_id) return v;
         return {
           ...v,
-          device: v.device ? { ...v.device, online: true, last_seen: msg.time } : undefined,
+          device: v.device ? { ...v.device, last_seen: msg.time } : undefined,
           last_position: {
             time: msg.time,
             lat: msg.lat,
@@ -77,18 +91,22 @@ export default function VehiclesPage() {
       v.vehicle_name.toLowerCase().includes(search.toLowerCase()) ||
       (v.license_plate ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (v.device?.imei ?? "").includes(search);
+    const online = isOnlineNow(v.device?.last_seen);
     const matchStatus =
       filterStatus === "all" ||
-      (filterStatus === "online" && v.device?.online) ||
-      (filterStatus === "offline" && !v.device?.online);
+      (filterStatus === "online" && online) ||
+      (filterStatus === "offline" && !online);
     return matchSearch && matchStatus;
   });
 
-  const onlineCount = fleet.filter(v => v.device?.online).length;
-  const movingCount = fleet.filter(v => v.last_position?.ignition && (v.last_position?.speed ?? 0) > 3).length;
+  const onlineCount = fleet.filter(v => isOnlineNow(v.device?.last_seen)).length;
+  const movingCount = fleet.filter(v => {
+    if (!isOnlineNow(v.device?.last_seen)) return false;
+    return v.last_position?.ignition && (v.last_position?.speed ?? 0) > 3;
+  }).length;
 
   return (
-    <div className="px-6 py-6 max-w-6xl">
+    <div className="px-6 py-6 max-w-none w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -164,9 +182,9 @@ export default function VehiclesPage() {
             <tbody>
               {filtered.map((v, i) => {
                 const pos = v.last_position;
-                const isMoving = pos?.ignition && (pos?.speed ?? 0) > 3;
-                const noSignal = v.device?.online && v.device.last_seen
-                  && (Date.now() - new Date(v.device.last_seen).getTime()) > 5 * 60 * 1000;
+                const online = isOnlineNow(v.device?.last_seen);
+                const ignition = online ? pos?.ignition : false;
+                const isMoving = online && ignition && (pos?.speed ?? 0) > 3;
                 return (
                   <tr
                     key={v.vehicle_id}
@@ -186,18 +204,13 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-4 py-3">
                       {v.device ? (
-                        <div className="flex flex-col gap-0.5">
-                          <StatusDot online={v.device.online} />
-                          {noSignal && (
-                            <span className="text-xs" style={{ color: "var(--warning)" }}>Sin señal</span>
-                          )}
-                        </div>
+                        <StatusDot online={online} />
                       ) : (
                         <span className="text-xs" style={{ color: "var(--muted)" }}>Sin dispositivo</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {pos ? (
+                      {pos && online ? (
                         <span className="font-mono text-sm" style={{ color: isMoving ? "var(--success)" : "var(--muted)" }}>
                           {pos.speed ?? 0} km/h
                         </span>
@@ -211,17 +224,15 @@ export default function VehiclesPage() {
                       ) : <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      {pos ? (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{
-                            background: pos.ignition ? "rgba(34,197,94,0.15)" : "rgba(100,116,139,0.1)",
-                            color: pos.ignition ? "var(--success)" : "var(--muted)",
-                          }}
-                        >
-                          {pos.ignition ? "ON" : "OFF"}
-                        </span>
-                      ) : <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>}
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-medium"
+                        style={{
+                          background: ignition ? "rgba(34,197,94,0.15)" : "rgba(100,116,139,0.1)",
+                          color: ignition ? "var(--success)" : "var(--muted)",
+                        }}
+                      >
+                        {ignition ? "ON" : "OFF"}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>
                       {v.device?.last_seen ? (

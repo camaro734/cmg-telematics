@@ -5,15 +5,17 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   getLastTelemetry, getTelemetryHistory, sendCommand, getTrips, getTripTrack,
-  getCommandHistory,
+  getCommandHistory, getLiveSignals, automations,
   maintenance, getEcoDrivingScores,
   type LastTelemetry, type TelemetryHistory, type Trip, type TrackPoint,
   type MaintenanceTaskOut, type EcoDrivingScore, type CommandHistoryEntry,
+  type LiveSignal, type AutomationSessionOut, type AutomationPositionOut,
 } from "@/lib/api";
 import Link from "next/link";
 import { useFleetWebSocket, type WsTelemetryMessage, type WsAlertMessage } from "@/lib/websocket";
 import Toast from "@/components/Toast";
 import { useToast } from "@/lib/toast";
+import { exportExcel, exportSessionPdf } from "@/lib/export";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), { ssr: false });
 const VehiclePositionMap = dynamic(() => import("@/components/VehiclePositionMap"), { ssr: false });
@@ -31,6 +33,7 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
   const [hours, setHours] = useState(24);
   const [loading, setLoading] = useState(true);
   const [cmdState, setCmdState] = useState<Record<string, "idle" | "sending" | "sent" | "error">>({});
+  const [liveSignals, setLiveSignals] = useState<LiveSignal[]>([]);
   const { toasts, addToast, dismiss } = useToast();
 
   // Maintenance state
@@ -46,6 +49,14 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
   // Eco-driving state
   const [ecoScore, setEcoScore] = useState<EcoDrivingScore | null>(null);
 
+  // Automation state
+  const [autoSessions, setAutoSessions] = useState<AutomationSessionOut[]>([]);
+  const [autoRules, setAutoRules] = useState<{ id: string; name: string; io_key: string; condition: string; threshold: number; actions: { type: string; params: Record<string, unknown> }[] }[]>([]);
+  const [userRole, setUserRole] = useState("");
+  const [autoMapSession, setAutoMapSession] = useState<AutomationSessionOut | null>(null);
+  const [autoMapPositions, setAutoMapPositions] = useState<AutomationPositionOut[]>([]);
+  const [autoMapLoading, setAutoMapLoading] = useState(false);
+
   // Trips state
   const defaultEnd = new Date();
   const defaultStart = new Date(defaultEnd.getTime() - 7 * 24 * 3600 * 1000);
@@ -59,12 +70,14 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
 
   const refresh = useCallback(async () => {
     try {
-      const [l, h] = await Promise.all([
+      const [l, h, ls] = await Promise.all([
         getLastTelemetry(id),
         getTelemetryHistory(id, hours),
+        getLiveSignals(id),
       ]);
       setLast(l);
       setHistory(h);
+      setLiveSignals(ls.signals.filter(s => s.is_configured && s.raw_value !== null));
     } catch {
       // silence
     } finally {
@@ -84,6 +97,19 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
     getEcoDrivingScores(24, id)
       .then(scores => setEcoScore(scores[0] ?? null))
       .catch(() => {});
+  }, [id]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("cmg_user");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setUserRole(parsed.role ?? "");
+      }
+    } catch { /* ignore */ }
+    // All roles can see automation rules + sessions for their vehicles
+    automations.list({ vehicle_id: id }).then(setAutoRules).catch(() => {});
+    automations.listSessionsByVehicle(id, 10).then(setAutoSessions).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -211,7 +237,6 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
 
   const d = last?.data;
   const online = last?.online ?? false;
-  const pressure = d?.io_data?.["9"] != null ? +(d.io_data["9"] * 0.006).toFixed(1) : null;
 
   if (loading) {
     return (
@@ -222,7 +247,7 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="px-6 py-6 space-y-6 max-w-5xl">
+    <div className="px-6 py-6 space-y-6 max-w-none w-full">
       <Toast toasts={toasts} onDismiss={dismiss} />
       {/* Header */}
       <div className="flex items-center gap-4">
@@ -261,7 +286,6 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
       {d ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <InfoCard label="Velocidad" value={`${d.speed ?? "–"} km/h`} />
-          <InfoCard label="Presión hidráulica" value={pressure != null ? `${pressure} bar` : "–"} color="var(--warning)" />
           <InfoCard label="Alimentación" value={d.ext_voltage_mv ? `${(d.ext_voltage_mv/1000).toFixed(1)} V` : "–"} />
           <InfoCard label="Satélites" value={`${d.satellites ?? "–"}`} />
           <InfoCard label="Latitud" value={d.lat?.toFixed(5) ?? "–"} />
@@ -273,6 +297,26 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
       ) : (
         <div className="rounded-xl p-6 text-center" style={{ background: "var(--card)", color: "var(--muted)" }}>
           Sin datos de telemetría disponibles
+        </div>
+      )}
+
+      {/* Señales CAN configuradas via variable maps */}
+      {liveSignals.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {liveSignals.map(s => (
+            <InfoCard
+              key={s.io_key}
+              label={s.display_name}
+              value={
+                s.data_type === "boolean"
+                  ? (s.converted_value ? "ON" : "OFF")
+                  : s.converted_value !== null
+                    ? `${s.converted_value}${s.unit ? ` ${s.unit}` : ""}`
+                    : "–"
+              }
+              color={s.data_type === "boolean" ? (s.converted_value ? "var(--success)" : "var(--muted)") : "var(--warning)"}
+            />
+          ))}
         </div>
       )}
 
@@ -445,15 +489,17 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
             </ChartCard>
           )}
 
-          <ChartCard title="Tensión de alimentación (V)">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="time" stroke="var(--muted)" tick={{ fontSize: 10 }} />
-              <YAxis stroke="var(--muted)" tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
-              <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }} />
-              <Line type="monotone" dataKey="voltaje" stroke="#22c55e" strokeWidth={2} dot={false} name="V" />
-            </LineChart>
-          </ChartCard>
+          {chartData.some(d => d.voltaje != null) && (
+            <ChartCard title="Tensión de alimentación (V)">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="time" stroke="var(--muted)" tick={{ fontSize: 10 }} />
+                <YAxis stroke="var(--muted)" tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
+                <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }} />
+                <Line type="monotone" dataKey="voltaje" stroke="#22c55e" strokeWidth={2} dot={false} name="V" connectNulls />
+              </LineChart>
+            </ChartCard>
+          )}
         </>
       ) : (
         <div className="rounded-xl p-6 text-center" style={{ background: "var(--card)", color: "var(--muted)" }}>
@@ -536,6 +582,183 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </div>
+
+      {/* ── Automation section ── */}
+      {autoRules.length > 0 && (
+        <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-white">Automatizaciones</h2>
+            <div className="flex items-center gap-2">
+              {autoSessions.length > 0 && (
+                <button
+                  onClick={() => exportExcel([{
+                    name: "Sesiones",
+                    rows: autoSessions.map(s => {
+                      const ms2 = (s.ended_at ? new Date(s.ended_at) : new Date()).getTime() - new Date(s.started_at).getTime();
+                      return {
+                        "Regla": s.label ?? "—",
+                        "Inicio": new Date(s.started_at).toLocaleString("es-ES"),
+                        "Fin": s.ended_at ? new Date(s.ended_at).toLocaleString("es-ES") : "En curso",
+                        "Duración (min)": Math.floor(ms2 / 60000),
+                        "Posiciones": s.position_count,
+                      };
+                    }),
+                  }], `sesiones_${last?.vehicle_name ?? id}_${new Date().toISOString().slice(0,10)}.xlsx`)}
+                  className="text-xs px-2 py-1 rounded flex items-center gap-1"
+                  style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)" }}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Excel
+                </button>
+              )}
+              {userRole === "superadmin" && (
+                <Link href="/admin/automations"
+                      className="text-xs px-2 py-1 rounded-lg"
+                      style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)" }}>
+                  Gestionar
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Configured rules */}
+          <div className="space-y-2 mb-4">
+            {autoRules.map(rule => {
+              const trackAction = rule.actions.find((a: { type: string }) => a.type === "track_position");
+              const color = (trackAction?.params?.color as string) ?? "#3b82f6";
+              const activeSession = autoSessions.find(s => s.rule_id === rule.id && !s.ended_at);
+              return (
+                <div key={rule.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
+                     style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}>
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{rule.name}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                      {rule.io_key} {rule.condition} {rule.threshold}
+                    </div>
+                  </div>
+                  {activeSession ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 flex items-center gap-1"
+                          style={{ background: "rgba(34,197,94,0.15)", color: "var(--success)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+                      Activa
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: "rgba(100,116,139,0.08)", color: "var(--muted)" }}>
+                      En espera
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Recent sessions */}
+          {autoSessions.length > 0 && (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--muted)" }}>
+                Últimas sesiones
+              </p>
+              <div className="space-y-1.5">
+                {autoSessions.slice(0, 5).map(s => {
+                  const ms = (s.ended_at ? new Date(s.ended_at) : new Date()).getTime() - new Date(s.started_at).getTime();
+                  const mins = Math.floor(ms / 60000);
+                  const dur = mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}min`;
+                  const isSelected = autoMapSession?.id === s.id;
+                  return (
+                    <div key={s.id} className="rounded-lg text-xs overflow-hidden"
+                         style={{ border: `1px solid ${isSelected ? (s.color ?? "#3b82f6") : "var(--border)"}` }}>
+                      <div className="flex items-center gap-3 px-3 py-2"
+                           style={{ background: isSelected ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.03)" }}>
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color ?? "#3b82f6" }} />
+                        <span className="flex-1 text-white truncate">{s.label ?? "Sesión"}</span>
+                        <span style={{ color: "var(--muted)" }}>
+                          {new Date(s.started_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}
+                          {" · "}{dur}{" · "}{s.position_count} pos.
+                        </span>
+                        {!s.ended_at && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                                style={{ background: "rgba(34,197,94,0.15)", color: "var(--success)" }}>En curso</span>
+                        )}
+                        {s.position_count > 0 && (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={async () => {
+                                if (isSelected) { setAutoMapSession(null); setAutoMapPositions([]); return; }
+                                setAutoMapSession(s);
+                                setAutoMapLoading(true);
+                                try {
+                                  const pts = await automations.getSessionPositions(s.id);
+                                  setAutoMapPositions(pts);
+                                } catch { setAutoMapPositions([]); }
+                                finally { setAutoMapLoading(false); }
+                              }}
+                              className="px-2 py-0.5 rounded font-medium"
+                              style={{ background: isSelected ? "rgba(59,130,246,0.25)" : "rgba(255,255,255,0.07)", color: "var(--accent)", fontSize: 11 }}
+                            >
+                              {isSelected ? "Cerrar" : "Ver mapa"}
+                            </button>
+                            <button
+                              title="Exportar PDF con mapa"
+                              onClick={async () => {
+                                const rule = autoRules.find(r => r.id === s.rule_id);
+                                let pts = isSelected ? autoMapPositions : [];
+                                if (!isSelected && s.position_count > 0) {
+                                  try { pts = await automations.getSessionPositions(s.id); } catch { pts = []; }
+                                }
+                                await exportSessionPdf({
+                                  vehicleName: last?.vehicle_name ?? id,
+                                  licensePlate: last?.license_plate,
+                                  ruleName: s.label ?? rule?.name ?? "Automatización",
+                                  ioKey: rule?.io_key ?? "—",
+                                  condition: rule?.condition ?? "eq",
+                                  threshold: rule?.threshold ?? 0,
+                                  session: s,
+                                  positions: pts,
+                                });
+                              }}
+                              className="px-1.5 py-0.5 rounded font-medium"
+                              style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 11 }}
+                            >
+                              PDF
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {/* Inline map for selected session */}
+                      {isSelected && (
+                        <div style={{ height: 280, background: "#111" }}>
+                          {autoMapLoading ? (
+                            <div className="flex items-center justify-center h-full text-xs" style={{ color: "var(--muted)" }}>
+                              Cargando posiciones…
+                            </div>
+                          ) : autoMapPositions.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-xs" style={{ color: "var(--muted)" }}>
+                              Sin posiciones registradas
+                            </div>
+                          ) : (
+                            <TripMap
+                              points={autoMapPositions.map(p => ({ lat: p.lat, lng: p.lng, speed: p.speed ?? 0 }))}
+                              height="280px"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {autoSessions.length === 0 && (
+            <p className="text-xs text-center py-2" style={{ color: "var(--muted)" }}>
+              Aún no se ha registrado ninguna sesión para este vehículo
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Trip history section ── */}
       <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>

@@ -125,16 +125,6 @@ const secondaryNav = [
       </svg>
     ),
   },
-  {
-    href: "/ecodriving",
-    label: "Eco-Driving",
-    icon: (
-      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-              stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
 ];
 
 const adminNav = [
@@ -179,11 +169,12 @@ const adminNav = [
     ),
   },
   {
-    href: "/admin/notifications",
-    label: "Notificaciones",
+    href: "/admin/automations",
+    label: "Automatizaciones",
+    superadminOnly: true,
     icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
               stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
@@ -320,7 +311,7 @@ export default function Sidebar() {
             <p className="text-xs px-3 pt-4 pb-1 font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
               Administración
             </p>
-            {adminNav.map(item => <DesktopNavItem key={item.href} {...item} />)}
+            {adminNav.filter(item => !item.superadminOnly || userRole === "superadmin").map(item => <DesktopNavItem key={item.href} {...item} />)}
           </>
         )}
       </nav>
@@ -368,7 +359,7 @@ export default function Sidebar() {
       {/* ── Desktop sidebar (md+) ─────────────────────────────────────────── */}
       <aside
         className="hidden md:flex flex-col h-full flex-shrink-0"
-        style={{ width: 220, background: "var(--sidebar)", borderRight: "1px solid var(--border)" }}
+        style={{ width: 260, background: "var(--sidebar)", borderRight: "1px solid var(--border)" }}
       >
         {desktopSidebar}
       </aside>
@@ -520,7 +511,7 @@ export default function Sidebar() {
               </p>
             </div>
             <div className="px-4 pb-2 grid grid-cols-3 gap-3">
-              {adminNav.map(item => {
+              {adminNav.filter(item => !item.superadminOnly || userRole === "superadmin").map(item => {
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <Link

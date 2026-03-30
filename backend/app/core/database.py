@@ -41,6 +41,7 @@ async def init_db():
     """Create all tables and configure TimescaleDB hypertables."""
     from app.models import tenant, user, vehicle, device, telemetry, variable_map, command_log, alert_log, maintenance, geofence, push_subscription  # noqa
     from app.models.tenant_notification_config import TenantNotificationConfig  # noqa
+    from app.models.automation_rule import AutomationRule, AutomationSession, AutomationPositionLog  # noqa
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   admin,
   variableMaps,
@@ -12,6 +13,82 @@ import Modal from "@/components/Modal";
 
 const DATA_TYPES = ["gauge", "counter", "boolean", "hours"] as const;
 type DataType = (typeof DATA_TYPES)[number];
+
+// ─── IO Key catalogue ─────────────────────────────────────────────────────────
+interface IoOption { value: string; label: string; }
+interface IoGroup  { group: string; options: IoOption[]; }
+
+const IO_KEY_GROUPS: IoGroup[] = [
+  {
+    group: "Columnas estándar (telemetría directa)",
+    options: [
+      { value: "ignition",        label: "ignition — Ignición (IO 239)" },
+      { value: "movement",        label: "movement — Movimiento (IO 240)" },
+      { value: "speed",           label: "speed — Velocidad km/h (IO 24)" },
+      { value: "ext_voltage_mv",  label: "ext_voltage_mv — Tensión externa mV (IO 66)" },
+      { value: "battery_mv",      label: "battery_mv — Batería interna mV (IO 67)" },
+      { value: "battery_current", label: "battery_current — Corriente batería (IO 68)" },
+      { value: "odometer_m",      label: "odometer_m — Odómetro metros (IO 16)" },
+      { value: "gsm_signal",      label: "gsm_signal — Señal GSM (IO 21)" },
+      { value: "rssi",            label: "rssi — RSSI radio (IO 22)" },
+      { value: "sleep_mode",      label: "sleep_mode — Modo sleep (IO 200)" },
+      { value: "din1",            label: "din1 — Entrada digital 1 (IO 1)" },
+      { value: "din2",            label: "din2 — Entrada digital 2 (IO 2)" },
+      { value: "din3",            label: "din3 — Entrada digital 3 (IO 3)" },
+      { value: "din4",            label: "din4 — Entrada digital 4 (IO 4)" },
+      { value: "dout1_status",    label: "dout1_status — Salida digital 1 (IO 179)" },
+      { value: "dout2_status",    label: "dout2_status — Salida digital 2 (IO 180)" },
+      { value: "dout3_status",    label: "dout3_status — Salida digital 3 (IO 181)" },
+      { value: "dout4_status",    label: "dout4_status — Salida digital 4 (IO 182)" },
+      { value: "analog_1_mv",     label: "analog_1_mv — AIN1 mV (IO 9)" },
+      { value: "analog_2_mv",     label: "analog_2_mv — AIN2 mV (IO 10)" },
+      { value: "analog_3_mv",     label: "analog_3_mv — AIN3 mV (IO 11)" },
+      { value: "dallas_temp_1",   label: "dallas_temp_1 — Sonda Dallas 1 (IO 71)" },
+    ],
+  },
+  {
+    group: "Manual CAN — slots 00–09 (AVL 145–154)",
+    options: Array.from({ length: 10 }, (_, i) => ({
+      value: String(145 + i),
+      label: `${145 + i} — Manual CAN slot ${String(i).padStart(2, "0")}`,
+    })),
+  },
+  {
+    group: "Manual CAN — slots 10–19 (AVL 380–389)",
+    options: Array.from({ length: 10 }, (_, i) => ({
+      value: String(380 + i),
+      label: `${380 + i} — Manual CAN slot ${String(10 + i).padStart(2, "0")}`,
+    })),
+  },
+  {
+    group: "Manual CAN — slots 20–69 (AVL 10298–10347)",
+    options: Array.from({ length: 50 }, (_, i) => ({
+      value: String(10298 + i),
+      label: `${10298 + i} — Manual CAN slot ${String(20 + i).padStart(2, "0")}`,
+    })),
+  },
+];
+
+const ALL_IO_VALUES = new Set(
+  IO_KEY_GROUPS.flatMap(g => g.options.map(o => o.value))
+);
+
+// Auto display names for known IO keys
+const IO_DEFAULT_NAMES: Record<string, string> = {
+  ignition: "Ignición", movement: "Movimiento", speed: "Velocidad",
+  ext_voltage_mv: "Tensión externa", battery_mv: "Batería interna",
+  battery_current: "Corriente batería", odometer_m: "Odómetro",
+  gsm_signal: "Señal GSM", rssi: "RSSI", sleep_mode: "Sleep mode",
+  din1: "Entrada digital 1", din2: "Entrada digital 2",
+  din3: "Entrada digital 3", din4: "Entrada digital 4",
+  dout1_status: "Salida digital 1", dout2_status: "Salida digital 2",
+  dout3_status: "Salida digital 3", dout4_status: "Salida digital 4",
+  analog_1_mv: "AIN1 mV", analog_2_mv: "AIN2 mV", analog_3_mv: "AIN3 mV",
+  dallas_temp_1: "Temperatura Dallas 1",
+};
+for (let i = 0; i < 10; i++) IO_DEFAULT_NAMES[String(145 + i)] = `Manual CAN slot ${String(i).padStart(2,"0")}`;
+for (let i = 0; i < 10; i++) IO_DEFAULT_NAMES[String(380 + i)] = `Manual CAN slot ${String(10+i).padStart(2,"0")}`;
+for (let i = 0; i < 50; i++) IO_DEFAULT_NAMES[String(10298 + i)] = `Manual CAN slot ${String(20+i).padStart(2,"0")}`;
 
 interface VariableForm {
   io_key: string;
@@ -56,6 +133,23 @@ function VariableModal({
   onClose: () => void;
   error: string;
 }) {
+  // Determine if the current io_key is from the catalogue or custom
+  const isCustom = form.io_key !== "" && !ALL_IO_VALUES.has(form.io_key);
+  const selectValue = isCustom ? "__custom__" : form.io_key;
+
+  function handleSelectChange(val: string) {
+    if (val === "__custom__") {
+      setForm(f => ({ ...f, io_key: "" }));
+      return;
+    }
+    const autoName = IO_DEFAULT_NAMES[val] ?? "";
+    setForm(f => ({
+      ...f,
+      io_key: val,
+      display_name: f.display_name || autoName,
+    }));
+  }
+
   return (
     <Modal
       title={editing ? `Editar: ${editing.display_name}` : title}
@@ -65,14 +159,32 @@ function VariableModal({
         {subtitle}
       </p>
       <div className="space-y-4">
-        <Field label="IO Key (p. ej. ain1_mv, io_300, dout1)">
-          <input
-            value={form.io_key}
-            onChange={(e) => setForm((f) => ({ ...f, io_key: e.target.value }))}
-            placeholder="ain1_mv"
-            className="w-full px-3 py-2.5 rounded-lg text-sm font-mono text-white"
+        <Field label="IO Key">
+          <select
+            value={selectValue}
+            onChange={e => handleSelectChange(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-lg text-sm text-white"
             style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
-          />
+          >
+            <option value="" disabled>— Selecciona un IO key —</option>
+            {IO_KEY_GROUPS.map(grp => (
+              <optgroup key={grp.group} label={grp.group}>
+                {grp.options.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </optgroup>
+            ))}
+            <option value="__custom__">✏ Personalizado (escribir manualmente)</option>
+          </select>
+          {(isCustom || selectValue === "__custom__") && (
+            <input
+              value={form.io_key}
+              onChange={e => setForm(f => ({ ...f, io_key: e.target.value }))}
+              placeholder="Escribe el IO key exacto"
+              className="w-full mt-2 px-3 py-2.5 rounded-lg text-sm font-mono text-white"
+              style={{ background: "var(--sidebar)", border: "1px solid var(--border)" }}
+            />
+          )}
         </Field>
         <Field label="Nombre para mostrar">
           <input
@@ -366,6 +478,20 @@ export default function AdminVariableMapsPage() {
   const [form, setForm] = useState<VariableForm>(emptyForm());
   const [modalError, setModalError] = useState("");
 
+  // Role check
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("cmg_user");
+      if (raw) {
+        const user = JSON.parse(raw);
+        setIsSuperadmin(user?.role === "superadmin");
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Load tenants + vehicles on mount
   useEffect(() => {
     Promise.all([admin.listTenants(), admin.listVehicles()])
@@ -495,10 +621,25 @@ export default function AdminVariableMapsPage() {
   }
 
   return (
-    <div className="px-4 py-6 max-w-5xl">
+    <div className="px-4 py-6 max-w-none w-full">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-lg font-bold text-white">Variables IO</h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-lg font-bold text-white">Variables IO</h1>
+          {isSuperadmin && (
+            <Link
+              href="/admin/can-sniffer"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors"
+              style={{
+                background: "var(--sidebar)",
+                color: "var(--muted)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              CAN Sniffer
+            </Link>
+          )}
+        </div>
         <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
           Configura las claves IO: nombres, unidades, factores de escala y alertas.
           Las plantillas de fabricante se heredan en todos sus vehículos.

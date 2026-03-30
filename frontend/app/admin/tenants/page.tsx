@@ -251,7 +251,7 @@ export default function TenantsPage() {
   }
 
   return (
-    <div className="px-6 py-6 max-w-3xl">
+    <div className="px-6 py-6 max-w-none w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-bold text-white">Clientes y Fabricantes</h1>

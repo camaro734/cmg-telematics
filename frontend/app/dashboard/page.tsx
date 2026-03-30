@@ -122,7 +122,7 @@ export default function DashboardPage() {
   );
 
   const online = fleet.filter(v => v.device?.online).length;
-  const withPosition = fleet.filter(v => v.last_position?.lat != null).length;
+  const withPosition = fleet.filter(v => v.device?.online && v.last_position?.lat != null).length;
   const ignitionOn = fleet.filter(v => v.last_position?.ignition).length;
 
   return (

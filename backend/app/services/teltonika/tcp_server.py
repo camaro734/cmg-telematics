@@ -23,6 +23,8 @@ from app.models.alert_rule import AlertRule
 from app.models.alert_log import AlertLog
 from app.models.geofence import Geofence, GeofenceEvent
 from app.models.vehicle import Vehicle
+from app.models.tenant import Tenant
+from app.models.automation_rule import AutomationRule, AutomationSession, AutomationPositionLog
 from app.services.geofence import is_inside_geofence
 from app.services.teltonika.codec8 import parse_codec8, AVLRecord
 from app.services.teltonika import device_registry
@@ -48,6 +50,9 @@ class TeltonikaServer:
         # Per-IMEI command queues: commands are flushed AFTER each ACK.
         # This guarantees the byte stream is always: ACK → command, never command → ACK.
         self._command_queues: dict[str, asyncio.Queue] = {}
+        # Per-IMEI automation locks: serialize _check_automations calls so that
+        # multi-record packets don't create duplicate sessions concurrently.
+        self._automation_locks: dict[str, asyncio.Lock] = {}
 
     async def start(self):
         self._server = await asyncio.start_server(
@@ -299,6 +304,13 @@ class TeltonikaServer:
         asyncio.create_task(self._check_alerts(device, avl))
         # Fire-and-forget geofence evaluation — does not block the ACK path
         asyncio.create_task(self._check_geofences(device, avl))
+        # Fire-and-forget automation engine — does not block the ACK path
+        # Lock serializes calls per device so multi-record packets don't open duplicate sessions.
+        auto_lock = self._automation_locks.setdefault(device.imei, asyncio.Lock())
+        async def _locked_check():
+            async with auto_lock:
+                await self._check_automations(device, avl, record.time)
+        asyncio.create_task(_locked_check())
 
     async def _check_alerts(self, device: Device, avl: AVLRecord):
         """
@@ -574,6 +586,171 @@ class TeltonikaServer:
 
         except Exception as e:
             logger.error(f"Error in _check_geofences for device {device.imei}: {e}")
+
+    async def _check_automations(self, device: Device, avl: AVLRecord, record_time: datetime):
+        """
+        Evaluate AutomationRule triggers and execute actions.
+        - When trigger fires: open AutomationSession, run start actions.
+        - While trigger is active: run per-record actions (e.g. track_position).
+        - When trigger clears: close the open session.
+        Runs as fire-and-forget task — never blocks the ACK path.
+        """
+        if device.vehicle_id is None:
+            return
+
+        IO_NAME_TO_ID: dict[str, int] = {
+            "ignition": 239, "din1": 1, "din2": 2, "din3": 3, "din4": 4,
+            "gsm_signal": 21,
+            "ain1_mv": 9, "ain2_mv": 10, "ain3_mv": 11,
+            "dout1": 179, "dout2": 180, "dout3": 181, "dout4": 182,
+            "ext_voltage_mv": 66, "battery_mv": 67,
+            "speed": 24,
+        }
+
+        def _resolve(io_key: str, io: dict) -> float | None:
+            if io_key in IO_NAME_TO_ID:
+                v = io.get(IO_NAME_TO_ID[io_key])
+                return float(v) if v is not None else None
+            try:
+                v = io.get(int(io_key))
+                return float(v) if v is not None else None
+            except (ValueError, TypeError):
+                pass
+            if io_key.startswith("io_"):
+                try:
+                    v = io.get(int(io_key[3:]))
+                    return float(v) if v is not None else None
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        def _eval(value: float, condition: str, threshold: float) -> bool:
+            return {
+                "gt": value > threshold, "lt": value < threshold,
+                "gte": value >= threshold, "lte": value <= threshold,
+                "eq": abs(value - threshold) < 1e-9,
+                "neq": abs(value - threshold) >= 1e-9,
+            }.get(condition, False)
+
+        try:
+            async with AsyncSessionLocal() as db:
+                # Resolve vehicle's tenant to filter rules correctly
+                vehicle_result = await db.execute(
+                    select(Vehicle).where(Vehicle.id == device.vehicle_id)
+                )
+                vehicle = vehicle_result.scalar_one_or_none()
+                if not vehicle:
+                    return
+
+                # Build ancestor chain for the vehicle's tenant so that rules assigned
+                # to a parent tenant also fire for vehicles in child tenants.
+                all_tenants_result = await db.execute(select(Tenant).where(Tenant.active == True))
+                all_tenants = {t.id: t for t in all_tenants_result.scalars().all()}
+                ancestor_ids: set = set()
+                tid = vehicle.tenant_id
+                while tid is not None:
+                    ancestor_ids.add(tid)
+                    t = all_tenants.get(tid)
+                    tid = t.parent_id if t else None
+
+                result = await db.execute(
+                    select(AutomationRule)
+                    .where(AutomationRule.active == True)
+                    .where(AutomationRule.tenant_id.in_(ancestor_ids))
+                    .where(
+                        (AutomationRule.vehicle_id == device.vehicle_id) |
+                        (AutomationRule.vehicle_id.is_(None))
+                    )
+                )
+                rules = result.scalars().all()
+                if not rules:
+                    return
+
+                io = avl.io
+                lat = avl.lat if avl.lat != 0 else None
+                lng = avl.lng if avl.lng != 0 else None
+
+                for rule in rules:
+                    raw = _resolve(rule.io_key, io)
+                    if raw is None:
+                        continue
+
+                    converted = raw * rule.scale_factor + rule.offset
+                    triggered = _eval(converted, rule.condition, rule.threshold)
+
+                    # Find open session for this rule + device
+                    open_result = await db.execute(
+                        select(AutomationSession)
+                        .where(AutomationSession.rule_id == rule.id)
+                        .where(AutomationSession.device_id == device.id)
+                        .where(AutomationSession.ended_at.is_(None))
+                        .order_by(AutomationSession.started_at.desc())
+                        .limit(1)
+                    )
+                    open_session = open_result.scalar_one_or_none()
+
+                    if not triggered and open_session:
+                        # Condition cleared — close the session
+                        open_session.ended_at = record_time
+                        await db.commit()
+                        logger.info(
+                            f"AUTOMATION '{rule.name}': session closed for device {device.imei}"
+                        )
+                        continue
+
+                    if not triggered:
+                        continue
+
+                    # Trigger is active — open session if needed
+                    if not open_session:
+                        # Pick label/color from first track_position action if present
+                        label = rule.name
+                        color = "#3b82f6"
+                        for action in (rule.actions or []):
+                            if action.get("type") == "track_position":
+                                params = action.get("params", {})
+                                label = params.get("label", label)
+                                color = params.get("color", color)
+                                break
+
+                        open_session = AutomationSession(
+                            id=uuid.uuid4(),
+                            rule_id=rule.id,
+                            device_id=device.id,
+                            vehicle_id=device.vehicle_id,
+                            started_at=record_time,
+                            label=label,
+                            color=color,
+                        )
+                        db.add(open_session)
+                        await db.commit()
+                        await db.refresh(open_session)
+                        logger.info(
+                            f"AUTOMATION '{rule.name}': session opened for device {device.imei} "
+                            f"(trigger={rule.io_key} {rule.condition} {rule.threshold})"
+                        )
+
+                    # Execute per-record actions
+                    for action in (rule.actions or []):
+                        action_type = action.get("type")
+
+                        if action_type == "track_position":
+                            if lat is not None and lng is not None:
+                                pos = AutomationPositionLog(
+                                    id=uuid.uuid4(),
+                                    session_id=open_session.id,
+                                    time=record_time,
+                                    lat=lat,
+                                    lng=lng,
+                                    speed=avl.speed if avl.speed else None,
+                                )
+                                db.add(pos)
+                            # (future action types go here as elif blocks)
+
+                    await db.commit()
+
+        except Exception as e:
+            logger.error(f"Error in _check_automations for device {device.imei}: {e}")
 
     async def send_command(self, imei: str, command: str) -> None:
         """

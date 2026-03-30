@@ -153,7 +153,7 @@ export default function AdminVehiclesPage() {
   }
 
   return (
-    <div className="px-6 py-6 max-w-5xl">
+    <div className="px-6 py-6 max-w-none w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

@@ -91,6 +91,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
 
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return res.json();
 }
 
@@ -898,4 +901,114 @@ export const alertRules = {
   delete: (id: string) =>
     request<void>(`/api/v1/alert-rules/${id}`, { method: "DELETE" }),
   listConditions: () => request<ConditionOption[]>("/api/v1/alert-rules/conditions"),
+};
+
+// ─── Automations ──────────────────────────────────────────────────────────────
+
+export interface AutomationAction {
+  type: string;
+  params: Record<string, unknown>;
+}
+
+export interface AutomationRuleOut {
+  id: string;
+  tenant_id: string;
+  vehicle_id: string | null;
+  name: string;
+  description: string | null;
+  io_key: string;
+  condition: string;
+  threshold: number;
+  scale_factor: number;
+  offset: number;
+  actions: AutomationAction[];
+  active: boolean;
+  created_at: string;
+  vehicle_name: string | null;
+}
+
+export interface AutomationSessionOut {
+  id: string;
+  rule_id: string;
+  device_id: string;
+  vehicle_id: string;
+  started_at: string;
+  ended_at: string | null;
+  label: string | null;
+  color: string | null;
+  position_count: number;
+}
+
+export interface AutomationPositionOut {
+  time: string;
+  lat: number;
+  lng: number;
+  speed: number | null;
+}
+
+export interface AutomationActionType {
+  type: string;
+  label: string;
+  description: string;
+}
+
+export const automations = {
+  listActionTypes: () =>
+    request<AutomationActionType[]>("/api/v1/automations/action-types"),
+
+  list: (params?: { tenant_id?: string; vehicle_id?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.tenant_id) qs.set("tenant_id", params.tenant_id);
+    if (params?.vehicle_id) qs.set("vehicle_id", params.vehicle_id);
+    const q = qs.toString();
+    return request<AutomationRuleOut[]>(`/api/v1/automations${q ? "?" + q : ""}`);
+  },
+
+  create: (body: {
+    tenant_id: string;
+    vehicle_id?: string | null;
+    name: string;
+    description?: string;
+    io_key: string;
+    condition: string;
+    threshold: number;
+    scale_factor?: number;
+    offset?: number;
+    actions: AutomationAction[];
+  }) =>
+    request<AutomationRuleOut>("/api/v1/automations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, body: Partial<{
+    tenant_id: string;
+    vehicle_id: string | null;
+    clear_vehicle: boolean;
+    name: string;
+    description: string;
+    io_key: string;
+    condition: string;
+    threshold: number;
+    scale_factor: number;
+    offset: number;
+    actions: AutomationAction[];
+    active: boolean;
+  }>) =>
+    request<AutomationRuleOut>(`/api/v1/automations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  delete: (id: string) =>
+    request<void>(`/api/v1/automations/${id}`, { method: "DELETE" }),
+
+  listSessionsByVehicle: (vehicleId: string, limit = 20) =>
+    request<AutomationSessionOut[]>(`/api/v1/automations/sessions?vehicle_id=${vehicleId}&limit=${limit}`),
+
+  listSessions: (ruleId: string, limit = 50) =>
+    request<AutomationSessionOut[]>(`/api/v1/automations/${ruleId}/sessions?limit=${limit}`),
+
+  getSessionPositions: (sessionId: string) =>
+    request<AutomationPositionOut[]>(`/api/v1/automations/sessions/${sessionId}/positions`),
 };
