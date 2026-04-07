@@ -12,9 +12,18 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
+      # ios_signing usa las variables APP_STORE_CONNECT_* para crear/descargar
+      # el certificado y el perfil de aprovisionamiento automáticamente.
+      # Mapeamos nuestros nombres sin guiones bajos a los nombres esperados.
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: es.cmgnexus.telematics
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
+        APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
+        APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
       groups:
         - apple_signing
 
@@ -55,30 +64,6 @@ workflows:
             find mobile/ios -name "*.entitlements" 2>/dev/null
           fi
 
-      - name: Configurar firma de código (crea certificado y perfil si no existen)
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --issuer-id "$ASCISSUERID" \
-            --key-id "$ASCKEYID" \
-            --private-key "$ASCPRIVATEKEY" \
-            --type IOS_APP_DEVELOPMENT \
-            --create
-          keychain add-certificates
-          echo "=== Perfiles descargados ==="
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null || echo "Ninguno"
-          xcode-project use-profiles \
-            --workspace mobile/ios/CMGTelematics.xcworkspace \
-            --project mobile/ios/CMGTelematics.xcodeproj
-
-      - name: Verificar workspace generado
-        script: |
-          echo "=== Workspaces en mobile/ios/ ==="
-          ls mobile/ios/*.xcworkspace 2>/dev/null || echo "Ninguno"
-          echo "=== Schemes disponibles ==="
-          xcodebuild -workspace mobile/ios/CMGTelematics.xcworkspace -list 2>/dev/null || \
-          xcodebuild -workspace mobile/ios/*.xcworkspace -list 2>/dev/null || echo "No se pudo listar"
-
       - name: Build iOS .ipa
         script: |
           cd mobile
@@ -110,9 +95,15 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: es.cmgnexus.telematics
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
+        APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
+        APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
       groups:
         - apple_signing
 
@@ -144,9 +135,9 @@ workflows:
 
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        api_key: $ASCPRIVATEKEY
+        key_id: $ASCKEYID
+        issuer_id: $ASCISSUERID
         submit_to_testflight: true
       email:
         recipients:
