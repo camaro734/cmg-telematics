@@ -7,7 +7,7 @@
     "icon": "./assets/logo-color.png",
     "scheme": "cmgtelematics",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/logo-dark.png",
       "resizeMode": "contain",
