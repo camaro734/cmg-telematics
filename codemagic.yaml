@@ -14,7 +14,7 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
-        XCODE_SCHEME: "cmgtelematics"
+        XCODE_SCHEME: "CMGTelematics"
       groups:
         - apple_signing
 
@@ -53,11 +53,19 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
 
+      - name: Verificar workspace generado
+        script: |
+          echo "=== Workspaces en mobile/ios/ ==="
+          ls mobile/ios/*.xcworkspace 2>/dev/null || echo "Ninguno"
+          echo "=== Schemes disponibles ==="
+          xcodebuild -workspace mobile/ios/CMGTelematics.xcworkspace -list 2>/dev/null || \
+          xcodebuild -workspace mobile/ios/*.xcworkspace -list 2>/dev/null || echo "No se pudo listar"
+
       - name: Build iOS .ipa
         script: |
           cd mobile
           xcode-project build-ipa \
-            --workspace ios/cmgtelematics.xcworkspace \
+            --workspace ios/CMGTelematics.xcworkspace \
             --scheme "$XCODE_SCHEME"
 
     artifacts:
@@ -85,7 +93,7 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
-        XCODE_SCHEME: "cmgtelematics"
+        XCODE_SCHEME: "CMGTelematics"
       groups:
         - apple_signing
 
@@ -109,7 +117,7 @@ workflows:
         script: |
           cd mobile
           xcode-project build-ipa \
-            --workspace ios/cmgtelematics.xcworkspace \
+            --workspace ios/CMGTelematics.xcworkspace \
             --scheme "$XCODE_SCHEME"
 
     artifacts:
