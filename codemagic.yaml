@@ -65,7 +65,11 @@ workflows:
             --type IOS_APP_DEVELOPMENT \
             --create
           keychain add-certificates
-          xcode-project use-profiles
+          echo "=== Perfiles descargados ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null || echo "Ninguno"
+          xcode-project use-profiles \
+            --workspace mobile/ios/CMGTelematics.xcworkspace \
+            --project mobile/ios/CMGTelematics.xcodeproj
 
       - name: Verificar workspace generado
         script: |
