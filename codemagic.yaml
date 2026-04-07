@@ -12,18 +12,9 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
-      # ios_signing usa las variables APP_STORE_CONNECT_* para crear/descargar
-      # el certificado y el perfil de aprovisionamiento automáticamente.
-      # Mapeamos nuestros nombres sin guiones bajos a los nombres esperados.
-      ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: es.cmgnexus.telematics
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
-        APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
-        APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
-        APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
       groups:
         - apple_signing
 
@@ -54,15 +45,26 @@ workflows:
         script: |
           ENTITLEMENTS="mobile/ios/CMGTelematics/CMGTelematics.entitlements"
           if [ -f "$ENTITLEMENTS" ]; then
-            echo "Entitlements antes:"
-            cat "$ENTITLEMENTS"
-            plutil -remove "aps-environment" "$ENTITLEMENTS" 2>/dev/null && echo "aps-environment eliminado" || echo "aps-environment no estaba presente"
-            echo "Entitlements después:"
-            cat "$ENTITLEMENTS"
-          else
-            echo "No se encontró fichero de entitlements en $ENTITLEMENTS"
-            find mobile/ios -name "*.entitlements" 2>/dev/null
+            plutil -remove "aps-environment" "$ENTITLEMENTS" 2>/dev/null || true
           fi
+
+      - name: Configurar firma de código
+        script: |
+          # Escribir la clave privada a fichero temporal
+          echo "$CERTKEY" > /tmp/cert.key
+          # Inicializar keychain
+          keychain initialize
+          # Descargar/crear certificado y perfiles usando nuestra clave privada
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --issuer-id "$ASCISSUERID" \
+            --key-id "$ASCKEYID" \
+            --private-key "$ASCPRIVATEKEY" \
+            --certificate-key "@file:/tmp/cert.key" \
+            --type IOS_APP_DEVELOPMENT \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+          rm -f /tmp/cert.key
 
       - name: Build iOS .ipa
         script: |
