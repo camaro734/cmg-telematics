@@ -12,6 +12,8 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
+      integrations:
+        app_store_connect: Codemagic CMG
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "cmgtelematics"
@@ -72,6 +74,8 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
+      integrations:
+        app_store_connect: Codemagic CMG
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "cmgtelematics"
