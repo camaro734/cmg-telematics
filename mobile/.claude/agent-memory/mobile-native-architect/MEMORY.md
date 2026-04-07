@@ -1,0 +1,1 @@
+- [WebSocket, Map, and DOUT implementation](project_ws_and_map.md) — WS hook pattern, dashboard map split layout, DOUT commands, EAS setup, TS5076 fix
