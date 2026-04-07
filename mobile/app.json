@@ -17,6 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "es.cmgnexus.telematics",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "CMG Telematics uses your location to show your position relative to fleet vehicles.",
         "NSCameraUsageDescription": "CMG Telematics uses the camera to capture geotagged photos during task execution.",
         "NSPhotoLibraryUsageDescription": "CMG Telematics saves task photos to your photo library."
@@ -47,6 +48,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "14248d0f-1e1d-44b2-b05e-4cddf8abb7da"
+      }
+    },
+    "owner": "camaro734"
   }
 }
