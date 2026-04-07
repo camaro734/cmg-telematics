@@ -1,0 +1,119 @@
+workflows:
+
+  # ── iOS Development Build ─────────────────────────────────────────────────────
+  # Genera un .ipa de desarrollo firmado para instalar en dispositivos físicos.
+  # Se lanza automáticamente en cada push a main.
+  ios-development:
+    name: CMG Telematics — iOS Development
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 23.11.1
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "es.cmgnexus.telematics"
+        XCODE_SCHEME: "cmgtelematics"
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: es.cmgnexus.telematics
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    scripts:
+      - name: Instalar dependencias Node
+        script: |
+          cd mobile
+          npm install --legacy-peer-deps
+
+      - name: Expo Prebuild (genera proyecto iOS nativo)
+        script: |
+          cd mobile
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: CocoaPods install
+        script: |
+          cd mobile/ios
+          pod install
+
+      - name: Build iOS .ipa
+        script: |
+          cd mobile
+          xcode-project build-ipa \
+            --workspace ios/cmgtelematics.xcworkspace \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - mobile/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - camaro734@icloud.com
+        notify:
+          success: true
+          failure: true
+
+  # ── iOS Production Build ──────────────────────────────────────────────────────
+  # Para subir a TestFlight / App Store. Lanzar manualmente desde Codemagic.
+  ios-production:
+    name: CMG Telematics — iOS Production
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 23.11.1
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "es.cmgnexus.telematics"
+        XCODE_SCHEME: "cmgtelematics"
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: es.cmgnexus.telematics
+
+    scripts:
+      - name: Instalar dependencias Node
+        script: |
+          cd mobile
+          npm install --legacy-peer-deps
+
+      - name: Expo Prebuild
+        script: |
+          cd mobile
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: CocoaPods install
+        script: |
+          cd mobile/ios
+          pod install
+
+      - name: Build iOS App Store
+        script: |
+          cd mobile
+          xcode-project build-ipa \
+            --workspace ios/cmgtelematics.xcworkspace \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - mobile/build/ios/ipa/*.ipa
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+      email:
+        recipients:
+          - camaro734@icloud.com
+        notify:
+          success: true
+          failure: true
