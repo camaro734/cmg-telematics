@@ -47,23 +47,17 @@ export default function LoginPage() {
               />
             </div>
           ) : (
-            <div
-              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
-              style={{ background: accentColor }}
-            >
-              <svg width="28" height="28" fill="none" viewBox="0 0 24 24">
-                <path
-                  d="M12 2L2 7v10l10 5 10-5V7L12 2z"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                  fill="rgba(255,255,255,0.15)"
-                />
-                <circle cx="12" cy="12" r="3" fill="white" />
-              </svg>
+            <div className="flex justify-center mb-4">
+              <img
+                src="/logo-white.png"
+                alt="CMG Hidráulica"
+                style={{ width: 200, height: "auto", margin: "0 auto 32px", display: "block" }}
+              />
             </div>
           )}
-          <h1 className="text-2xl font-bold text-white">{branding.brand_name}</h1>
+          {branding.is_custom && (
+            <h1 className="text-2xl font-bold text-white">{branding.brand_name}</h1>
+          )}
           <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
             {branding.is_custom
               ? "Portal de gestión de flota"

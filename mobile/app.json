@@ -4,12 +4,12 @@
     "slug": "cmg-telematics",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo-color.png",
     "scheme": "cmgtelematics",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo-dark.png",
       "resizeMode": "contain",
       "backgroundColor": "#0f1117"
     },
@@ -26,7 +26,7 @@
     "android": {
       "package": "es.cmgnexus.telematics",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logo-color.png",
         "backgroundColor": "#0f1117"
       },
       "edgeToEdgeEnabled": true,

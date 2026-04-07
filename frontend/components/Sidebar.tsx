@@ -268,29 +268,20 @@ export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette
         const effectiveName = userBranding?.brand_name || (branding.is_custom ? branding.brand_name : "CMG");
         const effectiveSubtitle = (userBranding?.is_custom || branding.is_custom) ? "Fleet Management" : "Telematics";
         return (
-          <div className="px-5 py-5 flex items-center gap-3 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+          <div className="px-5 py-5 flex items-center border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
             {effectiveLogo ? (
               <img
                 src={effectiveLogo}
                 alt={effectiveName}
-                className="h-7 max-w-[120px] object-contain flex-shrink-0"
+                className="h-7 max-w-[140px] object-contain flex-shrink-0"
                 style={{ filter: "brightness(0) invert(1)" }}
               />
             ) : (
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                   style={{ background: "var(--accent)" }}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-                  <path d="M12 2L2 7v10l10 5 10-5V7L12 2z" stroke="white" strokeWidth="1.5"
-                        strokeLinejoin="round" fill="rgba(255,255,255,0.2)" />
-                  <circle cx="12" cy="12" r="2.5" fill="white" />
-                </svg>
-              </div>
-            )}
-            {!effectiveLogo && (
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-white leading-tight truncate">{effectiveName}</div>
-                <div className="text-xs leading-tight" style={{ color: "var(--muted)" }}>{effectiveSubtitle}</div>
-              </div>
+              <img
+                src="/logo-white.png"
+                alt="CMG Hidráulica"
+                style={{ width: 140, height: "auto", display: "block" }}
+              />
             )}
           </div>
         );

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -61,10 +62,10 @@ export default function LoginScreen() {
       >
         {/* Logo / marca */}
         <View style={styles.logoSection}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoInitials}>CMG</Text>
-          </View>
-          <Text style={styles.logoTitle}>CMG Telematics</Text>
+          <Image
+            source={require('@/assets/logo-dark.png')}
+            style={styles.logoImage}
+          />
           <Text style={styles.logoSubtitle}>Plataforma de telemetría industrial</Text>
         </View>
 
@@ -146,26 +147,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
-  logoBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  logoInitials: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  logoTitle: {
-    color: Colors.text,
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+  logoImage: {
+    width: 200,
+    height: 85,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   logoSubtitle: {
     color: Colors.textSecondary,

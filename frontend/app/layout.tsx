@@ -3,8 +3,8 @@ import "./globals.css";
 import { BrandingProvider } from "@/context/BrandingContext";
 
 export const metadata: Metadata = {
-  title: "CMG Telematics",
-  description: "Plataforma de telemática industrial — CMG Metalhidráulica S.L.",
+  title: "CMG Telematics | CMG Hidráulica",
+  description: "Plataforma de telemática industrial para flotas de maquinaria especial",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

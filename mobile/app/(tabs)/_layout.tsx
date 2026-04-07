@@ -1,6 +1,6 @@
 // Bottom tabs layout — 4 tabs principales
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { useAlerts } from '@/hooks/useAlerts';
 
@@ -60,7 +60,12 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Flota',
-          headerTitle: 'CMG Flota',
+          headerTitle: () => (
+            <Image
+              source={require('@/assets/logo-dark.png')}
+              style={{ width: 120, height: 50, resizeMode: 'contain' }}
+            />
+          ),
           tabBarLabel: 'Flota',
           tabBarIcon: ({ focused }) => <TabIcon name="fleet" focused={focused} />,
         }}
