@@ -7,8 +7,6 @@ workflows:
     name: CMG Telematics — iOS Development
     max_build_duration: 60
     instance_type: mac_mini_m2
-    integrations:
-      app_store_connect: Codemagic CMG
 
     environment:
       node: 23.11.1
@@ -17,6 +15,8 @@ workflows:
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "cmgtelematics"
+      groups:
+        - apple_signing
 
     triggering:
       events:
@@ -45,6 +45,9 @@ workflows:
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
             --type IOS_APP_DEVELOPMENT \
             --create
           keychain add-certificates
@@ -75,8 +78,6 @@ workflows:
     name: CMG Telematics — iOS Production
     max_build_duration: 90
     instance_type: mac_mini_m2
-    integrations:
-      app_store_connect: Codemagic CMG
 
     environment:
       node: 23.11.1
@@ -85,9 +86,8 @@ workflows:
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "cmgtelematics"
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: es.cmgnexus.telematics
+      groups:
+        - apple_signing
 
     scripts:
       - name: Instalar dependencias Node
