@@ -78,32 +78,10 @@ workflows:
       - name: Build iOS .ipa
         script: |
           cd mobile
-          xcodebuild \
-            -workspace ios/CMGTelematics.xcworkspace \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Debug \
-            -sdk iphoneos \
-            -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM="$APPLETEAMID" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            -allowProvisioningUpdates \
-            -allowProvisioningDeviceRegistration
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist /dev/stdin \
-            -allowProvisioningUpdates <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>method</key><string>development</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>compileBitcode</key><false/>
-          </dict></plist>
-          EOF
+          xcode-project build-ipa \
+            --workspace ios/CMGTelematics.xcworkspace \
+            --scheme "$XCODE_SCHEME" \
+            --config Debug
 
     artifacts:
       - mobile/build/ios/ipa/*.ipa
