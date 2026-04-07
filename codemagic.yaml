@@ -41,6 +41,20 @@ workflows:
           cd mobile/ios
           pod install
 
+      - name: Eliminar entitlement Push Notifications (no disponible en perfil dev)
+        script: |
+          ENTITLEMENTS="mobile/ios/CMGTelematics/CMGTelematics.entitlements"
+          if [ -f "$ENTITLEMENTS" ]; then
+            echo "Entitlements antes:"
+            cat "$ENTITLEMENTS"
+            plutil -remove "aps-environment" "$ENTITLEMENTS" 2>/dev/null && echo "aps-environment eliminado" || echo "aps-environment no estaba presente"
+            echo "Entitlements después:"
+            cat "$ENTITLEMENTS"
+          else
+            echo "No se encontró fichero de entitlements en $ENTITLEMENTS"
+            find mobile/ios -name "*.entitlements" 2>/dev/null
+          fi
+
       - name: Configurar firma de código (crea certificado y perfil si no existen)
         script: |
           keychain initialize
