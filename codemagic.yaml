@@ -16,7 +16,7 @@ workflows:
       # el certificado y el perfil de aprovisionamiento automáticamente.
       # Mapeamos nuestros nombres sin guiones bajos a los nombres esperados.
       ios_signing:
-        distribution_type: development
+        distribution_type: ad_hoc
         bundle_identifier: es.cmgnexus.telematics
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
