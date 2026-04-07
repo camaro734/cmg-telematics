@@ -48,13 +48,13 @@ workflows:
             plutil -remove "aps-environment" "$ENTITLEMENTS" 2>/dev/null || true
           fi
 
-      - name: Configurar firma de código
+      - name: Configurar firma y build
         script: |
-          # Escribir la clave privada a fichero temporal
+          # Escribir clave privada a fichero temporal
           echo "$CERTKEY" > /tmp/cert.key
-          # Inicializar keychain
+
+          # Descargar certificado y perfil usando nuestra clave privada
           keychain initialize
-          # Descargar/crear certificado y perfiles usando nuestra clave privada
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --issuer-id "$ASCISSUERID" \
             --key-id "$ASCKEYID" \
@@ -63,16 +63,42 @@ workflows:
             --type IOS_APP_DEVELOPMENT \
             --create
           keychain add-certificates
-          xcode-project use-profiles
           rm -f /tmp/cert.key
 
-      - name: Build iOS .ipa
-        script: |
+          # Obtener UUID del perfil descargado
+          PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
+          UUID=$(security cms -D -i "$PROFILE" | python3 -c \
+            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
+          echo "Usando perfil: $UUID"
+
+          # Archivar pasando el UUID directamente — sin use-profiles
           cd mobile
-          xcode-project build-ipa \
-            --workspace ios/CMGTelematics.xcworkspace \
-            --scheme "$XCODE_SCHEME" \
-            --config Debug
+          xcodebuild \
+            -workspace ios/CMGTelematics.xcworkspace \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphoneos \
+            -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            "PROVISIONING_PROFILE=$UUID" \
+            "DEVELOPMENT_TEAM=XN3LPVTURB" \
+            COMPILER_INDEX_STORE_ENABLE=NO
+
+          # Exportar .ipa
+          xcodebuild -exportArchive \
+            -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist /dev/stdin <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>development</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>compileBitcode</key><false/>
+          </dict></plist>
+          PLIST
 
     artifacts:
       - mobile/build/ios/ipa/*.ipa
