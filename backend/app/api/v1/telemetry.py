@@ -262,7 +262,8 @@ _NAMED_COLUMNS: dict[str, tuple[str, str]] = {
 
 
 class LiveSignal(BaseModel):
-    io_key: str
+    io_key: str          # actual device IO identifier (e.g. "1671")
+    signal_key: str      # unique key: io_key for analog, "{io_key}:bit{n}" for digital
     display_name: str
     raw_value: Optional[float]
     converted_value: Optional[float]
@@ -272,6 +273,8 @@ class LiveSignal(BaseModel):
     data_type: str          # "boolean" | "gauge" | "counter" | "hours"
     is_configured: bool     # True if a VariableMap entry exists
     source: str             # "named_column" | "io_data"
+    signal_type: str        # "analog" | "digital"
+    bit_index: Optional[int]  # 0-7, only set when signal_type == "digital"
 
 
 class LiveSignalsResponse(BaseModel):
@@ -330,9 +333,16 @@ async def get_live_signals(
     vehicle_result = await db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
     vehicle = vehicle_result.scalar_one_or_none()
 
-    vm_map: dict[str, VariableMap] = {}
+    # Composite merge key: "io_key:bitN" for digital, "io_key" for analog.
+    # This allows multiple VMs per io_key (one per bit) without collision.
+    def _merge_key(vm: VariableMap) -> str:
+        if vm.signal_type == "digital" and vm.bit_index is not None:
+            return f"{vm.io_key}:bit{vm.bit_index}"
+        return vm.io_key
+
+    # vm_merged: composite_key → VariableMap (overrides win over templates)
+    vm_merged: dict[str, VariableMap] = {}
     if vehicle:
-        # Manufacturer template
         if vehicle.manufacturer_id:
             tmpl_result = await db.execute(
                 select(VariableMap).where(
@@ -341,39 +351,83 @@ async def get_live_signals(
                 )
             )
             for vm in tmpl_result.scalars().all():
-                vm_map[vm.io_key] = vm
+                vm_merged[_merge_key(vm)] = vm
 
-        # Vehicle-specific overrides (take precedence)
         veh_result = await db.execute(
             select(VariableMap).where(VariableMap.vehicle_id == vehicle_id)
         )
         for vm in veh_result.scalars().all():
-            vm_map[vm.io_key] = vm
+            vm_merged[_merge_key(vm)] = vm
 
-    def _make_signal(
+    # Group VMs by their actual io_key for fast lookup
+    vm_by_io_key: dict[str, list[VariableMap]] = {}
+    for vm in vm_merged.values():
+        vm_by_io_key.setdefault(vm.io_key, []).append(vm)
+        vm_by_io_key.setdefault(f"io_{vm.io_key}", []).append(vm)
+
+    def _make_signals(
         io_key: str,
         default_name: str,
         default_dtype: str,
         raw: Optional[float],
         source: str,
-    ) -> LiveSignal:
-        # Try to find variable map — also try "io_{key}" prefix convention
-        vm = vm_map.get(io_key) or vm_map.get(f"io_{io_key}")
-        scale = vm.scale_factor if vm else 1.0
-        offs = vm.offset if vm else 0.0
-        converted = round(raw * scale + offs, 4) if raw is not None else None
-        return LiveSignal(
-            io_key=io_key,
-            display_name=vm.display_name if vm else default_name,
-            raw_value=raw,
-            converted_value=converted,
-            unit=vm.unit or "" if vm else "",
-            scale_factor=scale,
-            offset=offs,
-            data_type=vm.data_type if vm else default_dtype,
-            is_configured=vm is not None,
-            source=source,
-        )
+    ) -> list[LiveSignal]:
+        """Return one LiveSignal per configured VariableMap for this io_key.
+        If no VM exists, returns a single unconfigured raw signal."""
+        vms = vm_by_io_key.get(io_key) or []
+
+        if not vms:
+            # No variable map → one raw signal
+            converted = round(raw, 4) if raw is not None else None
+            return [LiveSignal(
+                io_key=io_key,
+                signal_key=io_key,
+                display_name=default_name,
+                raw_value=raw,
+                converted_value=converted,
+                unit="",
+                scale_factor=1.0,
+                offset=0.0,
+                data_type=default_dtype,
+                is_configured=False,
+                source=source,
+                signal_type="analog",
+                bit_index=None,
+            )]
+
+        result = []
+        for vm in vms:
+            signal_key = (
+                f"{io_key}:bit{vm.bit_index}"
+                if vm.signal_type == "digital" and vm.bit_index is not None
+                else io_key
+            )
+            scale = vm.scale_factor
+            offs = vm.offset
+            if raw is not None:
+                if vm.signal_type == "digital" and vm.bit_index is not None:
+                    extracted = float((int(raw) >> vm.bit_index) & 1)
+                    converted = round(extracted * scale + offs, 4)
+                else:
+                    converted = round(raw * scale + offs, 4)
+            else:
+                converted = None
+            result.append(LiveSignal(
+                io_key=io_key,
+                signal_key=signal_key,
+                display_name=vm.display_name,
+                raw_value=raw,
+                converted_value=converted,
+                unit=vm.unit or "",
+                scale_factor=scale,
+                offset=offs,
+                data_type=vm.data_type,
+                is_configured=True,
+                source=source,
+                signal_type=vm.signal_type,
+                bit_index=vm.bit_index,
+            ))
+        return result
 
     signals: list[LiveSignal] = []
 
@@ -386,7 +440,7 @@ async def get_live_signals(
             raw_f = float(raw_val)
         except (TypeError, ValueError):
             raw_f = 1.0 if raw_val else 0.0
-        signals.append(_make_signal(col, default_name, default_dtype, raw_f, "named_column"))
+        signals.extend(_make_signals(col, default_name, default_dtype, raw_f, "named_column"))
 
     # 2. io_data JSONB keys (CAN / J1939 / extra IOs)
     named_io_ids = {
@@ -404,9 +458,9 @@ async def get_live_signals(
             continue
         default_name = f"IO {key_str}"
         default_dtype = "boolean" if raw_f in (0.0, 1.0) else "gauge"
-        signals.append(_make_signal(key_str, default_name, default_dtype, raw_f, "io_data"))
+        signals.extend(_make_signals(key_str, default_name, default_dtype, raw_f, "io_data"))
 
-    # Sort: configured first, then by source (named before io_data), then by key
+    # Sort: configured first, then named before io_data, then by io_key numeric, then by bit_index
     def _sort_key(s: LiveSignal):
         is_numeric = s.io_key.lstrip("-").isdigit()
         return (
@@ -414,6 +468,7 @@ async def get_live_signals(
             0 if s.source == "named_column" else 1,
             int(s.io_key) if is_numeric else 0,
             s.io_key,
+            s.bit_index if s.bit_index is not None else -1,
         )
 
     signals.sort(key=_sort_key)

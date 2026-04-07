@@ -238,14 +238,16 @@ export default function TripsPage() {
             </>
           )}
 
-          <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 480 }}>
+          <div className="space-y-1 overflow-y-auto" style={{ maxHeight: 480 }}>
             {loadingTrips ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: "var(--card)" }} />
               ))
             ) : trips.length === 0 && !loadingTrips ? (
               <div className="rounded-xl p-6 text-center" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-                <div className="text-3xl mb-2">🗺</div>
+                <svg width="36" height="36" fill="none" viewBox="0 0 24 24" className="mx-auto mb-2" style={{ color: "var(--muted)" }}>
+                  <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
                 <div className="text-sm font-medium text-white mb-1">Sin rutas</div>
                 <div className="text-xs" style={{ color: "var(--muted)" }}>
                   {selectedVehicle
@@ -253,48 +255,90 @@ export default function TripsPage() {
                     : "Selecciona un vehículo y pulsa Buscar"}
                 </div>
               </div>
-            ) : (
-              trips.map((trip) => {
-                const isActive = selectedTrip?.trip_num === trip.trip_num;
-                const distKm = trip.distance_km;
-                return (
-                  <button
-                    key={trip.trip_num}
-                    onClick={() => handleSelectTrip(trip)}
-                    className="w-full text-left rounded-xl p-3 transition-colors"
-                    style={{
-                      background: isActive ? "rgba(59,130,246,0.15)" : "var(--card)",
-                      border: `1px solid ${isActive ? "rgba(59,130,246,0.4)" : "var(--border)"}`,
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold" style={{ color: "var(--accent)" }}>
-                        Ruta #{trip.trip_num}
-                      </span>
-                      <span className="text-xs" style={{ color: "var(--muted)" }}>
-                        {formatDate(trip.start_time)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-xs text-white">{formatDateTime(trip.start_time)}</span>
-                      <span className="text-xs" style={{ color: "var(--muted)" }}>→</span>
-                      <span className="text-xs text-white">{formatDateTime(trip.end_time)}</span>
-                    </div>
-                    <div className="flex gap-3 mt-1.5">
-                      <span className="text-xs" style={{ color: "var(--muted)" }}>
-                        ⏱ {formatDuration(trip.duration_seconds)}
-                      </span>
-                      <span className="text-xs" style={{ color: "var(--muted)" }}>
-                        📍 ~{distKm.toFixed(1)} km
-                      </span>
-                      <span className="text-xs" style={{ color: "var(--muted)" }}>
-                        ⚡ max {trip.max_speed} km/h
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
+            ) : (() => {
+              // Group trips by calendar day
+              const maxDist = Math.max(...trips.map(t => t.distance_km), 1);
+              const groups: { day: string; trips: Trip[] }[] = [];
+              trips.forEach(trip => {
+                const day = new Date(trip.start_time).toLocaleDateString("es-ES", {
+                  weekday: "long", day: "2-digit", month: "long",
+                });
+                const last = groups[groups.length - 1];
+                if (last && last.day === day) last.trips.push(trip);
+                else groups.push({ day, trips: [trip] });
+              });
+              return groups.map(group => (
+                <div key={group.day}>
+                  {/* Day header */}
+                  <div className="px-1 py-1.5 flex items-center gap-2">
+                    <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+                    <span className="text-xs font-semibold capitalize flex-shrink-0"
+                          style={{ color: "var(--muted)" }}>
+                      {group.day}
+                    </span>
+                    <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+                  </div>
+                  {group.trips.map(trip => {
+                    const isActive = selectedTrip?.trip_num === trip.trip_num;
+                    const distKm = trip.distance_km;
+                    const distPct = (distKm / maxDist) * 100;
+                    const speedColor = trip.max_speed >= 100 ? "#ef4444" : trip.max_speed >= 70 ? "#f59e0b" : "#22c55e";
+                    return (
+                      <button
+                        key={trip.trip_num}
+                        onClick={() => handleSelectTrip(trip)}
+                        className="w-full text-left rounded-xl p-3 transition-colors mb-1"
+                        style={{
+                          background: isActive ? "rgba(59,130,246,0.12)" : "var(--card)",
+                          border: `1px solid ${isActive ? "rgba(59,130,246,0.4)" : "var(--border)"}`,
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-semibold" style={{ color: isActive ? "#60a5fa" : "var(--accent)" }}>
+                            Ruta #{trip.trip_num}
+                          </span>
+                          <span className="text-xs px-1.5 py-0.5 rounded font-mono font-bold"
+                                style={{ background: `${speedColor}22`, color: speedColor, fontSize: 10 }}>
+                            {trip.max_speed} km/h
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs mb-2" style={{ color: "var(--muted)" }}>
+                          <span>{formatDateTime(trip.start_time)}</span>
+                          <span>→</span>
+                          <span>{formatDateTime(trip.end_time)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs mb-2" style={{ color: "var(--muted)" }}>
+                          <span className="flex items-center gap-1">
+                            <svg width="10" height="10" fill="none" viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                              <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                            {formatDuration(trip.duration_seconds)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <svg width="10" height="10" fill="none" viewBox="0 0 24 24">
+                              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="2"/>
+                            </svg>
+                            ~{distKm.toFixed(1)} km
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <svg width="10" height="10" fill="none" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                            </svg>
+                            {trip.avg_speed.toFixed(0)} km/h media
+                          </span>
+                        </div>
+                        {/* Distance bar */}
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+                          <div className="h-full rounded-full"
+                               style={{ width: `${distPct}%`, background: isActive ? "#3b82f6" : "var(--accent)" }} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
           </div>
         </div>
 

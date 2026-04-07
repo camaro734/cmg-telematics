@@ -57,7 +57,8 @@ const IO_NAMES: Record<string, string> = {
 type Filter = "all" | "configured" | "raw";
 
 interface SignalRow {
-  io_key: string;
+  signal_key: string;     // unique row identifier ("io_key" or "io_key:bitN")
+  io_key: string;         // actual device IO ID — used for display and WS matching
   ws_key: string;         // numeric string key used in WebSocket io_data
   display_name: string;
   raw_value: number | null;
@@ -66,16 +67,28 @@ interface SignalRow {
   is_configured: boolean;
   source: string;
   scale_factor: number;
+  offset: number;
+  signal_type: "analog" | "digital";
+  bit_index: number | null;
   changed_at: number | null; // timestamp ms of last change
 }
 
+// Apply the same conversion logic as backend: bit extraction for digital, scale+offset for all
+function applyConversion(raw: number, scale: number, offset: number, signalType: "analog" | "digital", bitIndex: number | null): number {
+  if (signalType === "digital" && bitIndex != null) {
+    return ((Math.floor(raw) >> bitIndex) & 1) * scale + offset;
+  }
+  return raw * scale + offset;
+}
+
 function buildRows(signals: LiveSignal[], ioData: Record<string, number> | null): SignalRow[] {
-  const configured = signals.map(s => {
+  const rows = signals.map(s => {
     // For named_column rows the WS io_data uses the numeric IO ID, not the column name
     const ws_key = s.source === "named_column"
       ? (NAMED_COL_TO_IO[s.io_key] ?? s.io_key)
       : s.io_key;
     return {
+      signal_key: s.signal_key ?? s.io_key,
       io_key: s.io_key,
       ws_key,
       display_name: s.display_name || IO_NAMES[ws_key] || IO_NAMES[s.io_key] || `IO ${s.io_key}`,
@@ -85,20 +98,23 @@ function buildRows(signals: LiveSignal[], ioData: Record<string, number> | null)
       is_configured: s.is_configured,
       source: s.source,
       scale_factor: s.scale_factor ?? 1,
+      offset: s.offset ?? 0,
+      signal_type: s.signal_type ?? "analog",
+      bit_index: s.bit_index ?? null,
       changed_at: null,
     };
   });
 
-  // Track ws_keys already represented
-  const configuredWsKeys = new Set(configured.map(r => r.ws_key));
-  const configuredIoKeys = new Set(configured.map(r => r.io_key));
+  // Track io_keys already covered by configured rows
+  const coveredIoKeys = new Set(rows.filter(r => r.is_configured).map(r => r.ws_key));
 
-  // Add raw io_data keys not in variable_map
+  // Add raw io_data keys with no variable_map at all
   const extra: SignalRow[] = [];
   if (ioData) {
     for (const [key, val] of Object.entries(ioData)) {
-      if (!configuredWsKeys.has(key) && !configuredIoKeys.has(key)) {
+      if (!coveredIoKeys.has(key) && !rows.some(r => r.ws_key === key)) {
         extra.push({
+          signal_key: key,
           io_key: key,
           ws_key: key,
           display_name: IO_NAMES[key] || `IO ${key}`,
@@ -108,13 +124,16 @@ function buildRows(signals: LiveSignal[], ioData: Record<string, number> | null)
           is_configured: false,
           source: "io_data",
           scale_factor: 1,
+          offset: 0,
+          signal_type: "analog",
+          bit_index: null,
           changed_at: null,
         });
       }
     }
   }
 
-  return [...configured, ...extra];
+  return [...rows, ...extra];
 }
 
 export default function CanSnifferPage() {
@@ -156,29 +175,38 @@ export default function CanSnifferPage() {
     }).catch(() => {});
   }, []);
 
-  // Load signals when vehicle changes
-  const loadSignals = useCallback((vehicleId: string) => {
+  // Load signals — silent=true skips the loading spinner (used on periodic refresh)
+  const loadSignals = useCallback((vehicleId: string, silent = false) => {
     if (!vehicleId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     getLiveSignals(vehicleId).then(resp => {
-      const initial = buildRows(resp.signals, null);
-      setRows(initial);
+      setRows(prev => {
+        const fresh = buildRows(resp.signals, null);
+        // Preserve changed_at from existing rows so flash indicators survive the refresh
+        const prevByKey = new Map(prev.map(r => [r.signal_key, r]));
+        return fresh.map(r => {
+          const old = prevByKey.get(r.signal_key);
+          return old ? { ...r, changed_at: old.changed_at } : r;
+        });
+      });
       setLastUpdate(resp.as_of ? new Date(resp.as_of) : new Date());
       setSelectedVehicleId_ws(vehicleId);
     }).catch(() => {
-      setRows([]);
-    }).finally(() => setLoading(false));
+      if (!silent) setRows([]);
+    }).finally(() => {
+      if (!silent) setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
     if (selectedVehicleId) loadSignals(selectedVehicleId);
   }, [selectedVehicleId, loadSignals]);
 
-  // Periodic refresh every 30s — catches cases where WS drops or named columns lag
+  // Periodic refresh every 30s — silent: no spinner, preserves flash state
   useEffect(() => {
     if (!selectedVehicleId) return;
     const id = setInterval(() => {
-      if (!pausedRef.current) loadSignals(selectedVehicleId);
+      if (!pausedRef.current) loadSignals(selectedVehicleId, true);
     }, 30_000);
     return () => clearInterval(id);
   }, [selectedVehicleId, loadSignals]);
@@ -193,11 +221,13 @@ export default function CanSnifferPage() {
     const io = msg.io_data || {};
 
     setRows(prev => {
+      // Update all rows whose ws_key matches a value in io_data
+      // Multiple rows can share the same ws_key (e.g. bit0 and bit1 of the same byte)
       const updated = prev.map(row => {
-        // Named column rows match by ws_key (numeric), io_data rows match by io_key
-        const newRaw = io[row.ws_key] ?? row.raw_value;
+        if (!(row.ws_key in io)) return row;
+        const newRaw = io[row.ws_key];
         const changed = newRaw !== row.raw_value;
-        const newConverted = newRaw != null ? newRaw * (row.scale_factor || 1) : row.converted_value;
+        const newConverted = applyConversion(newRaw, row.scale_factor || 1, row.offset || 0, row.signal_type, row.bit_index);
         return {
           ...row,
           raw_value: newRaw,
@@ -206,12 +236,13 @@ export default function CanSnifferPage() {
         };
       });
 
-      // Add new io_data keys not yet in rows (by ws_key)
+      // Add brand-new io_data keys not represented by any row at all
       const existingWsKeys = new Set(prev.map(r => r.ws_key));
       const newRows: SignalRow[] = [];
       for (const [key, val] of Object.entries(io)) {
         if (!existingWsKeys.has(key)) {
           newRows.push({
+            signal_key: key,
             io_key: key,
             ws_key: key,
             display_name: IO_NAMES[key] || `IO ${key}`,
@@ -221,6 +252,9 @@ export default function CanSnifferPage() {
             is_configured: false,
             source: "io_data",
             scale_factor: 1,
+            offset: 0,
+            signal_type: "analog",
+            bit_index: null,
             changed_at: now,
           });
         }
@@ -240,9 +274,12 @@ export default function CanSnifferPage() {
     if (filter === "raw") return !r.is_configured;
     return true;
   }).sort((a, b) => {
-    // Configured first, then by io_key numeric
+    // Configured first, then by io_key numeric, then by bit_index
     if (a.is_configured !== b.is_configured) return a.is_configured ? -1 : 1;
-    return parseInt(a.io_key) - parseInt(b.io_key);
+    const numA = parseInt(a.io_key) || 0;
+    const numB = parseInt(b.io_key) || 0;
+    if (numA !== numB) return numA - numB;
+    return (a.bit_index ?? -1) - (b.bit_index ?? -1);
   });
 
   const FLASH_MS = 2000;
@@ -363,7 +400,7 @@ export default function CanSnifferPage() {
              style={{
                background: "var(--sidebar)",
                color: "var(--muted)",
-               gridTemplateColumns: "80px 1fr 110px 110px 80px 90px",
+               gridTemplateColumns: "80px 1fr 160px 110px 80px 90px",
                borderBottom: "1px solid var(--border)",
              }}>
           <span>IO ID</span>
@@ -395,7 +432,7 @@ export default function CanSnifferPage() {
 
               return (
                 <SignalRowItem
-                  key={row.io_key}
+                  key={row.signal_key}
                   row={row}
                   flashing={flashing}
                   isNull={isNull}
@@ -435,7 +472,7 @@ function SignalRowItem({ row, flashing, isNull }: {
   flashing: boolean;
   isNull: boolean;
 }) {
-  const [flashActive, setFlashActive] = useState(false);
+  const [flashActive, setFlashActive] = useState(flashing);
   const prevRaw = useRef(row.raw_value);
 
   useEffect(() => {
@@ -451,8 +488,11 @@ function SignalRowItem({ row, flashing, isNull }: {
   if (flashActive) bg = "rgba(245,158,11,0.12)";
   else if (row.is_configured) bg = "rgba(29,158,117,0.06)";
 
+  // For digital signals, show raw byte value + binary representation
   const formattedRaw = isNull ? "—"
-    : typeof row.raw_value === "number" ? row.raw_value.toLocaleString() : String(row.raw_value);
+    : row.signal_type === "digital" && typeof row.raw_value === "number"
+      ? `${row.raw_value} (${row.raw_value.toString(2).padStart(8, "0")}b)`
+      : typeof row.raw_value === "number" ? row.raw_value.toLocaleString() : String(row.raw_value);
 
   const formattedConverted = isNull ? "—"
     : row.converted_value != null ? Number(row.converted_value.toFixed(3)).toLocaleString() : "—";
@@ -465,7 +505,7 @@ function SignalRowItem({ row, flashing, isNull }: {
     <div
       className="grid items-center px-4 py-2.5 text-sm transition-colors"
       style={{
-        gridTemplateColumns: "80px 1fr 110px 110px 80px 90px",
+        gridTemplateColumns: "80px 1fr 160px 110px 80px 90px",
         background: bg,
         borderLeft: flashActive ? "2px solid var(--warning)"
           : row.is_configured ? "2px solid rgba(29,158,117,0.4)" : "2px solid transparent",
@@ -478,10 +518,23 @@ function SignalRowItem({ row, flashing, isNull }: {
 
       {/* Name */}
       <div className="min-w-0">
-        <span className="text-white font-medium text-sm truncate block">{row.display_name}</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-white font-medium text-sm truncate">{row.display_name}</span>
+          {row.is_configured && row.signal_type === "digital" && row.bit_index != null && (
+            <span
+              className="text-xs px-1.5 py-0.5 rounded font-mono flex-shrink-0"
+              style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning)" }}
+            >
+              bit {row.bit_index}
+            </span>
+          )}
+        </div>
         {row.is_configured && (
           <span className="text-xs" style={{ color: "var(--muted)" }}>
             {row.source === "named_column" ? "columna" : "io_data"} · configurado
+            {row.signal_type === "digital" && row.bit_index != null
+              ? ` · digital bit${row.bit_index} de raw=${row.raw_value ?? "—"}`
+              : ""}
           </span>
         )}
       </div>

@@ -4,51 +4,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { geofences as geofencesApi, type GeofenceOut, type GeofenceEventOut } from "@/lib/api";
 import type { GeofenceDrawMapRef, GeofenceDrawResult } from "@/components/GeofenceDrawMap";
+import Modal from "@/components/Modal";
 
 // Dynamic import — Leaflet is not SSR-compatible
 const GeofenceDrawMap = dynamic(() => import("@/components/GeofenceDrawMap"), { ssr: false });
-
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
-interface ModalProps {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}
-
-function Modal({ title, onClose, children }: ModalProps) {
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
-      onClick={onClose}
-    >
-      <div
-        className="rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        style={{ background: "var(--card)", border: "1px solid var(--border)" }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold text-white">{title}</h2>
-          <button onClick={onClose} style={{ color: "var(--muted)" }}>
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 // ─── Geofence form (map-based) ────────────────────────────────────────────────
 
@@ -547,7 +506,7 @@ export default function GeofencesPage() {
 
       {/* Create Modal */}
       {showModal && (
-        <Modal title="Nueva geocerca" onClose={() => setShowModal(false)}>
+        <Modal title="Nueva geocerca" onClose={() => setShowModal(false)} maxWidth="max-w-2xl">
           <GeofenceForm
             onSave={handleCreate}
             onCancel={() => setShowModal(false)}
@@ -557,7 +516,7 @@ export default function GeofencesPage() {
 
       {/* Edit Modal */}
       {editTarget && (
-        <Modal title={`Editar: ${editTarget.name}`} onClose={() => setEditTarget(null)}>
+        <Modal title={`Editar: ${editTarget.name}`} onClose={() => setEditTarget(null)} maxWidth="max-w-2xl">
           <GeofenceForm
             initial={editTarget}
             onSave={handleUpdate}

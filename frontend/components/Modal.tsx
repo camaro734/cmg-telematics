@@ -6,9 +6,10 @@ interface Props {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-export default function Modal({ title, onClose, children }: Props) {
+export default function Modal({ title, onClose, children, maxWidth = "max-w-md" }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
     document.addEventListener("keydown", onKey);
@@ -19,7 +20,7 @@ export default function Modal({ title, onClose, children }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: "rgba(0,0,0,0.6)" }}
          onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl flex flex-col"
+      <div className={`w-full ${maxWidth} rounded-2xl flex flex-col`}
            style={{
              background: "var(--card)",
              border: "1px solid var(--border)",

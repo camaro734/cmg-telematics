@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime, Float, Enum as SAEnum
+from sqlalchemy import String, ForeignKey, DateTime, Float, SmallInteger, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -29,6 +29,11 @@ class VariableMap(Base):
         SAEnum("gauge", "counter", "boolean", "hours", name="variable_data_type"),
         default="gauge",
     )
+    # Signal interpretation:
+    # - "analog"  → use raw value directly (apply scale_factor + offset)
+    # - "digital" → extract a single bit from the byte (bit_index 0=LSB … 7=MSB)
+    signal_type: Mapped[str] = mapped_column(String(10), default="analog", nullable=False)
+    bit_index: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

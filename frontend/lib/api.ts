@@ -173,7 +173,8 @@ export async function getVehicles() {
 }
 
 export interface LiveSignal {
-  io_key: string;
+  io_key: string;       // actual device IO ID (e.g. "1671")
+  signal_key: string;   // unique key: io_key for analog, "io_key:bitN" for digital
   display_name: string;
   raw_value: number | null;
   converted_value: number | null;
@@ -183,6 +184,8 @@ export interface LiveSignal {
   data_type: string; // "boolean" | "gauge" | "counter" | "hours"
   is_configured: boolean;
   source: string; // "named_column" | "io_data"
+  signal_type: "analog" | "digital";
+  bit_index: number | null;
 }
 
 export interface LiveSignalsResponse {
@@ -425,6 +428,8 @@ export interface VariableMapOut {
   alert_low: number | null;
   alert_high: number | null;
   data_type: string;
+  signal_type: "analog" | "digital";
+  bit_index: number | null;
   created_at: string;
 }
 
@@ -448,6 +453,8 @@ export const variableMaps = {
     alert_low?: number | null;
     alert_high?: number | null;
     data_type?: string;
+    signal_type?: string;
+    bit_index?: number | null;
   }) =>
     request<VariableMapOut>("/api/v1/variable-maps", {
       method: "POST",
@@ -478,6 +485,7 @@ export interface AlertLogOut {
   fired_at: string;
   resolved_at: string | null;
   acknowledged_at: string | null;
+  acknowledge_note: string | null;
   vehicle_name: string | null;
 }
 
@@ -525,10 +533,14 @@ export const alerts = {
   },
   activeCount: () =>
     request<{ count: number }>("/api/v1/alerts/active/count"),
-  acknowledge: (id: string) =>
+  acknowledge: (id: string, note?: string) =>
     request<{ id: string; acknowledged_at: string }>(
       `/api/v1/alerts/${id}/acknowledge`,
-      { method: "POST" }
+      {
+        method: "POST",
+        body: JSON.stringify({ note }),
+        headers: { "Content-Type": "application/json" },
+      }
     ),
 };
 
@@ -670,6 +682,7 @@ export interface MaintenanceTaskOut {
   vehicle_name: string | null;
   pto_io_key: string; // IO signal used to count engine hours
   current_hours: number | null; // accumulated hours since last maintenance
+  current_km: number | null; // current odometer km (for km-based triggers)
   last_maintenance_at: string | null; // when last maintenance was done
 }
 

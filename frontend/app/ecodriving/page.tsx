@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { getEcoDrivingScores, type EcoDrivingScore } from "@/lib/api";
 
@@ -85,10 +85,10 @@ function ScoreCard({ score }: { score: EcoDrivingScore }) {
       {/* Event counters */}
       {score.total_records > 0 ? (
         <div className="grid grid-cols-2 gap-1.5">
-          <EventPill icon="🚀" label={`${accel} aceler.`} active={accel > 0} danger />
-          <EventPill icon="🛑" label={`${braking} frenos`} active={braking > 0} danger />
-          <EventPill icon="⚡" label={`${speeding} excesos`} active={speeding > 0} danger />
-          <EventPill icon="💤" label={`${idling} ralentís`} active={idling > 0} warn />
+          <EventPill icon={<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>} label={`${accel} aceler.`} active={accel > 0} danger />
+          <EventPill icon={<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/><path d="M8 12h8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>} label={`${braking} frenos`} active={braking > 0} danger />
+          <EventPill icon={<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/></svg>} label={`${speeding} excesos`} active={speeding > 0} danger />
+          <EventPill icon={<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>} label={`${idling} ralentís`} active={idling > 0} warn />
         </div>
       ) : (
         <div className="text-xs text-center py-2" style={{ color: "var(--muted)" }}>
@@ -126,7 +126,7 @@ function EventPill({
   danger,
   warn,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   active: boolean;
   danger?: boolean;
@@ -143,7 +143,7 @@ function EventPill({
         border: `1px solid ${active ? activeColor : "var(--border)"}`,
       }}
     >
-      <span>{icon}</span>
+      {icon}
       <span>{label}</span>
     </div>
   );
@@ -369,6 +369,59 @@ export default function EcoDrivingPage() {
             {error}
           </div>
         )}
+
+        {/* Fleet KPI summary row */}
+        {!loading && scores.length > 0 && (() => {
+          const totalEvents = withData.reduce((acc, s) => acc + s.events.reduce((sum, e) => sum + e.count, 0), 0);
+          const bestVehicle = withData.length > 0 ? withData.reduce((a, b) => b.score > a.score ? b : a) : null;
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+              <div
+                className="flex flex-col gap-1"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}
+              >
+                <span className="text-xs" style={{ color: "var(--muted)" }}>Vehículos evaluados</span>
+                <span className="text-xl font-bold text-white">{withData.length} <span className="text-sm font-normal" style={{ color: "var(--muted)" }}>/ {scores.length}</span></span>
+              </div>
+              <div
+                className="flex flex-col gap-1"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}
+              >
+                <span className="text-xs" style={{ color: "var(--muted)" }}>Puntuacion media</span>
+                <span
+                  className="text-xl font-bold"
+                  style={{ color: avgScore != null ? scoreColor(avgScore) : "var(--muted)" }}
+                >
+                  {avgScore ?? "—"}
+                </span>
+              </div>
+              <div
+                className="flex flex-col gap-1"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}
+              >
+                <span className="text-xs" style={{ color: "var(--muted)" }}>Total eventos</span>
+                <span
+                  className="text-xl font-bold"
+                  style={{ color: totalEvents > 0 ? "#ef4444" : "var(--muted)" }}
+                >
+                  {totalEvents}
+                </span>
+              </div>
+              <div
+                className="flex flex-col gap-1"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}
+              >
+                <span className="text-xs" style={{ color: "var(--muted)" }}>Mejor vehículo</span>
+                <span
+                  className="text-xl font-bold text-white truncate"
+                  title={bestVehicle?.vehicle_name ?? "—"}
+                >
+                  {bestVehicle ? bestVehicle.vehicle_name : "—"}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Score cards grid */}
         {loading ? (

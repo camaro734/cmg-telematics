@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   getFleetAnalytics,
@@ -107,7 +107,7 @@ function EventPill({
   danger,
   warn,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   active: boolean;
   danger?: boolean;
@@ -124,7 +124,7 @@ function EventPill({
         border: `1px solid ${active ? activeColor : "var(--border)"}`,
       }}
     >
-      <span>{icon}</span>
+      {icon}
       <span>{label}</span>
     </div>
   );
@@ -182,10 +182,10 @@ function ScoreCard({ score }: { score: EcoDrivingScore }) {
       {/* Event counters */}
       {score.total_records > 0 ? (
         <div className="grid grid-cols-2 gap-1.5">
-          <EventPill icon="🚀" label={`${accel} aceler.`} active={accel > 0} danger />
-          <EventPill icon="🛑" label={`${braking} frenos`} active={braking > 0} danger />
-          <EventPill icon="⚡" label={`${speeding} excesos`} active={speeding > 0} danger />
-          <EventPill icon="💤" label={`${idling} ralentís`} active={idling > 0} warn />
+          <EventPill icon={<svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>} label={`${accel} aceler.`} active={accel > 0} danger />
+          <EventPill icon={<svg width="11" height="11" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/><path d="M8 12h8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>} label={`${braking} frenos`} active={braking > 0} danger />
+          <EventPill icon={<svg width="11" height="11" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>} label={`${speeding} excesos`} active={speeding > 0} danger />
+          <EventPill icon={<svg width="11" height="11" fill="none" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>} label={`${idling} ralentís`} active={idling > 0} warn />
         </div>
       ) : (
         <div className="text-xs text-center py-2" style={{ color: "var(--muted)" }}>
@@ -813,6 +813,57 @@ export default function AnalyticsPage() {
                       <Bar dataKey="value" fill="#f97316" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Utilization rate — horizontal bar chart */}
+            {!loading && vehicleStats.length > 0 && (
+              <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-white">Tasa de utilización por vehículo</h2>
+                  <span className="text-xs" style={{ color: "var(--muted)" }}>
+                    % tiempo con ignición ON en las últimas {periodLabel}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {[...vehicleStats]
+                    .sort((a, b) => b.ignition_hours - a.ignition_hours)
+                    .map(v => {
+                      const pct = Math.min(100, (v.ignition_hours / hours) * 100);
+                      const color = pct >= 70 ? "#22c55e" : pct >= 40 ? "#f59e0b" : "#64748b";
+                      const ecoMatch = ecoScores.find(e => e.vehicle_id === v.vehicle_id);
+                      return (
+                        <div key={v.vehicle_id}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs font-medium text-white truncate max-w-40">
+                                {v.vehicle_name}
+                              </span>
+                              {v.online && (
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                      style={{ background: "var(--success)" }} />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs flex-shrink-0">
+                              <span style={{ color: "var(--muted)" }}>{v.ignition_hours.toFixed(1)}h</span>
+                              {ecoMatch && ecoMatch.total_records > 0 && (
+                                <span className="font-bold" style={{ color: scoreColor(ecoMatch.score) }}>
+                                  {ecoMatch.grade}
+                                </span>
+                              )}
+                              <span className="font-semibold w-12 text-right" style={{ color }}>{pct.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                          <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%`, background: color }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}

@@ -90,6 +90,8 @@ for (let i = 0; i < 10; i++) IO_DEFAULT_NAMES[String(145 + i)] = `Manual CAN slo
 for (let i = 0; i < 10; i++) IO_DEFAULT_NAMES[String(380 + i)] = `Manual CAN slot ${String(10+i).padStart(2,"0")}`;
 for (let i = 0; i < 50; i++) IO_DEFAULT_NAMES[String(10298 + i)] = `Manual CAN slot ${String(20+i).padStart(2,"0")}`;
 
+type SignalType = "analog" | "digital";
+
 interface VariableForm {
   io_key: string;
   display_name: string;
@@ -99,6 +101,8 @@ interface VariableForm {
   alert_low: string;
   alert_high: string;
   data_type: DataType;
+  signal_type: SignalType;
+  bit_index: string;
 }
 
 const emptyForm = (): VariableForm => ({
@@ -110,6 +114,8 @@ const emptyForm = (): VariableForm => ({
   alert_low: "",
   alert_high: "",
   data_type: "gauge",
+  signal_type: "analog",
+  bit_index: "0",
 });
 
 // ─── Shared form modal ────────────────────────────────────────────────────────
@@ -250,6 +256,97 @@ function VariableModal({
             />
           </Field>
         </div>
+        {/* Signal type selector */}
+        <Field label="Tipo de señal">
+          <div className="flex gap-2">
+            {(["analog", "digital"] as SignalType[]).map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    signal_type: st,
+                    data_type: st === "digital" ? "boolean" : f.data_type,
+                    bit_index: st === "digital" ? f.bit_index || "0" : "0",
+                  }))
+                }
+                className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  background:
+                    form.signal_type === st
+                      ? st === "digital"
+                        ? "rgba(245,158,11,0.15)"
+                        : "rgba(29,158,117,0.15)"
+                      : "var(--sidebar)",
+                  color:
+                    form.signal_type === st
+                      ? st === "digital"
+                        ? "var(--warning)"
+                        : "var(--accent)"
+                      : "var(--muted)",
+                  border: `1px solid ${
+                    form.signal_type === st
+                      ? st === "digital"
+                        ? "var(--warning)"
+                        : "var(--accent)"
+                      : "var(--border)"
+                  }`,
+                }}
+              >
+                {st === "analog" ? "Analógico (valor completo)" : "Digital (bit)"}
+              </button>
+            ))}
+          </div>
+          {form.signal_type === "analog" && (
+            <p className="text-xs mt-1.5" style={{ color: "var(--muted)" }}>
+              Usa el valor raw completo → aplica escala y offset.
+            </p>
+          )}
+          {form.signal_type === "digital" && (
+            <p className="text-xs mt-1.5" style={{ color: "var(--warning)" }}>
+              Extrae 1 bit del byte recibido. Ideal para bytes que empaquetan
+              hasta 8 señales booleanas (bit 0 = LSB … bit 7 = MSB).
+            </p>
+          )}
+        </Field>
+
+        {/* Bit selector — only when digital */}
+        {form.signal_type === "digital" && (
+          <Field label="Bit a extraer (0 = LSB, 7 = MSB)">
+            <div className="flex gap-1.5">
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, bit_index: String(b) }))}
+                  className="flex-1 py-2 rounded-lg text-xs font-mono font-bold transition-colors"
+                  style={{
+                    background:
+                      form.bit_index === String(b)
+                        ? "rgba(245,158,11,0.2)"
+                        : "var(--sidebar)",
+                    color:
+                      form.bit_index === String(b)
+                        ? "var(--warning)"
+                        : "var(--muted)",
+                    border: `1px solid ${
+                      form.bit_index === String(b)
+                        ? "var(--warning)"
+                        : "var(--border)"
+                    }`,
+                  }}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-1.5" style={{ color: "var(--muted)" }}>
+              Bit {form.bit_index} → máscara 0x{(1 << parseInt(form.bit_index || "0")).toString(16).toUpperCase().padStart(2, "0")} = {(1 << parseInt(form.bit_index || "0")).toString(2).padStart(8, "0")}b
+            </p>
+          </Field>
+        )}
+
         <Field label="Tipo de dato">
           <select
             value={form.data_type}
@@ -330,7 +427,7 @@ function VariablesTable({
       className="rounded-xl overflow-x-auto"
       style={{ border: "1px solid var(--border)" }}
     >
-      <table className="w-full text-sm min-w-[700px]">
+      <table className="w-full text-sm min-w-[860px]">
         <thead>
           <tr
             style={{
@@ -341,6 +438,7 @@ function VariablesTable({
             {[
               "IO Key",
               "Nombre",
+              "Señal",
               "Unidad",
               "Escala",
               "Offset",
@@ -377,6 +475,29 @@ function VariablesTable({
               </td>
               <td className="px-4 py-3 font-medium text-white">
                 {v.display_name}
+              </td>
+              <td className="px-4 py-3">
+                {v.signal_type === "digital" ? (
+                  <span
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-mono"
+                    style={{
+                      background: "rgba(245,158,11,0.12)",
+                      color: "var(--warning)",
+                    }}
+                  >
+                    bit {v.bit_index}
+                  </span>
+                ) : (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{
+                      background: "rgba(29,158,117,0.1)",
+                      color: "var(--accent)",
+                    }}
+                  >
+                    analógico
+                  </span>
+                )}
               </td>
               <td
                 className="px-4 py-3 text-xs"
@@ -549,6 +670,8 @@ export default function AdminVariableMapsPage() {
       alert_low: v.alert_low != null ? String(v.alert_low) : "",
       alert_high: v.alert_high != null ? String(v.alert_high) : "",
       data_type: v.data_type as DataType,
+      signal_type: v.signal_type ?? "analog",
+      bit_index: v.bit_index != null ? String(v.bit_index) : "0",
     });
     setModalError("");
     setShowModal(true);
@@ -566,6 +689,8 @@ export default function AdminVariableMapsPage() {
         alert_low: form.alert_low !== "" ? parseFloat(form.alert_low) : null,
         alert_high: form.alert_high !== "" ? parseFloat(form.alert_high) : null,
         data_type: form.data_type,
+        signal_type: form.signal_type,
+        bit_index: form.signal_type === "digital" ? parseInt(form.bit_index) : null,
       };
 
       if (editing) {

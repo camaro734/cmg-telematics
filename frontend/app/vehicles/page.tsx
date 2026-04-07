@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { getFleet, type FleetVehicle } from "@/lib/api";
 import { useFleetWebSocket, type WsTelemetryMessage } from "@/lib/websocket";
+import Sparkline from "@/components/Sparkline";
 
 const ONLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 min
 
@@ -41,6 +42,8 @@ export default function VehiclesPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "online" | "offline">("all");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [, setTick] = useState(0);
+  // Sliding window of speed values per vehicle (max 20 points) for sparklines
+  const [speedHistory, setSpeedHistory] = useState<Record<string, number[]>>({});
 
   // Recalculate online status every 60s without API call
   useEffect(() => {
@@ -83,6 +86,12 @@ export default function VehiclesPage() {
           },
         };
       }));
+      // Accumulate speed history for sparklines (sliding window, max 20 points)
+      setSpeedHistory(prev => {
+        const existing = prev[msg.vehicle_id] ?? [];
+        const updated = [...existing, msg.speed].slice(-20);
+        return { ...prev, [msg.vehicle_id]: updated };
+      });
     }, [])
   );
 
@@ -170,108 +179,231 @@ export default function VehiclesPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
-                {["Vehículo", "IMEI", "Estado", "Velocidad", "Presión", "Encendido", "Última señal", ""].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: "var(--muted)" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((v, i) => {
-                const pos = v.last_position;
-                const online = isOnlineNow(v.device?.last_seen);
-                const ignition = online ? pos?.ignition : false;
-                const isMoving = online && ignition && (pos?.speed ?? 0) > 3;
-                return (
-                  <tr
-                    key={v.vehicle_id}
-                    style={{
-                      background: i % 2 === 0 ? "var(--card)" : "rgba(30,33,48,0.5)",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-white text-sm">{v.vehicle_name}</div>
+        <>
+          {/* Mobile card grid — visible only below md breakpoint */}
+          <div className="block md:hidden">
+            {filtered.length === 0 ? (
+              <div className="text-center py-10">
+                <div className="text-sm" style={{ color: "var(--muted)" }}>
+                  {search ? "Sin resultados para la búsqueda" : "No hay vehículos registrados"}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {filtered.map(v => {
+                  const pos = v.last_position;
+                  const online = isOnlineNow(v.device?.last_seen);
+                  const ignition = online ? pos?.ignition : false;
+                  const isMoving = online && ignition && (pos?.speed ?? 0) > 3;
+                  return (
+                    <div
+                      key={v.vehicle_id}
+                      className="rounded-xl p-[14px] flex flex-col gap-3"
+                      style={{
+                        background: "var(--card)",
+                        border: "1px solid var(--border)",
+                        opacity: online ? 1 : 0.7,
+                      }}
+                    >
+                      {/* Top row: name + status */}
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-white text-sm leading-tight">
+                          {v.vehicle_name}
+                        </span>
+                        {v.device ? (
+                          <StatusDot online={online} />
+                        ) : (
+                          <span className="text-xs" style={{ color: "var(--muted)" }}>Sin disp.</span>
+                        )}
+                      </div>
+
+                      {/* Second row: plate chip */}
                       {v.license_plate && (
-                        <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{v.license_plate}</div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-xs px-2 py-0.5 rounded font-mono"
+                            style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
+                          >
+                            {v.license_plate}
+                          </span>
+                        </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--muted)" }}>
-                      {v.device?.imei ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {v.device ? (
-                        <StatusDot online={online} />
-                      ) : (
-                        <span className="text-xs" style={{ color: "var(--muted)" }}>Sin dispositivo</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {pos && online ? (
-                        <span className="font-mono text-sm" style={{ color: isMoving ? "var(--success)" : "var(--muted)" }}>
-                          {pos.speed ?? 0} km/h
+
+                      {/* Stats row: speed · ignition · last seen */}
+                      <div className="flex items-center gap-4">
+                        {/* Speed */}
+                        <div className="flex items-center gap-1.5">
+                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" style={{ color: isMoving ? "var(--success)" : "var(--muted)" }}>
+                            <path d="M12 2a10 10 0 1 0 10 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            <path d="M12 12 17 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                          <span
+                            className="text-xs font-mono"
+                            style={{ color: isMoving ? "var(--success)" : "var(--muted)" }}
+                          >
+                            {online && pos ? `${pos.speed ?? 0} km/h` : "—"}
+                          </span>
+                        </div>
+
+                        {/* Ignition */}
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{
+                            background: ignition ? "rgba(34,197,94,0.15)" : "rgba(100,116,139,0.1)",
+                            color: ignition ? "var(--success)" : "var(--muted)",
+                          }}
+                        >
+                          {ignition ? "ON" : "OFF"}
                         </span>
-                      ) : <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {pos?.io_data?.["9"] != null ? (
-                        <span className="font-mono text-sm" style={{ color: "var(--warning)" }}>
-                          {(pos.io_data["9"] * 0.006).toFixed(0)} bar
-                        </span>
-                      ) : <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{
-                          background: ignition ? "rgba(34,197,94,0.15)" : "rgba(100,116,139,0.1)",
-                          color: ignition ? "var(--success)" : "var(--muted)",
-                        }}
-                      >
-                        {ignition ? "ON" : "OFF"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>
-                      {v.device?.last_seen ? (
-                        <span title={new Date(v.device.last_seen).toLocaleString("es-ES")}>
-                          hace {timeSince(v.device.last_seen)}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+
+                        {/* Last seen */}
+                        {v.device?.last_seen && (
+                          <span className="text-xs ml-auto" style={{ color: "var(--muted)" }}
+                            title={new Date(v.device.last_seen).toLocaleString("es-ES")}
+                          >
+                            hace {timeSince(v.device.last_seen)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bottom row: action links */}
+                      <div className="flex items-center gap-2 pt-1" style={{ borderTop: "1px solid var(--border)" }}>
                         <Link
                           href={`/vehicles/${v.vehicle_id}`}
-                          className="text-xs px-2.5 py-1 rounded font-medium"
+                          className="text-xs px-3 py-1.5 rounded font-medium min-h-[36px] flex items-center"
                           style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.25)" }}
                         >
-                          Detalle
+                          Detalle →
                         </Link>
                         <Link
                           href={`/trips?vehicle=${v.vehicle_id}`}
-                          className="text-xs px-2.5 py-1 rounded font-medium"
+                          className="text-xs px-3 py-1.5 rounded font-medium min-h-[36px] flex items-center"
                           style={{ background: "var(--card)", color: "var(--muted)", border: "1px solid var(--border)" }}
                         >
                           Rutas
                         </Link>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="text-center py-10">
-              <div className="text-sm" style={{ color: "var(--muted)" }}>
-                {search ? "Sin resultados para la búsqueda" : "No hay vehículos registrados"}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+
+          {/* Desktop table — hidden on mobile */}
+          <div className="hidden md:block rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
+                  {["Vehículo", "IMEI", "Estado", "Velocidad", "Presión", "Encendido", "Última señal", ""].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: "var(--muted)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((v, i) => {
+                  const pos = v.last_position;
+                  const online = isOnlineNow(v.device?.last_seen);
+                  const ignition = online ? pos?.ignition : false;
+                  const isMoving = online && ignition && (pos?.speed ?? 0) > 3;
+                  return (
+                    <tr
+                      key={v.vehicle_id}
+                      style={{
+                        background: i % 2 === 0 ? "var(--card)" : "rgba(30,33,48,0.5)",
+                        borderBottom: "1px solid var(--border)",
+                      }}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-white text-sm">{v.vehicle_name}</div>
+                        {v.license_plate && (
+                          <div className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{v.license_plate}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--muted)" }}>
+                        {v.device?.imei ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {v.device ? (
+                          <StatusDot online={online} />
+                        ) : (
+                          <span className="text-xs" style={{ color: "var(--muted)" }}>Sin dispositivo</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {pos && online ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm" style={{ color: isMoving ? "var(--success)" : "var(--muted)" }}>
+                              {pos.speed ?? 0} km/h
+                            </span>
+                            {(speedHistory[v.vehicle_id]?.length ?? 0) >= 2 && (
+                              <Sparkline
+                                values={speedHistory[v.vehicle_id]}
+                                width={52}
+                                height={20}
+                                color="#3b82f6"
+                              />
+                            )}
+                          </div>
+                        ) : <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {pos?.io_data?.["9"] != null ? (
+                          <span className="font-mono text-sm" style={{ color: "var(--warning)" }}>
+                            {(pos.io_data["9"] * 0.006).toFixed(0)} bar
+                          </span>
+                        ) : <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{
+                            background: ignition ? "rgba(34,197,94,0.15)" : "rgba(100,116,139,0.1)",
+                            color: ignition ? "var(--success)" : "var(--muted)",
+                          }}
+                        >
+                          {ignition ? "ON" : "OFF"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>
+                        {v.device?.last_seen ? (
+                          <span title={new Date(v.device.last_seen).toLocaleString("es-ES")}>
+                            hace {timeSince(v.device.last_seen)}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/vehicles/${v.vehicle_id}`}
+                            className="text-xs px-2.5 py-1 rounded font-medium"
+                            style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.25)" }}
+                          >
+                            Detalle
+                          </Link>
+                          <Link
+                            href={`/trips?vehicle=${v.vehicle_id}`}
+                            className="text-xs px-2.5 py-1 rounded font-medium"
+                            style={{ background: "var(--card)", color: "var(--muted)", border: "1px solid var(--border)" }}
+                          >
+                            Rutas
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {filtered.length === 0 && (
+              <div className="text-center py-10">
+                <div className="text-sm" style={{ color: "var(--muted)" }}>
+                  {search ? "Sin resultados para la búsqueda" : "No hay vehículos registrados"}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

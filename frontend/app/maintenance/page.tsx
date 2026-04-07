@@ -36,6 +36,64 @@ function triggerLabel(type: string): string {
   return { km: "Por km", hours: "Por horas", days: "Por días", date: "Fecha fija" }[type] ?? type;
 }
 
+// ─── Days/date progress bar ───────────────────────────────────────────────────
+function DaysProgress({ task }: { task: MaintenanceTaskOut }) {
+  if (task.trigger_type !== "days" && task.trigger_type !== "date") return null;
+  const dateDue = task.next_due_date;
+  if (!dateDue) return <span className="text-xs font-mono" style={{ color: "var(--muted)" }}>—</span>;
+
+  const now = Date.now();
+  const dueMs = new Date(dateDue).getTime();
+  const daysLeft = Math.ceil((dueMs - now) / 86400000);
+  const totalDays = task.interval_value ?? 365;
+
+  // Elapsed = how far through the interval we are
+  const lastMs = task.last_maintenance_at ? new Date(task.last_maintenance_at).getTime() : (dueMs - totalDays * 86400000);
+  const elapsed = Math.max(0, now - lastMs);
+  const pct = Math.min(100, (elapsed / (totalDays * 86400000)) * 100);
+  const color = pct >= 100 ? "#f87171" : pct >= 80 ? "#fb923c" : "var(--success)";
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-xs font-mono">
+        <span style={{ color }}>
+          {daysLeft <= 0 ? "Vencida" : `${daysLeft}d restantes`}
+        </span>
+        <span style={{ color: "var(--muted)" }}>
+          / {new Date(dateDue).toLocaleDateString("es-ES")}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)", width: "100px" }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Km progress bar ─────────────────────────────────────────────────────────
+function KmProgress({ task }: { task: MaintenanceTaskOut }) {
+  if (task.trigger_type !== "km") return null;
+  const current = task.current_km ?? 0;
+  const due = task.next_due_km;
+
+  const pct = due ? Math.min(100, (current / due) * 100) : 0;
+  const color = pct >= 100 ? "#f87171" : pct >= 80 ? "#fb923c" : "var(--success)";
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-xs font-mono">
+        <span style={{ color }}>{current.toLocaleString("es-ES")} km</span>
+        {due != null && <span style={{ color: "var(--muted)" }}>/ {due.toLocaleString("es-ES")} km</span>}
+      </div>
+      {due != null && (
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)", width: "100px" }}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Engine hours progress bar ────────────────────────────────────────────────
 function HoursProgress({ task }: { task: MaintenanceTaskOut }) {
   if (task.trigger_type !== "hours") return null;
@@ -412,6 +470,36 @@ export default function MaintenancePage() {
              style={{ background: "#450a0a", color: "#fca5a5" }}>{error}</div>
       )}
 
+      {/* Urgent / overdue callout */}
+      {!loading && tasks.filter(t => t.status === "overdue" || t.status === "warning").length > 0 && (
+        <div className="rounded-xl p-4 mb-4 space-y-2"
+             style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)" }}>
+          <div className="flex items-center gap-2 mb-2">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" style={{ color: "#f87171", flexShrink: 0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+              <path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <span className="text-sm font-semibold" style={{ color: "#f87171" }}>
+              {tasks.filter(t => t.status === "overdue").length > 0
+                ? `${tasks.filter(t => t.status === "overdue").length} tarea(s) vencida(s) — requieren atención inmediata`
+                : `${tasks.filter(t => t.status === "warning").length} tarea(s) próximas a vencer`}
+            </span>
+          </div>
+          {tasks.filter(t => t.status === "overdue" || t.status === "warning").slice(0, 5).map(t => (
+            <div key={t.id} className="flex items-center justify-between text-xs rounded-lg px-3 py-2"
+                 style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)" }}>
+              <div>
+                <span className="font-medium text-white">{t.vehicle_name ?? "—"}</span>
+                <span className="mx-1.5" style={{ color: "var(--muted)" }}>·</span>
+                <span style={{ color: "var(--muted)" }}>{t.name}</span>
+              </div>
+              <StatusBadge status={t.status} />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Tasks table */}
       {loading ? (
         <div className="space-y-2">
@@ -465,6 +553,10 @@ export default function MaintenancePage() {
                   <td className="px-4 py-3">
                     {task.trigger_type === "hours" ? (
                       <HoursProgress task={task} />
+                    ) : task.trigger_type === "km" ? (
+                      <KmProgress task={task} />
+                    ) : (task.trigger_type === "days" || task.trigger_type === "date") ? (
+                      <DaysProgress task={task} />
                     ) : (
                       <span className="text-xs font-mono" style={{ color: "var(--muted)" }}>
                         {formatNextDue(task)}

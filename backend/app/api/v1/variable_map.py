@@ -53,11 +53,26 @@ class VariableMapCreate(BaseModel):
     alert_low: Optional[float] = None
     alert_high: Optional[float] = None
     data_type: str = "gauge"
+    signal_type: str = "analog"
+    bit_index: Optional[int] = None
 
     @model_validator(mode="after")
     def check_scope(self):
         if (self.vehicle_id is None) == (self.tenant_id is None):
             raise ValueError("Exactly one of vehicle_id or tenant_id must be set")
+        return self
+
+    @model_validator(mode="after")
+    def check_signal_type(self):
+        if self.signal_type not in ("analog", "digital"):
+            raise ValueError("signal_type must be 'analog' or 'digital'")
+        if self.signal_type == "digital":
+            if self.bit_index is None:
+                raise ValueError("bit_index is required when signal_type is 'digital'")
+            if not (0 <= self.bit_index <= 7):
+                raise ValueError("bit_index must be between 0 and 7")
+        else:
+            self.bit_index = None
         return self
 
 
@@ -70,6 +85,8 @@ class VariableMapUpdate(BaseModel):
     alert_low: Optional[float] = None
     alert_high: Optional[float] = None
     data_type: Optional[str] = None
+    signal_type: Optional[str] = None
+    bit_index: Optional[int] = None
 
 
 class VariableMapOut(BaseModel):
@@ -85,6 +102,8 @@ class VariableMapOut(BaseModel):
     alert_low: Optional[float]
     alert_high: Optional[float]
     data_type: str
+    signal_type: str
+    bit_index: Optional[int]
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -104,6 +123,8 @@ class VariableMapOut(BaseModel):
             alert_low=vm.alert_low,
             alert_high=vm.alert_high,
             data_type=vm.data_type,
+            signal_type=vm.signal_type,
+            bit_index=vm.bit_index,
             created_at=vm.created_at,
         )
 
@@ -191,6 +212,12 @@ async def get_resolved_variable_maps(
     """
     vehicle = await _assert_vehicle_access(db, vehicle_id, current_user)
 
+    def _merge_key(vm: VariableMap) -> str:
+        """Unique key per (io_key, bit) so digital signals at different bits don't overwrite each other."""
+        if vm.signal_type == "digital" and vm.bit_index is not None:
+            return f"{vm.io_key}:bit{vm.bit_index}"
+        return vm.io_key
+
     # 1. Get manufacturer templates (if vehicle has a manufacturer)
     templates: dict[str, VariableMap] = {}
     if vehicle.manufacturer_id:
@@ -200,7 +227,7 @@ async def get_resolved_variable_maps(
             .order_by(VariableMap.io_key)
         )
         for vm in res.scalars().all():
-            templates[vm.io_key] = vm
+            templates[_merge_key(vm)] = vm
 
     # 2. Get vehicle-specific overrides
     res = await db.execute(
@@ -210,11 +237,13 @@ async def get_resolved_variable_maps(
     )
     overrides: dict[str, VariableMap] = {}
     for vm in res.scalars().all():
-        overrides[vm.io_key] = vm
+        overrides[_merge_key(vm)] = vm
 
-    # 3. Merge: overrides win per io_key
+    # 3. Merge: overrides win per (io_key, bit_index)
     merged = {**templates, **overrides}
-    return [VariableMapOut.from_orm_with_scope(vm) for vm in sorted(merged.values(), key=lambda x: x.io_key)]
+    return [VariableMapOut.from_orm_with_scope(vm) for vm in sorted(
+        merged.values(), key=lambda x: (x.io_key, x.bit_index if x.bit_index is not None else -1)
+    )]
 
 
 @router.post("", response_model=VariableMapOut, status_code=201)
@@ -243,6 +272,8 @@ async def create_variable_map(
         alert_low=body.alert_low,
         alert_high=body.alert_high,
         data_type=body.data_type,
+        signal_type=body.signal_type,
+        bit_index=body.bit_index,
     )
     db.add(vm)
     await db.commit()
@@ -287,6 +318,16 @@ async def update_variable_map(
         if body.data_type not in valid_types:
             raise HTTPException(400, f"data_type must be one of: {valid_types}")
         vm.data_type = body.data_type
+    if body.signal_type is not None:
+        if body.signal_type not in ("analog", "digital"):
+            raise HTTPException(400, "signal_type must be 'analog' or 'digital'")
+        vm.signal_type = body.signal_type
+    if body.bit_index is not None:
+        if not (0 <= body.bit_index <= 7):
+            raise HTTPException(400, "bit_index must be between 0 and 7")
+        vm.bit_index = body.bit_index
+    if body.signal_type == "analog":
+        vm.bit_index = None
 
     await db.commit()
     await db.refresh(vm)

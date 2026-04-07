@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Modal from "@/components/Modal";
 import {
   automations, variableMaps, getVehicles, admin,
   type AutomationRuleOut,
@@ -49,30 +50,18 @@ function durStr(start: string, end: string | null) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}min`;
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-         style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
-           style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
-             style={{ borderColor: "var(--border)" }}>
-          <h2 className="font-semibold text-white">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1 px-6 py-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Variable option type ─────────────────────────────────────────────────────
-interface VarOption { key: string; label: string; group: string; unit?: string }
+interface VarOption {
+  key: string;           // Raw io_key — stored as automation io_key
+  signal_key?: string;   // Unique React key: "io_key:bitN" for digital signals
+  label: string;
+  group: string;
+  unit?: string;
+  scale_factor?: number;
+  offset?: number;
+  signal_type?: string;
+  bit_index?: number | null;
+}
 
 // ─── Rule form ────────────────────────────────────────────────────────────────
 interface FormState {
@@ -118,6 +107,21 @@ function RuleForm({
   const set = (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
+
+  // When io_key changes, auto-fill scale/offset from variable map (analog only)
+  function handleIoKeyChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newKey = e.target.value;
+    const allOpts: VarOption[] = [...STANDARD_IO, ...(varOptionsByTenant[form.tenant_id] ?? [])];
+    const option = allOpts.find(o => o.key === newKey);
+    setForm(f => ({
+      ...f,
+      io_key: newKey,
+      ...(option?.signal_type && option.signal_type !== "digital" && option.scale_factor != null ? {
+        scale_factor: String(option.scale_factor),
+        offset: String(option.offset ?? 0),
+      } : {}),
+    }));
+  }
 
   // Vehicles filtered by selected tenant
   const tenantVehicles = allVehicles.filter(v => v.tenant_id === form.tenant_id);
@@ -189,12 +193,12 @@ function RuleForm({
       {/* Variable selector */}
       <div>
         <label className={lblCls} style={lblSt}>Variable *</label>
-        <select value={form.io_key} onChange={set("io_key")} className={inputCls} style={inputSt}>
+        <select value={form.io_key} onChange={handleIoKeyChange} className={inputCls} style={inputSt}>
           <option value="">— Selecciona una variable —</option>
           {Object.entries(groups).map(([group, items]) => (
             <optgroup key={group} label={group}>
               {items.map(o => (
-                <option key={o.key} value={o.key}>
+                <option key={o.signal_key ?? o.key} value={o.key}>
                   {o.label}{o.unit ? ` [${o.unit}]` : ""}
                 </option>
               ))}
@@ -205,9 +209,24 @@ function RuleForm({
           </optgroup>
         </select>
         {selectedOption && (
-          <p className="text-xs mt-1 px-1" style={{ color: "var(--accent)" }}>
-            {selectedOption.label}{selectedOption.unit ? ` — unidad: ${selectedOption.unit}` : ""}
-          </p>
+          <div className="mt-1 px-1 space-y-0.5">
+            <p className="text-xs" style={{ color: "var(--accent)" }}>
+              {selectedOption.label}{selectedOption.unit ? ` — unidad: ${selectedOption.unit}` : ""}
+            </p>
+            {selectedOption.scale_factor != null && selectedOption.signal_type !== "digital" && (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                ✓ Factor escala y offset cargados desde variable configurada
+                {(selectedOption.scale_factor !== 1 || (selectedOption.offset ?? 0) !== 0)
+                  ? ` (×${selectedOption.scale_factor} + ${selectedOption.offset ?? 0})`
+                  : ""}
+              </p>
+            )}
+            {selectedOption.signal_type === "digital" && (
+              <p className="text-xs" style={{ color: "#f59e0b" }}>
+                ⚠ Señal digital — la condición se evalúa contra el valor raw del byte CAN
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -384,12 +403,16 @@ function SessionsPanel({ rule, onClose }: { rule: AutomationRuleOut; onClose: ()
   }
 
   return (
-    <Modal title={`Sesiones — ${rule.name}`} onClose={onClose}>
+    <Modal title={`Sesiones — ${rule.name}`} onClose={onClose} maxWidth="max-w-lg">
       {!sessions && <p className="text-sm py-4 text-center" style={{ color: "var(--muted)" }}>Cargando...</p>}
       {sessions?.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: "var(--muted)" }}>
-          Aún no hay sesiones para esta regla.
-        </p>
+        <div className="text-center py-10">
+          <svg width="36" height="36" fill="none" viewBox="0 0 24 24" className="mx-auto mb-2" style={{ color: "var(--muted)" }}>
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <div className="text-sm font-medium text-white mb-1">Sin sesiones registradas</div>
+          <div className="text-xs" style={{ color: "var(--muted)" }}>Las sesiones se crean automáticamente cuando se dispara una regla de automatización</div>
+        </div>
       )}
       {sessions && sessions.length > 0 && (
         <>
@@ -507,7 +530,20 @@ export default function AutomationsPage() {
           const stdKeys = new Set(STANDARD_IO.map(o => o.key));
           byTenant[tid] = maps
             .filter(m => !stdKeys.has(m.io_key))
-            .map(m => ({ key: m.io_key, label: m.display_name, group: "Variables configuradas", unit: m.unit || undefined }));
+            .map(m => {
+              const isDigital = m.signal_type === "digital" && m.bit_index != null;
+              return {
+                key: m.io_key,
+                signal_key: isDigital ? `${m.io_key}:bit${m.bit_index}` : m.io_key,
+                label: isDigital ? `${m.display_name} (bit ${m.bit_index})` : m.display_name,
+                group: "Variables configuradas",
+                unit: m.unit || undefined,
+                scale_factor: m.scale_factor,
+                offset: m.offset,
+                signal_type: m.signal_type,
+                bit_index: m.bit_index,
+              };
+            });
         } catch { /* no maps */ }
       }));
       setVarOptionsByTenant(byTenant);
@@ -625,9 +661,9 @@ export default function AutomationsPage() {
     <div className="p-4 md:p-6 max-w-none w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Automatizaciones</h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>
-            Reglas por cliente — acciones automáticas cuando una variable se activa
+          <h1 className="text-lg font-bold text-white">Automatizaciones</h1>
+          <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+            Gestiona reglas de automatización y sesiones de trabajo
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -756,7 +792,7 @@ export default function AutomationsPage() {
       )}
 
       {showCreate && (
-        <Modal title="Nueva regla de automatización" onClose={() => setShowCreate(false)}>
+        <Modal title="Nueva regla de automatización" onClose={() => setShowCreate(false)} maxWidth="max-w-lg">
           <RuleForm tenants={tenants} allVehicles={allVehicles} actionTypes={actionTypes}
             varOptionsByTenant={varOptionsByTenant}
             onSave={handleCreate} onCancel={() => setShowCreate(false)} saving={saving} />
@@ -764,7 +800,7 @@ export default function AutomationsPage() {
       )}
 
       {editing && (
-        <Modal title="Editar regla" onClose={() => setEditing(null)}>
+        <Modal title="Editar regla" onClose={() => setEditing(null)} maxWidth="max-w-lg">
           <RuleForm initial={ruleToForm(editing)} tenants={tenants} allVehicles={allVehicles}
             actionTypes={actionTypes} varOptionsByTenant={varOptionsByTenant}
             onSave={handleUpdate} onCancel={() => setEditing(null)} saving={saving} />
@@ -776,7 +812,7 @@ export default function AutomationsPage() {
       )}
 
       {confirmDelete && (
-        <Modal title="Eliminar regla" onClose={() => setConfirmDelete(null)}>
+        <Modal title="Eliminar regla" onClose={() => setConfirmDelete(null)} maxWidth="max-w-lg">
           <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
             ¿Eliminar <strong className="text-white">{confirmDelete.name}</strong>? Se perderán todas las sesiones registradas.
           </p>

@@ -12,8 +12,10 @@ import {
   type LiveSignal, type AutomationSessionOut, type AutomationPositionOut,
 } from "@/lib/api";
 import Link from "next/link";
-import { useFleetWebSocket, type WsTelemetryMessage, type WsAlertMessage } from "@/lib/websocket";
+import { useFleetWebSocket, type WsTelemetryMessage, type WsAlertMessage, type WsStatus } from "@/lib/websocket";
+import CircularGauge, { type GaugeZone } from "@/components/CircularGauge";
 import Toast from "@/components/Toast";
+import Modal from "@/components/Modal";
 import { useToast } from "@/lib/toast";
 import { exportExcel, exportSessionPdf } from "@/lib/export";
 
@@ -35,6 +37,9 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
   const [cmdState, setCmdState] = useState<Record<string, "idle" | "sending" | "sent" | "error">>({});
   const [liveSignals, setLiveSignals] = useState<LiveSignal[]>([]);
   const { toasts, addToast, dismiss } = useToast();
+  const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
+  const [activeTab, setActiveTab] = useState<'estado' | 'historico' | 'mantenimiento' | 'rutas'>('estado');
+  const [sensorModal, setSensorModal] = useState<{ label: string; unit: string; dataKey: string; color: string } | null>(null);
 
   // Maintenance state
   const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTaskOut[]>([]);
@@ -132,7 +137,6 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
             ext_voltage_mv: msg.ext_voltage_mv,
             dout1: msg.dout1,
             dout2: msg.dout2,
-            // preserve fields not present in WS message
             altitude: prev.data?.altitude ?? null,
             satellites: prev.data?.satellites ?? null,
             dout3: prev.data?.dout3 ?? null,
@@ -150,6 +154,7 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
         message: `${alert.converted_value.toFixed(1)} ${alert.unit} (umbral: ${alert.threshold} ${alert.unit})`,
       });
     }, [id, addToast]),
+    useCallback((status: WsStatus) => setWsStatus(status), []),
   );
 
   const handleExport = async () => {
@@ -266,7 +271,7 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
             <span>/</span>
             <span className="text-white">{last?.vehicle_name ?? (last?.imei ? `IMEI ${last.imei}` : id.slice(0, 8))}</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-lg font-bold text-white">{last?.vehicle_name ?? "Detalle de vehículo"}</h1>
             <span className="text-xs px-2 py-0.5 rounded-full"
                   style={{
@@ -275,6 +280,16 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
                   }}>
               {online ? "EN LÍNEA" : "OFFLINE"}
             </span>
+            {/* Live indicator */}
+            <span className="flex items-center gap-1.5 text-xs"
+                  style={{ color: wsStatus === 'connected' ? "var(--success)" : wsStatus === 'connecting' ? "var(--warning)" : "var(--muted)" }}>
+              <span style={{
+                display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                background: wsStatus === 'connected' ? "var(--success)" : wsStatus === 'connecting' ? "var(--warning)" : "#64748b",
+                animation: wsStatus === 'connected' ? 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' : 'none',
+              }} />
+              {wsStatus === 'connected' ? 'En directo' : wsStatus === 'connecting' ? 'Conectando...' : 'Sin conexión'}
+            </span>
           </div>
           <p className="text-xs" style={{ color: "var(--muted)" }}>
             {last?.license_plate && <span>{last.license_plate} · </span>}IMEI: {last?.imei ?? id}
@@ -282,11 +297,126 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+        {([
+          { key: 'estado', label: 'Estado' },
+          { key: 'historico', label: 'Histórico' },
+          { key: 'mantenimiento', label: 'Mantenimiento' },
+          { key: 'rutas', label: 'Rutas' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              background: activeTab === tab.key ? "var(--accent)" : "transparent",
+              color: activeTab === tab.key ? "white" : "var(--muted)",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB: ESTADO ── */}
+      {activeTab === 'estado' && (<>
+
+      {/* Gauges principales */}
+      {d && (() => {
+        const speedZones: GaugeZone[] = [
+          { from: 0, to: 60,  color: "#22c55e" },
+          { from: 60, to: 90, color: "#f59e0b" },
+          { from: 90, to: 120, color: "#ef4444" },
+        ];
+        const voltZones: GaugeZone[] = [
+          { from: 10, to: 11.5, color: "#ef4444" },
+          { from: 11.5, to: 12.5, color: "#f59e0b" },
+          { from: 12.5, to: 15, color: "#22c55e" },
+          { from: 15, to: 16,   color: "#f59e0b" },
+        ];
+        const voltValue = d.ext_voltage_mv != null ? d.ext_voltage_mv / 1000 : null;
+        // First numeric live signal as pressure gauge (if available)
+        const pressSignal = liveSignals.find(s => s.data_type !== "boolean" && s.converted_value !== null);
+        const pressMax = pressSignal ? Math.max(300, (pressSignal.converted_value ?? 0) * 1.5) : 300;
+        const pressZones: GaugeZone[] = [
+          { from: 0, to: pressMax * 0.65, color: "#22c55e" },
+          { from: pressMax * 0.65, to: pressMax * 0.85, color: "#f59e0b" },
+          { from: pressMax * 0.85, to: pressMax, color: "#ef4444" },
+        ];
+        return (
+          <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-sm font-semibold text-white">Telemetría en tiempo real</h2>
+              {wsStatus === 'connected' && (
+                <span className="text-xs flex items-center gap-1" style={{ color: "var(--success)" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", display: "inline-block", animation: "pulse 2s infinite" }} />
+                  En directo
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 24, flexWrap: "wrap" }}>
+              <CircularGauge
+                value={d.speed ?? 0}
+                min={0} max={120}
+                label="Velocidad"
+                unit="km/h"
+                zones={speedZones}
+                size={120}
+              />
+              <CircularGauge
+                value={voltValue}
+                min={10} max={16}
+                label="Voltaje"
+                unit="V"
+                zones={voltZones}
+                size={120}
+              />
+              {pressSignal && (
+                <CircularGauge
+                  value={typeof pressSignal.converted_value === 'number' ? pressSignal.converted_value : null}
+                  min={0} max={pressMax}
+                  label={pressSignal.display_name}
+                  unit={pressSignal.unit ?? ""}
+                  zones={pressZones}
+                  size={120}
+                />
+              )}
+              {/* Ignition LED indicator */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 120 }}>
+                <div style={{
+                  width: 120, height: 120,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: "50%",
+                    background: d.ignition ? "rgba(34,197,94,0.2)" : "rgba(100,116,139,0.15)",
+                    border: `3px solid ${d.ignition ? "#22c55e" : "#475569"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: d.ignition ? "0 0 16px #22c55e66" : "none",
+                  }}>
+                    <span style={{ fontSize: 16 }}>{d.ignition ? "▶" : "⏹"}</span>
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: d.ignition ? "#22c55e" : "#64748b" }}>
+                    {d.ignition ? "ON" : "OFF"}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: -4, textAlign: "center" }}>
+                  Ignición
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Status cards */}
       {d ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <InfoCard label="Velocidad" value={`${d.speed ?? "–"} km/h`} />
-          <InfoCard label="Alimentación" value={d.ext_voltage_mv ? `${(d.ext_voltage_mv/1000).toFixed(1)} V` : "–"} />
+          <InfoCard label="Velocidad" value={`${d.speed ?? "–"} km/h`}
+            onClick={chartData.some(p => p.velocidad != null) ? () => setSensorModal({ label: "Velocidad", unit: "km/h", dataKey: "velocidad", color: "#3b82f6" }) : undefined} />
+          <InfoCard label="Alimentación" value={d.ext_voltage_mv ? `${(d.ext_voltage_mv/1000).toFixed(1)} V` : "–"}
+            onClick={chartData.some(p => p.voltaje != null) ? () => setSensorModal({ label: "Tensión de alimentación", unit: "V", dataKey: "voltaje", color: "#22c55e" }) : undefined} />
           <InfoCard label="Satélites" value={`${d.satellites ?? "–"}`} />
           <InfoCard label="Latitud" value={d.lat?.toFixed(5) ?? "–"} />
           <InfoCard label="Longitud" value={d.lng?.toFixed(5) ?? "–"} />
@@ -315,6 +445,11 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
                     : "–"
               }
               color={s.data_type === "boolean" ? (s.converted_value ? "var(--success)" : "var(--muted)") : "var(--warning)"}
+              onClick={
+                s.data_type !== "boolean"
+                  ? () => setSensorModal({ label: s.display_name, unit: s.unit ?? "", dataKey: "presion", color: "#f59e0b" })
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -435,6 +570,11 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
+      </>)} {/* end TAB: ESTADO */}
+
+      {/* ── TAB: HISTÓRICO ── */}
+      {activeTab === 'historico' && (<>
+
       {/* Chart controls */}
       <div className="flex items-center gap-3 flex-wrap">
         <h2 className="text-sm font-semibold text-white">Histórico</h2>
@@ -522,6 +662,11 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      </>)} {/* end TAB: HISTÓRICO */}
+
+      {/* ── TAB: MANTENIMIENTO ── */}
+      {activeTab === 'mantenimiento' && (<>
+
       {/* ── Maintenance section ── */}
       <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-4">
@@ -582,6 +727,11 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </div>
+
+      </>)} {/* end TAB: MANTENIMIENTO */}
+
+      {/* ── TAB: RUTAS ── */}
+      {activeTab === 'rutas' && (<>
 
       {/* ── Automation section ── */}
       {autoRules.length > 0 && (
@@ -881,6 +1031,60 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </div>
+
+      </>)} {/* end TAB: RUTAS */}
+
+      {/* ── Sensor chart modal ── */}
+      {sensorModal && (
+        <Modal
+          title={`${sensorModal.label} — Últimas ${hours}h`}
+          onClose={() => setSensorModal(null)}
+          maxWidth="max-w-2xl"
+        >
+          {chartData.length === 0 || !chartData.some(p => p[sensorModal.dataKey as keyof typeof p] != null) ? (
+            <div className="text-center py-10 space-y-2">
+              <div className="text-2xl">📈</div>
+              <div className="text-sm font-medium text-white">{sensorModal.label}</div>
+              <div className="text-xs" style={{ color: "var(--muted)" }}>
+                Histórico disponible en la pestaña <span className="font-semibold text-white">Histórico</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis dataKey="time" stroke="var(--muted)" tick={{ fontSize: 10, fill: "var(--muted)" }} />
+                  <YAxis stroke="var(--muted)" tick={{ fontSize: 10, fill: "var(--muted)" }} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: "var(--muted)" }}
+                    formatter={(val) => [`${val} ${sensorModal!.unit}`, sensorModal!.label]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={sensorModal.dataKey}
+                    stroke={sensorModal.color}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, fill: sensorModal.color }}
+                    connectNulls={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={() => setSensorModal(null)}
+              className="text-xs px-3 py-1.5 rounded-lg"
+              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--muted)" }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -891,10 +1095,27 @@ function formatDuration(seconds: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function InfoCard({ label, value, color }: { label: string; value: string; color?: string }) {
+function InfoCard({ label, value, color, onClick }: { label: string; value: string; color?: string; onClick?: () => void }) {
   return (
-    <div className="rounded-xl p-3" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-      <div className="text-xs mb-1" style={{ color: "var(--muted)" }}>{label}</div>
+    <div
+      className="rounded-xl p-3 transition-colors"
+      onClick={onClick}
+      style={{
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        cursor: onClick ? "pointer" : "default",
+      }}
+      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.2)"; }}
+      onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs" style={{ color: "var(--muted)" }}>{label}</div>
+        {onClick && (
+          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" style={{ color: "var(--muted)", flexShrink: 0 }}>
+            <path d="M18 20H4V6M20 4L4 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
       <div className="text-sm font-semibold" style={{ color: color || "white" }}>{value}</div>
     </div>
   );

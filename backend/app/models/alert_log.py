@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Float, ForeignKey, TIMESTAMP
+from sqlalchemy import String, Float, ForeignKey, TIMESTAMP, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -37,3 +37,4 @@ class AlertLog(Base):
     acknowledged_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
+    acknowledge_note: Mapped[str | None] = mapped_column(Text, nullable=True)

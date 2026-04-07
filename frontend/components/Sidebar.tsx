@@ -53,20 +53,6 @@ const primaryNav = [
     ),
   },
   {
-    href: "/map",
-    label: "Mapa",
-    icon: (active: boolean) => (
-      <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"
-          stroke="currentColor" strokeWidth={active ? "2" : "1.5"}
-          strokeLinecap="round" strokeLinejoin="round"
-          fill={active ? "currentColor" : "none"} fillOpacity={active ? 0.12 : 0} />
-        <line x1="8" y1="2" x2="8" y2="18" stroke="currentColor" strokeWidth={active ? "2" : "1.5"} strokeLinecap="round" />
-        <line x1="16" y1="6" x2="16" y2="22" stroke="currentColor" strokeWidth={active ? "2" : "1.5"} strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
     href: "/alerts",
     label: "Alertas",
     hasAlerts: true,
@@ -125,6 +111,18 @@ const secondaryNav = [
       </svg>
     ),
   },
+  {
+    href: "/ecodriving",
+    label: "Eco-Driving",
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+        <path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12z"
+              stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M7 12h1M16 12h1M12 7v1M12 16v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ];
 
 const adminNav = [
@@ -179,9 +177,19 @@ const adminNav = [
       </svg>
     ),
   },
+  {
+    href: "/admin/can-sniffer",
+    label: "CAN Sniffer",
+    superadminOnly: true,
+    icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+        <path d="M2 9h20M2 15h20M9 3L7 21M17 3l-2 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const branding = useBranding();
@@ -288,8 +296,40 @@ export default function Sidebar() {
         );
       })()}
 
+      {/* Command palette trigger button */}
+      <div className="px-3 pt-3 pb-1">
+        <button
+          onClick={onOpenCommandPalette}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors group"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid var(--border)",
+            color: "var(--muted)",
+          }}
+          title="Buscar (Ctrl+K)"
+        >
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="flex-1 text-left truncate" style={{ fontSize: 12 }}>Buscar...</span>
+          <span
+            className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              fontSize: 10,
+              fontFamily: "inherit",
+              lineHeight: 1.4,
+            }}
+          >
+            Ctrl K
+          </span>
+        </button>
+      </div>
+
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         <p className="text-xs px-3 pb-1 font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
           Monitorización
         </p>
@@ -302,6 +342,9 @@ export default function Sidebar() {
             badge={item.hasAlerts ? activeAlerts : undefined}
           />
         ))}
+        <p className="text-xs px-3 pt-4 pb-1 font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          Gestión
+        </p>
         {secondaryNav.map(item => (
           <DesktopNavItem key={item.href} href={item.href} label={item.label} icon={item.icon} />
         ))}

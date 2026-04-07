@@ -33,9 +33,12 @@ export interface WsAlertMessage {
 
 export type WsMessage = WsTelemetryMessage | WsAlertMessage
 
+export type WsStatus = 'connecting' | 'connected' | 'disconnected'
+
 export function useFleetWebSocket(
   onTelemetry: (data: WsTelemetryMessage) => void,
-  onAlert?: (data: WsAlertMessage) => void
+  onAlert?: (data: WsAlertMessage) => void,
+  onStatusChange?: (status: WsStatus) => void
 ) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -45,12 +48,16 @@ export function useFleetWebSocket(
   onTelemetryRef.current = onTelemetry
   const onAlertRef = useRef(onAlert)
   onAlertRef.current = onAlert
+  const onStatusRef = useRef(onStatusChange)
+  onStatusRef.current = onStatusChange
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return
 
     const token = localStorage.getItem('cmg_token')
     if (!token) return
+
+    onStatusRef.current?.('connecting')
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
@@ -59,6 +66,7 @@ export function useFleetWebSocket(
 
     ws.onopen = () => {
       reconnectDelay.current = 3000
+      onStatusRef.current?.('connected')
     }
 
     ws.onmessage = (event) => {
@@ -76,6 +84,7 @@ export function useFleetWebSocket(
 
     ws.onclose = () => {
       if (!mountedRef.current) return
+      onStatusRef.current?.('disconnected')
       reconnectTimeout.current = setTimeout(() => {
         reconnectDelay.current = Math.min(reconnectDelay.current * 1.5, 30000)
         connect()

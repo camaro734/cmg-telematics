@@ -33,6 +33,17 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "ahora mismo";
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `hace ${days}d`;
+}
+
 const LEVEL_ES: Record<string, string> = {
   high: "Alta",
   medium: "Media",
@@ -714,6 +725,7 @@ export default function AlertsPage() {
   const [levelFilter, setLevelFilter] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
+  const [ackModal, setAckModal] = useState<{ alertId: string; note: string } | null>(null);
 
   // Rules state
   const [rules, setRules] = useState<AlertRuleOut[]>([]);
@@ -819,10 +831,11 @@ export default function AlertsPage() {
     }, [addToast, loadAlerts]),
   );
 
-  async function handleAcknowledge(id: string) {
+  async function handleAcknowledge(id: string, note: string) {
     setAcknowledging(id);
+    setAckModal(null);
     try {
-      await alertsApi.acknowledge(id);
+      await alertsApi.acknowledge(id, note);
       await loadAlerts();
     } finally {
       setAcknowledging(null);
@@ -1026,58 +1039,76 @@ export default function AlertsPage() {
             </div>
           ) : (
             <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
-                    {["Fecha", "Vehículo", "Variable", "Nivel", "Valor", "Umbral", "Estado", ""].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: "var(--muted)" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {alertList.map((alert, i) => (
-                    <tr key={alert.id}
-                        style={{
-                          background: i % 2 === 0 ? "var(--card)" : "rgba(30,33,48,0.5)",
-                          borderBottom: "1px solid var(--border)",
-                          opacity: alert.resolved_at ? 0.7 : 1,
-                        }}>
-                      <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: "var(--muted)" }}>
-                        {formatDateTime(alert.fired_at)}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-white">
-                        {alert.vehicle_name ?? alert.vehicle_id.slice(0, 8)}
-                      </td>
-                      <td className="px-4 py-3 text-white">
-                        {alert.display_name}
-                        <span className="ml-1 text-xs" style={{ color: "var(--muted)" }}>({alert.io_key})</span>
-                      </td>
-                      <td className="px-4 py-3"><LevelBadge level={alert.level} /></td>
-                      <td className="px-4 py-3 font-mono text-white">
-                        {alert.converted_value.toFixed(2)}
-                        {alert.unit && <span className="ml-1 text-xs" style={{ color: "var(--muted)" }}>{alert.unit}</span>}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--muted)" }}>
-                        {alert.threshold}{alert.unit && ` ${alert.unit}`}
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge alert={alert} /></td>
-                      <td className="px-4 py-3">
-                        {!alert.resolved_at && !alert.acknowledged_at && (
-                          <button onClick={() => handleAcknowledge(alert.id)}
-                                  disabled={acknowledging === alert.id}
-                                  className="text-xs px-3 py-1 rounded font-medium"
-                                  style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)", opacity: acknowledging === alert.id ? 0.5 : 1 }}>
-                            {acknowledging === alert.id ? "..." : "Confirmar"}
-                          </button>
-                        )}
-                        {alert.acknowledged_at && !alert.resolved_at && (
-                          <span className="text-xs" style={{ color: "var(--muted)" }}>Confirmada</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {/* Alert inbox cards */}
+                <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                  {alertList.map((alert) => {
+                    const levelCfg: Record<string, { border: string; icon: string; iconBg: string }> = {
+                      high:   { border: "#ef4444", icon: "!", iconBg: "rgba(239,68,68,0.15)" },
+                      medium: { border: "#fb923c", icon: "!", iconBg: "rgba(251,146,60,0.15)" },
+                      low:    { border: "#f59e0b", icon: "↑", iconBg: "rgba(245,158,11,0.15)" },
+                    };
+                    const lc = levelCfg[alert.level] ?? levelCfg.low;
+                    return (
+                      <div key={alert.id}
+                           style={{
+                             display: "flex", alignItems: "flex-start", gap: 14,
+                             padding: "14px 16px",
+                             background: alert.resolved_at ? "transparent" : "rgba(255,255,255,0.015)",
+                             opacity: alert.resolved_at ? 0.6 : 1,
+                             borderLeft: `3px solid ${alert.resolved_at ? "var(--border)" : lc.border}`,
+                           }}>
+                        {/* Severity icon */}
+                        <div className="flex-shrink-0 flex items-center justify-center text-xs font-bold rounded-full mt-0.5"
+                             style={{ width: 28, height: 28, background: lc.iconBg, color: lc.border }}>
+                          {lc.icon}
+                        </div>
+
+                        {/* Main content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Human-readable description */}
+                          <div className="text-sm font-medium text-white leading-snug">
+                            <span>{alert.display_name}</span>
+                            <span className="font-mono ml-1.5 px-1.5 py-0.5 rounded text-xs"
+                                  style={{ background: "rgba(255,255,255,0.07)", color: lc.border }}>
+                              {alert.converted_value.toFixed(2)}{alert.unit ? ` ${alert.unit}` : ""}
+                            </span>
+                            <span className="text-xs ml-1" style={{ color: "var(--muted)" }}>
+                              (límite: {alert.threshold}{alert.unit ? ` ${alert.unit}` : ""})
+                            </span>
+                          </div>
+                          {/* Vehicle + time */}
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
+                              {alert.vehicle_name ?? alert.vehicle_id.slice(0, 8)}
+                            </span>
+                            <span style={{ color: "var(--border)" }}>·</span>
+                            <span className="text-xs" style={{ color: "var(--muted)" }}>
+                              {timeAgo(alert.fired_at)}
+                            </span>
+                            <span style={{ color: "var(--border)" }}>·</span>
+                            <span className="text-xs" style={{ color: "var(--muted)" }}>
+                              {formatDateTime(alert.fired_at)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right side: badges + action */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <LevelBadge level={alert.level} />
+                          <StatusBadge alert={alert} />
+                          {!alert.resolved_at && !alert.acknowledged_at && (
+                            <button onClick={() => setAckModal({ alertId: alert.id, note: "" })}
+                                    disabled={acknowledging === alert.id}
+                                    className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                                    style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)", opacity: acknowledging === alert.id ? 0.5 : 1 }}>
+                              {acknowledging === alert.id ? "..." : "Reconocer"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               {alertList.length === 0 && (
                 <div className="text-center py-12">
                   <div className="text-3xl mb-3">✓</div>
@@ -1388,6 +1419,44 @@ export default function AlertsPage() {
                       className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white"
                       style={{ background: "var(--accent)" }}>
                 Crear regla
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Acknowledge modal ── */}
+      {ackModal && (
+        <Modal title="Reconocer alerta" onClose={() => setAckModal(null)}>
+          <div className="space-y-4">
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              Describe la acción tomada para reconocer esta alerta. Este comentario quedará registrado.
+            </p>
+            <textarea
+              rows={4}
+              value={ackModal.note}
+              onChange={e => setAckModal(prev => prev ? { ...prev, note: e.target.value } : null)}
+              placeholder="Añade una nota obligatoria sobre la acción tomada..."
+              className="w-full px-3 py-2.5 rounded-lg text-sm text-white resize-none"
+              style={{ background: "var(--sidebar)", border: "1px solid var(--border)", outline: "none" }}
+            />
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setAckModal(null)}
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium"
+                style={{ background: "var(--sidebar)", color: "var(--muted)", border: "1px solid var(--border)" }}>
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleAcknowledge(ackModal.alertId, ackModal.note)}
+                disabled={!ackModal.note.trim()}
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white"
+                style={{
+                  background: !ackModal.note.trim() ? "rgba(59,130,246,0.3)" : "rgba(59,130,246,0.8)",
+                  opacity: !ackModal.note.trim() ? 0.6 : 1,
+                  cursor: !ackModal.note.trim() ? "not-allowed" : "pointer",
+                }}>
+                Confirmar
               </button>
             </div>
           </div>

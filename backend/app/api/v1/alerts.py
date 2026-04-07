@@ -36,9 +36,14 @@ class AlertLogOut(BaseModel):
     fired_at: datetime
     resolved_at: Optional[datetime]
     acknowledged_at: Optional[datetime]
+    acknowledge_note: Optional[str] = None
     vehicle_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AcknowledgeBody(BaseModel):
+    note: Optional[str] = None
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -133,6 +138,7 @@ async def list_alerts(
             fired_at=alert.fired_at,
             resolved_at=alert.resolved_at,
             acknowledged_at=alert.acknowledged_at,
+            acknowledge_note=alert.acknowledge_note,
             vehicle_name=vehicle_name,
         )
         out.append(item)
@@ -161,10 +167,11 @@ async def active_alert_count(
 @router.post("/{alert_id}/acknowledge")
 async def acknowledge_alert(
     alert_id: uuid.UUID,
+    body: AcknowledgeBody = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Acknowledge an alert (mark as seen)."""
+    """Acknowledge an alert (mark as seen). Optionally accepts a note."""
     result = await db.execute(select(AlertLog).where(AlertLog.id == alert_id))
     alert = result.scalar_one_or_none()
 
@@ -178,6 +185,12 @@ async def acknowledge_alert(
 
     alert.acknowledged_at = datetime.now(timezone.utc)
     alert.acknowledged_by = current_user.id
+    if body is not None:
+        alert.acknowledge_note = body.note
     await db.commit()
 
-    return {"id": str(alert.id), "acknowledged_at": alert.acknowledged_at.isoformat()}
+    return {
+        "id": str(alert.id),
+        "acknowledged_at": alert.acknowledged_at.isoformat(),
+        "acknowledge_note": alert.acknowledge_note,
+    }

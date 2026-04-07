@@ -8,16 +8,35 @@ interface Props {
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   geofences?: GeofenceOut[];
+  alertVehicleIds?: string[]; // IDs of vehicles with active alerts (show pulse ring)
+}
+
+function timeAgoShort(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "ahora";
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  return `hace ${Math.floor(hrs / 24)}d`;
 }
 
 // Modern CartoDB Voyager tiles — clean, professional, free
 const TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+const ONLINE_MS = 10 * 60 * 1000; // same threshold as other components
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
-function truckIcon(color: string, selected: boolean, speed?: number) {
+function truckIcon(color: string, selected: boolean, hasAlert: boolean, speed?: number) {
   const size = selected ? 44 : 36;
-  const ring = selected ? `<circle cx="22" cy="22" r="20" stroke="${color}" stroke-width="2.5" stroke-dasharray="4 3" fill="none" opacity="0.6"/>` : "";
-  // Truck SVG inside a pill badge
+  const selectedRing = selected
+    ? `<circle cx="22" cy="22" r="20" stroke="${color}" stroke-width="2.5" stroke-dasharray="4 3" fill="none" opacity="0.6"/>`
+    : "";
+  // Alert pulse ring (animated via CSS class)
+  const alertRingId = `alert-ring-${Math.random().toString(36).slice(2)}`;
+  const alertRing = hasAlert && !selected
+    ? `<circle cx="22" cy="22" r="19" stroke="#ef4444" stroke-width="2" fill="none" class="alert-pulse" id="${alertRingId}" opacity="0.8"/>`
+    : "";
+
   return `
     <div style="
       position:relative;
@@ -25,10 +44,10 @@ function truckIcon(color: string, selected: boolean, speed?: number) {
       filter: drop-shadow(0 3px 8px ${color}88);
     ">
       <svg width="${size}" height="${size}" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-        ${ring}
+        ${alertRing}
+        ${selectedRing}
         <circle cx="22" cy="22" r="${selected ? 17 : 16}" fill="${color}"/>
         <circle cx="22" cy="22" r="${selected ? 17 : 16}" fill="rgba(0,0,0,0.15)"/>
-        <!-- Truck icon centered -->
         <g transform="translate(10, 13)">
           <rect x="0" y="2" width="14" height="10" rx="1.5" fill="white" fill-opacity="0.95"/>
           <path d="M14 5h5l3 5v3h-8V5z" fill="white" fill-opacity="0.95"/>
@@ -36,8 +55,9 @@ function truckIcon(color: string, selected: boolean, speed?: number) {
           <circle cx="14" cy="14.5" r="2" fill="${color}" stroke="white" stroke-width="1.5"/>
           <circle cx="20" cy="14.5" r="2" fill="${color}" stroke="white" stroke-width="1.5"/>
         </g>
+        ${hasAlert ? `<circle cx="34" cy="10" r="5" fill="#ef4444"/><text x="34" y="10" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="7" font-weight="700" font-family="system-ui">!</text>` : ""}
       </svg>
-      ${speed != null ? `
+      ${speed != null && speed > 2 ? `
       <div style="
         position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
         background:${color}; color:white; border:1.5px solid rgba(0,0,0,0.3);
@@ -48,7 +68,8 @@ function truckIcon(color: string, selected: boolean, speed?: number) {
   `;
 }
 
-export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Props) {
+export default function FleetMap({ fleet, selectedId, onSelect, geofences, alertVehicleIds }: Props) {
+  const alertSet = new Set(alertVehicleIds ?? []);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   const markersRef = useRef<Record<string, unknown>>({});
@@ -115,58 +136,89 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
 
       validVehicles.forEach(vehicle => {
         const pos = vehicle.last_position!;
-        const isOnline = vehicle.device?.online ?? false;
+        const isOnline = !!vehicle.device?.last_seen &&
+          (Date.now() - new Date(vehicle.device.last_seen).getTime() < ONLINE_MS);
         const isSelected = vehicle.vehicle_id === selectedId;
-        const noSignal = isOnline && vehicle.device?.last_seen &&
-          (Date.now() - new Date(vehicle.device.last_seen).getTime()) > 5 * 60 * 1000;
+        // "no signal" = online according to DB but last_seen > 5 min (device went quiet)
+        const noSignal = !isOnline && !!vehicle.device?.last_seen &&
+          (Date.now() - new Date(vehicle.device.last_seen).getTime() < 30 * 60 * 1000);
 
-        const color = isSelected ? "#3b82f6" : noSignal ? "#f59e0b" : isOnline ? "#1D9E75" : "#64748b";
+        const hasAlert = alertSet.has(vehicle.vehicle_id);
+        const color = isSelected ? "#3b82f6" : hasAlert ? "#ef4444" : noSignal ? "#f59e0b" : isOnline ? "#1D9E75" : "#64748b";
         const ain1 = pos.io_data?.["9"];
         const pressure = ain1 != null ? Math.round(ain1 * 0.006) : null;
+        const voltageV = pos.ext_voltage_mv != null ? (pos.ext_voltage_mv / 1000).toFixed(1) : null;
 
         const icon = L.divIcon({
           className: "",
-          html: truckIcon(color, isSelected, pos.speed ?? undefined),
+          html: truckIcon(color, isSelected, hasAlert, pos.speed ?? undefined),
           iconSize: [isSelected ? 44 : 36, isSelected ? 52 : 44],
           iconAnchor: [isSelected ? 22 : 18, isSelected ? 26 : 22],
           popupAnchor: [0, isSelected ? -28 : -24],
         });
 
-        const statusLabel = noSignal ? "Sin señal" : isOnline ? "En línea" : "Offline";
-        const statusColor = noSignal ? "#f59e0b" : isOnline ? "#1D9E75" : "#64748b";
-        const lastSeenStr = vehicle.device?.last_seen
-          ? new Date(vehicle.device.last_seen).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-          : "–";
+        const statusLabel = hasAlert ? "Alerta activa" : noSignal ? "Sin señal" : isOnline ? "En línea" : "Offline";
+        const statusColor = hasAlert ? "#ef4444" : noSignal ? "#f59e0b" : isOnline ? "#1D9E75" : "#64748b";
+        const lastSeenAgo = vehicle.device?.last_seen ? timeAgoShort(vehicle.device.last_seen) : "–";
+        const motorState = pos.ignition ? "Motor ON" : "Motor OFF";
+        const motorColor = pos.ignition ? "#22c55e" : "#64748b";
 
         const popupHtml = `
           <div style="
-            min-width:190px; font-family:system-ui,sans-serif;
-            background:#1e2532; border-radius:10px; overflow:hidden;
-            border:1px solid rgba(255,255,255,0.08);
+            min-width:210px; font-family:system-ui,-apple-system,sans-serif;
+            background:#1a1d27; border-radius:12px; overflow:hidden;
+            border:1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
           ">
-            <div style="padding:10px 12px 6px; border-bottom:1px solid rgba(255,255,255,0.08)">
-              <div style="font-size:13px; font-weight:700; color:#f1f5f9; margin-bottom:3px">
+            <!-- Header -->
+            <div style="padding:11px 14px 8px; border-bottom:1px solid rgba(255,255,255,0.08)">
+              <div style="font-size:14px; font-weight:700; color:#f1f5f9; margin-bottom:2px">
                 ${vehicle.vehicle_name}
               </div>
-              ${vehicle.license_plate ? `<div style="font-size:11px; color:#94a3b8">${vehicle.license_plate}</div>` : ""}
+              <div style="display:flex; align-items:center; gap:8px">
+                ${vehicle.license_plate ? `<span style="font-size:11px; color:#64748b; background:rgba(255,255,255,0.06); padding:1px 6px; border-radius:4px">${vehicle.license_plate}</span>` : ""}
+              </div>
             </div>
-            <div style="padding:8px 12px">
-              <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px">
-                <span style="
-                  display:inline-flex; align-items:center; gap:4px;
-                  font-size:11px; font-weight:600; color:${statusColor};
-                  background:${statusColor}22; border-radius:20px; padding:2px 8px;
-                ">
-                  <span style="width:6px;height:6px;border-radius:50%;background:${statusColor};display:inline-block;${isOnline && !noSignal ? "animation:pulse 1.5s infinite" : ""}"></span>
-                  ${statusLabel}
-                </span>
+
+            <!-- Status row -->
+            <div style="padding:8px 14px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+              <span style="
+                display:inline-flex; align-items:center; gap:5px;
+                font-size:11px; font-weight:600; color:${statusColor};
+                background:${statusColor}22; border-radius:20px; padding:3px 9px;
+              ">
+                <span style="width:6px;height:6px;border-radius:50%;background:${statusColor};display:inline-block"></span>
+                ${statusLabel}
+              </span>
+              <span style="font-size:11px; font-weight:600; color:${motorColor}">
+                ${motorState}
+              </span>
+            </div>
+
+            <!-- Data grid -->
+            <div style="padding:8px 14px; display:grid; grid-template-columns:1fr 1fr; gap:6px 12px">
+              <div style="font-size:11px; color:#94a3b8">
+                Velocidad: <b style="color:#e2e8f0">${pos.speed ?? 0} km/h</b>
               </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:11px; color:#94a3b8">
-                <div>🚀 <b style="color:#e2e8f0">${pos.speed ?? "–"}</b> km/h</div>
-                <div>🔑 <b style="color:#e2e8f0">${pos.ignition ? "ON" : "OFF"}</b></div>
-                ${pressure != null ? `<div>🔧 <b style="color:#e2e8f0">${pressure}</b> bar</div>` : ""}
-                <div style="font-size:10px; color:#64748b; grid-column:1/-1">Últ. señal: ${lastSeenStr}</div>
+              ${voltageV ? `<div style="font-size:11px; color:#94a3b8">Voltaje: <b style="color:#e2e8f0">${voltageV} V</b></div>` : "<div></div>"}
+              ${pressure != null ? `<div style="font-size:11px; color:#94a3b8">Presión: <b style="color:#f59e0b">${pressure} bar</b></div>` : ""}
+              <div style="font-size:10px; color:#475569; grid-column:1/-1">
+                Actualizado ${lastSeenAgo}
               </div>
+            </div>
+
+            <!-- Action link -->
+            <div style="padding:0 14px 11px">
+              <a href="/vehicles/${vehicle.vehicle_id}"
+                 style="
+                   display:block; text-align:center;
+                   background:rgba(59,130,246,0.15); color:#60a5fa;
+                   border:1px solid rgba(59,130,246,0.3); border-radius:8px;
+                   padding:6px 12px; font-size:11px; font-weight:600;
+                   text-decoration:none;
+                 ">
+                Ver detalle →
+              </a>
             </div>
           </div>
         `;
@@ -259,6 +311,14 @@ export default function FleetMap({ fleet, selectedId, onSelect, geofences }: Pro
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
+        }
+        @keyframes alert-ring-pulse {
+          0%   { opacity: 0.9; transform-origin: 22px 22px; transform: scale(1); }
+          60%  { opacity: 0.2; transform-origin: 22px 22px; transform: scale(1.35); }
+          100% { opacity: 0; transform-origin: 22px 22px; transform: scale(1.5); }
+        }
+        .alert-pulse {
+          animation: alert-ring-pulse 1.4s ease-out infinite;
         }
       `}</style>
     </>
