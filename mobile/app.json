@@ -38,13 +38,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font",
-      [
-        "expo-notifications",
-        {
-          "color": "#2563eb"
-        }
-      ]
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
