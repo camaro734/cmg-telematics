@@ -45,9 +45,9 @@ workflows:
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --issuer-id "$ASCISSUERID" \
+            --key-id "$ASCKEYID" \
+            --private-key "$ASCPRIVATEKEY" \
             --type IOS_APP_DEVELOPMENT \
             --create
           keychain add-certificates
