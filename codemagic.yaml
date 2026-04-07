@@ -17,9 +17,6 @@ workflows:
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "cmgtelematics"
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: es.cmgnexus.telematics
 
     triggering:
       events:
@@ -43,6 +40,15 @@ workflows:
         script: |
           cd mobile/ios
           pod install
+
+      - name: Configurar firma de código (crea certificado y perfil si no existen)
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_DEVELOPMENT \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
 
       - name: Build iOS .ipa
         script: |
