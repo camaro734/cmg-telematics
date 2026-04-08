@@ -12,15 +12,9 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: es.cmgnexus.telematics
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
-        APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
-        APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
-        APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
       groups:
         - apple_signing
 
@@ -56,9 +50,18 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          cd mobile
+          # Descargar/crear certificado development y provisioning profile
+          # Sin --certificate-key: app-store-connect genera el par de claves automáticamente
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --issuer-id "$ASCISSUERID" \
+            --key-id "$ASCKEYID" \
+            --private-key "$ASCPRIVATEKEY" \
+            --type IOS_APP_DEVELOPMENT \
+            --create
+          keychain add-certificates
 
-          # Codemagic ios_signing ya descargó certificado y perfil — solo aplicar
+          cd mobile
           xcode-project use-profiles
 
           # Archivar
