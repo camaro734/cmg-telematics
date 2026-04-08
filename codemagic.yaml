@@ -35,6 +35,9 @@ workflows:
         script: |
           cd mobile
           npx expo prebuild --platform ios --clean --no-install
+          # Sobrescribir .xcode.env con path absoluto de node para que el
+          # script "Bundle React Native code and images" lo encuentre en Release
+          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env
 
       - name: CocoaPods install
         script: |
