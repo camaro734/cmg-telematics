@@ -35,9 +35,10 @@ workflows:
         script: |
           cd mobile
           npx expo prebuild --platform ios --clean --no-install
-          # Sobrescribir .xcode.env con path absoluto de node para que el
-          # script "Bundle React Native code and images" lo encuentre en Release
+          # NODE_BINARY: path absoluto para que el bundle script lo encuentre en Release
           echo "export NODE_BINARY=$(which node)" > ios/.xcode.env
+          # ENTRY_FILE: entry point de Expo Router (más fiable en .xcode.env.local que en build settings)
+          echo "export ENTRY_FILE=node_modules/expo-router/entry.js" > ios/.xcode.env.local
 
       - name: CocoaPods install
         script: |
@@ -91,8 +92,6 @@ workflows:
 
           # Archivar
           cd mobile
-          export NODE_BINARY=$(which node)
-          export ENTRY_FILE="node_modules/expo-router/entry.js"
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
@@ -103,9 +102,7 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=$TEAM_ID" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            "NODE_BINARY=$NODE_BINARY" \
-            "ENTRY_FILE=$ENTRY_FILE"
+            COMPILER_INDEX_STORE_ENABLE=NO
 
           # Exportar .ipa — escribir plist con variables expandidas
           cat > /tmp/ExportOptions.plist <<EOF
