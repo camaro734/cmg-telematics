@@ -52,6 +52,27 @@ workflows:
             plutil -remove "aps-environment" "$ENTITLEMENTS" 2>/dev/null || true
           fi
 
+      - name: Verificar bundle Metro (diagnóstico — muestra el error real si falla)
+        script: |
+          cd mobile
+          export NODE_BINARY=$(which node)
+          echo "Node: $(which node) — $(node --version)"
+          echo "ENTRY_FILE: node_modules/expo-router/entry.js"
+          echo "metro.config.js existe: $([ -f metro.config.js ] && echo SI || echo NO)"
+          echo "babel.config.js existe: $([ -f babel.config.js ] && echo SI || echo NO)"
+          echo "Paquetes clave:"
+          ls node_modules | grep -E "^(metro|babel-preset-expo|expo-router)$" || true
+          echo ""
+          echo "--- Probando bundle Metro directamente ---"
+          "${NODE_BINARY}" node_modules/.bin/react-native bundle \
+            --entry-file node_modules/expo-router/entry.js \
+            --platform ios \
+            --dev false \
+            --bundle-output /tmp/test-main.jsbundle \
+            --assets-dest /tmp/test-assets \
+            --reset-cache
+          echo "--- Bundle Metro OK ---"
+
       - name: Configurar firma y build
         script: |
           # Usar clave RSA guardada en Codemagic (IOS_CERT_KEY) o generar una nueva.
@@ -92,6 +113,8 @@ workflows:
 
           # Archivar
           cd mobile
+          mkdir -p /tmp/xcodebuild_logs
+          set -o pipefail
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
@@ -102,7 +125,9 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=$TEAM_ID" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee /tmp/xcodebuild_logs/build.log || \
+            { grep -A 20 "error:" /tmp/xcodebuild_logs/build.log | head -60; exit 1; }
 
           # Exportar .ipa — escribir plist con variables expandidas
           cat > /tmp/ExportOptions.plist <<EOF
