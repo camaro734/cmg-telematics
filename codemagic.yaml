@@ -91,7 +91,7 @@ workflows:
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             archive \
