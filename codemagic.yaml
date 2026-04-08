@@ -50,30 +50,24 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          # 1. Generar clave RSA para el certificado de desarrollo
-          # ($ASCPRIVATEKEY es la API key ASC — diferente a la clave del certificado iOS)
-          openssl genrsa -out /tmp/cert_key.pem 2048
-
-          # 2. Descargar o crear certificado Development + provisioning profile
+          # Instalar certificado .p12 (base64 almacenado en IOS_DEV_CERT_P12)
+          echo "$IOS_DEV_CERT_P12" | base64 --decode > /tmp/cert.p12
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --issuer-id "$ASCISSUERID" \
-            --key-id "$ASCKEYID" \
-            --private-key "$ASCPRIVATEKEY" \
-            --certificate-key "@file:/tmp/cert_key.pem" \
-            --type IOS_APP_DEVELOPMENT \
-            --create
-          keychain add-certificates
-          rm -f /tmp/cert_key.pem
+          keychain add-certificates --certificate /tmp/cert.p12 \
+            --certificate-password "$IOS_DEV_CERT_PASSWORD"
+          rm -f /tmp/cert.p12
 
-          # 3. Obtener UUID del perfil descargado y pasarlo directamente a xcodebuild
-          PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
-          UUID=$(security cms -D -i "$PROFILE" | python3 -c \
+          # Instalar provisioning profile (base64 almacenado en IOS_DEV_PROFILE)
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$IOS_DEV_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
+          UUID=$(security cms -D -i /tmp/profile.mobileprovision | python3 -c \
             "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
-          echo "Usando perfil UUID: $UUID"
+          cp /tmp/profile.mobileprovision \
+            ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          rm -f /tmp/profile.mobileprovision
+          echo "Perfil instalado: $UUID"
 
-          # 4. Archivar
+          # Archivar
           cd mobile
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
@@ -87,7 +81,7 @@ workflows:
             "DEVELOPMENT_TEAM=XN3LPVTURB" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # 5. Exportar .ipa
+          # Exportar .ipa
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             -exportPath build/ios/ipa \
