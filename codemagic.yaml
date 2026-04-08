@@ -50,9 +50,17 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          # Generar clave RSA para el certificado de desarrollo
-          # NOTA: requiere API key con rol Admin en App Store Connect
-          openssl genrsa -out /tmp/cert_key.pem 2048
+          # Usar clave RSA guardada en Codemagic (IOS_CERT_KEY) o generar una nueva.
+          # Si se genera una nueva, guarda el valor impreso como variable IOS_CERT_KEY.
+          if [ -n "$IOS_CERT_KEY" ]; then
+            echo "$IOS_CERT_KEY" > /tmp/cert_key.pem
+            echo "Usando clave RSA almacenada en IOS_CERT_KEY"
+          else
+            openssl genrsa -out /tmp/cert_key.pem 2048
+            echo "====== COPIA ESTO COMO VARIABLE IOS_CERT_KEY EN CODEMAGIC ======"
+            cat /tmp/cert_key.pem
+            echo "================================================================="
+          fi
 
           # Descargar o crear certificado Development + provisioning profile
           keychain initialize
