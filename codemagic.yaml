@@ -88,6 +88,8 @@ workflows:
 
           # Archivar
           cd mobile
+          export NODE_BINARY=$(which node)
+          export ENTRY_FILE="node_modules/expo-router/entry.js"
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
@@ -98,7 +100,9 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=$TEAM_ID" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            "NODE_BINARY=$NODE_BINARY" \
+            "ENTRY_FILE=$ENTRY_FILE"
 
           # Exportar .ipa — escribir plist con variables expandidas
           cat > /tmp/ExportOptions.plist <<EOF
