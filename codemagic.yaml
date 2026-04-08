@@ -50,10 +50,11 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          # Generar clave RSA para el certificado de desarrollo
-          # ($ASCPRIVATEKEY es la API key de App Store Connect — diferente a esta clave)
+          # 1. Generar clave RSA para el certificado de desarrollo
+          # ($ASCPRIVATEKEY es la API key ASC — diferente a la clave del certificado iOS)
           openssl genrsa -out /tmp/cert_key.pem 2048
 
+          # 2. Descargar o crear certificado Development + provisioning profile
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --issuer-id "$ASCISSUERID" \
@@ -65,10 +66,15 @@ workflows:
           keychain add-certificates
           rm -f /tmp/cert_key.pem
 
-          cd mobile
-          xcode-project use-profiles
+          # 3. Obtener UUID del perfil descargado y pasarlo directamente a xcodebuild
+          PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
+          UUID=$(security cms -D -i "$PROFILE" | python3 -c \
+            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
+          echo "Usando perfil UUID: $UUID"
 
-          # Archivar
+          # 4. Archivar
+          cd mobile
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
@@ -77,10 +83,11 @@ workflows:
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
+            "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=XN3LPVTURB" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # Exportar .ipa
+          # 5. Exportar .ipa
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             -exportPath build/ios/ipa \
