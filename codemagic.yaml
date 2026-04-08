@@ -82,7 +82,9 @@ workflows:
           if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
           UUID=$(security cms -D -i "$PROFILE" | python3 -c \
             "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
-          echo "Perfil: $UUID"
+          TEAM_ID=$(security cms -D -i "$PROFILE" | python3 -c \
+            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['TeamIdentifier'][0])")
+          echo "Perfil: $UUID — Team: $TEAM_ID"
 
           # Archivar
           cd mobile
@@ -95,7 +97,7 @@ workflows:
             archive \
             CODE_SIGN_STYLE=Manual \
             "PROVISIONING_PROFILE=$UUID" \
-            "DEVELOPMENT_TEAM=XN3LPVTURB" \
+            "DEVELOPMENT_TEAM=$TEAM_ID" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
           # Exportar .ipa
