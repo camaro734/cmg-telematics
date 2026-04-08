@@ -12,9 +12,15 @@ workflows:
       node: 23.11.1
       xcode: latest
       cocoapods: default
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: es.cmgnexus.telematics
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
+        APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
+        APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
       groups:
         - apple_signing
 
@@ -50,30 +56,12 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          # Escribir clave privada a fichero temporal
-          echo "$CERTKEY" > /tmp/cert.key
-
-          # Descargar certificado y perfil usando nuestra clave privada
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --issuer-id "$ASCISSUERID" \
-            --key-id "$ASCKEYID" \
-            --private-key "$ASCPRIVATEKEY" \
-            --certificate-key "@file:/tmp/cert.key" \
-            --type IOS_APP_DEVELOPMENT \
-            --create
-          keychain add-certificates
-          rm -f /tmp/cert.key
-
-          # Obtener UUID del perfil descargado
-          PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
-          UUID=$(security cms -D -i "$PROFILE" | python3 -c \
-            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
-          echo "Usando perfil: $UUID"
-
-          # Archivar pasando el UUID directamente — sin use-profiles
           cd mobile
+
+          # Codemagic ios_signing ya descargó certificado y perfil — solo aplicar
+          xcode-project use-profiles
+
+          # Archivar
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
@@ -82,7 +70,6 @@ workflows:
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
-            "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=XN3LPVTURB" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
