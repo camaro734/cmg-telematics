@@ -100,19 +100,25 @@ workflows:
             "DEVELOPMENT_TEAM=$TEAM_ID" \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # Exportar .ipa
-          xcodebuild -exportArchive \
-            -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist /dev/stdin <<'PLIST'
+          # Exportar .ipa — escribir plist con variables expandidas
+          cat > /tmp/ExportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
-            <key>method</key><string>development</string>
+            <key>method</key><string>debugging</string>
             <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>provisioningProfiles</key><dict>
+              <key>${BUNDLE_ID}</key><string>${UUID}</string>
+            </dict>
             <key>compileBitcode</key><false/>
           </dict></plist>
-          PLIST
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist /tmp/ExportOptions.plist
 
     artifacts:
       - mobile/build/ios/ipa/*.ipa
