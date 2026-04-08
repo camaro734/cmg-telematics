@@ -66,8 +66,11 @@ workflows:
           keychain add-certificates
           rm -f /tmp/cert_key.pem
 
-          # Obtener UUID del perfil y pasarlo directamente a xcodebuild
-          PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          # Obtener UUID del perfil (app-store-connect guarda en Xcode/UserData)
+          PROFILE=$(ls ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -z "$PROFILE" ]; then
+            PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          fi
           if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
           UUID=$(security cms -D -i "$PROFILE" | python3 -c \
             "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
