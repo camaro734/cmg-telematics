@@ -50,16 +50,20 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          # Descargar/crear certificado development y provisioning profile
-          # Sin --certificate-key: app-store-connect genera el par de claves automáticamente
+          # Generar clave RSA para el certificado de desarrollo
+          # ($ASCPRIVATEKEY es la API key de App Store Connect — diferente a esta clave)
+          openssl genrsa -out /tmp/cert_key.pem 2048
+
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --issuer-id "$ASCISSUERID" \
             --key-id "$ASCKEYID" \
             --private-key "$ASCPRIVATEKEY" \
+            --certificate-key "@file:/tmp/cert_key.pem" \
             --type IOS_APP_DEVELOPMENT \
             --create
           keychain add-certificates
+          rm -f /tmp/cert_key.pem
 
           cd mobile
           xcode-project use-profiles
