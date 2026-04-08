@@ -10,7 +10,7 @@ workflows:
 
     environment:
       node: 23.11.1
-      xcode: latest
+      xcode: 16.3
       cocoapods: default
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
@@ -135,7 +135,7 @@ workflows:
 
     environment:
       node: 23.11.1
-      xcode: latest
+      xcode: 16.3
       cocoapods: default
       ios_signing:
         distribution_type: app_store
