@@ -43,8 +43,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font",
-      ["react-native-maps", { "googleMapsApiKey": "", "enableGoogleMaps": false }]
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
