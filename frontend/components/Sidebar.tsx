@@ -197,6 +197,7 @@ export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette
   const [userRole, setUserRole] = useState("");
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [userBranding, setUserBranding] = useState<{ brand_name: string; brand_color: string; logo_url: string | null; is_custom: boolean } | null>(null);
 
   useEffect(() => {
@@ -235,6 +236,20 @@ export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette
     router.push("/login");
   }
 
+  // Persist collapse state in localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("cmg_sidebar_collapsed");
+    if (stored !== null) setCollapsed(stored === "true");
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed(v => {
+      const next = !v;
+      localStorage.setItem("cmg_sidebar_collapsed", String(next));
+      return next;
+    });
+  }
+
   // Desktop sidebar nav item
   function DesktopNavItem({ href, label, icon, badge }: { href: string; label: string; icon: React.ReactNode; badge?: number }) {
     const active = pathname === href || pathname.startsWith(href + "/");
@@ -259,6 +274,107 @@ export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette
     );
   }
 
+  // ── Collapsed sidebar (64px icon-only) ──────────────────────────────────────
+  const collapsedSidebar = (
+    <>
+      {/* Logo icon — triángulo CMG */}
+      <div className="flex items-center justify-center border-b flex-shrink-0" style={{ borderColor: "var(--border)", height: 64 }}>
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="CMG">
+          <polygon points="4,28 4,4 28,28" fill="var(--accent)" />
+          <line x1="19" y1="4" x2="19" y2="28" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </div>
+
+      {/* Nav icons */}
+      <nav className="flex flex-col items-center gap-0.5 px-2 pt-3 flex-1 overflow-y-auto">
+        {primaryNav.map(item => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              className="relative w-10 h-10 flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                background: active ? "rgba(29,158,117,0.15)" : "transparent",
+                color: active ? "var(--accent)" : "var(--muted)",
+              }}
+            >
+              {item.icon(active)}
+              {item.hasAlerts && activeAlerts > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: "#ef4444" }} />
+              )}
+            </Link>
+          );
+        })}
+
+        <div className="w-8 my-2 flex-shrink-0" style={{ height: 1, background: "var(--border)" }} />
+
+        {secondaryNav.map(item => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                background: active ? "rgba(29,158,117,0.15)" : "transparent",
+                color: active ? "var(--accent)" : "var(--muted)",
+              }}
+            >
+              {item.icon}
+            </Link>
+          );
+        })}
+
+        {(userRole === "superadmin" || userRole === "admin") && (
+          <>
+            <div className="w-8 my-2 flex-shrink-0" style={{ height: 1, background: "var(--border)" }} />
+            {adminNav.filter(item => !item.superadminOnly || userRole === "superadmin").map(item => {
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={item.label}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors"
+                  style={{
+                    background: active ? "rgba(29,158,117,0.15)" : "transparent",
+                    color: active ? "var(--accent)" : "var(--muted)",
+                  }}
+                >
+                  {item.icon}
+                </Link>
+              );
+            })}
+          </>
+        )}
+      </nav>
+
+      {/* Footer: expand button + avatar */}
+      <div className="flex flex-col items-center gap-2 px-2 py-3 border-t flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+        <button
+          onClick={toggleCollapsed}
+          title="Expandir menú"
+          className="w-10 h-10 flex items-center justify-center rounded-lg"
+          style={{ color: "var(--muted)", background: "rgba(255,255,255,0.04)" }}
+        >
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        {userName && (
+          <Link href="/profile" title={userName}
+            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
+            style={{ background: "var(--accent)" }}>
+            {getInitials(userName)}
+          </Link>
+        )}
+      </div>
+    </>
+  );
+
   const desktopSidebar = (
     <>
       {/* Brand */}
@@ -268,21 +384,32 @@ export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette
         const effectiveName = userBranding?.brand_name || (branding.is_custom ? branding.brand_name : "CMG");
         const effectiveSubtitle = (userBranding?.is_custom || branding.is_custom) ? "Fleet Management" : "Telematics";
         return (
-          <div className="px-5 py-5 flex items-center border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+          <div className="px-4 py-4 flex items-center justify-between gap-2 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
             {effectiveLogo ? (
               <img
                 src={effectiveLogo}
                 alt={effectiveName}
-                className="h-7 max-w-[140px] object-contain flex-shrink-0"
+                className="h-7 max-w-[130px] object-contain object-left flex-shrink-0"
                 style={{ filter: "brightness(0) invert(1)" }}
               />
             ) : (
               <img
                 src="/logo-white.png"
                 alt="CMG Hidráulica"
-                style={{ width: 140, height: "auto", display: "block" }}
+                className="object-contain object-left flex-shrink-0"
+                style={{ height: 28, maxWidth: 140 }}
               />
             )}
+            <button
+              onClick={toggleCollapsed}
+              title="Colapsar menú [C]"
+              className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
+              style={{ color: "var(--muted)", background: "rgba(255,255,255,0.04)" }}
+            >
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
+                <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
         );
       })()}
@@ -393,9 +520,13 @@ export default function Sidebar({ onOpenCommandPalette }: { onOpenCommandPalette
       {/* ── Desktop sidebar (md+) ─────────────────────────────────────────── */}
       <aside
         className="hidden md:flex flex-col h-full flex-shrink-0"
-        style={{ width: 260, background: "var(--sidebar)", borderRight: "1px solid var(--border)" }}
+        style={{
+          width: collapsed ? 64 : 260,
+          background: "var(--sidebar)",
+          borderRight: "1px solid var(--border)",
+        }}
       >
-        {desktopSidebar}
+        {collapsed ? collapsedSidebar : desktopSidebar}
       </aside>
 
       {/* ── Mobile: bottom tab bar ────────────────────────────────────────── */}

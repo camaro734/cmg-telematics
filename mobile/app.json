@@ -18,9 +18,14 @@
       "bundleIdentifier": "es.cmgnexus.telematics",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
         "NSLocationWhenInUseUsageDescription": "CMG Telematics uses your location to show your position relative to fleet vehicles.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "CMG Telematics uses your location in the background to geotag task photos and track work sessions.",
         "NSCameraUsageDescription": "CMG Telematics uses the camera to capture geotagged photos during task execution.",
-        "NSPhotoLibraryUsageDescription": "CMG Telematics saves task photos to your photo library."
+        "NSPhotoLibraryUsageDescription": "CMG Telematics saves task photos to your photo library.",
+        "NSMicrophoneUsageDescription": "CMG Telematics may use the microphone to record video notes during task execution."
       }
     },
     "android": {
@@ -38,7 +43,8 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      ["react-native-maps", { "googleMapsApiKey": "", "enableGoogleMaps": false }]
     ],
     "experiments": {
       "typedRoutes": true

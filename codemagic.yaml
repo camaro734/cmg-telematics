@@ -15,6 +15,7 @@ workflows:
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
+        EXPO_PUBLIC_API_URL: "http://213.210.20.183/api/v1"
       groups:
         - apple_signing
 
@@ -181,6 +182,7 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
         APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
         APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
+        EXPO_PUBLIC_API_URL: "http://213.210.20.183/api/v1"
       groups:
         - apple_signing
 
@@ -194,6 +196,18 @@ workflows:
         script: |
           cd mobile
           npx expo prebuild --platform ios --clean --no-install
+
+      - name: Configurar NODE_BINARY para Xcode build scripts
+        script: |
+          echo "export NODE_BINARY=$(which node)" > mobile/ios/.xcode.env
+          echo "export ENTRY_FILE=node_modules/expo-router/entry.js" >> mobile/ios/.xcode.env
+          cat mobile/ios/.xcode.env
+
+      - name: Verificar bundle Metro pre-build
+        script: |
+          cd mobile || true
+          npx expo export --platform ios --output-dir /tmp/metro-check 2>&1 | tail -20
+          ls -lh /tmp/metro-check/
 
       - name: CocoaPods install
         script: |
