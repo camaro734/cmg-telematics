@@ -10,21 +10,12 @@ import {
   ListRenderItemInfo,
   useWindowDimensions,
 } from 'react-native';
-import MapView, { Marker, Callout, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import { useFleet } from '@/hooks/useVehicles';
 import { useFleetWebSocket, type TelemetryMsg, type AlertMsg } from '@/hooks/useFleetWebSocket';
 import { useAppStore } from '@/store/useAppStore';
 import { Colors } from '@/constants/colors';
 import type { FleetVehicle } from '@/types';
-
-// ─── Región inicial: centro de España ────────────────────────────────────────
-const INITIAL_REGION: Region = {
-  latitude: 40.4,
-  longitude: -3.7,
-  latitudeDelta: 8,
-  longitudeDelta: 8,
-};
 
 // ─── Posición en vivo desde WebSocket ────────────────────────────────────────
 interface LivePosition {
@@ -115,14 +106,9 @@ function VehicleCard({ vehicle, livePos, onPress }: VehicleCardProps) {
 export default function FleetDashboard() {
   const router = useRouter();
   const { height } = useWindowDimensions();
-  const mapRef = useRef<MapView>(null);
-
   const { data: fleet, isLoading, isRefetching, refetch, error } = useFleet();
   const wsStatus = useAppStore((s) => s.wsStatus);
 
-  // Mapa mutable de posiciones en vivo: vehicleId (string) → LivePosition
-  // Se usa ref para evitar re-renders en cada mensaje WS; useState solo actualiza
-  // el mapa de estado "visible" cuando interesa (cada mensaje de telemetría)
   const livePosRef = useRef<Map<string, LivePosition>>(new Map());
   const [livePosVersion, setLivePosVersion] = useState(0);
 
@@ -135,13 +121,11 @@ export default function FleetDashboard() {
         speed: (speed as number | undefined) ?? 0,
         ignition: (ignition as boolean | undefined) ?? false,
       });
-      // Bump version para que el render vea las nuevas posiciones
       setLivePosVersion((v) => v + 1);
     }
   }, []);
 
   const handleAlert = useCallback((_msg: AlertMsg) => {
-    // Las alertas se gestionan en la tab de alertas; aquí solo refrescamos el contador
     refetch();
   }, [refetch]);
 
@@ -180,16 +164,6 @@ export default function FleetDashboard() {
 
   const handleVehiclePress = useCallback(
     (vehicle: FleetVehicle) => {
-      // Animar el mapa hacia la posición del vehículo si está disponible
-      const live = livePosRef.current.get(String(vehicle.vehicle_id));
-      const lat = live?.lat ?? vehicle.last_position?.lat;
-      const lng = live?.lng ?? vehicle.last_position?.lng;
-      if (lat && lng && lat !== 0 && lng !== 0 && mapRef.current) {
-        mapRef.current.animateToRegion(
-          { latitude: lat, longitude: lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
-          600,
-        );
-      }
       router.push(`/(tabs)/vehicle/${vehicle.vehicle_id}`);
     },
     [router],
@@ -231,34 +205,14 @@ export default function FleetDashboard() {
 
   return (
     <View style={styles.container}>
-      {/* ── Mapa de flota (40% pantalla) ─────────────────────────────────── */}
+      {/* ── Mapa de flota (40% pantalla) — placeholder hasta integrar maps ── */}
       <View style={[styles.mapContainer, { height: mapHeight }]}>
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          provider={PROVIDER_DEFAULT}
-          initialRegion={INITIAL_REGION}
-          showsUserLocation={false}
-          showsCompass={false}
-          toolbarEnabled={false}
-        >
-          {markersData.map((m) => (
-            <Marker
-              key={m.id}
-              coordinate={{ latitude: m.lat, longitude: m.lng }}
-              pinColor={m.online ? Colors.success : Colors.offline}
-            >
-              <Callout tooltip={false}>
-                <View style={styles.callout}>
-                  <Text style={styles.calloutName}>{m.name}</Text>
-                  <Text style={styles.calloutDetail}>{m.speed.toFixed(0)} km/h</Text>
-                </View>
-              </Callout>
-            </Marker>
-          ))}
-        </MapView>
+        <View style={styles.mapPlaceholder}>
+          <Text style={styles.mapPlaceholderText}>🗺️ Mapa de flota</Text>
+          <Text style={styles.mapPlaceholderSub}>{markersData.length} vehículos con posición</Text>
+        </View>
 
-        {/* Badge de estado WS sobre el mapa */}
+        {/* Badge de estado WS */}
         <View style={[styles.wsBadge, { borderColor: wsColor }]}>
           <View style={[styles.wsDot, { backgroundColor: wsColor }]} />
           <Text style={[styles.wsLabel, { color: wsColor }]}>
@@ -315,6 +269,20 @@ const styles = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
     backgroundColor: Colors.surface,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  mapPlaceholderText: {
+    color: Colors.textSecondary,
+    fontSize: 18,
+  },
+  mapPlaceholderSub: {
+    color: Colors.muted,
+    fontSize: 13,
   },
   callout: {
     backgroundColor: Colors.elevated,

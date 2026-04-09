@@ -1,10 +1,22 @@
 // Layout raíz — QueryClient + Zustand + GestureHandler + redirección auth
 import { useEffect } from 'react';
+import { Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/hooks/useAuth';
+
+// Captura errores JS no manejados y los muestra como Alert (útil en Release)
+const originalHandler = ErrorUtils.getGlobalHandler();
+ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+  Alert.alert(
+    isFatal ? '💥 Error fatal' : '⚠️ Error',
+    error?.message ?? String(error),
+    [{ text: 'OK' }],
+  );
+  originalHandler(error, isFatal);
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
