@@ -77,80 +77,25 @@ workflows:
 
       - name: Configurar firma y build
         script: |
-          # Usar clave RSA guardada en Codemagic (IOS_CERT_KEY) o generar una nueva.
-          # Si se genera una nueva, guarda el valor impreso como variable IOS_CERT_KEY.
-          if [ -n "$IOS_CERT_KEY" ]; then
-            echo "$IOS_CERT_KEY" > /tmp/cert_key.pem
-            echo "Usando clave RSA almacenada en IOS_CERT_KEY"
-          else
-            openssl genrsa -out /tmp/cert_key.pem 2048
-            echo "====== COPIA ESTO COMO VARIABLE IOS_CERT_KEY EN CODEMAGIC ======"
-            cat /tmp/cert_key.pem
-            echo "================================================================="
-          fi
-
-          # Descargar o crear certificado Development + provisioning profile
-          keychain initialize
+          cd mobile
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --issuer-id "$ASCISSUERID" \
             --key-id "$ASCKEYID" \
             --private-key "$ASCPRIVATEKEY" \
-            --certificate-key "@file:/tmp/cert_key.pem" \
             --type IOS_APP_DEVELOPMENT \
             --create
-          keychain add-certificates
-          rm -f /tmp/cert_key.pem
-
-          # Obtener UUID del perfil (app-store-connect guarda en Xcode/UserData)
-          PROFILE=$(ls ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          if [ -z "$PROFILE" ]; then
-            PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          fi
-          if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
-          UUID=$(security cms -D -i "$PROFILE" | python3 -c \
-            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
-          TEAM_ID=$(security cms -D -i "$PROFILE" | python3 -c \
-            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['TeamIdentifier'][0])")
-          echo "Perfil: $UUID — Team: $TEAM_ID"
-
-          # Archivar
-          cd mobile
-          mkdir -p /tmp/xcodebuild_logs
-          set -o pipefail
+          xcode-project use-profiles
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
-            -sdk iphoneos \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            "PROVISIONING_PROFILE=$UUID" \
-            "DEVELOPMENT_TEAM=$TEAM_ID" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            OTHER_CPLUSPLUSFLAGS="-std=c++17 -D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES" \
-            2>&1 | tee /tmp/xcodebuild_logs/build.log || \
-            { grep -A 20 "error:" /tmp/xcodebuild_logs/build.log | head -60; exit 1; }
-
-          # Exportar .ipa — escribir plist con variables expandidas
-          cat > /tmp/ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>method</key><string>debugging</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>teamID</key><string>${TEAM_ID}</string>
-            <key>provisioningProfiles</key><dict>
-              <key>${BUNDLE_ID}</key><string>${UUID}</string>
-            </dict>
-            <key>compileBitcode</key><false/>
-          </dict></plist>
-          EOF
-
+            archive
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist /tmp/ExportOptions.plist
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/
+
 
     artifacts:
       - mobile/build/ios/ipa/*.ipa
