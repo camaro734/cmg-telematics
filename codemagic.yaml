@@ -9,13 +9,12 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      node: 20.18.0
+      node: 23.11.1
       xcode: 16.3
       cocoapods: default
       vars:
         BUNDLE_ID: "es.cmgnexus.telematics"
         XCODE_SCHEME: "CMGTelematics"
-        EXPO_PUBLIC_API_URL: "http://213.210.20.183/api/v1"
       groups:
         - apple_signing
 
@@ -36,16 +35,11 @@ workflows:
         script: |
           cd mobile
           npx expo prebuild --platform ios --clean --no-install
-          # NODE_BINARY: path absoluto para que el bundle script lo encuentre en Release
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env
-          # ENTRY_FILE: entry point de Expo Router (más fiable en .xcode.env.local que en build settings)
-          echo "export ENTRY_FILE=node_modules/expo-router/entry.js" > ios/.xcode.env.local
 
       - name: CocoaPods install
         script: |
           cd mobile/ios
-          gem install cocoapods --no-document 2>/dev/null || true
-          pod install --repo-update
+          pod install
 
       - name: Eliminar entitlement Push Notifications (no disponible en perfil dev)
         script: |
@@ -54,48 +48,71 @@ workflows:
             plutil -remove "aps-environment" "$ENTITLEMENTS" 2>/dev/null || true
           fi
 
-      - name: Verificar bundle Metro (diagnóstico — muestra el error real si falla)
-        script: |
-          cd mobile
-          export NODE_BINARY=$(which node)
-          echo "Node: $(which node) — $(node --version)"
-          echo "ENTRY_FILE: node_modules/expo-router/entry.js"
-          echo "metro.config.js existe: $([ -f metro.config.js ] && echo SI || echo NO)"
-          echo "babel.config.js existe: $([ -f babel.config.js ] && echo SI || echo NO)"
-          echo "Paquetes clave:"
-          ls node_modules | grep -E "^(metro|babel-preset-expo|expo-router)$" || true
-          echo ""
-          echo "--- Probando bundle Metro directamente ---"
-          "${NODE_BINARY}" node_modules/.bin/react-native bundle \
-            --entry-file node_modules/expo-router/entry.js \
-            --platform ios \
-            --dev false \
-            --bundle-output /tmp/test-main.jsbundle \
-            --assets-dest /tmp/test-assets \
-            --reset-cache
-          echo "--- Bundle Metro OK ---"
-
       - name: Configurar firma y build
         script: |
-          cd mobile
+          # Usar clave RSA guardada en Codemagic (IOS_CERT_KEY) o generar una nueva.
+          # Si se genera una nueva, guarda el valor impreso como variable IOS_CERT_KEY.
+          if [ -n "$IOS_CERT_KEY" ]; then
+            echo "$IOS_CERT_KEY" > /tmp/cert_key.pem
+            echo "Usando clave RSA almacenada en IOS_CERT_KEY"
+          else
+            openssl genrsa -out /tmp/cert_key.pem 2048
+            echo "====== COPIA ESTO COMO VARIABLE IOS_CERT_KEY EN CODEMAGIC ======"
+            cat /tmp/cert_key.pem
+            echo "================================================================="
+          fi
+
+          # Descargar o crear certificado Development + provisioning profile
+          keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --issuer-id "$ASCISSUERID" \
             --key-id "$ASCKEYID" \
             --private-key "$ASCPRIVATEKEY" \
+            --certificate-key "@file:/tmp/cert_key.pem" \
             --type IOS_APP_DEVELOPMENT \
             --create
-          xcode-project use-profiles
+          keychain add-certificates
+          rm -f /tmp/cert_key.pem
+
+          # Obtener UUID del perfil (app-store-connect guarda en Xcode/UserData)
+          PROFILE=$(ls ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -z "$PROFILE" ]; then
+            PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          fi
+          if [ -z "$PROFILE" ]; then echo "ERROR: no se descargó ningún perfil" && exit 1; fi
+          UUID=$(security cms -D -i "$PROFILE" | python3 -c \
+            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['UUID'])")
+          TEAM_ID=$(security cms -D -i "$PROFILE" | python3 -c \
+            "import sys,plistlib; d=plistlib.loads(sys.stdin.buffer.read()); print(d['TeamIdentifier'][0])")
+          echo "Perfil: $UUID — Team: $TEAM_ID"
+
+          # Archivar
+          cd mobile
           xcodebuild \
             -workspace ios/CMGTelematics.xcworkspace \
             -scheme "$XCODE_SCHEME" \
-            -configuration Release \
+            -configuration Debug \
+            -sdk iphoneos \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            archive
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            "PROVISIONING_PROFILE=$UUID" \
+            "DEVELOPMENT_TEAM=$TEAM_ID" \
+            COMPILER_INDEX_STORE_ENABLE=NO
+
+          # Exportar .ipa
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath build/
-
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist /dev/stdin <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>development</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>compileBitcode</key><false/>
+          </dict></plist>
+          PLIST
 
     artifacts:
       - mobile/build/ios/ipa/*.ipa
@@ -117,7 +134,7 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      node: 20.18.0
+      node: 23.11.1
       xcode: 16.3
       cocoapods: default
       ios_signing:
@@ -129,7 +146,6 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: $ASCISSUERID
         APP_STORE_CONNECT_KEY_IDENTIFIER: $ASCKEYID
         APP_STORE_CONNECT_PRIVATE_KEY: $ASCPRIVATEKEY
-        EXPO_PUBLIC_API_URL: "http://213.210.20.183/api/v1"
       groups:
         - apple_signing
 
@@ -143,18 +159,6 @@ workflows:
         script: |
           cd mobile
           npx expo prebuild --platform ios --clean --no-install
-
-      - name: Configurar NODE_BINARY para Xcode build scripts
-        script: |
-          echo "export NODE_BINARY=$(which node)" > mobile/ios/.xcode.env
-          echo "export ENTRY_FILE=node_modules/expo-router/entry.js" >> mobile/ios/.xcode.env
-          cat mobile/ios/.xcode.env
-
-      - name: Verificar bundle Metro pre-build
-        script: |
-          cd mobile || true
-          npx expo export --platform ios --output-dir /tmp/metro-check 2>&1 | tail -20
-          ls -lh /tmp/metro-check/
 
       - name: CocoaPods install
         script: |
