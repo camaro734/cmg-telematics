@@ -128,6 +128,7 @@ workflows:
             "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=$TEAM_ID" \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            OTHER_CPLUSPLUSFLAGS="-std=c++17 -D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES" \
             2>&1 | tee /tmp/xcodebuild_logs/build.log || \
             { grep -A 20 "error:" /tmp/xcodebuild_logs/build.log | head -60; exit 1; }
 
