@@ -9,7 +9,7 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      node: 23.11.1
+      node: 20.18.0
       xcode: 16.3
       cocoapods: default
       vars:
@@ -171,7 +171,7 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      node: 23.11.1
+      node: 20.18.0
       xcode: 16.3
       cocoapods: default
       ios_signing:
