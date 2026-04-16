@@ -10,21 +10,19 @@
     },
     "preview": {
       "distribution": "internal",
-      "ios": {
-        "simulator": false
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://213.210.20.183/api/v1"
-      }
+      "ios": { "simulator": false },
+      "env": { "EXPO_PUBLIC_API_URL": "http://213.210.20.183/api/v1" }
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://213.210.20.183/api/v1"
-      }
+      "env": { "EXPO_PUBLIC_API_URL": "http://213.210.20.183/api/v1" }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6762199233"
+      }
+    }
   }
 }
