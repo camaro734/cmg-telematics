@@ -93,6 +93,7 @@ workflows:
             -scheme "$XCODE_SCHEME" \
             -configuration Debug \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
