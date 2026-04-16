@@ -2,7 +2,7 @@
   "expo": {
     "name": "CMG Telematics",
     "slug": "cmg-telematics",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/logo-color.png",
     "scheme": "cmgtelematics",
@@ -34,8 +34,7 @@
         "foregroundImage": "./assets/logo-color.png",
         "backgroundColor": "#0f1117"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "edgeToEdgeEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

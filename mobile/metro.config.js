@@ -1,4 +1,4 @@
-// Metro config para Expo SDK 54 + Expo Router
+// Metro config para Expo SDK 52 + Expo Router
 // getDefaultConfig carga automáticamente los paths de tsconfig.json (@/ alias)
 const { getDefaultConfig } = require('expo/metro-config');
 
