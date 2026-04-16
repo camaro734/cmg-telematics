@@ -44,7 +44,8 @@ workflows:
       - name: CocoaPods install
         script: |
           cd mobile/ios
-          pod install
+          gem install cocoapods --no-document 2>/dev/null || true
+          pod install --repo-update
 
       - name: Eliminar entitlement Push Notifications (no disponible en perfil dev)
         script: |
