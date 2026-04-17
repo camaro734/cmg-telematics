@@ -96,6 +96,7 @@ workflows:
             -destination 'generic/platform=iOS' \
             -archivePath build/ios/xcarchive/CMGTelematics.xcarchive \
             archive \
+            OTHER_CFLAGS='$(inherited) -DFMT_USE_CONSTEVAL=0' \
             CODE_SIGN_STYLE=Manual \
             "PROVISIONING_PROFILE=$UUID" \
             "DEVELOPMENT_TEAM=$TEAM_ID" \
