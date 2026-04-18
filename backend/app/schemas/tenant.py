@@ -2,7 +2,7 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 
@@ -24,7 +24,7 @@ class TenantOut(BaseModel):
 
 class TenantCreate(BaseModel):
     parent_id: uuid.UUID | None = None
-    tier: str
+    tier: Literal["cmg", "client", "subclient"]
     name: str
     slug: str
     brand_name: str | None = None

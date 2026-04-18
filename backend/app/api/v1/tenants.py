@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
+from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user, require_tier
 from app.schemas.auth import CurrentUser
@@ -39,10 +40,38 @@ async def create_tenant(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Ya existe un tenant con slug '{body.slug}'",
         )
+    # Fix 4: validate parent_id and tier hierarchy
+    if body.parent_id is not None:
+        parent = await db.get(Tenant, body.parent_id)
+        if not parent or not parent.active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tenant padre no encontrado o inactivo",
+            )
+        # client must have cmg parent, subclient must have client parent
+        valid_parent_tiers = {"client": "cmg", "subclient": "client"}
+        if body.tier in valid_parent_tiers and parent.tier != valid_parent_tiers[body.tier]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Un tenant tier='{body.tier}' debe tener un padre tier='{valid_parent_tiers[body.tier]}'",
+            )
+    elif body.tier in ("client", "subclient"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Un tenant tier='{body.tier}' requiere parent_id",
+        )
     tenant = Tenant(**body.model_dump())
     db.add(tenant)
-    await db.commit()
-    await db.refresh(tenant)
+    # Fix 2: handle slug uniqueness race condition
+    try:
+        await db.commit()
+        await db.refresh(tenant)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Ya existe un tenant con slug '{body.slug}'",
+        )
     return tenant
 
 
@@ -105,6 +134,28 @@ async def create_grant(
 ):
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo admins")
+    # Fix 3a: validate grantee exists and is active
+    grantee = await db.get(Tenant, body.grantee_id)
+    if not grantee or not grantee.active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Grantee no encontrado o inactivo",
+        )
+    # Fix 3b: validate vehicle resource belongs to grantor's tenant (non-cmg)
+    if body.resource_type == "vehicle" and body.resource_id is not None and user.tenant_tier != "cmg":
+        from app.models.vehicle import Vehicle
+        vehicle = await db.get(Vehicle, body.resource_id)
+        if not vehicle or str(vehicle.tenant_id) != str(user.tenant_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes acceso a este recurso",
+            )
+    # Fix 3c: validate allowed_actions is non-empty
+    if not body.allowed_actions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="allowed_actions no puede estar vacío",
+        )
     data = body.model_dump()
     grant = PermissionGrant(
         grantor_id=user.tenant_id,
