@@ -1,6 +1,8 @@
 # backend/app/api/v1/rules.py
+import operator
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -12,12 +14,12 @@ from app.models.alert_rule import AlertRule
 router = APIRouter(tags=["rules"])
 
 _OPS = {
-    ">": float.__gt__,
-    "<": float.__lt__,
-    ">=": float.__ge__,
-    "<=": float.__le__,
-    "==": float.__eq__,
-    "!=": float.__ne__,
+    ">": operator.gt,
+    "<": operator.lt,
+    ">=": operator.ge,
+    "<=": operator.le,
+    "==": operator.eq,
+    "!=": operator.ne,
 }
 
 
@@ -69,11 +71,10 @@ async def create_rule(
 ):
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    rule = AlertRule(
-        tenant_id=user.tenant_id,
-        created_by_user_id=user.user_id,
-        **body.model_dump(),
-    )
+    data = body.model_dump()
+    data.pop("tenant_id", None)
+    data.pop("created_by_user_id", None)
+    rule = AlertRule(tenant_id=user.tenant_id, created_by_user_id=user.user_id, **data)
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
@@ -95,7 +96,7 @@ async def update_rule(
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
 
-    for field, value in body.model_dump(exclude_none=True).items():
+    for field, value in body.model_dump(exclude_unset=True).items():
         setattr(rule, field, value)
     await db.commit()
     await db.refresh(rule)
@@ -115,8 +116,15 @@ async def delete_rule(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    await db.delete(rule)
-    await db.commit()
+    try:
+        await db.delete(rule)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar la regla: tiene alertas asociadas",
+        )
 
 
 @router.post("/rules/{rule_id}/test", response_model=RuleTestResult)
