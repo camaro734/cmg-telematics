@@ -46,7 +46,7 @@ class AVLRecord:
     satellites: int
     speed_kmh: int
     event_io_id: int
-    io_elements: dict = field(default_factory=dict)
+    io_elements: dict[int, int] = field(default_factory=dict)
 
     @property
     def datetime_utc(self) -> datetime:
@@ -63,11 +63,11 @@ def decode_packet(data: bytes) -> list[AVLRecord]:
         raise ValueError(f"preamble inválido: {preamble:#010x}")
 
     data_length = struct.unpack_from(">I", data, 4)[0]
-    # Verificación flexible: el paquete debe contener al menos los bytes mínimos
-    # para codec_id + num_records. data_length puede diferir si el firmware del
-    # dispositivo envía un valor distinto al esperado (tolerancia de campo).
-    if len(data) < 10:
-        raise ValueError("Datos incompletos: faltan codec_id o num_records")
+    expected_total = 4 + 4 + data_length + 4
+    if len(data) < expected_total:
+        raise ValueError(
+            f"Paquete incompleto: esperado {expected_total} bytes, recibido {len(data)}"
+        )
 
     codec_id = data[8]
     if codec_id != 0x08:
@@ -90,55 +90,58 @@ def decode_packet(data: bytes) -> list[AVLRecord]:
 
 def _decode_avl_record(data: bytes, offset: int) -> tuple[AVLRecord, int]:
     """Decodifica un AVL record desde `offset`. Devuelve (record, nuevo_offset)."""
-    timestamp_ms = struct.unpack_from(">Q", data, offset)[0]
-    offset += 8
+    try:
+        timestamp_ms = struct.unpack_from(">Q", data, offset)[0]
+        offset += 8
 
-    priority = data[offset]
-    offset += 1
-
-    # GPS Element (15 bytes)
-    lon_raw = struct.unpack_from(">i", data, offset)[0]
-    lat_raw = struct.unpack_from(">i", data, offset + 4)[0]
-    altitude_m = struct.unpack_from(">h", data, offset + 8)[0]
-    heading = struct.unpack_from(">H", data, offset + 10)[0]
-    satellites = data[offset + 12]
-    speed_kmh = struct.unpack_from(">H", data, offset + 13)[0]
-    offset += 15
-
-    longitude = lon_raw / 1e7
-    latitude = lat_raw / 1e7
-
-    # IO Element
-    event_io_id = data[offset]
-    offset += 1
-    _total_ios = data[offset]
-    offset += 1
-
-    io_elements: dict[int, int] = {}
-
-    for io_size in (1, 2, 4, 8):
-        count = data[offset]
+        priority = data[offset]
         offset += 1
-        fmt = {1: "B", 2: ">H", 4: ">I", 8: ">Q"}[io_size]
-        for _ in range(count):
-            io_id = data[offset]
-            offset += 1
-            (value,) = struct.unpack_from(fmt, data, offset)
-            offset += io_size
-            io_elements[io_id] = value
 
-    return AVLRecord(
-        timestamp_ms=timestamp_ms,
-        priority=priority,
-        longitude=longitude,
-        latitude=latitude,
-        altitude_m=altitude_m,
-        heading=heading,
-        satellites=satellites,
-        speed_kmh=speed_kmh,
-        event_io_id=event_io_id,
-        io_elements=io_elements,
-    ), offset
+        # GPS Element (15 bytes)
+        lon_raw = struct.unpack_from(">i", data, offset)[0]
+        lat_raw = struct.unpack_from(">i", data, offset + 4)[0]
+        altitude_m = struct.unpack_from(">h", data, offset + 8)[0]
+        heading = struct.unpack_from(">H", data, offset + 10)[0]
+        satellites = data[offset + 12]
+        speed_kmh = struct.unpack_from(">H", data, offset + 13)[0]
+        offset += 15
+
+        longitude = lon_raw / 1e7
+        latitude = lat_raw / 1e7
+
+        # IO Element
+        event_io_id = data[offset]
+        offset += 1
+        _total_ios = data[offset]
+        offset += 1
+
+        io_elements: dict[int, int] = {}
+
+        for io_size in (1, 2, 4, 8):
+            count = data[offset]
+            offset += 1
+            fmt = {1: "B", 2: ">H", 4: ">I", 8: ">Q"}[io_size]
+            for _ in range(count):
+                io_id = data[offset]
+                offset += 1
+                (value,) = struct.unpack_from(fmt, data, offset)
+                offset += io_size
+                io_elements[io_id] = value
+
+        return AVLRecord(
+            timestamp_ms=timestamp_ms,
+            priority=priority,
+            longitude=longitude,
+            latitude=latitude,
+            altitude_m=altitude_m,
+            heading=heading,
+            satellites=satellites,
+            speed_kmh=speed_kmh,
+            event_io_id=event_io_id,
+            io_elements=io_elements,
+        ), offset
+    except struct.error as exc:
+        raise ValueError(f"Paquete truncado o malformado en offset {offset}: {exc}") from exc
 
 
 def build_ack(num_records: int) -> bytes:

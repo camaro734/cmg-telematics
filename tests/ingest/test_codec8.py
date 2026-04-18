@@ -4,7 +4,7 @@ from services.ingest.src.codec8 import decode_packet, AVLRecord
 # Paquete Codec 8 real de un FMC650 (simplificado para tests)
 SAMPLE_PACKET = bytes.fromhex(
     "00000000"          # preamble
-    "00000025"          # data field length = 37 bytes
+    "00000023"          # data field length = 35 bytes
     "08"                # codec ID = 8
     "01"                # number of data 1 = 1 record
     # AVL record:
@@ -49,6 +49,8 @@ def test_decode_gps():
     assert r.heading == 180
     assert r.satellites == 7
     assert r.altitude_m == 100
+    assert abs(r.longitude - 3.7340600) < 1e-5
+    assert abs(r.latitude - 2.4705942) < 1e-5
 
 
 def test_decode_ignition_io():
