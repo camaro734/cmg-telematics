@@ -19,7 +19,7 @@ async def set_sustained_start(redis: Redis, rule_id: str, vehicle_id: str, ts: f
 
 
 async def clear_sustained_start(redis: Redis, rule_id: str, vehicle_id: str) -> None:
-    await redis.delete(f"rule:state:{rule_id}:{vehicle_id}")
+    await redis.hdel(f"rule:state:{rule_id}:{vehicle_id}", "first_triggered_at")
 
 
 async def get_accumulator(redis: Redis, rule_id: str, vehicle_id: str) -> float:

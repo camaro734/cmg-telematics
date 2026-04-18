@@ -96,7 +96,7 @@ async def test_threshold_sustained_clears_when_condition_not_met():
     msg = make_msg(can_data={"hydraulic_pressure_1": 100.0})  # below threshold
     redis = AsyncMock()
     await evaluate_rule(rule, msg, redis)
-    redis.delete.assert_called_once()  # timer cleared
+    redis.hdel.assert_called_once()  # timer cleared
 
 
 # --- accumulation ---

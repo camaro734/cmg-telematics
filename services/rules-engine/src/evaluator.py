@@ -1,3 +1,4 @@
+import logging
 import operator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -10,8 +11,11 @@ from src.state import (
     get_sustained_start,
     set_sustained_start,
     clear_sustained_start,
+    get_accumulator,
     increment_accumulator,
 )
+
+logger = logging.getLogger(__name__)
 
 # Map operator strings to callable comparators
 _OPS: dict[str, Any] = {
@@ -138,36 +142,36 @@ async def _eval_condition(cond: dict, rule: Rule, msg: TelemetryMsg, redis: Any)
             return None
 
     if cond_type == "accumulation":
-        field_name = cond["field"]
-        increment_when = cond.get("increment_when", True)
-        limit = cond["limit"]
-        value = _get_field(msg, field_name)
+        val = _get_field(msg, cond["field"])
+        if val is not None:
+            increment_when = bool(cond.get("increment_when", True))
+            if increment_when:
+                should_increment = bool(val)
+            else:
+                should_increment = not bool(val)
 
-        # Determine whether to increment
-        should_increment = bool(value) == bool(increment_when)
-        if should_increment:
-            total = await increment_accumulator(redis, rule.id, msg.vehicle_id, 1.0)
-            if total >= limit:
-                return RuleMatch(rule=rule, vehicle_id=msg.vehicle_id, trigger_value={"field": field_name, "accumulated": total})
+            if should_increment:
+                total = await increment_accumulator(redis, rule.id, msg.vehicle_id, 1.0)
+            else:
+                total = await get_accumulator(redis, rule.id, msg.vehicle_id)
+
+            if total >= float(cond.get("limit", float("inf"))):
+                return RuleMatch(rule=rule, vehicle_id=msg.vehicle_id, trigger_value={"field": cond["field"], "accumulated": total})
         return None
 
     if cond_type == "composite":
-        op = cond.get("op", "AND").upper()
-        sub_conditions = cond.get("conditions", [])
-        results = []
-        for sub_cond in sub_conditions:
-            match = await _eval_condition(sub_cond, rule, msg, redis)
-            results.append(match is not None)
-
+        op = cond.get("op", "AND")
         if op == "AND":
-            fired = all(results)
-        elif op == "OR":
-            fired = any(results)
-        else:
-            fired = False
-
-        if fired:
+            for sub in cond.get("conditions", []):
+                r = await _eval_condition(sub, rule, msg, redis)
+                if r is None:
+                    return None
             return RuleMatch(rule=rule, vehicle_id=msg.vehicle_id, trigger_value={"composite_op": op})
+        else:  # OR
+            for sub in cond.get("conditions", []):
+                r = await _eval_condition(sub, rule, msg, redis)
+                if r is not None:
+                    return RuleMatch(rule=rule, vehicle_id=msg.vehicle_id, trigger_value={"composite_op": op})
         return None
 
     if cond_type == "schedule":
@@ -220,13 +224,14 @@ async def process_message(rules: list[Rule], msg: TelemetryMsg, redis: Any) -> l
         if scope == "all":
             pass  # applies to all vehicles in tenant
         elif scope == "vehicle":
-            allowed_ids = rule.vehicle_filter.get("vehicle_ids", [])
-            if msg.vehicle_id not in allowed_ids:
+            if rule.vehicle_filter.get("vehicle_id") != msg.vehicle_id:
                 continue
-        elif scope == "type":
-            # vehicle_type filtering — would require vehicle metadata lookup
-            # for now, skip if we can't determine type
-            pass
+        else:
+            # Unknown/unimplemented scope (e.g. "type") — skip to avoid mis-firing
+            logger.warning(
+                "Unknown vehicle_filter scope %r for rule %s, skipping", scope, rule.id
+            )
+            continue
 
         # 3. Cooldown check
         in_cooldown = await is_in_cooldown(redis, rule.id, msg.vehicle_id)
