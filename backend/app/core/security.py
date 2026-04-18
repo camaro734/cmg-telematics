@@ -1,6 +1,6 @@
 # backend/app/core/security.py
 from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
+from jose import JWTError, ExpiredSignatureError, jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 
@@ -35,4 +35,9 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict:
-    return jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+    try:
+        return jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+    except ExpiredSignatureError:
+        raise ValueError("Token expirado")
+    except JWTError as exc:
+        raise ValueError("Token inválido") from exc
