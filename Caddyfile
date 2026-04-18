@@ -1,0 +1,22 @@
+{$DOMAIN} {
+    handle /api/* {
+        reverse_proxy core-api:8010
+    }
+    handle /ws/* {
+        reverse_proxy core-api:8010
+    }
+    handle /docs {
+        reverse_proxy core-api:8010
+    }
+    handle /redoc {
+        reverse_proxy core-api:8010
+    }
+    handle /openapi.json {
+        reverse_proxy core-api:8010
+    }
+    handle {
+        root * /srv/frontend
+        file_server
+        try_files {path} /index.html
+    }
+}
