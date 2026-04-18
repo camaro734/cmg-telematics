@@ -2,10 +2,11 @@
 import asyncio
 import json
 import logging
-import uuid as _uuid
+import uuid
 
 import asyncpg
 from redis.asyncio import Redis
+from redis.exceptions import ResponseError
 
 from src.config import settings
 from src.dispatcher import dispatch_action
@@ -15,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 STREAM_KEY = "alerts.fire"
 CONSUMER_GROUP = "notify-workers"
-CONSUMER_NAME = "notifier-%s" % _uuid.uuid4().hex[:8]
+CONSUMER_NAME = "notifier-%s" % uuid.uuid4().hex[:8]
 
 
-async def _process_alert(conn: asyncpg.Connection, redis: Redis, fields: dict) -> None:
+async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> None:
     alert_id = fields.get("alert_id", "")
     rule_id = fields.get("rule_id", "")
     vehicle_id = fields.get("vehicle_id", "")
@@ -28,7 +29,8 @@ async def _process_alert(conn: asyncpg.Connection, redis: Redis, fields: dict) -
     actions = json.loads(fields.get("actions", "[]"))
     escalation = json.loads(fields.get("escalation", "[]"))
 
-    row = await conn.fetchrow("SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id)
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id)
     rule_name = row["name"] if row else "unknown"
 
     context = {
@@ -62,8 +64,7 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
             for _stream, messages in entries:
                 for msg_id, fields in messages:
                     try:
-                        async with db_pool.acquire() as conn:
-                            await _process_alert(conn, redis, fields)
+                        await _process_alert(db_pool, redis, fields)
                         await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
                     except Exception as exc:
                         logger.error("Error on alert %s: %s", msg_id, exc, exc_info=True)
@@ -105,8 +106,9 @@ async def main() -> None:
 
     try:
         await redis.xgroup_create(STREAM_KEY, CONSUMER_GROUP, id="0", mkstream=True)
-    except Exception:
-        pass
+    except ResponseError as exc:
+        if "BUSYGROUP" not in str(exc):
+            raise
 
     logger.info("Notify service started as %s", CONSUMER_NAME)
     await asyncio.gather(

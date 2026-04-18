@@ -51,7 +51,7 @@ async def _send_email(action: dict, context: dict) -> None:
             context.get("rule_name"),
         )
     )
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, _smtp_send, msg)
 
 

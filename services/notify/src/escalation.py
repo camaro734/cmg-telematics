@@ -23,7 +23,8 @@ async def schedule_escalation(
 
 async def pop_due_escalations(redis: Redis) -> list[dict]:
     now = time.time()
-    items = await redis.zrangebyscore(ESCALATION_KEY, 0, now)
-    if items:
-        await redis.zremrangebyscore(ESCALATION_KEY, 0, now)
+    async with redis.pipeline(transaction=True) as pipe:
+        await pipe.zrangebyscore(ESCALATION_KEY, 0, now)
+        await pipe.zremrangebyscore(ESCALATION_KEY, 0, now)
+        items, _ = await pipe.execute()
     return [json.loads(item) for item in items]
