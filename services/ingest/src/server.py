@@ -95,12 +95,14 @@ class TeltonikaConnection:
                         self.device_info["vehicle_id"],
                         self.device_info["tenant_id"],
                     )
-                    await publish_record(
-                        self.redis, avl,
-                        self.device_info["device_id"],
-                        self.device_info["vehicle_id"],
-                        self.device_info["tenant_id"],
-                    )
+
+            for avl in records:
+                await publish_record(
+                    self.redis, avl,
+                    self.device_info["device_id"],
+                    self.device_info["vehicle_id"],
+                    self.device_info["tenant_id"],
+                )
 
             ack = build_ack(len(records))
             self.writer.write(ack)
