@@ -71,7 +71,7 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("slug", sa.String(50), unique=True, nullable=False),
         sa.Column("name", sa.String(200), nullable=False),
-        sa.Column("sensor_schema", JSONB, nullable=False, server_default="[]"),
+        sa.Column("sensor_schema", JSONB, nullable=False, server_default="{}"),
     )
 
     op.create_table(
@@ -102,6 +102,11 @@ def upgrade() -> None:
     )
     op.create_index("ix_device_imei", "device", ["imei"])
 
+    # telemetry_record is a TimescaleDB hypertable.
+    # FK constraints on device_id/vehicle_id/tenant_id are intentionally omitted:
+    # TimescaleDB requires the partition column (time) in composite PKs, and FK
+    # constraints on hypertable columns interfere with chunk management.
+    # Referential integrity is enforced at the application layer (ingest-svc).
     op.create_table(
         "telemetry_record",
         sa.Column("time", sa.DateTime(timezone=True), nullable=False),
@@ -150,9 +155,16 @@ def upgrade() -> None:
     )
     op.execute("""
         CREATE OR REPLACE FUNCTION notify_rule_change() RETURNS trigger AS $$
+        DECLARE
+          payload json;
         BEGIN
-          PERFORM pg_notify('rules_changed', row_to_json(NEW)::text);
-          RETURN NEW;
+          IF (TG_OP = 'DELETE') THEN
+            payload := row_to_json(OLD);
+          ELSE
+            payload := row_to_json(NEW);
+          END IF;
+          PERFORM pg_notify('rules_changed', payload::text);
+          RETURN COALESCE(NEW, OLD);
         END;
         $$ LANGUAGE plpgsql;
     """)
@@ -243,3 +255,4 @@ def downgrade() -> None:
     op.drop_table("permission_grant")
     op.drop_table("user")
     op.drop_table("tenant")
+    op.execute("DROP EXTENSION IF EXISTS timescaledb CASCADE;")
