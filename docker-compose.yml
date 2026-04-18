@@ -47,6 +47,39 @@ services:
       redis:
         condition: service_healthy
 
+  rules-engine:
+    build:
+      context: ./services/rules-engine
+    restart: unless-stopped
+    environment:
+      DB_URL: ${DB_URL}
+      REDIS_URL: ${REDIS_URL}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  notify-svc:
+    build:
+      context: ./services/notify
+    restart: unless-stopped
+    environment:
+      DB_URL: ${DB_URL}
+      REDIS_URL: ${REDIS_URL}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-alertas@cmg.es}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   core-api:
     build:
       context: ./backend

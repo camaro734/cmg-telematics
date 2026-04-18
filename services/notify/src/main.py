@@ -1,0 +1,123 @@
+# services/notify/src/main.py
+import asyncio
+import json
+import logging
+import uuid as _uuid
+
+import asyncpg
+from redis.asyncio import Redis
+
+from src.config import settings
+from src.dispatcher import dispatch_action
+from src.escalation import schedule_escalation, pop_due_escalations
+
+logger = logging.getLogger(__name__)
+
+STREAM_KEY = "alerts.fire"
+CONSUMER_GROUP = "notify-workers"
+CONSUMER_NAME = "notifier-%s" % _uuid.uuid4().hex[:8]
+
+
+async def _process_alert(conn: asyncpg.Connection, redis: Redis, fields: dict) -> None:
+    alert_id = fields.get("alert_id", "")
+    rule_id = fields.get("rule_id", "")
+    vehicle_id = fields.get("vehicle_id", "")
+    tenant_id = fields.get("tenant_id", "")
+    severity = fields.get("severity", "info")
+    trigger_value = json.loads(fields.get("trigger_value", "{}"))
+    actions = json.loads(fields.get("actions", "[]"))
+    escalation = json.loads(fields.get("escalation", "[]"))
+
+    row = await conn.fetchrow("SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id)
+    rule_name = row["name"] if row else "unknown"
+
+    context = {
+        "alert_id": alert_id,
+        "rule_id": rule_id,
+        "rule_name": rule_name,
+        "vehicle_id": vehicle_id,
+        "tenant_id": tenant_id,
+        "severity": severity,
+        "trigger_value": trigger_value,
+    }
+
+    for action in actions:
+        await dispatch_action(action, context)
+
+    for step in escalation:
+        await schedule_escalation(
+            redis, alert_id, rule_id, vehicle_id,
+            step, step.get("delay_minutes", 10),
+        )
+
+
+async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    while True:
+        try:
+            entries = await redis.xreadgroup(
+                CONSUMER_GROUP, CONSUMER_NAME, {STREAM_KEY: ">"}, count=10, block=2000
+            )
+            if not entries:
+                continue
+            for _stream, messages in entries:
+                for msg_id, fields in messages:
+                    try:
+                        async with db_pool.acquire() as conn:
+                            await _process_alert(conn, redis, fields)
+                        await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                    except Exception as exc:
+                        logger.error("Error on alert %s: %s", msg_id, exc, exc_info=True)
+                        await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.error("Stream error: %s", exc)
+            await asyncio.sleep(1)
+
+
+async def _escalation_worker(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    while True:
+        await asyncio.sleep(30)
+        try:
+            due = await pop_due_escalations(redis)
+            for item in due:
+                context = {
+                    "alert_id": item["alert_id"],
+                    "rule_id": item["rule_id"],
+                    "vehicle_id": item["vehicle_id"],
+                    "severity": "escalated",
+                    "rule_name": "escalation",
+                    "trigger_value": {},
+                }
+                for action in item.get("actions", []):
+                    await dispatch_action(action, context)
+                logger.info("Escalation fired for alert %s", item["alert_id"])
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.error("Escalation worker error: %s", exc)
+
+
+async def main() -> None:
+    dsn = settings.db_url.replace("+asyncpg", "")
+    db_pool = await asyncpg.create_pool(dsn=dsn, min_size=2, max_size=5)
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+
+    try:
+        await redis.xgroup_create(STREAM_KEY, CONSUMER_GROUP, id="0", mkstream=True)
+    except Exception:
+        pass
+
+    logger.info("Notify service started as %s", CONSUMER_NAME)
+    await asyncio.gather(
+        _process_stream(db_pool, redis),
+        _escalation_worker(db_pool, redis),
+    )
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
+    asyncio.run(main())
