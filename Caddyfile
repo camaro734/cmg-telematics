@@ -5,10 +5,10 @@
     handle /ws/* {
         reverse_proxy core-api:8010
     }
-    handle /docs {
+    handle /docs* {
         reverse_proxy core-api:8010
     }
-    handle /redoc {
+    handle /redoc* {
         reverse_proxy core-api:8010
     }
     handle /openapi.json {
