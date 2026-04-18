@@ -1,7 +1,8 @@
 # backend/app/api/v1/vehicles.py
 import uuid
+import json
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db
@@ -62,6 +63,7 @@ async def get_vehicle(
 @router.get("/vehicles/{vehicle_id}/status", response_model=VehicleStatus)
 async def get_vehicle_status(
     vehicle_id: uuid.UUID,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -70,16 +72,96 @@ async def get_vehicle_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
     _check_vehicle_access(vehicle, user)
 
-    device_result = await db.execute(
-        select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
-    )
-    device = device_result.scalar_one_or_none()
+    redis = request.app.state.redis
+    redis_key = f"vehicle:{vehicle_id}:status"
+    hash_data = await redis.hgetall(redis_key)
 
-    since = datetime.now(timezone.utc) - timedelta(days=1)
+    if not hash_data:
+        return VehicleStatus(vehicle_id=vehicle_id, online=False)
+
+    def _parse_bool(val: str | None) -> bool | None:
+        if val is None:
+            return None
+        return val.lower() in ("true", "1", "yes")
+
+    def _parse_float(val: str | None) -> float | None:
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return None
+
+    def _parse_datetime(val: str | None) -> datetime | None:
+        if val is None:
+            return None
+        try:
+            return datetime.fromisoformat(val)
+        except (ValueError, TypeError):
+            return None
+
+    def _parse_json(val: str | None) -> dict | None:
+        if val is None:
+            return None
+        try:
+            return json.loads(val)
+        except (ValueError, TypeError):
+            return None
+
+    online_raw = hash_data.get(b"online") or hash_data.get("online")
+    online_str = online_raw.decode() if isinstance(online_raw, bytes) else online_raw
+
+    last_seen_raw = hash_data.get(b"last_seen") or hash_data.get("last_seen")
+    last_seen_str = last_seen_raw.decode() if isinstance(last_seen_raw, bytes) else last_seen_raw
+
+    lat_raw = hash_data.get(b"lat") or hash_data.get("lat")
+    lat_str = lat_raw.decode() if isinstance(lat_raw, bytes) else lat_raw
+
+    lon_raw = hash_data.get(b"lon") or hash_data.get("lon")
+    lon_str = lon_raw.decode() if isinstance(lon_raw, bytes) else lon_raw
+
+    speed_raw = hash_data.get(b"speed_kmh") or hash_data.get("speed_kmh")
+    speed_str = speed_raw.decode() if isinstance(speed_raw, bytes) else speed_raw
+
+    ignition_raw = hash_data.get(b"ignition") or hash_data.get("ignition")
+    ignition_str = ignition_raw.decode() if isinstance(ignition_raw, bytes) else ignition_raw
+
+    pto_raw = hash_data.get(b"pto_active") or hash_data.get("pto_active")
+    pto_str = pto_raw.decode() if isinstance(pto_raw, bytes) else pto_raw
+
+    can_raw = hash_data.get(b"can_data") or hash_data.get("can_data")
+    can_str = can_raw.decode() if isinstance(can_raw, bytes) else can_raw
+
+    return VehicleStatus(
+        vehicle_id=vehicle_id,
+        online=_parse_bool(online_str) or False,
+        last_seen=_parse_datetime(last_seen_str),
+        lat=_parse_float(lat_str),
+        lon=_parse_float(lon_str),
+        speed_kmh=_parse_float(speed_str),
+        ignition=_parse_bool(ignition_str),
+        pto_active=_parse_bool(pto_str),
+        can_data=_parse_json(can_str),
+    )
+
+
+@router.get("/vehicles/{vehicle_id}/telemetry/latest", response_model=TelemetryPoint)
+async def get_vehicle_telemetry_latest(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+
+    since = datetime.now(timezone.utc) - timedelta(days=7)
     row = (
         await db.execute(
             text(
-                "SELECT lat, lon, speed_kmh, ignition, pto_active, can_data "
+                "SELECT time, lat, lon, speed_kmh, heading, altitude_m, "
+                "ignition, pto_active, ext_voltage_mv, can_data "
                 "FROM telemetry_record "
                 "WHERE vehicle_id = :vid AND tenant_id = :tid AND time >= :since "
                 "ORDER BY time DESC LIMIT 1"
@@ -88,55 +170,17 @@ async def get_vehicle_status(
         )
     ).fetchone()
 
-    return VehicleStatus(
-        vehicle_id=vehicle_id,
-        online=device.online if device else False,
-        last_seen=device.last_seen if device else None,
-        lat=row.lat if row else None,
-        lon=row.lon if row else None,
-        speed_kmh=row.speed_kmh if row else None,
-        ignition=row.ignition if row else None,
-        pto_active=row.pto_active if row else None,
-        can_data=row.can_data if row else None,
-    )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No hay telemetría reciente")
 
-
-@router.get("/vehicles/{vehicle_id}/telemetry/latest", response_model=list[TelemetryPoint])
-async def get_vehicle_telemetry_latest(
-    vehicle_id: uuid.UUID,
-    limit: int = 50,
-    user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    if limit > 1000:
-        limit = 1000
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
-
-    since = datetime.now(timezone.utc) - timedelta(days=7)
-    rows = (
-        await db.execute(
-            text(
-                "SELECT time, lat, lon, speed_kmh, heading, altitude_m, "
-                "ignition, pto_active, ext_voltage_mv, can_data "
-                "FROM telemetry_record "
-                "WHERE vehicle_id = :vid AND tenant_id = :tid AND time >= :since "
-                "ORDER BY time DESC LIMIT :lim"
-            ),
-            {"vid": vehicle_id, "tid": vehicle.tenant_id, "since": since, "lim": limit},
-        )
-    ).fetchall()
-
-    return [TelemetryPoint(**dict(r._mapping)) for r in rows]
+    return TelemetryPoint(**dict(row._mapping))
 
 
 @router.get("/vehicles/{vehicle_id}/telemetry/history", response_model=list[TelemetryPoint])
 async def get_vehicle_telemetry_history(
     vehicle_id: uuid.UUID,
-    from_ts: datetime | None = None,
-    to_ts: datetime | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
     limit: int = 500,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -148,10 +192,10 @@ async def get_vehicle_telemetry_history(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
     _check_vehicle_access(vehicle, user)
 
-    if from_ts is None:
-        from_ts = datetime.now(timezone.utc) - timedelta(days=1)
-    if to_ts is None:
-        to_ts = datetime.now(timezone.utc)
+    if start is None:
+        start = datetime.now(timezone.utc) - timedelta(days=1)
+    if end is None:
+        end = datetime.now(timezone.utc)
 
     rows = (
         await db.execute(
@@ -160,14 +204,14 @@ async def get_vehicle_telemetry_history(
                 "ignition, pto_active, ext_voltage_mv, can_data "
                 "FROM telemetry_record "
                 "WHERE vehicle_id = :vid AND tenant_id = :tid "
-                "AND time >= :from_ts AND time <= :to_ts "
+                "AND time >= :start AND time <= :end "
                 "ORDER BY time DESC LIMIT :lim"
             ),
             {
                 "vid": vehicle_id,
                 "tid": vehicle.tenant_id,
-                "from_ts": from_ts,
-                "to_ts": to_ts,
+                "start": start,
+                "end": end,
                 "lim": limit,
             },
         )
@@ -206,28 +250,32 @@ async def get_vehicle_track_today(
 @router.get("/vehicles/{vehicle_id}/kpis", response_model=list[KpiHour])
 async def get_vehicle_kpis(
     vehicle_id: uuid.UUID,
-    hours: int = 24,
+    start: datetime | None = None,
+    end: datetime | None = None,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if hours > 24 * 30:
-        hours = 24 * 30
     vehicle = await db.get(Vehicle, vehicle_id)
     if not vehicle or not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
     _check_vehicle_access(vehicle, user)
 
-    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    if start is None:
+        start = datetime.now(timezone.utc) - timedelta(hours=24)
+    if end is None:
+        end = datetime.now(timezone.utc)
+
     rows = (
         await db.execute(
             text(
                 "SELECT bucket, avg_pressure_1, max_pressure_1, avg_oil_temp, "
                 "max_oil_temp, pto_active_minutes, engine_on_minutes, record_count "
                 "FROM telemetry_1h "
-                "WHERE vehicle_id = :vid AND tenant_id = :tid AND bucket >= :since "
+                "WHERE vehicle_id = :vid AND tenant_id = :tid "
+                "AND bucket >= :start AND bucket <= :end "
                 "ORDER BY bucket DESC"
             ),
-            {"vid": vehicle_id, "tid": vehicle.tenant_id, "since": since},
+            {"vid": vehicle_id, "tid": vehicle.tenant_id, "start": start, "end": end},
         )
     ).fetchall()
 
