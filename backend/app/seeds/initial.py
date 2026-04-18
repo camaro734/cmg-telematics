@@ -4,6 +4,7 @@ Seed idempotente: crea tenant CMG, usuario superadmin y 3 vehicle_types.
 Ejecutar: python -m app.seeds.initial
 """
 import asyncio
+import logging
 import uuid
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import select
@@ -13,6 +14,9 @@ from app.models.base import Base
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.vehicle_type import VehicleType
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 VACUUM_SENSORS = [
     {"key": "hydraulic_pressure_1", "label": "Presión bomba principal", "unit": "bar",
@@ -55,43 +59,47 @@ CISTERN_SENSORS = [
 async def run():
     engine = create_async_engine(settings.db_url, echo=False)
     Session = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            # Tenant CMG
+            result = await db.execute(select(Tenant).where(Tenant.slug == "cmg"))
+            cmg = result.scalar_one_or_none()
+            if not cmg:
+                cmg = Tenant(id=uuid.uuid4(), tier="cmg", name="CMG Metalhidráulica S.L.",
+                             slug="cmg", active=True)
+                db.add(cmg)
+                await db.flush()
+                logger.info("Creado tenant CMG")
 
-    async with Session() as db:
-        # Tenant CMG
-        result = await db.execute(select(Tenant).where(Tenant.slug == "cmg"))
-        cmg = result.scalar_one_or_none()
-        if not cmg:
-            cmg = Tenant(id=uuid.uuid4(), tier="cmg", name="CMG Metalhidráulica S.L.",
-                         slug="cmg", active=True)
-            db.add(cmg)
-            await db.flush()
-            print("Creado tenant CMG")
-
-        # Usuario superadmin
-        result = await db.execute(select(User).where(User.email == "admin@cmg.es"))
-        if not result.scalar_one_or_none():
-            admin = User(
-                tenant_id=cmg.id, email="admin@cmg.es",
-                hashed_password=hash_password("Admin2026!"),
-                full_name="Administrador CMG", role="admin",
-            )
-            db.add(admin)
-            print("Creado usuario admin@cmg.es / Admin2026!")
-
-        # Vehicle types
-        for slug, name, sensors in [
-            ("vacuum", "Camión aspirador", VACUUM_SENSORS),
-            ("sweeper", "Barredora municipal", SWEEPER_SENSORS),
-            ("cistern", "Camión cisterna", CISTERN_SENSORS),
-        ]:
-            result = await db.execute(select(VehicleType).where(VehicleType.slug == slug))
+            # Usuario superadmin
+            result = await db.execute(select(User).where(User.email == "admin@cmg.es"))
             if not result.scalar_one_or_none():
-                db.add(VehicleType(slug=slug, name=name, sensor_schema=sensors))
-                print(f"Creado vehicle_type: {slug}")
+                admin = User(
+                    tenant_id=cmg.id, email="admin@cmg.es",
+                    hashed_password=hash_password("Admin2026!"),
+                    full_name="Administrador CMG", role="admin",
+                )
+                db.add(admin)
+                logger.info("Creado usuario admin@cmg.es / Admin2026!")
 
-        await db.commit()
-    await engine.dispose()
-    print("Seed completado.")
+            # Vehicle types
+            for slug, name, sensors in [
+                ("vacuum", "Camión aspirador", VACUUM_SENSORS),
+                ("sweeper", "Barredora municipal", SWEEPER_SENSORS),
+                ("cistern", "Camión cisterna", CISTERN_SENSORS),
+            ]:
+                result = await db.execute(select(VehicleType).where(VehicleType.slug == slug))
+                if not result.scalar_one_or_none():
+                    db.add(VehicleType(slug=slug, name=name, sensor_schema=sensors))
+                    logger.info(f"Creado vehicle_type: {slug}")
+
+            await db.commit()
+        logger.info("Seed completado.")
+    except Exception:
+        logger.exception("Error durante seed")
+        raise
+    finally:
+        await engine.dispose()
 
 
 if __name__ == "__main__":
