@@ -1,6 +1,7 @@
 # backend/app/api/v1/vehicles.py
 import uuid
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,8 @@ from app.schemas.vehicle import (
 )
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
-from app.models.device import Device
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["vehicles"])
 
@@ -74,7 +76,11 @@ async def get_vehicle_status(
 
     redis = request.app.state.redis
     redis_key = f"vehicle:{vehicle_id}:status"
-    hash_data = await redis.hgetall(redis_key)
+    try:
+        hash_data = await redis.hgetall(redis_key)
+    except Exception:
+        logger.warning("Redis unavailable for vehicle status %s, returning offline", vehicle_id)
+        return VehicleStatus(vehicle_id=vehicle_id, online=False)
 
     if not hash_data:
         return VehicleStatus(vehicle_id=vehicle_id, online=False)
@@ -98,6 +104,7 @@ async def get_vehicle_status(
         try:
             return datetime.fromisoformat(val)
         except (ValueError, TypeError):
+            logger.warning("Failed to parse datetime from Redis: %r", val)
             return None
 
     def _parse_json(val: str | None) -> dict | None:
@@ -108,33 +115,24 @@ async def get_vehicle_status(
         except (ValueError, TypeError):
             return None
 
-    online_raw = hash_data.get(b"online") or hash_data.get("online")
-    online_str = online_raw.decode() if isinstance(online_raw, bytes) else online_raw
+    def _get(key: str) -> str | None:
+        raw = hash_data.get(key.encode()) if hash_data and isinstance(next(iter(hash_data), None), bytes) else hash_data.get(key)
+        if raw is None:
+            return None
+        return raw.decode() if isinstance(raw, bytes) else raw
 
-    last_seen_raw = hash_data.get(b"last_seen") or hash_data.get("last_seen")
-    last_seen_str = last_seen_raw.decode() if isinstance(last_seen_raw, bytes) else last_seen_raw
-
-    lat_raw = hash_data.get(b"lat") or hash_data.get("lat")
-    lat_str = lat_raw.decode() if isinstance(lat_raw, bytes) else lat_raw
-
-    lon_raw = hash_data.get(b"lon") or hash_data.get("lon")
-    lon_str = lon_raw.decode() if isinstance(lon_raw, bytes) else lon_raw
-
-    speed_raw = hash_data.get(b"speed_kmh") or hash_data.get("speed_kmh")
-    speed_str = speed_raw.decode() if isinstance(speed_raw, bytes) else speed_raw
-
-    ignition_raw = hash_data.get(b"ignition") or hash_data.get("ignition")
-    ignition_str = ignition_raw.decode() if isinstance(ignition_raw, bytes) else ignition_raw
-
-    pto_raw = hash_data.get(b"pto_active") or hash_data.get("pto_active")
-    pto_str = pto_raw.decode() if isinstance(pto_raw, bytes) else pto_raw
-
-    can_raw = hash_data.get(b"can_data") or hash_data.get("can_data")
-    can_str = can_raw.decode() if isinstance(can_raw, bytes) else can_raw
+    online_str = _get("online")
+    last_seen_str = _get("last_seen")
+    lat_str = _get("lat")
+    lon_str = _get("lon")
+    speed_str = _get("speed_kmh")
+    ignition_str = _get("ignition")
+    pto_str = _get("pto_active")
+    can_str = _get("can_data")
 
     return VehicleStatus(
         vehicle_id=vehicle_id,
-        online=_parse_bool(online_str) or False,
+        online=bool(_parse_bool(online_str)),
         last_seen=_parse_datetime(last_seen_str),
         lat=_parse_float(lat_str),
         lon=_parse_float(lon_str),
@@ -196,6 +194,8 @@ async def get_vehicle_telemetry_history(
         start = datetime.now(timezone.utc) - timedelta(days=1)
     if end is None:
         end = datetime.now(timezone.utc)
+    if start > end:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start must be <= end")
 
     rows = (
         await db.execute(
@@ -264,6 +264,8 @@ async def get_vehicle_kpis(
         start = datetime.now(timezone.utc) - timedelta(hours=24)
     if end is None:
         end = datetime.now(timezone.utc)
+    if start > end:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start must be <= end")
 
     rows = (
         await db.execute(

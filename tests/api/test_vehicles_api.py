@@ -60,3 +60,25 @@ async def test_get_vehicle_wrong_tenant_returns_404(client, admin_token):
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 404
+
+
+async def test_client_tenant_cannot_see_other_tenant_vehicles(client):
+    """Tenant-scoped user should only see their own vehicles, not others'."""
+    import uuid as _uuid
+    from app.core.security import create_access_token
+
+    fake_tenant_id = _uuid.uuid4()
+    token = create_access_token(data={
+        "sub": str(_uuid.uuid4()),
+        "tenant_id": str(fake_tenant_id),
+        "tenant_tier": "client",
+        "role": "admin",
+        "email": "test@other.com",
+    })
+    # Should see zero vehicles (all seeded vehicles belong to CMG tenant)
+    resp = await client.get(
+        "/api/v1/vehicles",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
