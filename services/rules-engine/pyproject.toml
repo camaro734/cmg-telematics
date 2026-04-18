@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cmg-rules-engine"
+version = "2.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg==0.29.0",
+    "redis[asyncio]==5.1.1",
+    "pydantic-settings==2.5.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
