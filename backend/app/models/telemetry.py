@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Float, Boolean, Integer, SmallInteger, ForeignKey, Index
+from sqlalchemy import Float, Boolean, Integer, SmallInteger, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
@@ -10,7 +10,7 @@ class TelemetryRecord(Base):
 
     time: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), primary_key=True, nullable=False)
     device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, nullable=False)
-    vehicle_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("vehicle.id"), nullable=False)
+    vehicle_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     lat: Mapped[float | None] = mapped_column(Float(precision=10), nullable=True)
     lon: Mapped[float | None] = mapped_column(Float(precision=10), nullable=True)
