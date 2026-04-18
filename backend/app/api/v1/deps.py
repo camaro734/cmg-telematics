@@ -17,15 +17,15 @@ async def get_current_user(
         payload = decode_token(credentials.credentials)
         if payload.get("type") != "access":
             raise ValueError("Not an access token")
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
-    return CurrentUser(
-        user_id=uuid.UUID(payload["sub"]),
-        tenant_id=uuid.UUID(payload["tenant_id"]),
-        tenant_tier=payload["tenant_tier"],
-        role=payload["role"],
-        email=payload["email"],
-    )
+        return CurrentUser(
+            user_id=uuid.UUID(payload["sub"]),
+            tenant_id=uuid.UUID(payload["tenant_id"]),
+            tenant_tier=payload["tenant_tier"],
+            role=payload["role"],
+            email=payload["email"],
+        )
+    except (ValueError, KeyError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 
 
 def require_role(*roles: str):
