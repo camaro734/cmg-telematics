@@ -1,6 +1,25 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
 import RequireAuth from './features/auth/RequireAuth'
+
+const FleetPage = lazy(() => import('./features/fleet/FleetPage'))
+const VehicleDetailPage = lazy(() => import('./features/vehicle/VehicleDetailPage'))
+
+function Loading() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--bg-base)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'var(--text-muted)',
+    }}>
+      Cargando…
+    </div>
+  )
+}
 
 export default function App() {
   return (
@@ -10,11 +29,13 @@ export default function App() {
         path="/*"
         element={
           <RequireAuth>
-            <Routes>
-              <Route path="fleet" element={<div style={{ padding: 24, color: 'var(--text-primary)' }}>Fleet (próximamente)</div>} />
-              <Route path="vehicles/:id" element={<div style={{ padding: 24, color: 'var(--text-primary)' }}>Vehicle detail (próximamente)</div>} />
-              <Route path="*" element={<Navigate to="/fleet" replace />} />
-            </Routes>
+            <Suspense fallback={<Loading />}>
+              <Routes>
+                <Route path="fleet" element={<FleetPage />} />
+                <Route path="vehicles/:id" element={<VehicleDetailPage />} />
+                <Route path="*" element={<Navigate to="/fleet" replace />} />
+              </Routes>
+            </Suspense>
           </RequireAuth>
         }
       />
