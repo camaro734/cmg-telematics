@@ -10,7 +10,8 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { logoUrl } = useAuthStore()
+  const { logoUrl, user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
 
   return (
     <nav style={{
@@ -68,18 +69,22 @@ export default function Sidebar() {
       )}
 
       <div style={{ marginTop: 'auto' }}>
-        <div
-          title="Ajustes — disponible en próxima versión"
-          style={{
-            width: 36, height: 36,
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--bg-border)',
-            cursor: 'not-allowed',
-          }}
-        >
-          <IconAjustes width={20} height={20}/>
-        </div>
+        {isAdmin ? (
+          <NavLink
+            to="/settings"
+            title="Ajustes"
+            style={({ isActive }) => ({
+              width: 36, height: 36,
+              borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+              background: isActive ? 'rgba(110,197,177,0.15)' : 'transparent',
+              transition: 'background 0.15s, color 0.15s',
+            })}
+          >
+            <IconAjustes width={20} height={20}/>
+          </NavLink>
+        ) : null}
       </div>
     </nav>
   )
