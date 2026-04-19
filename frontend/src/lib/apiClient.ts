@@ -7,14 +7,20 @@ async function request<T>(
   retry = true,
 ): Promise<T> {
   const token = useAuthStore.getState().accessToken
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(path, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error('Error de red')
+  }
 
   if (res.status === 401 && retry) {
     const ok = await useAuthStore.getState().refresh()
@@ -24,11 +30,13 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
+    const text = await res.text().catch(() => res.statusText || 'Error desconocido')
     throw new Error(`${res.status}: ${text}`)
   }
 
-  return res.json() as Promise<T>
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 export const apiClient = {
