@@ -63,7 +63,7 @@ describe('SettingsPage', () => {
     vi.mocked(apiClient.patch).mockResolvedValue({ ...mockSettings, notification_email: 'new@test.com' })
 
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
-    qc.setQueryData(['settings', undefined], mockSettings)
+    qc.setQueryData(['settings'], mockSettings)
 
     const { getByRole } = render(
       <QueryClientProvider client={qc}>

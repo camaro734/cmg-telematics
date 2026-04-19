@@ -45,7 +45,8 @@ export default function NotificationSettings() {
 
   useEffect(() => {
     if (settings !== undefined) setEmail(settings.notification_email ?? '')
-  }, [settings?.tenant_id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.tenant_id, settings?.notification_email])
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: () =>
