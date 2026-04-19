@@ -7,6 +7,7 @@ export const keys = {
   vehicleTypes: () => ['vehicle-types'] as const,
   alerts: () => ['alerts'] as const,
   rules: () => ['rules'] as const,
+  rule: (id: string) => ['rules', id] as const,
   tenants: () => ['tenants'] as const,
   tenantBrandTokens: (tenantId: string) => ['tenants', tenantId, 'brand-tokens'] as const,
   settings: (tenantId?: string) => tenantId ? ['settings', tenantId] as const : ['settings'] as const,

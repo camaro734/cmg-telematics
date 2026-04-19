@@ -119,14 +119,80 @@ export interface AlertInstanceOut {
   ack_note: string | null
 }
 
-export interface RuleOut {
-  id: string
-  name: string
-  severity: 'info' | 'warning' | 'critical'
-  active: boolean
-}
-
 export interface SettingsOut {
   tenant_id: string
   notification_email: string | null
+}
+
+export type RuleSeverity = 'info' | 'warning' | 'critical'
+export type ConditionOp = '>' | '<' | '>=' | '<=' | '==' | '!='
+
+export interface ScheduleWindow {
+  type: 'always'
+}
+export interface ScheduleTimeWindow {
+  type: 'time_window'
+  days: number[]
+  start: string
+  end: string
+}
+
+export interface ConditionDef {
+  type: 'threshold' | 'threshold_sustained' | 'accumulation' | 'trend_rising' | 'schedule' | 'composite'
+  field?: string
+  op?: ConditionOp
+  value?: number
+  minutes?: number
+  limit?: number
+  threshold?: number
+  window_minutes?: number
+  expected_outside?: boolean
+  schedule?: ScheduleWindow | ScheduleTimeWindow
+  op_composite?: 'AND' | 'OR'
+  conditions?: ConditionDef[]
+}
+
+export interface ActionDef {
+  type: 'email' | 'webhook' | 'in_app' | 'push' | 'sms'
+  recipients?: string[]
+  url?: string
+  method?: 'POST' | 'GET'
+}
+
+export interface EscalationStep {
+  delay_minutes: number
+  actions: ActionDef[]
+}
+
+export interface VehicleFilter {
+  scope: 'all' | 'vehicle' | 'type'
+  vehicle_id?: string
+  vehicle_type_id?: string
+}
+
+export interface RuleOut {
+  id: string
+  tenant_id: string
+  name: string
+  description: string | null
+  active: boolean
+  severity: RuleSeverity
+  vehicle_filter: VehicleFilter
+  condition: ConditionDef
+  actions: ActionDef[]
+  escalation: EscalationStep[]
+  cooldown_minutes: number
+  created_at: string
+}
+
+export interface RuleCreate {
+  name: string
+  description?: string | null
+  severity: RuleSeverity
+  vehicle_filter: VehicleFilter
+  condition: ConditionDef
+  actions: ActionDef[]
+  escalation: EscalationStep[]
+  cooldown_minutes: number
+  active: boolean
 }
