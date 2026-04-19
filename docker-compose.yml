@@ -118,6 +118,16 @@ services:
       core-api:
         condition: service_started
 
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      core-api:
+        condition: service_healthy
+
 volumes:
   pgdata:
   redisdata:
