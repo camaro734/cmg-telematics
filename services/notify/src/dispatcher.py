@@ -33,7 +33,7 @@ async def _send_email(action: dict, context: dict) -> None:
     if not settings.smtp_host:
         logger.info(
             "[stub] Email to %s — rule: %s vehicle: %s",
-            recipients, context.get("rule_name"), context.get("vehicle_id"),
+            recipients, context.get("rule_name"), context.get("vehicle_name", context.get("vehicle_id")),
         )
         return
 
@@ -41,11 +41,14 @@ async def _send_email(action: dict, context: dict) -> None:
     msg["From"] = settings.smtp_from
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = action.get(
-        "subject", "Alerta: %s" % context.get("rule_name", "CMG Telematics")
+        "subject", "[ALERTA] %s — %s" % (
+            context.get("rule_name", "CMG Telematics"),
+            context.get("vehicle_name", ""),
+        )
     )
     msg.set_content(
         "Vehículo: %s\nSeveridad: %s\nValor disparado: %s\nRegla: %s" % (
-            context.get("vehicle_id"),
+            context.get("vehicle_name", context.get("vehicle_id")),
             context.get("severity"),
             context.get("trigger_value"),
             context.get("rule_name"),

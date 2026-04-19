@@ -30,21 +30,42 @@ async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> N
     escalation = json.loads(fields.get("escalation", "[]"))
 
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id)
-    rule_name = row["name"] if row else "unknown"
+        rule_row = await conn.fetchrow(
+            "SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id
+        )
+        vehicle_row = await conn.fetchrow(
+            "SELECT name FROM vehicle WHERE id = $1::uuid", vehicle_id
+        )
+        tenant_row = await conn.fetchrow(
+            "SELECT notification_email FROM tenant WHERE id = $1::uuid", tenant_id
+        )
+
+    rule_name = rule_row["name"] if rule_row else "unknown"
+    vehicle_name = vehicle_row["name"] if vehicle_row else vehicle_id
+    tenant_email = tenant_row["notification_email"] if tenant_row else None
 
     context = {
         "alert_id": alert_id,
         "rule_id": rule_id,
         "rule_name": rule_name,
         "vehicle_id": vehicle_id,
+        "vehicle_name": vehicle_name,
         "tenant_id": tenant_id,
         "severity": severity,
         "trigger_value": trigger_value,
     }
 
+    email_dispatched = any(a.get("type") == "email" for a in actions)
+
     for action in actions:
         await dispatch_action(action, context)
+
+    # Tenant email fallback: only if no email action was in the rule
+    if not email_dispatched and tenant_email:
+        await dispatch_action(
+            {"type": "email", "recipients": [tenant_email]},
+            context,
+        )
 
     for step in escalation:
         await schedule_escalation(
