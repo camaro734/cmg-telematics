@@ -45,7 +45,7 @@ export default function Sidebar() {
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              background: isActive ? 'rgba(110,197,177,0.15)' : 'transparent',
+              background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
               transition: 'background 0.15s, color 0.15s',
             })}
           >
@@ -78,7 +78,7 @@ export default function Sidebar() {
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              background: isActive ? 'rgba(110,197,177,0.15)' : 'transparent',
+              background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
               transition: 'background 0.15s, color 0.15s',
             })}
           >

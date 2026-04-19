@@ -16,6 +16,9 @@ router = APIRouter(tags=["alerts"])
 @router.get("/alerts", response_model=list[AlertInstanceOut])
 async def list_alerts(
     alert_status: str | None = Query(None, alias="status"),
+    vehicle_id: uuid.UUID | None = Query(None),
+    triggered_at_from: datetime | None = Query(None),
+    triggered_at_to: datetime | None = Query(None),
     limit: int = 50,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -27,6 +30,12 @@ async def list_alerts(
         query = query.where(AlertInstance.tenant_id == user.tenant_id)
     if alert_status:
         query = query.where(AlertInstance.status == alert_status)
+    if vehicle_id:
+        query = query.where(AlertInstance.vehicle_id == vehicle_id)
+    if triggered_at_from:
+        query = query.where(AlertInstance.triggered_at >= triggered_at_from)
+    if triggered_at_to:
+        query = query.where(AlertInstance.triggered_at <= triggered_at_to)
     query = query.order_by(AlertInstance.triggered_at.desc()).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()

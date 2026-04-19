@@ -110,12 +110,22 @@ async def _escalation_worker(db_pool: asyncpg.Pool, redis: Redis) -> None:
         try:
             due = await pop_due_escalations(redis)
             for item in due:
+                rule_id = item["rule_id"]
+                vehicle_id = item["vehicle_id"]
+                async with db_pool.acquire() as conn:
+                    rule_row = await conn.fetchrow(
+                        "SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id
+                    )
+                    vehicle_row = await conn.fetchrow(
+                        "SELECT name FROM vehicle WHERE id = $1::uuid", vehicle_id
+                    )
                 context = {
                     "alert_id": item["alert_id"],
-                    "rule_id": item["rule_id"],
-                    "vehicle_id": item["vehicle_id"],
+                    "rule_id": rule_id,
+                    "rule_name": rule_row["name"] if rule_row else "unknown",
+                    "vehicle_id": vehicle_id,
+                    "vehicle_name": vehicle_row["name"] if vehicle_row else vehicle_id,
                     "severity": "escalated",
-                    "rule_name": "escalation",
                     "trigger_value": {},
                 }
                 for action in item.get("actions", []):

@@ -85,6 +85,75 @@ async def test_patch_settings_requires_admin(client, admin_token, db):
     assert resp.status_code == 403
 
 
+async def test_non_cmg_tenant_id_param_ignored_on_get(client, db):
+    """Un admin de cliente que pasa ?tenant_id= ajeno siempre recibe su propio tenant."""
+    from app.models.tenant import Tenant
+    from app.models.user import User
+    from app.core.security import hash_password
+
+    suffix = uuid.uuid4().hex[:8]
+    client_tenant = Tenant(id=uuid.uuid4(), tier="client", name="TestClient GET", slug=f"testclient-get-{suffix}")
+    db.add(client_tenant)
+    await db.flush()
+
+    user = User(
+        tenant_id=client_tenant.id,
+        email=f"client_admin_{suffix}@test.com",
+        hashed_password=hash_password("Test1234!"),
+        full_name="Client Admin",
+        role="admin",
+    )
+    db.add(user)
+    await db.commit()
+
+    login = await client.post("/api/v1/auth/login", json={"email": user.email, "password": "Test1234!"})
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    foreign_uuid = str(uuid.uuid4())
+    resp = await client.get(
+        f"/api/v1/settings?tenant_id={foreign_uuid}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["tenant_id"] == str(client_tenant.id)
+
+
+async def test_non_cmg_tenant_id_param_ignored_on_patch(client, db):
+    """Un admin de cliente que pasa ?tenant_id= ajeno modifica su propio tenant."""
+    from app.models.tenant import Tenant
+    from app.models.user import User
+    from app.core.security import hash_password
+
+    suffix = uuid.uuid4().hex[:8]
+    client_tenant = Tenant(id=uuid.uuid4(), tier="client", name="TestClient PATCH", slug=f"testclient-patch-{suffix}")
+    db.add(client_tenant)
+    await db.flush()
+
+    user = User(
+        tenant_id=client_tenant.id,
+        email=f"client_admin_{suffix}@test.com",
+        hashed_password=hash_password("Test1234!"),
+        full_name="Client Admin",
+        role="admin",
+    )
+    db.add(user)
+    await db.commit()
+
+    login = await client.post("/api/v1/auth/login", json={"email": user.email, "password": "Test1234!"})
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    foreign_uuid = str(uuid.uuid4())
+    resp = await client.patch(
+        f"/api/v1/settings?tenant_id={foreign_uuid}",
+        json={"notification_email": "isolated@test.com"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["tenant_id"] == str(client_tenant.id)
+
+
 async def test_cmg_admin_can_set_tenant_id_param(client, admin_token):
     resp = await client.get(
         "/api/v1/settings",

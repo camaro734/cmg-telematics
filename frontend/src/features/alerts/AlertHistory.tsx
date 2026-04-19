@@ -40,28 +40,27 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
   const buildUrl = (s: string) => {
     const p = new URLSearchParams({ status: s, limit: '50' })
     if (vehicleId) p.set('vehicle_id', vehicleId)
+    if (dateFrom) p.set('triggered_at_from', dateFrom + 'T00:00:00Z')
+    if (dateTo)   p.set('triggered_at_to',   dateTo   + 'T23:59:59Z')
     return `/api/v1/alerts?${p}`
   }
 
+  const queryKey = (s: string) => [...keys.alerts(), s, vehicleId, dateFrom, dateTo]
+
   const { data: acked = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'acknowledged', vehicleId],
+    queryKey: queryKey('acknowledged'),
     queryFn: () => apiClient.get<AlertInstanceOut[]>(buildUrl('acknowledged')),
     enabled: status === 'all' || status === 'acknowledged',
   })
 
   const { data: resolved = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'resolved', vehicleId],
+    queryKey: queryKey('resolved'),
     queryFn: () => apiClient.get<AlertInstanceOut[]>(buildUrl('resolved')),
     enabled: status === 'all' || status === 'resolved',
   })
 
-  let rows = status === 'all' ? [...acked, ...resolved]
-    : status === 'acknowledged' ? acked
-    : resolved
-
-  if (dateFrom) rows = rows.filter(a => a.triggered_at >= dateFrom)
-  if (dateTo)   rows = rows.filter(a => a.triggered_at <= dateTo + 'T23:59:59Z')
-  rows = [...rows].sort((a, b) => b.triggered_at.localeCompare(a.triggered_at))
+  const rows = [...(status === 'all' ? [...acked, ...resolved] : status === 'acknowledged' ? acked : resolved)]
+    .sort((a, b) => (b.triggered_at > a.triggered_at ? 1 : b.triggered_at < a.triggered_at ? -1 : 0))
 
   return (
     <div>
@@ -88,7 +87,7 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
             <thead>
               <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--bg-border)' }}>
-                {['Fecha', 'Vehículo', 'Regla', 'Valor', 'Ubicación', 'Estado', 'Nota'].map(h => (
+                {['Fecha', 'Vehículo', 'Regla', 'Valor', 'Estado', 'Nota'].map(h => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
               </tr>
@@ -97,9 +96,6 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
               {rows.map(a => {
                 const badge = STATUS_BADGE[a.status] ?? { label: a.status, color: 'var(--text-muted)' }
                 const tv = a.trigger_value
-                const lat = tv?.lat as number | undefined
-                const lon = tv?.lon as number | undefined
-                const loc = lat != null && lon != null ? `${lat.toFixed(4)}, ${lon.toFixed(4)}` : '—'
                 const val = tv?.value != null ? String(tv.value) : '—'
                 return (
                   <tr key={a.id} style={{ borderBottom: '1px solid var(--bg-elevated)' }}>
@@ -109,7 +105,6 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
                     <td style={TD}>{vehicleMap[a.vehicle_id] ?? '—'}</td>
                     <td style={TD}>{ruleMap[a.rule_id] ?? '—'}</td>
                     <td style={{ ...TD, fontFamily: 'var(--font-data)' }}>{val}</td>
-                    <td style={{ ...TD, fontFamily: 'var(--font-data)' }}>{loc}</td>
                     <td style={TD}>
                       <span style={{ color: badge.color, fontWeight: 600 }}>{badge.label}</span>
                     </td>

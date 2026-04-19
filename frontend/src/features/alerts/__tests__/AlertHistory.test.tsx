@@ -28,8 +28,8 @@ const ackedAlert: AlertInstanceOut = {
 function wrap(node: React.ReactNode, prefill?: AlertInstanceOut[]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
   if (prefill) {
-    qc.setQueryData(['alerts', 'acknowledged', ''], prefill)
-    qc.setQueryData(['alerts', 'resolved', ''], [])
+    qc.setQueryData(['alerts', 'acknowledged', '', '', ''], prefill)
+    qc.setQueryData(['alerts', 'resolved', '', '', ''], [])
   }
   return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>)
 }
@@ -43,20 +43,19 @@ describe('AlertHistory', () => {
   it('muestra fila de alerta reconocida', () => {
     wrap(<AlertHistory vehicles={vehicles} rules={rules} />, [ackedAlert])
     expect(screen.getByText('Presión alta')).toBeInTheDocument()
-    // vehicle name appears in dropdown + table, so check it's present anywhere
     expect(screen.getAllByText('Camión 01').length).toBeGreaterThan(0)
     expect(screen.getByText('RECONOCIDA')).toBeInTheDocument()
     expect(screen.getByText('Revisado')).toBeInTheDocument()
   })
 
-  it('muestra ubicación cuando trigger_value tiene lat/lon', () => {
+  it('muestra el valor del trigger_value en la tabla', () => {
     wrap(<AlertHistory vehicles={vehicles} rules={rules} />, [ackedAlert])
-    expect(screen.getByText('39.4698, -0.3774')).toBeInTheDocument()
+    expect(screen.getByText('380')).toBeInTheDocument()
   })
 
-  it('muestra — en ubicación cuando no hay lat/lon', () => {
-    const noLoc = { ...ackedAlert, trigger_value: { value: 380 } }
-    wrap(<AlertHistory vehicles={vehicles} rules={rules} />, [noLoc])
+  it('muestra — cuando trigger_value no tiene value', () => {
+    const noVal = { ...ackedAlert, trigger_value: null }
+    wrap(<AlertHistory vehicles={vehicles} rules={rules} />, [noVal])
     expect(screen.getAllByText('—').length).toBeGreaterThan(0)
   })
 })
