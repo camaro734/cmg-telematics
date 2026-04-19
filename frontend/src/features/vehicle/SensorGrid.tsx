@@ -20,7 +20,7 @@ function getSensorValue(
   if (sensor.avl_id != null) {
     const raw = canData[`avl_${sensor.avl_id}`]
     if (typeof raw !== 'number') {
-      if (process.env.NODE_ENV !== 'production' && raw != null) {
+      if (import.meta.env.DEV && raw != null) {
         console.warn(`SensorGrid: avl_${sensor.avl_id} tiene tipo inesperado "${typeof raw}", se esperaba number`)
       }
       return null
@@ -104,7 +104,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
         }
 
         // Tipo no reconocido — mostrar como numérico con aviso en dev
-        if (process.env.NODE_ENV !== 'production') {
+        if (import.meta.env.DEV) {
           console.warn(`SensorGrid: gauge_type no reconocido "${sensor.gauge_type}" para clave "${sensor.key}"`)
         }
         return (

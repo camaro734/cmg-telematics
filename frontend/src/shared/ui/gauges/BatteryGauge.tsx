@@ -38,7 +38,7 @@ export default function BatteryGauge({
   unit = 'V',
   warnBelow, alertBelow,
 }: BatteryGaugeProps) {
-  if (process.env.NODE_ENV !== 'production' && warnBelow != null && alertBelow != null && alertBelow >= warnBelow) {
+  if (import.meta.env.DEV && warnBelow != null && alertBelow != null && alertBelow >= warnBelow) {
     console.warn(`BatteryGauge "${label}": alertBelow (${alertBelow}) must be < warnBelow (${warnBelow})`)
   }
 

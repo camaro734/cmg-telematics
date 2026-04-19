@@ -47,7 +47,7 @@ export default function LinearGauge({
   value, min, max, label,
   warnBelow, alertBelow,
 }: LinearGaugeProps) {
-  if (process.env.NODE_ENV !== 'production' && warnBelow != null && alertBelow != null && alertBelow >= warnBelow) {
+  if (import.meta.env.DEV && warnBelow != null && alertBelow != null && alertBelow >= warnBelow) {
     console.warn(`LinearGauge "${label}": alertBelow (${alertBelow}) must be < warnBelow (${warnBelow})`)
   }
 
