@@ -7,18 +7,24 @@ import NumericDisplay from '../../shared/ui/gauges/NumericDisplay'
 interface SensorGridProps {
   sensorSchema: SensorDef[]
   canData: Record<string, unknown>
-  derivedValues?: Record<string, number | null>
+  // Partial porque los KPIs derivados pueden no estar presentes para todas las claves
+  derivedValues?: Partial<Record<string, number | null>>
 }
 
 function getSensorValue(
   sensor: SensorDef,
   canData: Record<string, unknown>,
-  derived: Record<string, number | null>,
+  derived: Partial<Record<string, number | null>>,
 ): number | null {
   if (sensor.kpi_key) return derived[sensor.kpi_key] ?? null
   if (sensor.avl_id != null) {
     const raw = canData[`avl_${sensor.avl_id}`]
-    if (typeof raw !== 'number') return null
+    if (typeof raw !== 'number') {
+      if (process.env.NODE_ENV !== 'production' && raw != null) {
+        console.warn(`SensorGrid: avl_${sensor.avl_id} tiene tipo inesperado "${typeof raw}", se esperaba number`)
+      }
+      return null
+    }
     return sensor.scale != null ? raw * sensor.scale : raw
   }
   return null
@@ -29,6 +35,8 @@ const gridStyle = {
   gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
   gap: 8,
 }
+
+const unit = (s: SensorDef) => s.unit ?? ''
 
 export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }: SensorGridProps) {
   return (
@@ -43,7 +51,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
               value={value}
               min={sensor.min ?? 0}
               max={sensor.max ?? 100}
-              unit={sensor.unit ?? ''}
+              unit={unit(sensor)}
               label={sensor.label}
               warnAbove={sensor.warn_above}
               alertAbove={sensor.alert_above}
@@ -53,6 +61,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
           )
         }
 
+        // battery y linear son sensores de nivel — solo alertan por valor bajo, no alto
         if (sensor.gauge_type === 'battery') {
           return (
             <BatteryGauge
@@ -61,7 +70,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
               min={sensor.min ?? 0}
               max={sensor.max ?? 100}
               label={sensor.label}
-              unit={sensor.unit ?? undefined}
+              unit={unit(sensor)}
               warnBelow={sensor.warn_below}
               alertBelow={sensor.alert_below}
             />
@@ -75,7 +84,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
               value={value}
               min={sensor.min ?? 0}
               max={sensor.max ?? 100}
-              unit={sensor.unit ?? undefined}
+              unit={unit(sensor)}
               label={sensor.label}
               warnBelow={sensor.warn_below}
               alertBelow={sensor.alert_below}
@@ -88,13 +97,24 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
             <NumericDisplay
               key={sensor.key}
               value={value}
-              unit={sensor.unit ?? ''}
+              unit={unit(sensor)}
               label={sensor.label}
             />
           )
         }
 
-        return null
+        // Tipo no reconocido — mostrar como numérico con aviso en dev
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`SensorGrid: gauge_type no reconocido "${sensor.gauge_type}" para clave "${sensor.key}"`)
+        }
+        return (
+          <NumericDisplay
+            key={sensor.key}
+            value={value}
+            unit={unit(sensor)}
+            label={sensor.label}
+          />
+        )
       })}
     </div>
   )

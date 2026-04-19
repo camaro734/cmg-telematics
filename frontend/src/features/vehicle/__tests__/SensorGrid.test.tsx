@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import SensorGrid from '../SensorGrid'
 import type { SensorDef } from '../../../lib/types'
@@ -96,5 +96,22 @@ describe('SensorGrid', () => {
       <SensorGrid sensorSchema={[batterySensor]} canData={{ avl_66: 24100 }} />
     )
     expect(getByText('24.1 V')).toBeInTheDocument()
+  })
+
+  it('gauge_type desconocido muestra NumericDisplay y avisa en dev', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const ledSensor: SensorDef = {
+      key: 'pto_led',
+      label: 'PTO',
+      unit: '',
+      gauge_type: 'led',
+      avl_id: 99,
+    }
+    const { getByText } = render(
+      <SensorGrid sensorSchema={[ledSensor]} canData={{ avl_99: 1 }} />
+    )
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('gauge_type'))
+    expect(getByText('PTO')).toBeInTheDocument()
+    spy.mockRestore()
   })
 })
