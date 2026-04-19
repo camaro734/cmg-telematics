@@ -62,10 +62,17 @@ async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> N
 
     # Tenant email fallback: only if no email action was in the rule
     if not email_dispatched and tenant_email:
+        logger.info(
+            "No rule-level email action — sending tenant fallback to %s for alert %s",
+            tenant_email, alert_id,
+        )
         await dispatch_action(
             {"type": "email", "recipients": [tenant_email]},
             context,
         )
+
+    if not email_dispatched and not tenant_email:
+        logger.debug("No email recipients configured for alert %s", alert_id)
 
     for step in escalation:
         await schedule_escalation(

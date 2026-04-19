@@ -27,7 +27,10 @@ async def dispatch_action(action: dict, context: dict) -> None:
 
 
 async def _send_email(action: dict, context: dict) -> None:
-    recipients = action.get("recipients", [])
+    recipients = action.get("recipients") or action.get("to", [])
+    # Normalize to list if a single string was provided
+    if isinstance(recipients, str):
+        recipients = [recipients]
     if not recipients:
         return
     if not settings.smtp_host:
