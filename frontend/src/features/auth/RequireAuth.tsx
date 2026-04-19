@@ -7,9 +7,11 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   const [checking, setChecking] = useState(!accessToken)
 
   useEffect(() => {
+    let cancelled = false
     if (!accessToken) {
-      refresh().finally(() => setChecking(false))
+      refresh().finally(() => { if (!cancelled) setChecking(false) })
     }
+    return () => { cancelled = true }
   }, [accessToken, refresh])
 
   if (checking) {

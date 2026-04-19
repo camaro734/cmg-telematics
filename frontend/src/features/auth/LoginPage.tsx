@@ -18,6 +18,7 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return
     setError(null)
     setLoading(true)
     try {
@@ -75,15 +76,17 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>
+            <label htmlFor="email" style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>
               Email
             </label>
             <input
+              id="email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
               autoFocus
+              autoComplete="email"
               style={{
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--bg-border)',
@@ -97,14 +100,16 @@ export default function LoginPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>
+            <label htmlFor="password" style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>
               Contraseña
             </label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               style={{
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--bg-border)',
