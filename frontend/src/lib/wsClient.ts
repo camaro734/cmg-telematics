@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { VehicleStatus } from './types'
+import type { WsMessage } from './types'
 import { keys } from './queryKeys'
+
+import type { VehicleStatus } from './types'
 
 const RECONNECT_MAX_MS = 30_000
 
@@ -51,7 +53,7 @@ class WsClientImpl {
 
     this.socket.onmessage = (event: MessageEvent) => {
       try {
-        const msg = JSON.parse(event.data as string) as { type: string; data: VehicleStatus }
+        const msg = JSON.parse(event.data as string) as WsMessage
         if (msg.type === 'telemetry' && msg.data) {
           this.queryClient?.setQueryData(keys.vehicleStatus(msg.data.vehicle_id), msg.data)
           this.listeners.forEach(cb => cb(msg.data))
@@ -62,7 +64,8 @@ class WsClientImpl {
     }
 
     this.socket.onerror = () => {
-      this.socket?.close()
+      // El navegador dispara onclose automáticamente después de onerror;
+      // llamar close() explícitamente causaría un doble onclose y dos timers de reconexión
     }
 
     this.socket.onclose = () => {
