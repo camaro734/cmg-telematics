@@ -20,37 +20,37 @@ export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [tab, setTab] = useState<'live' | 'historic'>('live')
 
-  if (!id) return <Navigate to="/fleet" replace />
-
   const { data: vehicle, isLoading: loadingVehicle, error: vehicleError } = useQuery({
-    queryKey: keys.vehicle(id),
+    queryKey: keys.vehicle(id ?? ''),
     queryFn: () => apiClient.get<VehicleOut>(`/api/v1/vehicles/${id}`),
+    enabled: !!id,
   })
 
   const { data: vehicleTypes = [] } = useQuery({
     queryKey: keys.vehicleTypes(),
     queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
     staleTime: Infinity,
+    enabled: !!id,
   })
 
   const { data: status } = useQuery({
-    queryKey: keys.vehicleStatus(id),
+    queryKey: keys.vehicleStatus(id ?? ''),
     queryFn: () => apiClient.get<VehicleStatus>(`/api/v1/vehicles/${id}/status`),
     refetchInterval: 30_000,
     enabled: !!vehicle,
   })
 
   const { data: track = [] } = useQuery({
-    queryKey: keys.vehicleTrack(id),
+    queryKey: keys.vehicleTrack(id ?? ''),
     queryFn: () => apiClient.get<TrackPoint[]>(`/api/v1/vehicles/${id}/track/today`),
     staleTime: 60_000,
     enabled: !!vehicle,
   })
 
   const { data: kpis = [] } = useQuery({
-    queryKey: [...keys.vehicleKpis(id), 24],
+    queryKey: [...keys.vehicleKpis(id ?? ''), 24],
     queryFn: () => apiClient.get<KpiHour[]>(`/api/v1/vehicles/${id}/kpis?hours=24`),
-    enabled: tab === 'historic' && !!vehicle,
+    enabled: !!vehicle,
   })
 
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicle?.vehicle_type_id)
@@ -61,6 +61,8 @@ export default function VehicleDetailPage() {
       ? Math.round(kpis.reduce((s, h) => s + (h.pto_active_minutes ?? 0), 0) / 60 * 10) / 10
       : null,
   }), [kpis])
+
+  if (!id) return <Navigate to="/fleet" replace />
 
   if (loadingVehicle) {
     return (

@@ -27,9 +27,10 @@ const BTN_BASE = {
   transition: 'background 0.15s',
 }
 
-function formatBucket(bucket: string): string {
+function formatBucket(bucket: string, hours: number): string {
   const d = new Date(bucket)
-  return `${d.getHours()}:00`
+  if (hours <= 24) return `${d.getHours()}:00`
+  return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 interface KpiChartProps {
@@ -45,7 +46,7 @@ export default function KpiChart({ vehicleId }: KpiChartProps) {
   })
 
   const chartData = kpis.map(h => ({
-    time: formatBucket(h.bucket),
+    time: formatBucket(h.bucket, hours),
     pressure: h.avg_pressure_1,
     temp: h.avg_oil_temp,
     pto: h.pto_active_minutes,

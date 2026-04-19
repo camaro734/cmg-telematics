@@ -23,7 +23,7 @@ const barStyle = {
   position: 'relative' as const,
   width: 32,
   height: 100,
-  background: 'var(--gauge-track, #3C3330)',
+  background: 'var(--gauge-track)',
   borderRadius: 4,
   border: '1px solid var(--bg-border)',
   overflow: 'hidden' as const,

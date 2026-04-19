@@ -70,6 +70,7 @@ export default function BatteryGauge({
           aria-valuenow={value ?? 0}
           aria-valuemin={min}
           aria-valuemax={max}
+          aria-label={label}
         >
           <div
             className="bat-fill"

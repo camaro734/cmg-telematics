@@ -54,6 +54,13 @@ export default function CircularGauge({
   size = 120,
   warnAbove, alertAbove, warnBelow, alertBelow,
 }: CircularGaugeProps) {
+  if (import.meta.env.DEV && alertAbove != null && warnAbove != null && alertAbove <= warnAbove) {
+    console.warn(`CircularGauge "${label}": alertAbove (${alertAbove}) must be > warnAbove (${warnAbove})`)
+  }
+  if (import.meta.env.DEV && alertBelow != null && warnBelow != null && alertBelow >= warnBelow) {
+    console.warn(`CircularGauge "${label}": alertBelow (${alertBelow}) must be < warnBelow (${warnBelow})`)
+  }
+
   const hasValue = value != null
   const range = max - min
   const pct = hasValue && range !== 0 ? Math.max(0, Math.min(1, (value - min) / range)) : 0
@@ -126,7 +133,7 @@ export default function CircularGauge({
           textAnchor="middle"
           fontSize="8"
           fill="var(--text-muted)"
-          fontFamily="var(--font-data)"
+          fontFamily="var(--font-ui)"
           letterSpacing="0.8"
         >
           {label.toUpperCase()}

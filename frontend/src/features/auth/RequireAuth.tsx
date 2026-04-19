@@ -24,6 +24,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
     if (accessToken && !checking) {
       wsClient.connect(accessToken, queryClient)
     }
+    return () => { wsClient.disconnect() }
   }, [accessToken, checking, queryClient])
 
   if (checking) {
