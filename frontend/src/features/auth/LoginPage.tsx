@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from './useAuthStore'
 import { apiClient } from '../../lib/apiClient'
 import type { BrandTokens } from '../../lib/types'
+import logo from '../../assets/logo.png'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -57,19 +58,14 @@ export default function LoginPage() {
         width: 360,
         border: '1px solid var(--bg-border)',
       }}>
-        {/* Logo mark */}
-        <div style={{
-          width: 48, height: 48,
-          background: 'var(--accent-energy)',
-          borderRadius: 8,
-          marginBottom: 24,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-data)',
-          fontWeight: 700, fontSize: 20,
-          color: '#fff',
-        }}>C</div>
+        {/* Logo */}
+        <img
+          src={logo}
+          alt="CMG Hidráulica"
+          style={{ width: 200, height: 'auto', marginBottom: 28, borderRadius: 6 }}
+        />
 
-        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>CMG Telematics</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>CMG Nexus</h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: 32, fontSize: 13 }}>
           Inicia sesión para continuar
         </p>

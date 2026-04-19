@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import logo from '../../assets/logo.png'
 
 const NAV_ITEMS = [
   { to: '/fleet', icon: '🚛', label: 'Flota', active: true },
@@ -21,16 +22,14 @@ export default function Sidebar() {
       gap: 4,
       zIndex: 100,
     }}>
-      {/* Logo */}
-      <div style={{
-        width: 32, height: 32,
-        background: 'var(--accent-energy)',
-        borderRadius: 6,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14, fontWeight: 700, color: '#fff',
-        fontFamily: 'var(--font-data)',
-        marginBottom: 16,
-      }}>C</div>
+      {/* Logo — triangle mark only (left crop of horizontal logo) */}
+      <div style={{ width: 40, height: 26, marginBottom: 16, overflow: 'hidden', borderRadius: 4 }}>
+        <img
+          src={logo}
+          alt="CMG Hidráulica"
+          style={{ height: 26, width: 'auto', display: 'block' }}
+        />
+      </div>
 
       {NAV_ITEMS.map(({ to, icon, label, active }) =>
         active ? (
@@ -43,7 +42,7 @@ export default function Sidebar() {
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 18,
-              background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
+              background: isActive ? 'rgba(110,197,177,0.15)' : 'transparent',
               color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
               transition: 'background 0.15s',
             })}

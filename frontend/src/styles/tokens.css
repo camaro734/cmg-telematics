@@ -4,7 +4,7 @@
   --bg-elevated:   #3C3330;
   --bg-border:     #57534E;
 
-  --accent-energy: #F97316;
+  --accent-energy: #6EC5B1;
   --accent-ok:     #22C55E;
   --accent-warn:   #EAB308;
   --accent-crit:   #EF4444;
@@ -19,7 +19,7 @@
   --font-ui:   'Inter', sans-serif;
 
   --gauge-track: #3C3330;
-  --gauge-fill:  #F97316;
+  --gauge-fill:  #6EC5B1;
   --gauge-warn:  #EAB308;
   --gauge-crit:  #EF4444;
 
