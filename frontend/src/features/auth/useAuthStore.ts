@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { CurrentUser, BrandTokens } from '../../lib/types'
+import { wsClient } from '../../lib/wsClient'
 
 const REFRESH_KEY = 'cmg_refresh'
 
@@ -66,6 +67,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   logout: () => {
     localStorage.removeItem(REFRESH_KEY)
+    wsClient.disconnect()
     set({ accessToken: null, user: null, brandName: null, logoUrl: null })
     window.location.href = '/login'
   },

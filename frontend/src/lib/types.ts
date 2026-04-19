@@ -76,3 +76,31 @@ export interface TenantOut {
   brand_tokens: BrandTokens | null
   created_at: string
 }
+
+export interface SensorDef {
+  key: string
+  label: string
+  unit: string | null
+  min?: number
+  max?: number
+  gauge_type: 'circular' | 'linear' | 'battery' | 'numeric' | 'led'
+  warn_above?: number
+  alert_above?: number
+  warn_below?: number
+  alert_below?: number
+  avl_id?: number
+  scale?: number
+  kpi_key?: string
+}
+
+export interface WsMessage {
+  type: 'telemetry'
+  data: VehicleStatus
+}
+
+export interface VehicleTypeOut {
+  id: string
+  slug: string
+  name: string
+  sensor_schema: SensorDef[]
+}
