@@ -104,3 +104,29 @@ export interface VehicleTypeOut {
   name: string
   sensor_schema: SensorDef[]
 }
+
+export interface AlertInstanceOut {
+  id: string
+  rule_id: string
+  vehicle_id: string
+  tenant_id: string
+  triggered_at: string
+  resolved_at: string | null
+  status: 'firing' | 'acknowledged' | 'resolved' | 'escalated'
+  trigger_value: Record<string, unknown> | null
+  ack_by_user_id: string | null
+  ack_at: string | null
+  ack_note: string | null
+}
+
+export interface RuleOut {
+  id: string
+  name: string
+  severity: 'info' | 'warning' | 'critical'
+  active: boolean
+}
+
+export interface SettingsOut {
+  tenant_id: string
+  notification_email: string | null
+}
