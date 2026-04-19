@@ -1,0 +1,78 @@
+// Matches backend app/schemas/auth.py + app/schemas/vehicle.py + app/schemas/alert.py + app/schemas/tenant.py
+
+export interface CurrentUser {
+  user_id: string
+  tenant_id: string
+  tenant_tier: 'cmg' | 'client' | 'subclient'
+  role: 'admin' | 'operator' | 'viewer' | 'driver'
+  email: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+}
+
+export interface VehicleOut {
+  id: string
+  tenant_id: string
+  vehicle_type_id: string
+  name: string
+  license_plate: string | null
+  vin: string | null
+  year: number | null
+  active: boolean
+  created_at: string
+}
+
+export interface VehicleStatus {
+  vehicle_id: string
+  online: boolean
+  last_seen: string | null
+  lat: number | null
+  lon: number | null
+  speed_kmh: number | null
+  ignition: boolean | null
+  pto_active: boolean | null
+  can_data: Record<string, unknown> | null
+}
+
+export interface TrackPoint {
+  time: string
+  lat: number | null
+  lon: number | null
+}
+
+export interface KpiHour {
+  bucket: string
+  avg_pressure_1: number | null
+  max_pressure_1: number | null
+  avg_oil_temp: number | null
+  max_oil_temp: number | null
+  pto_active_minutes: number | null
+  engine_on_minutes: number | null
+  record_count: number | null
+}
+
+export interface BrandTokens {
+  brand_name?: string
+  brand_color?: string
+  logo_url?: string
+  [key: string]: string | undefined
+}
+
+export interface TenantOut {
+  id: string
+  parent_id: string | null
+  tier: string
+  name: string
+  slug: string
+  active: boolean
+  brand_name: string | null
+  brand_color: string | null
+  logo_url: string | null
+  custom_domain: string | null
+  brand_tokens: BrandTokens | null
+  created_at: string
+}
