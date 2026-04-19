@@ -34,4 +34,12 @@ describe('Tabs', () => {
     const historicBtn = getByRole('tab', { name: 'HISTÓRICO' })
     expect(historicBtn).toHaveAttribute('aria-selected', 'true')
   })
+
+  it('la pestaña inactiva tiene atributo aria-selected=false', () => {
+    const { getByRole } = render(
+      <Tabs tabs={TABS} activeTab="historic" onTabChange={() => {}} />
+    )
+    const liveBtn = getByRole('tab', { name: 'EN VIVO' })
+    expect(liveBtn).toHaveAttribute('aria-selected', 'false')
+  })
 })
