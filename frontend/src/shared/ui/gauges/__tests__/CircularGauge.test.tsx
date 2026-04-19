@@ -11,11 +11,11 @@ describe('CircularGauge', () => {
     expect(getByText('/ 600 bar')).toBeInTheDocument()
   })
 
-  it('muestra el label inferior', () => {
+  it('transforma el label a mayúsculas', () => {
     const { getByText } = render(
-      <CircularGauge value={100} min={0} max={600} unit="bar" label="P. HIDRÁULICA 1" />
+      <CircularGauge value={100} min={0} max={100} unit="%" label="nivel aceite" />
     )
-    expect(getByText('P. HIDRÁULICA 1')).toBeInTheDocument()
+    expect(getByText('NIVEL ACEITE')).toBeInTheDocument()
   })
 
   it('color verde (accent-energy) cuando valor está en rango OK', () => {
@@ -49,12 +49,20 @@ describe('CircularGauge', () => {
     expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-warn)')
   })
 
-  it('no renderiza arco de valor cuando value es null', () => {
+  it('color rojo (accent-crit) cuando value <= alertBelow', () => {
+    const { container } = render(
+      <CircularGauge value={5} min={0} max={100} unit="%" label="Nivel"
+        warnBelow={20} alertBelow={10} />
+    )
+    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-crit)')
+  })
+
+  it('no renderiza arco ni punto cuando value es null', () => {
     const { container } = render(
       <CircularGauge value={null} min={0} max={600} unit="bar" label="P." />
     )
-    const arc = container.querySelector('.g-val')
-    expect(arc?.getAttribute('d') ?? '').toBe('')
+    expect(container.querySelector('.g-val')?.getAttribute('d') ?? '').toBe('')
+    expect(container.querySelector('.g-dot')).toBeNull()
   })
 
   it('muestra guión cuando value es null', () => {
@@ -62,5 +70,13 @@ describe('CircularGauge', () => {
       <CircularGauge value={null} min={0} max={600} unit="bar" label="P." />
     )
     expect(getByText('—')).toBeInTheDocument()
+  })
+
+  it('no renderiza arco ni punto cuando value === min', () => {
+    const { container } = render(
+      <CircularGauge value={0} min={0} max={600} unit="bar" label="P." />
+    )
+    expect(container.querySelector('.g-val')?.getAttribute('d') ?? '').toBe('')
+    expect(container.querySelector('.g-dot')).toBeNull()
   })
 })

@@ -4,6 +4,7 @@ interface CircularGaugeProps {
   max: number
   unit: string
   label: string
+  size?: number
   warnAbove?: number
   alertAbove?: number
   warnBelow?: number
@@ -15,6 +16,14 @@ const CY = 72
 const R = 50
 const START_DEG = 135
 const TOTAL_DEG = 270
+
+const cardStyle = {
+  background: 'var(--bg-surface)',
+  borderRadius: 8,
+  padding: 8,
+  textAlign: 'center' as const,
+  border: '1px solid var(--bg-elevated)',
+}
 
 function arcPath(startDeg: number, sweepDeg: number): string {
   if (sweepDeg < 0.3) return ''
@@ -42,10 +51,12 @@ function gaugeColor(
 
 export default function CircularGauge({
   value, min, max, unit, label,
+  size = 120,
   warnAbove, alertAbove, warnBelow, alertBelow,
 }: CircularGaugeProps) {
   const hasValue = value != null
-  const pct = hasValue ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0
+  const range = max - min
+  const pct = hasValue && range !== 0 ? Math.max(0, Math.min(1, (value - min) / range)) : 0
   const valueDeg = pct * TOTAL_DEG
   const color = hasValue
     ? gaugeColor(value, alertAbove, warnAbove, warnBelow, alertBelow)
@@ -54,16 +65,11 @@ export default function CircularGauge({
   const dotAngle = (START_DEG + valueDeg) * Math.PI / 180
   const dotX = CX + R * Math.cos(dotAngle)
   const dotY = CY + R * Math.sin(dotAngle)
+  const displayHeight = Math.round(size * 128 / 120)
 
   return (
-    <div style={{
-      background: 'var(--bg-surface)',
-      borderRadius: 8,
-      padding: 8,
-      textAlign: 'center',
-      border: '1px solid var(--bg-elevated)',
-    }}>
-      <svg width="120" height="128" viewBox="0 0 140 140" aria-label={label}>
+    <div style={cardStyle}>
+      <svg width={size} height={displayHeight} viewBox="0 0 140 140" aria-label={label}>
         {/* Track */}
         <path
           className="g-track"
@@ -86,8 +92,8 @@ export default function CircularGauge({
         {hasValue && valueDeg > 0.3 && (
           <circle
             className="g-dot"
-            cx={dotX.toFixed(2)}
-            cy={dotY.toFixed(2)}
+            cx={dotX}
+            cy={dotY}
             r="5"
             fill={color}
             style={{ filter: `drop-shadow(0 0 5px ${color})` }}
