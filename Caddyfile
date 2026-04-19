@@ -1,4 +1,4 @@
-{$DOMAIN} {
+app.cmgnexus.es {
     handle /api/* {
         reverse_proxy core-api:8010
     }
@@ -15,8 +15,6 @@
         reverse_proxy core-api:8010
     }
     handle {
-        root * /srv/frontend
-        file_server
-        try_files {path} /index.html
+        reverse_proxy frontend:3000
     }
 }

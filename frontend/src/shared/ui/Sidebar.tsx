@@ -1,13 +1,17 @@
 import { NavLink } from 'react-router-dom'
-import logo from '../../assets/logo.png'
+import { useAuthStore } from '../../features/auth/useAuthStore'
+import { CmgMark } from './CmgLogo'
+import { IconFlota, IconAlertas, IconReglas, IconAjustes } from './icons'
 
 const NAV_ITEMS = [
-  { to: '/fleet', icon: '🚛', label: 'Flota', active: true },
-  { to: '/alerts', icon: '🔔', label: 'Alertas', active: false },
-  { to: '/rules', icon: '⚙️', label: 'Reglas', active: false },
+  { to: '/fleet',  Icon: IconFlota,   label: 'Flota',   active: true  },
+  { to: '/alerts', Icon: IconAlertas, label: 'Alertas', active: false },
+  { to: '/rules',  Icon: IconReglas,  label: 'Reglas',  active: false },
 ]
 
 export default function Sidebar() {
+  const { logoUrl } = useAuthStore()
+
   return (
     <nav style={{
       position: 'fixed',
@@ -22,16 +26,14 @@ export default function Sidebar() {
       gap: 4,
       zIndex: 100,
     }}>
-      {/* Logo — triangle mark only (left crop of horizontal logo) */}
-      <div style={{ width: 40, height: 26, marginBottom: 16, overflow: 'hidden', borderRadius: 4 }}>
-        <img
-          src={logo}
-          alt="CMG Hidráulica"
-          style={{ height: 26, width: 'auto', display: 'block' }}
-        />
+      <div style={{ marginBottom: 16 }}>
+        {logoUrl
+          ? <img src={logoUrl} alt="logo" style={{ width: 30, height: 30, objectFit: 'contain' }}/>
+          : <CmgMark size={30}/>
+        }
       </div>
 
-      {NAV_ITEMS.map(({ to, icon, label, active }) =>
+      {NAV_ITEMS.map(({ to, Icon, label, active }) =>
         active ? (
           <NavLink
             key={to}
@@ -41,13 +43,12 @@ export default function Sidebar() {
               width: 36, height: 36,
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18,
-              background: isActive ? 'rgba(110,197,177,0.15)' : 'transparent',
               color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              transition: 'background 0.15s',
+              background: isActive ? 'rgba(110,197,177,0.15)' : 'transparent',
+              transition: 'background 0.15s, color 0.15s',
             })}
           >
-            {icon}
+            <Icon width={20} height={20}/>
           </NavLink>
         ) : (
           <div
@@ -57,17 +58,15 @@ export default function Sidebar() {
               width: 36, height: 36,
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18,
               color: 'var(--bg-border)',
               cursor: 'not-allowed',
             }}
           >
-            {icon}
+            <Icon width={20} height={20}/>
           </div>
         )
       )}
 
-      {/* Settings stub at bottom */}
       <div style={{ marginTop: 'auto' }}>
         <div
           title="Ajustes — disponible en próxima versión"
@@ -75,11 +74,12 @@ export default function Sidebar() {
             width: 36, height: 36,
             borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18,
             color: 'var(--bg-border)',
             cursor: 'not-allowed',
           }}
-        >⚙</div>
+        >
+          <IconAjustes width={20} height={20}/>
+        </div>
       </div>
     </nav>
   )
