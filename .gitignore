@@ -28,3 +28,6 @@ frontend/build/
 
 # Superpowers brainstorm (auto-generated)
 .superpowers/
+
+# Git worktrees
+.worktrees/
