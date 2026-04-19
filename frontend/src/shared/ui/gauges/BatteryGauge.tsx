@@ -3,11 +3,11 @@ interface BatteryGaugeProps {
   min: number
   max: number
   label: string
+  unit?: string
   warnBelow?: number
   alertBelow?: number
 }
 
-// Estilo del card — definido a nivel de módulo para evitar objetos nuevos por render
 const cardStyle = {
   background: 'var(--bg-surface)',
   borderRadius: 8,
@@ -34,13 +34,14 @@ function batteryStatus(value: number | null, warnBelow?: number, alertBelow?: nu
 }
 
 export default function BatteryGauge({
-  value,
-  min,
-  max,
-  label,
-  warnBelow,
-  alertBelow,
+  value, min, max, label,
+  unit = 'V',
+  warnBelow, alertBelow,
 }: BatteryGaugeProps) {
+  if (process.env.NODE_ENV !== 'production' && warnBelow != null && alertBelow != null && alertBelow >= warnBelow) {
+    console.warn(`BatteryGauge "${label}": alertBelow (${alertBelow}) must be < warnBelow (${warnBelow})`)
+  }
+
   const range = max - min
   const pct = value == null || range === 0
     ? 0
@@ -48,80 +49,40 @@ export default function BatteryGauge({
 
   const color = batteryColor(value, warnBelow, alertBelow)
   const status = batteryStatus(value, warnBelow, alertBelow)
-  const voltageText = value != null ? `${value.toFixed(1)} V` : '— V'
+  const valueText = value != null ? `${value.toFixed(1)} ${unit}` : `— ${unit}`
 
   return (
-    <div style={cardStyle}>
-      {/* Etiqueta superior */}
-      <div
-        style={{
-          fontFamily: 'var(--font-ui)',
-          fontSize: 9,
-          color: 'var(--text-muted)',
-          letterSpacing: '0.8px',
-        }}
-      >
+    <div style={cardStyle} aria-label={label}>
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.8px' }}>
         {label}
       </div>
 
-      {/* Icono batería: caja exterior + terminal positivo */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        {/* Caja exterior */}
         <div
           style={{
-            width: 70,
-            height: 26,
+            width: 70, height: 26,
             border: '2px solid var(--bg-border)',
             borderRadius: 4,
             background: 'var(--bg-base)',
             overflow: 'hidden',
-            position: 'relative',
           }}
+          role="meter"
+          aria-valuenow={value ?? 0}
+          aria-valuemin={min}
+          aria-valuemax={max}
         >
-          {/* Relleno proporcional */}
           <div
             className="bat-fill"
-            style={{
-              width: `${pct}%`,
-              height: '100%',
-              background: color,
-              transition: 'width 0.3s',
-            }}
+            style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.3s' }}
           />
         </div>
-
-        {/* Terminal positivo (nub) */}
-        <div
-          style={{
-            width: 4,
-            height: 10,
-            background: 'var(--bg-border)',
-            borderRadius: '0 2px 2px 0',
-          }}
-        />
+        <div style={{ width: 4, height: 10, background: 'var(--bg-border)', borderRadius: '0 2px 2px 0' }} />
       </div>
 
-      {/* Valor de voltaje */}
-      <div
-        style={{
-          fontFamily: 'var(--font-data)',
-          fontSize: 20,
-          fontWeight: 700,
-          color,
-        }}
-      >
-        {voltageText}
+      <div style={{ fontFamily: 'var(--font-data)', fontSize: 20, fontWeight: 700, color }}>
+        {valueText}
       </div>
-
-      {/* Estado */}
-      <div
-        style={{
-          fontFamily: 'var(--font-data)',
-          fontSize: 9,
-          color,
-          marginTop: 4,
-        }}
-      >
+      <div style={{ fontFamily: 'var(--font-data)', fontSize: 9, color, marginTop: 4 }}>
         {status}
       </div>
     </div>

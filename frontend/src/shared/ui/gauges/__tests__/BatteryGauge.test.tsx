@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import BatteryGauge from '../BatteryGauge'
 
@@ -28,6 +28,14 @@ describe('BatteryGauge', () => {
     expect(fill.style.width).toBe('100%')
   })
 
+  it('relleno 0% cuando value está por debajo de min', () => {
+    const { container } = render(
+      <BatteryGauge value={10} min={18} max={30} label="BATERÍA" />
+    )
+    const fill = container.querySelector('.bat-fill') as HTMLElement
+    expect(fill.style.width).toBe('0%')
+  })
+
   it('muestra ADVERTENCIA cuando value <= warnBelow', () => {
     const { getByText } = render(
       <BatteryGauge value={20} min={18} max={30} label="BATERÍA"
@@ -49,5 +57,22 @@ describe('BatteryGauge', () => {
       <BatteryGauge value={null} min={18} max={30} label="BATERÍA" />
     )
     expect(getByText('— V')).toBeInTheDocument()
+  })
+
+  it('usa la unidad personalizada cuando se proporciona', () => {
+    const { getByText } = render(
+      <BatteryGauge value={75} min={0} max={100} label="NIVEL" unit="%" />
+    )
+    expect(getByText('75.0 %')).toBeInTheDocument()
+  })
+
+  it('advierte en dev cuando alertBelow >= warnBelow (umbrales invertidos)', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    render(
+      <BatteryGauge value={20} min={0} max={30} label="TEST"
+        warnBelow={19} alertBelow={22} />
+    )
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('alertBelow'))
+    spy.mockRestore()
   })
 })
