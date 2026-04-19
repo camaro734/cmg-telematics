@@ -43,9 +43,8 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {alerts.map(alert => {
         const rule = ruleMap[alert.rule_id]
-        const color = alert.status === 'escalated' || rule?.severity === 'critical'
-          ? 'var(--accent-crit)'
-          : 'var(--accent-warn)'
+        const isCritical = rule?.severity === 'critical' || alert.status === 'escalated'
+        const color = isCritical ? 'var(--accent-crit)' : 'var(--accent-warn)'
 
         return (
           <div key={alert.id} style={{ ...CARD, borderLeft: `3px solid ${color}` }}>
@@ -60,7 +59,7 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
             </div>
             {alert.trigger_value != null && (
               <div style={{ fontFamily: 'var(--font-data)', fontSize: 13, color, flexShrink: 0 }}>
-                {String(alert.trigger_value['value'] ?? JSON.stringify(alert.trigger_value))}
+                {String(alert.trigger_value.value ?? JSON.stringify(alert.trigger_value))}
               </div>
             )}
             <button
