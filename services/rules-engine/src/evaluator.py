@@ -238,6 +238,9 @@ async def process_message(
                 )
                 continue
             vehicle_type_id = vehicle_type_map.get(msg.vehicle_id)
+            if vehicle_type_id is None:
+                # vehicle not yet in map (new vehicle or map stale) — skip safely
+                continue
             if vehicle_type_id != rule.vehicle_filter.get("vehicle_type_id"):
                 continue
         else:

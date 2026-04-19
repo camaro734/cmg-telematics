@@ -10,7 +10,6 @@ from redis.asyncio import Redis
 from src.config import settings
 from src.loader import load_rules, load_vehicle_type_map, Rule
 from src.evaluator import process_message, TelemetryMsg, RuleMatch
-from src.state import set_cooldown
 
 logger = logging.getLogger(__name__)
 
@@ -97,10 +96,6 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
                                 for match in matches:
                                     alert_id = await _write_alert(conn, match)
                                     await _publish_alert(redis, alert_id, match)
-                                    await set_cooldown(
-                                        redis, match.rule.id, match.vehicle_id,
-                                        match.rule.cooldown_minutes
-                                    )
                         await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
                     except Exception as exc:
                         logger.error("Error processing %s: %s", msg_id, exc, exc_info=True)
