@@ -1,4 +1,4 @@
-type BadgeVariant = 'online' | 'offline' | 'pto' | 'warn' | 'crit'
+export type BadgeVariant = 'online' | 'offline' | 'pto' | 'warn' | 'crit'
 
 const VARIANT_STYLES: Record<BadgeVariant, { bg: string; color: string; label: string }> = {
   online:  { bg: 'rgba(34,197,94,0.15)',  color: 'var(--accent-ok)',     label: 'EN LÍNEA' },
