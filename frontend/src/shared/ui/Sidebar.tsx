@@ -5,7 +5,7 @@ import { IconFlota, IconAlertas, IconReglas, IconAjustes } from './icons'
 
 const NAV_ITEMS = [
   { to: '/fleet',  Icon: IconFlota,   label: 'Flota',   active: true  },
-  { to: '/alerts', Icon: IconAlertas, label: 'Alertas', active: false },
+  { to: '/alerts', Icon: IconAlertas, label: 'Alertas', active: true },
   { to: '/rules',  Icon: IconReglas,  label: 'Reglas',  active: false },
 ]
 
