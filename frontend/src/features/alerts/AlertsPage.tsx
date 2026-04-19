@@ -39,7 +39,7 @@ export default function AlertsPage() {
   })
 
   const activeAlerts = [...firing, ...escalated].sort(
-    (a, b) => b.triggered_at.localeCompare(a.triggered_at),
+    (a, b) => (b.triggered_at > a.triggered_at ? 1 : b.triggered_at < a.triggered_at ? -1 : 0),
   )
 
   return (
