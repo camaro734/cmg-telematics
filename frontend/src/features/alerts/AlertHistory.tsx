@@ -72,8 +72,8 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
           <option value="resolved">Resueltas</option>
         </select>
         <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={SELECT} aria-label="Filtrar por vehículo">
-          <option value="" label="Todos los vehículos" />
-          {vehicles.map(v => <option key={v.id} value={v.id} label={v.name} />)}
+          <option value="">Todos los vehículos</option>
+          {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={SELECT} title="Desde" />
         <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   style={SELECT} title="Hasta" />

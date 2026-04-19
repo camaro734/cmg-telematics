@@ -43,7 +43,8 @@ describe('AlertHistory', () => {
   it('muestra fila de alerta reconocida', () => {
     wrap(<AlertHistory vehicles={vehicles} rules={rules} />, [ackedAlert])
     expect(screen.getByText('Presión alta')).toBeInTheDocument()
-    expect(screen.getByText('Camión 01')).toBeInTheDocument()
+    // vehicle name appears in dropdown + table, so check it's present anywhere
+    expect(screen.getAllByText('Camión 01').length).toBeGreaterThan(0)
     expect(screen.getByText('RECONOCIDA')).toBeInTheDocument()
     expect(screen.getByText('Revisado')).toBeInTheDocument()
   })
