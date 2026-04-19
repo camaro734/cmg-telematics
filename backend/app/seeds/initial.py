@@ -1,6 +1,6 @@
 # backend/app/seeds/initial.py
 """
-Seed idempotente: crea tenant CMG, usuario superadmin y 3 vehicle_types.
+Seed idempotente: crea tenant CMG, usuario superadmin y 5 vehicle_types.
 Ejecutar: python -m app.seeds.initial
 """
 import asyncio
@@ -70,6 +70,7 @@ WASTERENT_VACUUM_SENSORS = [
      "min": 0, "max": 9999, "gauge_type": "numeric", "avl_id": 310},
     {"key": "pto_hours_today", "label": "Horas PTO hoy", "unit": "h",
      "gauge_type": "numeric", "kpi_key": "pto_hours_today"},
+    # Sensores comunes del chasis
     {"key": "battery_v", "label": "Batería", "unit": "V",
      "min": 18, "max": 30, "gauge_type": "battery",
      "warn_below": 21, "alert_below": 19, "avl_id": 66, "scale": 0.001},
@@ -93,6 +94,7 @@ VACUUM_PRESSURE_SENSORS = [
      "min": 0, "max": 9999, "gauge_type": "numeric", "avl_id": 321},
     {"key": "pto_hours_today", "label": "Horas PTO hoy", "unit": "h",
      "gauge_type": "numeric", "kpi_key": "pto_hours_today"},
+    # Sensores comunes del chasis
     {"key": "battery_v", "label": "Batería", "unit": "V",
      "min": 18, "max": 30, "gauge_type": "battery",
      "warn_below": 21, "alert_below": 19, "avl_id": 66, "scale": 0.001},
