@@ -13,10 +13,10 @@
 
   --text-primary:  #E7E5E4;
   --text-dim:      #A8A29E;
-  --text-muted:    #78716C;
+  --text-muted:    #A1978F;
 
   --font-data: 'JetBrains Mono', 'IBM Plex Mono', monospace;
-  --font-ui:   'Inter', 'DM Sans', sans-serif;
+  --font-ui:   'Inter', sans-serif;
 
   --gauge-track: #3C3330;
   --gauge-fill:  #F97316;
