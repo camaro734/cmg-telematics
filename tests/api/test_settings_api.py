@@ -1,5 +1,4 @@
 # tests/api/test_settings_api.py
-import pytest
 import uuid
 
 
@@ -54,27 +53,25 @@ async def test_patch_settings_rejects_invalid_email(client, admin_token):
     assert resp.status_code == 422
 
 
-async def test_patch_settings_requires_admin(client, admin_token):
+async def test_patch_settings_requires_admin(client, admin_token, db):
     import base64, json as _json
     payload = admin_token.split(".")[1]
     payload += "=" * (4 - len(payload) % 4)
     claims = _json.loads(base64.b64decode(payload))
     tenant_id = claims["tenant_id"]
 
-    from app.core.config import settings as app_settings
+    from app.models.user import User
     from app.core.security import hash_password
-    import asyncpg
-    dsn = app_settings.db_url.replace("+asyncpg", "")
-    conn = await asyncpg.connect(dsn=dsn)
-    op_id = str(uuid.uuid4())
-    op_email = f"operator_{op_id[:8]}@test.com"
-    pw_hash = hash_password("Test1234!")
-    await conn.execute(
-        """INSERT INTO "user" (id, tenant_id, email, hashed_password, full_name, role)
-           VALUES ($1::uuid, $2::uuid, $3, $4, $5, 'operator')""",
-        op_id, tenant_id, op_email, pw_hash, "Test Operator",
+    op_email = f"operator_{uuid.uuid4().hex[:8]}@test.com"
+    operator = User(
+        tenant_id=uuid.UUID(tenant_id),
+        email=op_email,
+        hashed_password=hash_password("Test1234!"),
+        full_name="Test Operator",
+        role="operator",
     )
-    await conn.close()
+    db.add(operator)
+    await db.commit()
 
     login = await client.post("/api/v1/auth/login", json={"email": op_email, "password": "Test1234!"})
     assert login.status_code == 200

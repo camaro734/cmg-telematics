@@ -17,6 +17,6 @@ class SettingsPatch(BaseModel):
     @field_validator("notification_email")
     @classmethod
     def validate_email(cls, v: str | None) -> str | None:
-        if v is not None and "@" not in v:
+        if v is not None and (not v or "@" not in v):
             raise ValueError("Email inválido")
         return v
