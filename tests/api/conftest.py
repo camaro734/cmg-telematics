@@ -65,6 +65,14 @@ async def client(override_get_db):
 
 
 @pytest.fixture
+async def db(test_engine) -> AsyncGenerator[AsyncSession, None]:
+    """Provide an AsyncSession using the test engine (same pool as the app override)."""
+    session_factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with session_factory() as session:
+        yield session
+
+
+@pytest.fixture
 async def admin_token(client):
     resp = await client.post(
         "/api/v1/auth/login",
