@@ -24,3 +24,11 @@ async def load_rules(conn: asyncpg.Connection) -> list[Rule]:
         "FROM alert_rule WHERE active = true"
     )
     return [Rule(**dict(row)) for row in rows]
+
+
+async def load_vehicle_type_map(conn: asyncpg.Connection) -> dict[str, str]:
+    """Returns {vehicle_id: vehicle_type_id} for all active vehicles."""
+    rows = await conn.fetch(
+        "SELECT id::text, vehicle_type_id::text FROM vehicle WHERE active = true"
+    )
+    return {row["id"]: row["vehicle_type_id"] for row in rows}

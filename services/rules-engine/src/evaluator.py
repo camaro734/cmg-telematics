@@ -202,7 +202,12 @@ async def evaluate_rule(rule: Rule, msg: TelemetryMsg, redis: Any) -> RuleMatch 
     return await _eval_condition(rule.condition, rule, msg, redis)
 
 
-async def process_message(rules: list[Rule], msg: TelemetryMsg, redis: Any) -> list[RuleMatch]:
+async def process_message(
+    rules: list[Rule],
+    msg: TelemetryMsg,
+    redis: Any,
+    vehicle_type_map: dict[str, str] | None = None,
+) -> list[RuleMatch]:
     """
     Process a telemetry message against all applicable rules.
 
@@ -215,19 +220,27 @@ async def process_message(rules: list[Rule], msg: TelemetryMsg, redis: Any) -> l
     matches: list[RuleMatch] = []
 
     for rule in rules:
-        # 1. Tenant isolation — rule must belong to the same tenant as the message
+        # 1. Tenant isolation
         if rule.tenant_id != msg.tenant_id:
             continue
 
         # 2. Vehicle filter
         scope = rule.vehicle_filter.get("scope", "all")
         if scope == "all":
-            pass  # applies to all vehicles in tenant
+            pass
         elif scope == "vehicle":
             if rule.vehicle_filter.get("vehicle_id") != msg.vehicle_id:
                 continue
+        elif scope == "type":
+            if vehicle_type_map is None:
+                logger.warning(
+                    "vehicle_type_map not provided — skipping scope:type rule %s", rule.id
+                )
+                continue
+            vehicle_type_id = vehicle_type_map.get(msg.vehicle_id)
+            if vehicle_type_id != rule.vehicle_filter.get("vehicle_type_id"):
+                continue
         else:
-            # Unknown/unimplemented scope (e.g. "type") — skip to avoid mis-firing
             logger.warning(
                 "Unknown vehicle_filter scope %r for rule %s, skipping", scope, rule.id
             )

@@ -8,7 +8,7 @@ import asyncpg
 from redis.asyncio import Redis
 
 from src.config import settings
-from src.loader import load_rules, Rule
+from src.loader import load_rules, load_vehicle_type_map, Rule
 from src.evaluator import process_message, TelemetryMsg, RuleMatch
 from src.state import set_cooldown
 
@@ -21,6 +21,7 @@ CONSUMER_NAME = f"worker-{_uuid.uuid4().hex[:8]}"
 ALERTS_MAX_LEN = 10_000
 
 _rules: list[Rule] = []
+_vehicle_type_map: dict[str, str] = {}
 
 
 async def _write_alert(conn: asyncpg.Connection, match: RuleMatch) -> str:
@@ -90,7 +91,7 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
                             pto_active=bool(payload.get("pto_active")),
                             can_data=can,
                         )
-                        matches = await process_message(_rules, msg, redis)
+                        matches = await process_message(_rules, msg, redis, vehicle_type_map=_vehicle_type_map)
                         if matches:
                             async with db_pool.acquire() as conn:
                                 for match in matches:
@@ -112,11 +113,12 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
 
 
 async def _reload_rules(db_pool: asyncpg.Pool) -> None:
-    global _rules
+    global _rules, _vehicle_type_map
     try:
         async with db_pool.acquire() as conn:
             _rules = await load_rules(conn)
-        logger.info("Hot-reloaded %d rules", len(_rules))
+            _vehicle_type_map = await load_vehicle_type_map(conn)
+        logger.info("Hot-reloaded %d rules, %d vehicles", len(_rules), len(_vehicle_type_map))
     except Exception as exc:
         logger.error("Rule reload failed: %s", exc)
 
@@ -139,7 +141,7 @@ async def _listen_rule_changes(db_pool: asyncpg.Pool) -> None:
 
 
 async def main() -> None:
-    global _rules
+    global _rules, _vehicle_type_map
 
     def _encode_json(v):
         return json.dumps(v)
@@ -158,7 +160,8 @@ async def main() -> None:
 
     async with db_pool.acquire() as conn:
         _rules = await load_rules(conn)
-    logger.info("Loaded %d rules at startup", len(_rules))
+        _vehicle_type_map = await load_vehicle_type_map(conn)
+    logger.info("Loaded %d rules, %d vehicles at startup", len(_rules), len(_vehicle_type_map))
 
     try:
         await redis.xgroup_create(STREAM_KEY, CONSUMER_GROUP, id="0", mkstream=True)

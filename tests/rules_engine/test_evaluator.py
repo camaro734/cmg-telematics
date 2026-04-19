@@ -187,3 +187,45 @@ async def test_process_message_skips_wrong_tenant():
     redis.exists.return_value = 0
     results = await process_message([rule], msg, redis)
     assert results == []
+
+
+# --- vehicle_filter scope:"type" ---
+
+async def test_process_message_scope_type_matches_vehicle():
+    rule = make_rule(
+        condition={"type": "threshold", "field": "hydraulic_pressure_1", "op": ">", "value": 220.0},
+        vehicle_filter={"scope": "type", "vehicle_type_id": "vtype-vacuum"},
+    )
+    msg = make_msg()
+    redis = AsyncMock()
+    redis.exists.return_value = 0
+    redis.set.return_value = True
+    vehicle_type_map = {"veh-1": "vtype-vacuum"}
+    results = await process_message([rule], msg, redis, vehicle_type_map=vehicle_type_map)
+    assert len(results) == 1
+
+
+async def test_process_message_scope_type_skips_wrong_type():
+    rule = make_rule(
+        condition={"type": "threshold", "field": "hydraulic_pressure_1", "op": ">", "value": 220.0},
+        vehicle_filter={"scope": "type", "vehicle_type_id": "vtype-sweeper"},
+    )
+    msg = make_msg()
+    redis = AsyncMock()
+    redis.exists.return_value = 0
+    vehicle_type_map = {"veh-1": "vtype-vacuum"}
+    results = await process_message([rule], msg, redis, vehicle_type_map=vehicle_type_map)
+    assert results == []
+
+
+async def test_process_message_scope_type_skips_when_no_map():
+    """When vehicle_type_map is not provided, scope:'type' rules are skipped."""
+    rule = make_rule(
+        condition={"type": "threshold", "field": "hydraulic_pressure_1", "op": ">", "value": 220.0},
+        vehicle_filter={"scope": "type", "vehicle_type_id": "vtype-vacuum"},
+    )
+    msg = make_msg()
+    redis = AsyncMock()
+    redis.exists.return_value = 0
+    results = await process_message([rule], msg, redis)
+    assert results == []
