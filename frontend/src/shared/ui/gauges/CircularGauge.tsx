@@ -120,7 +120,7 @@ export default function CircularGauge({
           textAnchor="middle"
           fontSize="8"
           fill="var(--text-muted)"
-          fontFamily="var(--font-ui)"
+          fontFamily="var(--font-data)"
           letterSpacing="0.8"
         >
           {label.toUpperCase()}
