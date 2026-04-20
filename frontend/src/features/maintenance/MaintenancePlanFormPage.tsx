@@ -38,13 +38,13 @@ export default function MaintenancePlanFormPage() {
     if (existing) {
       setName(existing.name)
       setVehicleId(existing.vehicle_id)
-      setThresholds(existing.trigger_condition.thresholds)
+      setThresholds(existing.trigger_condition.thresholds ?? DEFAULT_THRESHOLDS)
       setWarnPct(existing.warn_before_pct)
       setActive(existing.active)
     } else if (vehicles.length > 0 && !vehicleId) {
       setVehicleId(vehicles[0].id)
     }
-  }, [existing, vehicles])
+  }, [existing, vehicles, vehicleId])
 
   const mutation = useMutation({
     mutationFn: (payload: MaintenancePlanCreate) =>

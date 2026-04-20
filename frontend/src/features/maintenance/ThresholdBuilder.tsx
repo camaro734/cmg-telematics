@@ -45,7 +45,7 @@ export default function ThresholdBuilder({ thresholds, onChange }: Props) {
   return (
     <div>
       {thresholds.map((t, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+        <div key={`${t.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
           <select
             value={t.type}
             onChange={e => update(i, 'type', e.target.value)}
