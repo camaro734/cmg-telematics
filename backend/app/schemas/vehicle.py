@@ -27,6 +27,15 @@ class VehicleOut(BaseModel):
     created_at: datetime
 
 
+class VehicleCreate(BaseModel):
+    vehicle_type_id: uuid.UUID
+    name: str
+    license_plate: str | None = None
+    vin: str | None = None
+    year: int | None = None
+    tenant_id: uuid.UUID | None = None
+
+
 class VehicleStatus(BaseModel):
     vehicle_id: uuid.UUID
     online: bool

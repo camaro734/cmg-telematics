@@ -3,14 +3,14 @@ import uuid
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
-    VehicleTypeOut, VehicleOut, VehicleStatus,
+    VehicleTypeOut, VehicleOut, VehicleCreate, VehicleStatus,
     TelemetryPoint, TrackPoint, KpiHour,
 )
 from app.models.vehicle import Vehicle
@@ -41,14 +41,47 @@ async def list_vehicle_types(
 
 @router.get("/vehicles", response_model=list[VehicleOut])
 async def list_vehicles(
+    tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Vehicle).where(Vehicle.active == True)
     if user.tenant_tier != "cmg":
         query = query.where(Vehicle.tenant_id == user.tenant_id)
+    elif tenant_id is not None:
+        query = query.where(Vehicle.tenant_id == tenant_id)
     result = await db.execute(query.order_by(Vehicle.name))
     return result.scalars().all()
+
+
+@router.post("/vehicles", response_model=VehicleOut, status_code=201)
+async def create_vehicle(
+    body: VehicleCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    effective_tenant_id = (
+        body.tenant_id
+        if (body.tenant_id is not None and user.tenant_tier == "cmg")
+        else uuid.UUID(str(user.tenant_id))
+    )
+    vtype = await db.get(VehicleType, body.vehicle_type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    vehicle = Vehicle(
+        tenant_id=effective_tenant_id,
+        vehicle_type_id=body.vehicle_type_id,
+        name=body.name,
+        license_plate=body.license_plate,
+        vin=body.vin,
+        year=body.year,
+    )
+    db.add(vehicle)
+    await db.commit()
+    await db.refresh(vehicle)
+    return vehicle
 
 
 @router.get("/vehicles/{vehicle_id}", response_model=VehicleOut)
