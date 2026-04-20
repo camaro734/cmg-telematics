@@ -4,9 +4,9 @@ import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import BrandTokensEditor from '../BrandTokensEditor'
 
-vi.mock('../../../lib/apiClient', () => ({ apiClient: { get: vi.fn(), put: vi.fn() } }))
-
 const mockApplyBrandTokens = vi.hoisted(() => vi.fn())
+
+vi.mock('../../../lib/apiClient', () => ({ apiClient: { get: vi.fn(), put: vi.fn() } }))
 
 vi.mock('../../auth/useAuthStore', () => {
   const useAuthStore: any = vi.fn(() => ({ user: { tenant_id: 't1' } }))
@@ -61,6 +61,8 @@ describe('BrandTokensEditor', () => {
     wrap('otro-tenant')
     fireEvent.click(await screen.findByText('Guardar'))
     await waitFor(() => expect(apiClient.put).toHaveBeenCalled())
-    expect(mockApplyBrandTokens).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(mockApplyBrandTokens).not.toHaveBeenCalled()
+    })
   })
 })
