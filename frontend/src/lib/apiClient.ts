@@ -45,4 +45,17 @@ export const apiClient = {
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
+  getBlob: async (path: string): Promise<Blob> => {
+    const token = useAuthStore.getState().accessToken
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    let res: Response
+    try {
+      res = await fetch(path, { method: 'GET', headers })
+    } catch {
+      throw new Error('Error de red')
+    }
+    if (!res.ok) throw new Error(`${res.status}`)
+    return res.blob()
+  },
 }
