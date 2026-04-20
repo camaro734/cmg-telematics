@@ -105,8 +105,12 @@ async def update_tenant(
         tenant.slug = body.slug
     if body.active is not None:
         tenant.active = body.active
-    await db.commit()
-    await db.refresh(tenant)
+    try:
+        await db.commit()
+        await db.refresh(tenant)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Slug ya existe")
     return tenant
 
 

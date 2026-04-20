@@ -103,14 +103,17 @@ async def test_update_tenant_client_admin_forbidden(client, db):
 async def test_list_grants_grantee_filter(client, admin_token, db):
     cmg_id = await _cmg_tenant_id(db)
     tenant = await _create_client_tenant(db, cmg_id)
-    await client.post(
+    post_resp = await client.post(
         "/api/v1/grants",
         json={"grantee_id": str(tenant.id), "resource_type": "maintenance", "allowed_actions": ["log"]},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
+    assert post_resp.status_code == 201
     resp = await client.get(
         f"/api/v1/grants?grantee_id={tenant.id}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 200
-    assert all(g["grantee_id"] == str(tenant.id) for g in resp.json())
+    grants = resp.json()
+    assert len(grants) >= 1
+    assert all(g["grantee_id"] == str(tenant.id) for g in grants)
