@@ -100,6 +100,18 @@ async def test_update_tenant_client_admin_forbidden(client, db):
     assert resp.status_code == 403
 
 
+async def test_update_tenant_slug_conflict(client, admin_token, db):
+    cmg_id = await _cmg_tenant_id(db)
+    tenant_a = await _create_client_tenant(db, cmg_id)
+    tenant_b = await _create_client_tenant(db, cmg_id)
+    resp = await client.put(
+        f"/api/v1/tenants/{tenant_b.id}",
+        json={"slug": tenant_a.slug},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 409
+
+
 async def test_list_grants_grantee_filter(client, admin_token, db):
     cmg_id = await _cmg_tenant_id(db)
     tenant = await _create_client_tenant(db, cmg_id)

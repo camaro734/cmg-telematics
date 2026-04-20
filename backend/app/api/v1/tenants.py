@@ -110,7 +110,7 @@ async def update_tenant(
         await db.refresh(tenant)
     except IntegrityError:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="Slug ya existe")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slug ya existe")
     return tenant
 
 
