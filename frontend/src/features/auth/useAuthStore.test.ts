@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useAuthStore } from './useAuthStore'
 
 beforeEach(() => {
   useAuthStore.setState({ accessToken: null, user: null, brandName: null, logoUrl: null })
   document.documentElement.style.removeProperty('--accent-energy')
 })
+
+afterEach(() => { vi.unstubAllGlobals() })
 
 describe('applyBrandTokens', () => {
   it('aplica brand_color válido como --accent-energy', () => {
@@ -28,7 +30,8 @@ describe('applyBrandTokens', () => {
     expect(useAuthStore.getState().logoUrl).toBe('https://cdn.example.com/logo.png')
   })
 
-  it('rechaza logo_url sin https', () => {
+  it('rechaza logo_url sin https y limpia el valor previo', () => {
+    useAuthStore.setState({ logoUrl: 'https://prev.com/logo.png' })
     useAuthStore.getState().applyBrandTokens({ logo_url: 'http://unsafe.com/logo.png' })
     expect(useAuthStore.getState().logoUrl).toBeNull()
   })
@@ -41,6 +44,5 @@ describe('logout', () => {
     vi.stubGlobal('location', { href: '' })
     useAuthStore.getState().logout()
     expect(spy).toHaveBeenCalledWith('--accent-energy')
-    vi.unstubAllGlobals()
   })
 })

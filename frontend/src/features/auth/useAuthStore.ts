@@ -99,7 +99,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (tokens.brand_color && /^#[0-9a-fA-F]{6}$/.test(tokens.brand_color)) {
       root.style.setProperty('--accent-energy', tokens.brand_color)
     }
-    const safeLogoUrl = tokens.logo_url?.startsWith('https://') ? tokens.logo_url : get().logoUrl
+    const safeLogoUrl = tokens.logo_url
+      ? tokens.logo_url.startsWith('https://') ? tokens.logo_url : null
+      : get().logoUrl   // no logo_url key → keep existing
     set({
       brandName: tokens.brand_name ?? get().brandName,
       logoUrl: safeLogoUrl,
