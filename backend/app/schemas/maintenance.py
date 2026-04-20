@@ -49,7 +49,7 @@ class MaintenancePlanOut(BaseModel):
     vehicle_name: str
     tenant_id: uuid.UUID
     name: str
-    trigger_condition: dict
+    trigger_condition: TriggerCondition
     warn_before_pct: int
     active: bool
     created_at: datetime
@@ -66,10 +66,10 @@ class MaintenanceLogCreate(BaseModel):
 class MaintenanceLogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    plan_id: uuid.UUID | None
+    plan_id: uuid.UUID | None = None
     vehicle_id: uuid.UUID
     performed_at: datetime
     performed_by_email: str | None = None
-    description: str | None
+    description: str | None = None
     reset_counters: list[str]
-    cost_eur: float | None
+    cost_eur: float | None = None
