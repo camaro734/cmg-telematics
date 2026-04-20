@@ -32,6 +32,12 @@ class TenantCreate(BaseModel):
     logo_url: str | None = None
 
 
+class TenantUpdate(BaseModel):
+    name: str | None = None
+    slug: str | None = None
+    active: bool | None = None
+
+
 class BrandTokensUpdate(BaseModel):
     brand_tokens: dict[str, Any]
 

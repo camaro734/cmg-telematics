@@ -1,13 +1,13 @@
 # backend/app/api/v1/tenants.py
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user, require_tier
 from app.schemas.auth import CurrentUser
-from app.schemas.tenant import TenantOut, TenantCreate, BrandTokensUpdate, GrantOut, GrantCreate
+from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, BrandTokensUpdate, GrantOut, GrantCreate
 from app.models.tenant import Tenant
 from app.models.permission_grant import PermissionGrant
 
@@ -75,6 +75,41 @@ async def create_tenant(
     return tenant
 
 
+@router.get("/tenants/{tenant_id}", response_model=TenantOut)
+async def get_tenant(
+    tenant_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    if user.tenant_tier != "cmg" and str(tenant.id) != str(user.tenant_id):
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    return tenant
+
+
+@router.put("/tenants/{tenant_id}", response_model=TenantOut)
+async def update_tenant(
+    tenant_id: uuid.UUID,
+    body: TenantUpdate,
+    user: CurrentUser = Depends(require_tier("cmg")),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    if body.name is not None:
+        tenant.name = body.name
+    if body.slug is not None:
+        tenant.slug = body.slug
+    if body.active is not None:
+        tenant.active = body.active
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
 @router.get("/tenants/{tenant_id}/brand-tokens")
 async def get_brand_tokens(
     tenant_id: uuid.UUID,
@@ -108,21 +143,21 @@ async def update_brand_tokens(
 
 @router.get("/grants", response_model=list[GrantOut])
 async def list_grants(
+    grantee_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.tenant_tier == "cmg":
-        result = await db.execute(select(PermissionGrant).where(PermissionGrant.active == True))
-    else:
-        result = await db.execute(
-            select(PermissionGrant).where(
-                PermissionGrant.active == True,
-                or_(
-                    PermissionGrant.grantor_id == user.tenant_id,
-                    PermissionGrant.grantee_id == user.tenant_id,
-                ),
+    query = select(PermissionGrant).where(PermissionGrant.active == True)
+    if user.tenant_tier != "cmg":
+        query = query.where(
+            or_(
+                PermissionGrant.grantor_id == user.tenant_id,
+                PermissionGrant.grantee_id == user.tenant_id,
             )
         )
+    if grantee_id is not None:
+        query = query.where(PermissionGrant.grantee_id == grantee_id)
+    result = await db.execute(query)
     return result.scalars().all()
 
 
