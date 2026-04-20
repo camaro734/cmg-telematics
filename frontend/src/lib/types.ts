@@ -196,3 +196,64 @@ export interface RuleCreate {
   cooldown_minutes: number
   active: boolean
 }
+
+export interface MaintenanceThreshold {
+  type: 'pto_hours' | 'engine_hours' | 'calendar_days'
+  value: number
+}
+
+export interface TriggerCondition {
+  thresholds: MaintenanceThreshold[]
+  op: 'OR'
+}
+
+export interface ThresholdProgress {
+  type: string
+  current: number
+  limit: number
+  pct: number
+}
+
+export interface MaintenanceProgress {
+  status: 'ok' | 'próximo' | 'vencido'
+  thresholds: ThresholdProgress[]
+}
+
+export interface MaintenancePlanOut {
+  id: string
+  vehicle_id: string
+  vehicle_name: string
+  tenant_id: string
+  name: string
+  trigger_condition: TriggerCondition
+  warn_before_pct: number
+  active: boolean
+  created_at: string
+  progress: MaintenanceProgress
+}
+
+export interface MaintenancePlanCreate {
+  vehicle_id: string
+  name: string
+  trigger_condition: TriggerCondition
+  warn_before_pct: number
+  active: boolean
+}
+
+export interface MaintenanceLogOut {
+  id: string
+  plan_id: string | null
+  vehicle_id: string
+  performed_at: string
+  performed_by_email: string | null
+  description: string | null
+  reset_counters: string[]
+  cost_eur: number | null
+}
+
+export interface MaintenanceLogCreate {
+  performed_at: string
+  description?: string
+  reset_counters: string[]
+  cost_eur?: number
+}

@@ -4,6 +4,7 @@ export const keys = {
   vehicleStatus: (id: string) => ['vehicles', id, 'status'] as const,
   vehicleTrack: (id: string) => ['vehicles', id, 'track'] as const,
   vehicleKpis: (id: string) => ['vehicles', id, 'kpis'] as const,
+  vehicleMaintenance: (id: string) => ['vehicles', id, 'maintenance'] as const,
   vehicleTypes: () => ['vehicle-types'] as const,
   alerts: () => ['alerts'] as const,
   rules: () => ['rules'] as const,
@@ -11,4 +12,7 @@ export const keys = {
   tenants: () => ['tenants'] as const,
   tenantBrandTokens: (tenantId: string) => ['tenants', tenantId, 'brand-tokens'] as const,
   settings: (tenantId?: string) => tenantId ? ['settings', tenantId] as const : ['settings'] as const,
+  maintenancePlans: () => ['maintenance', 'plans'] as const,
+  maintenancePlan: (id: string) => ['maintenance', 'plans', id] as const,
+  maintenanceLogs: (planId: string) => ['maintenance', 'plans', planId, 'logs'] as const,
 }
