@@ -198,9 +198,10 @@ async def generate_monthly_pdf(
             JOIN vehicle v ON v.id = ml.vehicle_id
             WHERE mp.tenant_id = :tid
               AND ml.performed_at >= :start AND ml.performed_at < :end
+              AND ml.vehicle_id = ANY(:vids)
             ORDER BY ml.performed_at
         """),
-        {"tid": tid, "start": start, "end": end},
+        {"tid": tid, "start": start, "end": end, "vids": [str(v) for v in vehicle_ids]},
     )
     maintenance = [dict(r) for r in maint_row.mappings().all()]
     for m in maintenance:

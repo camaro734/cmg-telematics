@@ -45,7 +45,7 @@ export const apiClient = {
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
-  getBlob: async (path: string): Promise<Blob> => {
+  getBlob: async (path: string, retry = true): Promise<Blob> => {
     const token = useAuthStore.getState().accessToken
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
@@ -54,6 +54,12 @@ export const apiClient = {
       res = await fetch(path, { method: 'GET', headers })
     } catch {
       throw new Error('Error de red')
+    }
+    if (res.status === 401 && retry) {
+      const ok = await useAuthStore.getState().refresh()
+      if (ok) return apiClient.getBlob(path, false)
+      useAuthStore.getState().logout()
+      throw new Error('Sesión expirada')
     }
     if (!res.ok) throw new Error(`${res.status}`)
     return res.blob()
