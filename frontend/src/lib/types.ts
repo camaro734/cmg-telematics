@@ -331,3 +331,27 @@ export interface VehicleCreate {
   year?: number | null
   tenant_id?: string | null
 }
+
+export interface DeviceOut {
+  id: string
+  tenant_id: string | null
+  vehicle_id: string | null
+  imei: string
+  model: string
+  firmware_ver: string | null
+  online: boolean
+  last_seen: string | null
+  active: boolean
+  created_at: string
+}
+
+export interface DeviceCreate {
+  imei: string
+  model?: string
+  firmware_ver?: string | null
+  tenant_id: string
+}
+
+export interface DeviceAssignVehicle {
+  vehicle_id: string | null
+}
