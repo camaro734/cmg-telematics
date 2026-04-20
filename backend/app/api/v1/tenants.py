@@ -265,7 +265,7 @@ async def create_tenant_user(
     db.add(new_user)
     try:
         await db.commit()
-    except Exception:
+    except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=409, detail="Email ya registrado")
     await db.refresh(new_user)
