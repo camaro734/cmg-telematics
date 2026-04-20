@@ -10,6 +10,17 @@ const NAV_ITEMS = [
   { to: '/rules',       Icon: IconReglas,         label: 'Reglas',        active: true },
 ]
 
+function navLinkStyle({ isActive }: { isActive: boolean }) {
+  return {
+    width: 36, height: 36,
+    borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+    background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
+    transition: 'background 0.15s, color 0.15s',
+  } as const
+}
+
 export default function Sidebar() {
   const { logoUrl, brandName, user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
@@ -38,19 +49,7 @@ export default function Sidebar() {
 
       {NAV_ITEMS.map(({ to, Icon, label, active }) =>
         active ? (
-          <NavLink
-            key={to}
-            to={to}
-            title={label}
-            style={({ isActive }) => ({
-              width: 36, height: 36,
-              borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
-              transition: 'background 0.15s, color 0.15s',
-            })}
-          >
+          <NavLink key={to} to={to} title={label} style={navLinkStyle}>
             <Icon width={20} height={20}/>
           </NavLink>
         ) : (
@@ -71,56 +70,23 @@ export default function Sidebar() {
       )}
 
       {isCmg && (
-        <NavLink
-          to="/clientes"
-          title="Clientes"
-          style={({ isActive }) => ({
-            width: 36, height: 36,
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-            background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
-            transition: 'background 0.15s, color 0.15s',
-          })}
-        >
+        <NavLink to="/clientes" title="Clientes" style={navLinkStyle}>
           <IconClientes width={20} height={20}/>
         </NavLink>
       )}
 
       {isAdmin && (
-        <NavLink
-          to="/reports"
-          title="Reportes"
-          style={({ isActive }) => ({
-            width: 36, height: 36,
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-            background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
-            transition: 'background 0.15s, color 0.15s',
-          })}
-        >
+        <NavLink to="/reports" title="Reportes" style={navLinkStyle}>
           <IconReportes width={20} height={20}/>
         </NavLink>
       )}
 
       <div style={{ marginTop: 'auto' }}>
-        {isAdmin ? (
-          <NavLink
-            to="/settings"
-            title="Ajustes"
-            style={({ isActive }) => ({
-              width: 36, height: 36,
-              borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
-              transition: 'background 0.15s, color 0.15s',
-            })}
-          >
+        {isAdmin && (
+          <NavLink to="/settings" title="Ajustes" style={navLinkStyle}>
             <IconAjustes width={20} height={20}/>
           </NavLink>
-        ) : null}
+        )}
       </div>
     </nav>
   )

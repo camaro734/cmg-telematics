@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
@@ -21,9 +21,9 @@ export default function ReportsPage() {
   const user = useAuthStore(s => s.user)
   const isCmg = user?.tenant_tier === 'cmg'
 
-  const prev = getPreviousMonth()
-  const [year, setYear] = useState(prev.year)
-  const [month, setMonth] = useState(prev.month)
+  const previousMonth = getPreviousMonth()
+  const [year, setYear] = useState(previousMonth.year)
+  const [month, setMonth] = useState(previousMonth.month)
   const [tenantId, setTenantId] = useState('')
   const [vehicleIds, setVehicleIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,15 +50,15 @@ export default function ReportsPage() {
     staleTime: 60_000,
   })
 
-  // Auto-select first client tenant when CMG list loads
-  if (isCmg && tenants.length > 0 && !tenantId) {
+  useEffect(() => {
+    if (!isCmg || tenantId || tenants.length === 0) return
     const firstClient = tenants.find(t => t.tier !== 'cmg')
     if (firstClient) setTenantId(firstClient.id)
-  }
+  }, [isCmg, tenants, tenantId])
 
   function toggleVehicle(id: string) {
-    setVehicleIds(prev =>
-      prev.includes(id) ? prev.filter(v => v !== id) : prev.length < 15 ? [...prev, id] : prev
+    setVehicleIds(ids =>
+      ids.includes(id) ? ids.filter(v => v !== id) : ids.length < 15 ? [...ids, id] : ids
     )
   }
 
@@ -74,9 +74,12 @@ export default function ReportsPage() {
       const a = document.createElement('a')
       a.href = url
       a.download = `informe-${year}-${String(month).padStart(2, '0')}.pdf`
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
-    } catch {
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch (err) {
+      console.error('report generation failed', err)
       setError('Error al generar el informe. Inténtalo de nuevo.')
     } finally {
       setLoading(false)
