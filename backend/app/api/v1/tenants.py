@@ -8,8 +8,11 @@ from app.core.database import get_db
 from app.api.v1.deps import get_current_user, require_tier
 from app.schemas.auth import CurrentUser
 from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, BrandTokensUpdate, GrantOut, GrantCreate
+from app.schemas.user import UserOut, UserCreate
 from app.models.tenant import Tenant
 from app.models.permission_grant import PermissionGrant
+from app.models.user import User
+from app.core.security import hash_password
 
 router = APIRouter(tags=["tenants"])
 
@@ -220,3 +223,50 @@ async def delete_grant(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     grant.active = False
     await db.commit()
+
+
+@router.get("/tenants/{tenant_id}/users", response_model=list[UserOut])
+async def list_tenant_users(
+    tenant_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" and (
+        user.role != "admin" or str(user.tenant_id) != str(tenant_id)
+    ):
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    result = await db.execute(
+        select(User).where(User.tenant_id == tenant_id).order_by(User.email)
+    )
+    return result.scalars().all()
+
+
+@router.post("/tenants/{tenant_id}/users", response_model=UserOut, status_code=201)
+async def create_tenant_user(
+    tenant_id: uuid.UUID,
+    body: UserCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" and (
+        user.role != "admin" or str(user.tenant_id) != str(tenant_id)
+    ):
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant or not tenant.active:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    new_user = User(
+        tenant_id=tenant_id,
+        email=body.email,
+        hashed_password=hash_password(body.password),
+        full_name=body.full_name,
+        role=body.role,
+    )
+    db.add(new_user)
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Email ya registrado")
+    await db.refresh(new_user)
+    return new_user

@@ -7,6 +7,7 @@ from app.api.v1.rules import router as rules_router
 from app.api.v1.tenants import router as tenants_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.maintenance import router as maintenance_router
+from app.api.v1.users import router as users_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
@@ -16,3 +17,4 @@ api_router.include_router(rules_router)
 api_router.include_router(tenants_router)
 api_router.include_router(settings_router)
 api_router.include_router(maintenance_router)
+api_router.include_router(users_router)
