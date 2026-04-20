@@ -1,4 +1,4 @@
-app.cmgnexus.es {
+cmgtrack.com {
     handle /api/* {
         reverse_proxy core-api:8010
     }
@@ -17,4 +17,15 @@ app.cmgnexus.es {
     handle {
         reverse_proxy frontend:3000
     }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+}
+
+www.cmgtrack.com {
+    redir https://cmgtrack.com{uri} permanent
 }
