@@ -13,7 +13,7 @@ describe('ConditionBuilder', () => {
   it('renders threshold fields by default', () => {
     const cond: ConditionDef = { type: 'threshold', field: 'hydraulic_pressure_1', op: '>', value: 220 }
     render(<ConditionBuilder condition={cond} sensors={sensors} onChange={vi.fn()} />)
-    expect(screen.getByDisplayValue('hydraulic_pressure_1')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Presión bomba')).toBeInTheDocument()
     expect(screen.getByDisplayValue('>')).toBeInTheDocument()
     expect(screen.getByDisplayValue('220')).toBeInTheDocument()
   })

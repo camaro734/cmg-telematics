@@ -40,6 +40,7 @@ export default function App() {
                 <Route path="alerts"       element={<AlertsPage />} />
                 <Route path="settings"     element={<SettingsPage />} />
                 <Route path="rules"        element={<RulesPage />} />
+                <Route path="rules/new"    element={<RuleFormPage />} />
                 <Route path="rules/:id"    element={<RuleFormPage />} />
                 <Route path="*"            element={<Navigate to="/fleet" replace />} />
               </Routes>

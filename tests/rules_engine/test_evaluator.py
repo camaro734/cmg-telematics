@@ -151,6 +151,26 @@ async def test_composite_and_no_fire_when_one_fails():
     assert result is None
 
 
+async def test_composite_or_fires_when_any_condition_met():
+    """Composite OR rule fires when at least one condition matches."""
+    rule = make_rule(
+        condition={
+            "type": "composite",
+            "op_composite": "OR",
+            "conditions": [
+                {"type": "threshold", "field": "hydraulic_pressure_1", "op": ">", "value": 9999.0},  # no disparará
+                {"type": "threshold", "field": "hydraulic_pressure_1", "op": ">", "value": 200.0},   # disparará
+            ],
+        },
+    )
+    msg = make_msg()
+    redis = AsyncMock()
+    redis.exists.return_value = 0
+    redis.set.return_value = True
+    results = await process_message([rule], msg, redis)
+    assert len(results) == 1
+
+
 # --- schedule filter ---
 
 def test_schedule_always_returns_true():

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
@@ -9,7 +9,7 @@ import ConditionBuilder from './ConditionBuilder'
 import VehicleFilterPicker from './VehicleFilterPicker'
 import ActionsList from './ActionsList'
 import EscalationBuilder from './EscalationBuilder'
-import type { RuleOut, RuleCreate, ConditionDef, VehicleTypeOut, SensorDef } from '../../lib/types'
+import type { RuleOut, RuleCreate, ConditionDef, VehicleTypeOut, VehicleOut, SensorDef } from '../../lib/types'
 
 const SECTION: CSSProperties = {
   marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--bg-border)',
@@ -80,6 +80,13 @@ export default function RuleFormPage() {
     staleTime: Infinity,
   })
 
+  const { data: selectedVehicle } = useQuery({
+    queryKey: keys.vehicle(form.vehicle_filter.vehicle_id ?? ''),
+    queryFn: () => apiClient.get<VehicleOut>(`/api/v1/vehicles/${form.vehicle_filter.vehicle_id}`),
+    enabled: form.vehicle_filter.scope === 'vehicle' && !!form.vehicle_filter.vehicle_id,
+    staleTime: Infinity,
+  })
+
   // Pre-cargar formulario cuando se obtiene la regla existente
   // Depende de existingRule?.id para no re-ejecutar si cambia la referencia del objeto
   useEffect(() => {
@@ -98,7 +105,16 @@ export default function RuleFormPage() {
     }
   }, [existingRule?.id])
 
-  const sensors: SensorDef[] = mergedSensors(vehicleTypes)
+  const sensors: SensorDef[] = useMemo(() => {
+    const { scope, vehicle_type_id, vehicle_id } = form.vehicle_filter
+    if (scope === 'type' && vehicle_type_id) {
+      return vehicleTypes.find(vt => vt.id === vehicle_type_id)?.sensor_schema ?? []
+    }
+    if (scope === 'vehicle' && vehicle_id && selectedVehicle) {
+      return vehicleTypes.find(vt => vt.id === selectedVehicle.vehicle_type_id)?.sensor_schema ?? mergedSensors(vehicleTypes)
+    }
+    return mergedSensors(vehicleTypes)
+  }, [vehicleTypes, form.vehicle_filter, selectedVehicle])
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => isEdit

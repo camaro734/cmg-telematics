@@ -160,7 +160,7 @@ async def _eval_condition(cond: dict, rule: Rule, msg: TelemetryMsg, redis: Any)
         return None
 
     if cond_type == "composite":
-        op = cond.get("op", "AND")
+        op = cond.get("op_composite") or cond.get("op", "AND")
         if op == "AND":
             for sub in cond.get("conditions", []):
                 r = await _eval_condition(sub, rule, msg, redis)

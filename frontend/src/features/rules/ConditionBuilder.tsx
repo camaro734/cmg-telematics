@@ -74,7 +74,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {/* Selector de sensor — muestra el key como valor de opción (necesario para tests y compatibilidad con el modelo de datos) */}
       <select value={condition.field ?? ''} onChange={e => update({ field: e.target.value })} style={SELECT}>
-        {sensorList.map(s => <option key={s.key} value={s.key}>{s.key}</option>)}
+        {sensorList.map(s => <option key={s.key} value={s.key}>{s.label || s.key}</option>)}
       </select>
 
       {/* Campos threshold y threshold_sustained */}
