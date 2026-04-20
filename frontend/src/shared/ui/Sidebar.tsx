@@ -11,7 +11,7 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { logoUrl, user } = useAuthStore()
+  const { logoUrl, brandName, user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const isCmg = user?.tenant_tier === 'cmg'
 
@@ -29,7 +29,7 @@ export default function Sidebar() {
       gap: 4,
       zIndex: 100,
     }}>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }} title={brandName ?? 'CMG Telematic'}>
         {logoUrl
           ? <img src={logoUrl} alt="logo" style={{ width: 30, height: 30, objectFit: 'contain' }}/>
           : <CmgMark size={30}/>
@@ -47,7 +47,7 @@ export default function Sidebar() {
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
+              background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
               transition: 'background 0.15s, color 0.15s',
             })}
           >
@@ -79,7 +79,7 @@ export default function Sidebar() {
             borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-            background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
+            background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
             transition: 'background 0.15s, color 0.15s',
           })}
         >
@@ -97,7 +97,7 @@ export default function Sidebar() {
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
+              background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
               transition: 'background 0.15s, color 0.15s',
             })}
           >
