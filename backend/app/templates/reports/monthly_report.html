@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 1.5cm 1.5cm 2cm 1.5cm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: #1C1917;
+    color: #E7E5E4;
+    font-size: 9pt;
+    line-height: 1.4;
+  }
+  .page-break { page-break-before: always; }
+
+  /* ── Cover ── */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 24cm;
+    text-align: center;
+  }
+  .cover-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    background: #F97316;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28pt;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .cover-brand { font-size: 22pt; font-weight: 700; color: #E7E5E4; margin-bottom: 4px; }
+  .cover-subtitle { font-size: 10pt; color: #A8A29E; margin-bottom: 20px; }
+  .cover-period { font-size: 28pt; font-weight: 700; color: #F97316; margin-bottom: 6px; }
+  .cover-generated { font-size: 8pt; color: #78716C; margin-bottom: 32px; }
+  .kpi-row { display: flex; gap: 16px; justify-content: center; }
+  .kpi-box {
+    background: #292524;
+    border-radius: 8px;
+    padding: 14px 24px;
+    text-align: center;
+    min-width: 90px;
+  }
+  .kpi-value { font-size: 28pt; font-weight: 700; }
+  .kpi-label { font-size: 8pt; color: #78716C; margin-top: 2px; }
+
+  /* ── Section header ── */
+  .section-title {
+    font-size: 8pt;
+    font-weight: 700;
+    color: #F97316;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #3C3330;
+  }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  th {
+    text-align: left;
+    padding: 5px 8px;
+    color: #78716C;
+    font-weight: 600;
+    border-bottom: 1px solid #3C3330;
+    font-size: 7.5pt;
+  }
+  td { padding: 5px 8px; border-bottom: 1px solid #292524; }
+  tr:last-child td { border-bottom: none; }
+  .mono { font-family: "Courier New", Courier, monospace; }
+  .right { text-align: right; }
+  .muted { color: #78716C; }
+
+  /* ── Alert severity colors ── */
+  .sev-critical { color: #EF4444; }
+  .sev-warning  { color: #EAB308; }
+  .sev-info     { color: #38BDF8; }
+
+  /* ── Summary cards ── */
+  .card-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .card {
+    flex: 1;
+    background: #292524;
+    border-radius: 6px;
+    padding: 10px 14px;
+    text-align: center;
+  }
+  .card-value { font-size: 22pt; font-weight: 700; }
+  .card-label { font-size: 7pt; color: #78716C; margin-top: 2px; }
+
+  /* ── Map section ── */
+  .map-img { width: 100%; border-radius: 6px; margin-bottom: 12px; }
+  .map-legend { font-size: 7.5pt; color: #A8A29E; margin-top: -8px; margin-bottom: 12px; }
+  .vehicle-kpis { display: flex; gap: 10px; margin-bottom: 12px; }
+  .vehicle-kpi {
+    flex: 1;
+    background: #292524;
+    border-radius: 5px;
+    padding: 8px 12px;
+    text-align: center;
+  }
+  .vehicle-kpi-value { font-size: 16pt; font-weight: 700; color: #F97316; }
+  .vehicle-kpi-label { font-size: 7pt; color: #78716C; }
+
+  /* ── SVG chart container ── */
+  .chart-box {
+    background: #292524;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+  .chart-label { font-size: 7.5pt; color: #78716C; margin-top: 4px; }
+
+  /* ── Cost footer ── */
+  .cost-total {
+    text-align: right;
+    font-size: 9pt;
+    font-weight: 700;
+    color: #E7E5E4;
+    padding: 8px 8px 0;
+    border-top: 1px solid #3C3330;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     Página 1 — Portada
+     ═══════════════════════════════════════════ -->
+<div class="cover">
+  {% if logo_url %}
+    <img src="{{ logo_url }}" alt="logo" style="width:64px;height:64px;object-fit:contain;border-radius:10px;margin-bottom:16px;">
+  {% else %}
+    <div class="cover-logo">{{ tenant_name[0] | upper }}</div>
+  {% endif %}
+
+  <div class="cover-brand">{{ tenant_name }}</div>
+  <div class="cover-subtitle">Informe mensual de operaciones</div>
+  <div class="cover-period">{{ month_name }} {{ year }}</div>
+  <div class="cover-generated">Generado el {{ generated_at }} — CMG Telematic</div>
+
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-value" style="color:#F97316">{{ kpi_vehicles }}</div>
+      <div class="kpi-label">Vehículos</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-value" style="color:#EF4444">{{ kpi_alerts }}</div>
+      <div class="kpi-label">Alertas</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-value" style="color:#22C55E">{{ kpi_interventions }}</div>
+      <div class="kpi-label">Intervenciones</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     Página 2 — Resumen de flota + Gráfica PTO
+     ═══════════════════════════════════════════ -->
+<div class="page-break">
+  <div class="section-title">Flota — Resumen del mes</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Vehículo</th>
+        <th>Matrícula</th>
+        <th class="right">H. Motor</th>
+        <th class="right">H. PTO</th>
+        <th class="right">Alertas</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in fleet_rows %}
+      <tr>
+        <td>{{ row.name }}</td>
+        <td class="muted">{{ row.license_plate }}</td>
+        <td class="right mono">{{ row.engine_hours }}h</td>
+        <td class="right mono" style="color:#F97316">{{ row.pto_hours }}h</td>
+        <td class="right mono {% if row.alert_count > 0 %}sev-critical{% else %}muted{% endif %}">
+          {{ row.alert_count }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <br>
+  <div class="section-title">Actividad diaria — Horas PTO (global flota)</div>
+  <div class="chart-box">
+    {{ pto_bar_chart_svg | safe }}
+    <div class="chart-label">Días del mes (barras = horas PTO acumuladas de todos los vehículos)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     Página 3 — Alertas del período
+     ═══════════════════════════════════════════ -->
+<div class="page-break">
+  <div class="section-title">Alertas del período</div>
+
+  <div class="card-row">
+    <div class="card">
+      <div class="card-value sev-critical">{{ critical_count }}</div>
+      <div class="card-label">Críticas</div>
+    </div>
+    <div class="card">
+      <div class="card-value sev-warning">{{ warning_count }}</div>
+      <div class="card-label">Advertencia</div>
+    </div>
+    <div class="card">
+      <div class="card-value" style="color:#22C55E">{{ resolved_count }}</div>
+      <div class="card-label">Resueltas</div>
+    </div>
+  </div>
+
+  {% if alerts %}
+  <table>
+    <thead>
+      <tr>
+        <th>Regla</th>
+        <th>Vehículo</th>
+        <th>Fecha</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr>
+        <td class="sev-{{ a.severity }}">{{ a.rule_name }}</td>
+        <td class="muted">{{ a.vehicle_name }}</td>
+        <td class="muted mono">{{ a.triggered_at_fmt }}</td>
+        <td class="muted">{{ a.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">Sin alertas en este período.</p>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════
+     Página 4 — Mantenimiento
+     ═══════════════════════════════════════════ -->
+<div class="page-break">
+  <div class="section-title">Intervenciones de mantenimiento</div>
+
+  {% if maintenance %}
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Plan</th>
+        <th>Vehículo</th>
+        <th>Descripción</th>
+        <th class="right">Coste</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in maintenance %}
+      <tr>
+        <td class="mono muted">{{ m.performed_at_fmt }}</td>
+        <td>{{ m.plan_name }}</td>
+        <td class="muted">{{ m.vehicle_name }}</td>
+        <td class="muted">{{ m.description or "—" }}</td>
+        <td class="right mono">
+          {% if m.cost_eur is not none %}{{ "%.2f"|format(m.cost_eur) }} €{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="cost-total">Total: {{ "%.2f"|format(total_cost) }} €</div>
+  {% else %}
+    <p class="muted">Sin intervenciones registradas en este período.</p>
+  {% endif %}
+</div>
+
+<!-- ═══════════════════════════════════════════
+     Páginas GPS — Una por vehículo con datos GPS
+     ═══════════════════════════════════════════ -->
+{% for v in vehicles_with_gps %}
+<div class="page-break">
+  <div class="section-title">{{ v.name }}{% if v.license_plate %} — {{ v.license_plate }}{% endif %} — Recorrido {{ month_name }} {{ year }}</div>
+
+  {% if v.map_base64 %}
+    <img class="map-img" src="data:image/png;base64,{{ v.map_base64 }}" alt="Mapa GPS {{ v.name }}">
+    <div class="map-legend">● Verde = inicio &nbsp; ● Azul = fin &nbsp; ● Rojo = alerta crítica</div>
+  {% else %}
+    <p class="muted" style="margin-bottom:12px">Mapa no disponible (sin conexión a tiles OSM).</p>
+  {% endif %}
+
+  <div class="vehicle-kpis">
+    <div class="vehicle-kpi">
+      <div class="vehicle-kpi-value">{{ v.engine_hours }}h</div>
+      <div class="vehicle-kpi-label">Motor</div>
+    </div>
+    <div class="vehicle-kpi">
+      <div class="vehicle-kpi-value">{{ v.pto_hours }}h</div>
+      <div class="vehicle-kpi-label">PTO</div>
+    </div>
+    <div class="vehicle-kpi">
+      <div class="vehicle-kpi-value {% if v.alert_count > 0 %}sev-critical{% endif %}">{{ v.alert_count }}</div>
+      <div class="vehicle-kpi-label">Alertas</div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+</body>
+</html>

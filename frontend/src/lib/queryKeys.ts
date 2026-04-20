@@ -1,5 +1,6 @@
 export const keys = {
   vehicles: () => ['vehicles'] as const,
+  vehiclesByTenant: (tenantId: string) => ['vehicles', 'by-tenant', tenantId] as const,
   vehicle: (id: string) => ['vehicles', id] as const,
   vehicleStatus: (id: string) => ['vehicles', id, 'status'] as const,
   vehicleTrack: (id: string) => ['vehicles', id, 'track'] as const,

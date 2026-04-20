@@ -15,6 +15,7 @@ const MaintenancePlanDetailPage  = lazy(() => import('./features/maintenance/Mai
 const TenantsPage      = lazy(() => import('./features/clientes/TenantsPage'))
 const TenantFormPage   = lazy(() => import('./features/clientes/TenantFormPage'))
 const TenantDetailPage = lazy(() => import('./features/clientes/TenantDetailPage'))
+const ReportsPage      = lazy(() => import('./features/reports/ReportsPage'))
 
 function Loading() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
                 <Route path="clientes/new"      element={<TenantFormPage />} />
                 <Route path="clientes/:id"      element={<TenantDetailPage />} />
                 <Route path="clientes/:id/edit" element={<TenantFormPage />} />
+                <Route path="reports"           element={<ReportsPage />} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>
