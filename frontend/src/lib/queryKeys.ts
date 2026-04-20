@@ -15,4 +15,8 @@ export const keys = {
   maintenancePlans: () => ['maintenance', 'plans'] as const,
   maintenancePlan: (id: string) => ['maintenance', 'plans', id] as const,
   maintenanceLogs: (planId: string) => ['maintenance', 'plans', planId, 'logs'] as const,
+  cliente: (id: string) => ['tenants', id] as const,
+  clienteUsers: (id: string) => ['tenants', id, 'users'] as const,
+  clienteVehicles: (id: string) => ['tenants', id, 'vehicles'] as const,
+  clienteGrants: (id: string) => ['tenants', id, 'grants'] as const,
 }

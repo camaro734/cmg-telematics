@@ -264,3 +264,70 @@ export interface MaintenanceLogCreate {
   reset_counters: string[]
   cost_eur?: number
 }
+
+export interface TenantCreate {
+  parent_id: string
+  tier: 'client'
+  name: string
+  slug: string
+}
+
+export interface TenantUpdate {
+  name?: string
+  slug?: string
+  active?: boolean
+}
+
+export interface UserOut {
+  id: string
+  tenant_id: string
+  email: string
+  full_name: string
+  role: 'admin' | 'operator' | 'viewer' | 'driver'
+  active: boolean
+  created_at: string
+}
+
+export interface UserCreate {
+  email: string
+  full_name: string
+  role: 'admin' | 'operator' | 'viewer' | 'driver'
+  password: string
+}
+
+export interface UserUpdate {
+  full_name?: string
+  role?: 'admin' | 'operator' | 'viewer' | 'driver'
+  active?: boolean
+}
+
+export interface GrantOut {
+  id: string
+  grantor_id: string
+  grantee_id: string
+  resource_type: string
+  resource_id: string | null
+  allowed_actions: string[]
+  constraints: Record<string, unknown> | null
+  granted_at: string
+  expires_at: string | null
+  active: boolean
+}
+
+export interface GrantCreate {
+  grantee_id: string
+  resource_type: string
+  resource_id?: string | null
+  allowed_actions: string[]
+  constraints?: Record<string, unknown> | null
+  expires_at?: string | null
+}
+
+export interface VehicleCreate {
+  vehicle_type_id: string
+  name: string
+  license_plate?: string | null
+  vin?: string | null
+  year?: number | null
+  tenant_id?: string | null
+}
