@@ -24,7 +24,7 @@ const vehicles: VehicleOut[] = [{
   year: 2020, active: true, created_at: '2026-01-01T00:00:00Z',
 }]
 
-const rules: RuleOut[] = [{ id: 'r1', name: 'Presión alta', severity: 'warning', active: true }]
+const rules: RuleOut[] = [{ id: 'r1', tenant_id: 't1', name: 'Presión alta', description: null, severity: 'warning', active: true, vehicle_filter: { scope: 'all' }, condition: { type: 'threshold' }, actions: [], escalation: [], cooldown_minutes: 30, created_at: '2026-04-19T00:00:00Z' }]
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
