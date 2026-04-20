@@ -111,3 +111,16 @@ export function IconReportes(props: IconProps) {
     </Icon>
   )
 }
+
+// Devices: SIM card / device module with connector notch
+export function IconDispositivos(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="2" width="14" height="20" rx="2"/>
+      <path d="M9 2v4h6V2"/>
+      <line x1="9" y1="10" x2="15" y2="10"/>
+      <line x1="9" y1="14" x2="15" y2="14"/>
+      <line x1="9" y1="18" x2="12" y2="18"/>
+    </Icon>
+  )
+}
