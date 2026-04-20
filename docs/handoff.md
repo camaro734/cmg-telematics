@@ -1,11 +1,11 @@
 # CMG Telematic1 — Handoff Document
-> Última actualización: 2026-04-19
+> Última actualización: 2026-04-20
 
 ## Estado actual
 
-Plataforma SaaS de telemetría industrial en desarrollo activo. **8 sprints completados.** Código en `/opt/cmg-telematic1`, rama `master`, commit `1ffda5a`.
+Plataforma SaaS de telemetría industrial en desarrollo activo. **10 sprints completados.** Código en `/opt/cmg-telematic1`, rama `master`, commit `549ede9`.
 
-**Tests:** 56 backend + 93 frontend = 149 pasando. Build de producción limpio.
+**Tests:** 64 backend + 107 frontend = 171 pasando. Build de producción limpio.
 
 ---
 
@@ -21,29 +21,37 @@ Plataforma SaaS de telemetría industrial en desarrollo activo. **8 sprints comp
 | Vehicle detail | ✅ | Gauges SVG (presión, temperatura, batería), KPI charts, track GPS |
 | Alerts page | ✅ | Alertas activas con ack, historial con filtros fecha/vehículo |
 | Settings page | ✅ | Email de notificación por tenant, solo admin |
-| **Rule builder** | ✅ | Lista reglas + formulario crear/editar (Sprint 8, recién terminado) |
+| **Rule builder** | ✅ | Lista reglas + formulario crear/editar (Sprint 8) |
+| **Mantenimiento predictivo** | ✅ | Planes por horas PTO/motor/días, historial intervenciones, badge vehículo (Sprint 10) |
 
 ---
 
-## Último sprint completado: Sprint 8 — Rule Builder
+## Último sprint completado: Sprint 10 — Mantenimiento Predictivo
 
 ### Qué se hizo
 
-**Backend (rules-engine):**
-- `evaluator.py` + `loader.py` + `main.py`: soporte `vehicle_filter scope:"type"` con `vehicle_type_map` cache
-- Bug fix: OR composite siempre evaluaba como AND → corregido con `op_composite`
+**Backend:**
+- `backend/app/models/maintenance.py` — modelos `MaintenancePlan` + `MaintenanceLog` con `created_at`
+- `backend/alembic/versions/003_004` — migraciones: `created_at`, FK `tenant_id` CASCADE, FK `plan_id` SET NULL
+- `backend/app/schemas/maintenance.py` — schemas Pydantic completos con `MaintenancePlanOut`, `MaintenanceProgress`, `ThresholdProgress`
+- `backend/app/api/v1/maintenance.py` — 7 endpoints CRUD + progreso calculado dinámicamente desde `telemetry_1h`
+  - Progreso por `pto_hours`, `engine_hours`, `calendar_days`
+  - Baseline: último `MaintenanceLog` con `reset_counters @> [tipo]`, fallback a `plan.created_at`
+  - Batch query de baselines en `list_plans` (evita N+1)
+  - Permisos: admin o `permission_grant(resource_type='maintenance', 'log')`
+- `backend/app/api/v1/vehicles.py` — endpoint `/vehicles/:id/maintenance` añadido
 
 **Frontend:**
-- `frontend/src/features/rules/` — 6 nuevos componentes:
-  - `RulesPage.tsx` — tabla con toggle activo/inactivo y delete inline
-  - `RuleFormPage.tsx` — formulario crear/editar, orquestador
-  - `ConditionBuilder.tsx` — 6 tipos: threshold, threshold_sustained, accumulation, trend_rising, schedule, composite (AND/OR)
-  - `VehicleFilterPicker.tsx` — scope all/tipo/vehículo con sensores filtrados dinámicamente
-  - `ActionsList.tsx` — in-app, email (multi-recipient), webhook
-  - `EscalationBuilder.tsx` — escalones con delay y destinatarios
-- `frontend/src/lib/types.ts` — tipos completos: `RuleOut`, `RuleCreate`, `ConditionDef`, `ActionDef`, `EscalationStep`, `VehicleFilter`
-- Rutas `/rules`, `/rules/new`, `/rules/:id` activadas en `App.tsx`
-- Sidebar `/rules` activado
+- `frontend/src/features/maintenance/` — 6 componentes nuevos:
+  - `ProgressBar.tsx` — barra verde/naranja/rojo según estado
+  - `MaintenancePage.tsx` — tabla global ordenada por urgencia (vencido > próximo > ok)
+  - `ThresholdBuilder.tsx` — añadir/quitar umbrales (tipo + valor)
+  - `MaintenancePlanFormPage.tsx` — crear/editar plan con ThresholdBuilder
+  - `MaintenancePlanDetailPage.tsx` — detalle + tarjetas de progreso + historial intervenciones
+  - `LogInterventionModal.tsx` — modal registro intervención con checkboxes reset contadores
+- `frontend/src/lib/types.ts` — tipos nuevos: `MaintenancePlanOut`, `MaintenancePlanUpdate`, `MaintenanceProgress`, etc.
+- `VehicleDetailPage.tsx` — badge de mantenimiento pendiente/vencido
+- Sidebar + App.tsx — entrada `/maintenance` wired
 
 ---
 
@@ -77,7 +85,8 @@ cd frontend && npm run dev
 │   ├── fleet/                   — mapa y lista de vehículos
 │   ├── vehicle/                 — detalle con gauges
 │   ├── alerts/                  — alertas e historial
-│   ├── rules/                   — rule builder (nuevo)
+│   ├── rules/                   — rule builder
+│   ├── maintenance/             — mantenimiento predictivo (nuevo)
 │   └── settings/                — configuración tenant
 ├── services/rules-engine/src/   — evaluador de reglas
 ├── services/notify/src/         — despachador de notificaciones
@@ -98,11 +107,7 @@ cd frontend && npm run dev
 - Variables de entorno documentadas (`.env.example`)
 - Script de despliegue inicial (seed + migraciones)
 
-### Sprint 10 — Mantenimiento predictivo *(diferenciador clave de CMG)*
-- Endpoints backend para `maintenance_plan` y `maintenance_log`
-- UI: umbrales por ciclos hidráulicos reales (no por km)
-- Reset de acumuladores tras intervención
-- Historial de mantenimientos por vehículo
+### Sprint 10 — Mantenimiento predictivo ✅ *completado*
 
 ### Sprint 11 — Gestión multi-tenant *(para incorporar clientes reales)*
 - Página admin CMG para crear/gestionar tenants (Wasterent, PREZERO, etc.)
@@ -120,7 +125,7 @@ Al abrir una nueva sesión, Claude tendrá acceso al historial del proyecto. Par
 
 Si quieres empezar el siguiente sprint:
 
-> *"Empieza el Sprint 9 — infraestructura de producción"* (o Sprint 10 / Sprint 11)
+> *"Empieza el Sprint 9 — infraestructura de producción"* (o Sprint 11)
 
 ---
 
