@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import or_, select, text
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user
