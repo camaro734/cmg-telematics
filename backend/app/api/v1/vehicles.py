@@ -15,6 +15,8 @@ from app.schemas.vehicle import (
 )
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
+from app.models.maintenance import MaintenancePlan
+from app.schemas.maintenance import MaintenancePlanOut
 
 logger = logging.getLogger(__name__)
 
@@ -282,3 +284,26 @@ async def get_vehicle_kpis(
     ).fetchall()
 
     return [KpiHour(**dict(r._mapping)) for r in rows]
+
+
+@router.get("/vehicles/{vehicle_id}/maintenance", response_model=list[MaintenancePlanOut])
+async def list_vehicle_maintenance(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+
+    result = await db.execute(
+        select(MaintenancePlan)
+        .where(MaintenancePlan.vehicle_id == vehicle_id)
+        .order_by(MaintenancePlan.name)
+    )
+    plans = result.scalars().all()
+
+    # Import here to avoid circular import at module level
+    from app.api.v1.maintenance import _to_out as _maintenance_to_out
+    return [await _maintenance_to_out(p, vehicle.name, db) for p in plans]
