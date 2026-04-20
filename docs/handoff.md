@@ -5,7 +5,7 @@
 
 Plataforma SaaS de telemetría industrial en desarrollo activo. **12 sprints completados.** Código en `/opt/cmg-telematic1`, rama `master`. **En producción en https://cmgtrack.com**
 
-**Tests:** 82 backend + 122 frontend = 204 pasando. Build de producción limpio.
+**Tests:** 82 backend + 130 frontend = 212 pasando. Build de producción limpio.
 
 ---
 
@@ -23,33 +23,22 @@ Plataforma SaaS de telemetría industrial en desarrollo activo. **12 sprints com
 | Settings page | ✅ | Email de notificación por tenant + gestión de usuarios propios |
 | Rule builder | ✅ | Lista reglas + formulario crear/editar (Sprint 8) |
 | Mantenimiento predictivo | ✅ | Planes por horas PTO/motor/días, historial intervenciones, badge vehículo (Sprint 10) |
-| **Gestión clientes (multi-tenant)** | ✅ | CRUD tenants, usuarios, vehículos por cliente, grants, white-label (Sprint 11) |
+| **Gestión clientes (multi-tenant)** | ✅ | CRUD tenants, usuarios, vehículos por cliente, grants, white-label runtime (Sprints 11–12) |
 | **Infraestructura producción** | ✅ | Docker Compose, Caddy HTTPS, dominio cmgtrack.com (Sprint 9) |
 
 ---
 
-## Último sprint completado: Sprint 11 — Gestión de Clientes Multi-Tenant
+## Último sprint completado: Sprint 12 — White-label Runtime
 
 ### Qué se hizo
 
-**Backend:**
-- `backend/app/schemas/user.py` — schemas `UserOut`, `UserCreate`, `UserUpdate` (con `EmailStr`, `Field(min_length=8)`)
-- `backend/app/schemas/tenant.py` — añadidos `TenantUpdate`, `TenantCreate.tier` restringido a `'client'`
-- `backend/app/schemas/vehicle.py` — añadido `VehicleCreate` con `tenant_id` opcional
-- `backend/app/api/v1/tenants.py` — `GET/PUT /tenants/{id}`, `GET/POST /tenants/{id}/users` con permisos CMG-o-admin-propio
-- `backend/app/api/v1/users.py` — nuevo: `PUT /users/{id}`, `DELETE /users/{id}` (soft delete)
-- `backend/app/api/v1/vehicles.py` — `GET /vehicles?tenant_id=`, `POST /vehicles` con `tenant_id` para CMG
-- `backend/app/api/v1/router.py` — registrado `users_router`
-- `backend/pyproject.toml` — añadido `psycopg2-binary` para migraciones Alembic
-- Tests: `test_tenant_detail_api.py`, `test_users_api.py`, `test_vehicle_tenant_api.py`
+- `useAuthStore.applyBrandTokens` — fix: el bucle `k.startsWith('--')` nunca aplicaba color; ahora mapea `brand_color` → `--accent-energy` en `document.documentElement` con validación hex
+- `useAuthStore.logout` — añadido `removeProperty('--accent-energy')` + semántica explícita en `logo_url` inválida (→ null en lugar de conservar previo)
+- `BrandTokensEditor` — llama a `applyBrandTokens` en `onSuccess` si el tenant editado es el propio tenant del usuario; admin CMG editando otro cliente no afecta su sesión
+- `Sidebar` — tooltip con `brand_name` en el logo; color activo usa `color-mix(in srgb, var(--accent-energy) 15%, transparent)` en lugar de naranja hardcodeado
+- Tests: `useAuthStore.test.ts` (nuevo, 6 tests); `BrandTokensEditor.test.tsx` (ampliado, +2 tests)
 
-**Frontend:**
-- `features/clientes/` — 6 componentes: `TenantsPage`, `TenantFormPage`, `TenantDetailPage`, `UserFormModal`, `GrantsSection`, `BrandTokensEditor`
-- `features/settings/UsersSection.tsx` — gestión de usuarios propios para admins de cliente
-- `shared/ui/Sidebar.tsx` — entrada "Clientes" solo para `tenant_tier=cmg`
-- `lib/types.ts` — `TenantCreate`, `TenantUpdate`, `UserOut`, `UserCreate`, `UserUpdate`, `GrantOut`, `GrantCreate`, `VehicleCreate`
-- `lib/queryKeys.ts` — `cliente()`, `clienteUsers()`, `clienteVehicles()`, `clienteGrants()`
-- Tests: 6 ficheros en `features/clientes/__tests__/`
+**Tests:** 82 backend + 130 frontend = 212 pasando
 
 ---
 
@@ -106,11 +95,6 @@ cd /opt/cmg-telematic1/frontend && npm run dev
 ---
 
 ## Próximos sprints sugeridos (por prioridad)
-
-### Sprint 12 — White-label runtime
-- Aplicar `brand_tokens` del tenant como CSS variables en el frontend en tiempo real
-- El backend ya sirve los tokens; falta inyectarlos en `index.html` o vía endpoint al arrancar
-- Preview de colores ya funciona en `BrandTokensEditor`; falta que apliquen globalmente
 
 ### Sprint 13 — Reportes y exportación
 - Exportar historial de alertas, telemetría, intervenciones a PDF/Excel
