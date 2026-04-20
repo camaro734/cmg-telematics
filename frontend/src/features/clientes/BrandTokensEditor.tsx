@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useAuthStore } from '../auth/useAuthStore'
 import type { BrandTokens } from '../../lib/types'
 
 interface Props { tenantId: string }
@@ -31,7 +32,11 @@ export default function BrandTokensEditor({ tenantId }: Props) {
   const mutation = useMutation({
     mutationFn: (payload: BrandTokens) =>
       apiClient.put(`/api/v1/tenants/${tenantId}/brand-tokens`, { brand_tokens: payload }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tenantBrandTokens(tenantId) }),
+    onSuccess: (_, payload) => {
+      qc.invalidateQueries({ queryKey: keys.tenantBrandTokens(tenantId) })
+      const { user, applyBrandTokens } = useAuthStore.getState()
+      if (user?.tenant_id === tenantId) applyBrandTokens(payload)
+    },
   })
 
   const inputStyle: React.CSSProperties = {
@@ -87,7 +92,6 @@ export default function BrandTokensEditor({ tenantId }: Props) {
         {mutation.isSuccess && <p style={{ color: 'var(--accent-ok)', fontSize: 12, margin: 0 }}>Guardado</p>}
       </div>
 
-      {/* Live preview */}
       <div style={{ width: 180 }}>
         <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '0 0 8px' }}>Preview</p>
         <div style={{ background: 'var(--bg-surface)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bg-border)' }}>
