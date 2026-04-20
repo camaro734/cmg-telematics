@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text, func, cast
+from sqlalchemy import select, text, func, cast, or_
 from sqlalchemy.dialects.postgresql import array
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
@@ -14,10 +14,17 @@ from app.schemas.maintenance import (
     MaintenanceProgress, ThresholdProgress,
 )
 from app.models.maintenance import MaintenancePlan, MaintenanceLog
+from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.models.permission_grant import PermissionGrant
 
 router = APIRouter(tags=["maintenance"])
+
+# Safe mapping from threshold type to telemetry_1h column name
+_COUNTER_COLUMNS = {
+    "pto_hours": "pto_active_minutes",
+    "engine_hours": "engine_on_minutes",
+}
 
 
 async def _require_admin(user: CurrentUser) -> None:
@@ -28,11 +35,16 @@ async def _require_admin(user: CurrentUser) -> None:
 async def _require_admin_or_grant(user: CurrentUser, db: AsyncSession) -> None:
     if user.role == "admin":
         return
+    now = datetime.now(timezone.utc)
     result = await db.execute(
         select(PermissionGrant).where(
             PermissionGrant.grantee_id == user.tenant_id,
             PermissionGrant.resource_type == "maintenance",
             PermissionGrant.active == True,
+            or_(
+                PermissionGrant.expires_at.is_(None),
+                PermissionGrant.expires_at > now,
+            ),
         )
     )
     grant = result.scalar_one_or_none()
@@ -64,8 +76,8 @@ async def _compute_progress(plan: MaintenancePlan, db: AsyncSession) -> Maintena
 
         if t_type == "calendar_days":
             current = float(max(0, (datetime.now(timezone.utc) - baseline).days))
-        elif t_type in ("pto_hours", "engine_hours"):
-            col = "pto_active_minutes" if t_type == "pto_hours" else "engine_on_minutes"
+        elif t_type in _COUNTER_COLUMNS:
+            col = _COUNTER_COLUMNS[t_type]
             row = await db.execute(
                 text(
                     f"SELECT COALESCE(SUM({col}), 0) / 60.0 "
@@ -116,6 +128,7 @@ async def _to_out(plan: MaintenancePlan, vehicle_name: str, db: AsyncSession) ->
 @router.get("/maintenance/plans", response_model=list[MaintenancePlanOut])
 async def list_plans(
     vehicle_id: uuid.UUID | None = Query(None),
+    active: bool | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -124,6 +137,8 @@ async def list_plans(
         query = query.where(MaintenancePlan.tenant_id == user.tenant_id)
     if vehicle_id:
         query = query.where(MaintenancePlan.vehicle_id == vehicle_id)
+    if active is not None:
+        query = query.where(MaintenancePlan.active == active)
     result = await db.execute(query.order_by(MaintenancePlan.name))
     plans = result.scalars().all()
 
@@ -269,13 +284,23 @@ async def list_logs(
         .where(MaintenanceLog.plan_id == plan_id)
         .order_by(MaintenanceLog.performed_at.desc())
     )
+    logs = result.scalars().all()
+
+    # Batch lookup user emails to avoid N+1 queries
+    user_ids = {lg.performed_by for lg in logs if lg.performed_by is not None}
+    email_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        u_res = await db.execute(select(User.id, User.email).where(User.id.in_(user_ids)))
+        email_map = {row.id: row.email for row in u_res}
+
     return [
         MaintenanceLogOut(
             id=lg.id, plan_id=lg.plan_id, vehicle_id=lg.vehicle_id,
-            performed_at=lg.performed_at, performed_by_email=None,
+            performed_at=lg.performed_at,
+            performed_by_email=email_map.get(lg.performed_by) if lg.performed_by else None,
             description=lg.description,
             reset_counters=lg.reset_counters or [],
             cost_eur=float(lg.cost_eur) if lg.cost_eur is not None else None,
         )
-        for lg in result.scalars().all()
+        for lg in logs
     ]
