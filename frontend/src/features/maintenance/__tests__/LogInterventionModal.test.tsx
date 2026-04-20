@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import LogInterventionModal from '../LogInterventionModal'
+import type { MaintenanceThreshold } from '../../../lib/types'
 
 vi.mock('../../../lib/apiClient', () => ({
   apiClient: { post: vi.fn() },
@@ -10,7 +11,7 @@ vi.mock('../../../lib/apiClient', () => ({
 
 import { apiClient } from '../../../lib/apiClient'
 
-const THRESHOLDS = [
+const THRESHOLDS: MaintenanceThreshold[] = [
   { type: 'pto_hours', value: 500 },
   { type: 'calendar_days', value: 365 },
 ]

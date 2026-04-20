@@ -9,7 +9,7 @@ import SensorGrid from './SensorGrid'
 import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut } from '../../lib/types'
 
 const PAGE_TABS = [
   { id: 'live', label: 'EN VIVO' },
@@ -53,6 +53,15 @@ export default function VehicleDetailPage() {
     enabled: !!vehicle,
   })
 
+  const { data: maintenancePlans = [] } = useQuery({
+    queryKey: keys.vehicleMaintenance(id ?? ''),
+    queryFn: () => apiClient.get<MaintenancePlanOut[]>(`/api/v1/vehicles/${id}/maintenance`),
+    enabled: !!vehicle,
+  })
+  const urgentCount = maintenancePlans.filter(
+    p => p.progress.status === 'vencido' || p.progress.status === 'próximo'
+  ).length
+
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicle?.vehicle_type_id)
   const sensorSchema = vehicleType?.sensor_schema ?? []
 
@@ -83,6 +92,23 @@ export default function VehicleDetailPage() {
 
   return (
     <Shell title={vehicle.name}>
+      {urgentCount > 0 && (
+        <div style={{ padding: '6px 24px 0' }}>
+          <a
+            href={`/maintenance?vehicle=${id}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'rgba(239,68,68,0.15)',
+              border: '1px solid var(--accent-crit)',
+              borderRadius: 6, padding: '4px 10px',
+              fontSize: 11, color: 'var(--accent-crit)',
+              textDecoration: 'none', fontWeight: 600,
+            }}
+          >
+            ⚠ {urgentCount} plan{urgentCount > 1 ? 'es' : ''} de mantenimiento pendiente{urgentCount > 1 ? 's' : ''}
+          </a>
+        </div>
+      )}
       <div style={{ height: '100%', overflowY: 'auto' }}>
         <VehicleHeader vehicle={vehicle} status={status} />
 

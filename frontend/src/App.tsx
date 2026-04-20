@@ -7,8 +7,11 @@ const FleetPage         = lazy(() => import('./features/fleet/FleetPage'))
 const VehicleDetailPage = lazy(() => import('./features/vehicle/VehicleDetailPage'))
 const AlertsPage        = lazy(() => import('./features/alerts/AlertsPage'))
 const SettingsPage      = lazy(() => import('./features/settings/SettingsPage'))
-const RulesPage         = lazy(() => import('./features/rules/RulesPage'))
-const RuleFormPage      = lazy(() => import('./features/rules/RuleFormPage'))
+const RulesPage                  = lazy(() => import('./features/rules/RulesPage'))
+const RuleFormPage               = lazy(() => import('./features/rules/RuleFormPage'))
+const MaintenancePage            = lazy(() => import('./features/maintenance/MaintenancePage'))
+const MaintenancePlanFormPage    = lazy(() => import('./features/maintenance/MaintenancePlanFormPage'))
+const MaintenancePlanDetailPage  = lazy(() => import('./features/maintenance/MaintenancePlanDetailPage'))
 
 function Loading() {
   return (
@@ -39,10 +42,14 @@ export default function App() {
                 <Route path="vehicles/:id" element={<VehicleDetailPage />} />
                 <Route path="alerts"       element={<AlertsPage />} />
                 <Route path="settings"     element={<SettingsPage />} />
-                <Route path="rules"        element={<RulesPage />} />
-                <Route path="rules/new"    element={<RuleFormPage />} />
-                <Route path="rules/:id"    element={<RuleFormPage />} />
-                <Route path="*"            element={<Navigate to="/fleet" replace />} />
+                <Route path="rules"              element={<RulesPage />} />
+                <Route path="rules/new"          element={<RuleFormPage />} />
+                <Route path="rules/:id"          element={<RuleFormPage />} />
+                <Route path="maintenance"          element={<MaintenancePage />} />
+                <Route path="maintenance/new"      element={<MaintenancePlanFormPage />} />
+                <Route path="maintenance/:id"      element={<MaintenancePlanDetailPage />} />
+                <Route path="maintenance/:id/edit" element={<MaintenancePlanFormPage />} />
+                <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>
           </RequireAuth>
