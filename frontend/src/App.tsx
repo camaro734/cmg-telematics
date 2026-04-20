@@ -7,6 +7,8 @@ const FleetPage         = lazy(() => import('./features/fleet/FleetPage'))
 const VehicleDetailPage = lazy(() => import('./features/vehicle/VehicleDetailPage'))
 const AlertsPage        = lazy(() => import('./features/alerts/AlertsPage'))
 const SettingsPage      = lazy(() => import('./features/settings/SettingsPage'))
+const RulesPage         = lazy(() => import('./features/rules/RulesPage'))
+const RuleFormPage      = lazy(() => import('./features/rules/RuleFormPage'))
 
 function Loading() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
                 <Route path="vehicles/:id" element={<VehicleDetailPage />} />
                 <Route path="alerts"       element={<AlertsPage />} />
                 <Route path="settings"     element={<SettingsPage />} />
+                <Route path="rules"        element={<RulesPage />} />
+                <Route path="rules/:id"    element={<RuleFormPage />} />
                 <Route path="*"            element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>

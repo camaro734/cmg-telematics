@@ -4,9 +4,9 @@ import { CmgMark } from './CmgLogo'
 import { IconFlota, IconAlertas, IconReglas, IconAjustes } from './icons'
 
 const NAV_ITEMS = [
-  { to: '/fleet',  Icon: IconFlota,   label: 'Flota',   active: true  },
+  { to: '/fleet',  Icon: IconFlota,   label: 'Flota',   active: true },
   { to: '/alerts', Icon: IconAlertas, label: 'Alertas', active: true },
-  { to: '/rules',  Icon: IconReglas,  label: 'Reglas',  active: false },
+  { to: '/rules',  Icon: IconReglas,  label: 'Reglas',  active: true },
 ]
 
 export default function Sidebar() {
