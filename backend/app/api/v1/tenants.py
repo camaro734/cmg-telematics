@@ -37,6 +37,8 @@ async def create_tenant(
     user: CurrentUser = Depends(require_tier("cmg")),
     db: AsyncSession = Depends(get_db),
 ):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
     existing = await db.execute(select(Tenant).where(Tenant.slug == body.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -99,6 +101,8 @@ async def update_tenant(
     user: CurrentUser = Depends(require_tier("cmg")),
     db: AsyncSession = Depends(get_db),
 ):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")

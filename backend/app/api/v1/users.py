@@ -49,5 +49,7 @@ async def deactivate_user(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     _check_user_access(user, current)
+    if user.id == current.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No puedes desactivarte a ti mismo")
     user.active = False
     await db.commit()

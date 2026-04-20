@@ -112,6 +112,32 @@ async def test_update_tenant_slug_conflict(client, admin_token, db):
     assert resp.status_code == 409
 
 
+async def test_create_tenant_cmg_operator_forbidden(client, db):
+    # Create a CMG operator user
+    from app.models.user import User
+    from app.core.security import hash_password
+    email = f"operator-{uuid.uuid4().hex[:8]}@cmg.es"
+    cmg_id = await _cmg_tenant_id(db)
+    u = User(
+        tenant_id=uuid.UUID(cmg_id),
+        email=email,
+        hashed_password=hash_password("Test1234!"),
+        full_name="CMG Operator",
+        role="operator",
+    )
+    db.add(u)
+    await db.commit()
+    resp = await client.post("/api/v1/auth/login", json={"email": email, "password": "Test1234!"})
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    resp = await client.post(
+        "/api/v1/tenants",
+        json={"parent_id": cmg_id, "tier": "client", "name": "Intento", "slug": f"intento-{uuid.uuid4().hex[:8]}"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
 async def test_list_grants_grantee_filter(client, admin_token, db):
     cmg_id = await _cmg_tenant_id(db)
     tenant = await _create_client_tenant(db, cmg_id)

@@ -24,7 +24,7 @@ class TenantOut(BaseModel):
 
 class TenantCreate(BaseModel):
     parent_id: uuid.UUID | None = None
-    tier: Literal["cmg", "client", "subclient"]
+    tier: Literal["client"] = "client"
     name: str
     slug: str
     brand_name: str | None = None

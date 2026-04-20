@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserOut(BaseModel):
@@ -19,7 +19,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
     role: Literal['admin', 'operator', 'viewer', 'driver'] = 'operator'
-    password: str
+    password: str = Field(min_length=8)
 
 
 class UserUpdate(BaseModel):
