@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useParams, Navigate } from 'react-router-dom'
+import { useParams, Navigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import Tabs from '../../shared/ui/Tabs'
@@ -94,8 +94,8 @@ export default function VehicleDetailPage() {
     <Shell title={vehicle.name}>
       {urgentCount > 0 && (
         <div style={{ padding: '6px 24px 0' }}>
-          <a
-            href={`/maintenance?vehicle=${id}`}
+          <Link
+            to={`/maintenance?vehicle=${id}`}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'rgba(239,68,68,0.15)',
@@ -106,7 +106,7 @@ export default function VehicleDetailPage() {
             }}
           >
             ⚠ {urgentCount} plan{urgentCount > 1 ? 'es' : ''} de mantenimiento pendiente{urgentCount > 1 ? 's' : ''}
-          </a>
+          </Link>
         </div>
       )}
       <div style={{ height: '100%', overflowY: 'auto' }}>
