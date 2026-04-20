@@ -240,6 +240,13 @@ export interface MaintenancePlanCreate {
   active: boolean
 }
 
+export interface MaintenancePlanUpdate {
+  name?: string
+  trigger_condition?: TriggerCondition
+  warn_before_pct?: number
+  active?: boolean
+}
+
 export interface MaintenanceLogOut {
   id: string
   plan_id: string | null

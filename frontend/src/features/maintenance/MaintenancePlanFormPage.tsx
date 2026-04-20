@@ -5,7 +5,7 @@ import Shell from '../../shared/ui/Shell'
 import ThresholdBuilder from './ThresholdBuilder'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { VehicleOut, MaintenancePlanOut, MaintenancePlanCreate, MaintenanceThreshold } from '../../lib/types'
+import type { VehicleOut, MaintenancePlanOut, MaintenancePlanCreate, MaintenancePlanUpdate, MaintenanceThreshold } from '../../lib/types'
 
 const DEFAULT_THRESHOLDS: MaintenanceThreshold[] = [{ type: 'pto_hours', value: 500 }]
 
@@ -47,7 +47,7 @@ export default function MaintenancePlanFormPage() {
   }, [existing, vehicles, vehicleId])
 
   const mutation = useMutation({
-    mutationFn: (payload: MaintenancePlanCreate) =>
+    mutationFn: (payload: MaintenancePlanCreate | MaintenancePlanUpdate) =>
       isEdit
         ? apiClient.put<MaintenancePlanOut>(`/api/v1/maintenance/plans/${id}`, payload)
         : apiClient.post<MaintenancePlanOut>('/api/v1/maintenance/plans', payload),
@@ -61,13 +61,22 @@ export default function MaintenancePlanFormPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    mutation.mutate({
-      vehicle_id: vehicleId,
-      name: name.trim(),
-      trigger_condition: { thresholds, op: 'OR' },
-      warn_before_pct: warnPct,
-      active,
-    })
+    if (isEdit) {
+      mutation.mutate({
+        name: name.trim(),
+        trigger_condition: { thresholds, op: 'OR' },
+        warn_before_pct: warnPct,
+        active,
+      } satisfies MaintenancePlanUpdate)
+    } else {
+      mutation.mutate({
+        vehicle_id: vehicleId,
+        name: name.trim(),
+        trigger_condition: { thresholds, op: 'OR' },
+        warn_before_pct: warnPct,
+        active,
+      } satisfies MaintenancePlanCreate)
+    }
   }
 
   const labelStyle = { fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }

@@ -55,7 +55,42 @@ async def _require_admin_or_grant(user: CurrentUser, db: AsyncSession) -> None:
         )
 
 
-async def _compute_progress(plan: MaintenancePlan, db: AsyncSession) -> MaintenanceProgress:
+async def _fetch_baselines(
+    plan_ids: list[uuid.UUID],
+    db: AsyncSession,
+) -> dict[tuple[uuid.UUID, str], datetime]:
+    """Batch-fetch the most recent log per (plan_id, counter_type) in one query."""
+    if not plan_ids:
+        return {}
+    rows = await db.execute(
+        text(
+            """
+            WITH expanded AS (
+                SELECT plan_id, performed_at,
+                       unnest(reset_counters) AS t_type
+                FROM maintenance_log
+                WHERE plan_id = ANY(:plan_ids)
+            ),
+            ranked AS (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY plan_id, t_type
+                    ORDER BY performed_at DESC
+                ) AS rn
+                FROM expanded
+            )
+            SELECT plan_id, t_type, performed_at FROM ranked WHERE rn = 1
+            """
+        ),
+        {"plan_ids": plan_ids},
+    )
+    return {(row.plan_id, row.t_type): row.performed_at for row in rows}
+
+
+async def _compute_progress(
+    plan: MaintenancePlan,
+    db: AsyncSession,
+    baselines: dict[tuple[uuid.UUID, str], datetime] | None = None,
+) -> MaintenanceProgress:
     thresholds = plan.trigger_condition.get("thresholds", [])
     results: list[ThresholdProgress] = []
 
@@ -63,16 +98,19 @@ async def _compute_progress(plan: MaintenancePlan, db: AsyncSession) -> Maintena
         t_type = thresh["type"]
         limit = float(thresh["value"])
 
-        log_res = await db.execute(
-            select(MaintenanceLog.performed_at)
-            .where(
-                MaintenanceLog.plan_id == plan.id,
-                MaintenanceLog.reset_counters.op("@>")(array([t_type])),
+        if baselines is not None:
+            baseline: datetime = baselines.get((plan.id, t_type)) or plan.created_at
+        else:
+            log_res = await db.execute(
+                select(MaintenanceLog.performed_at)
+                .where(
+                    MaintenanceLog.plan_id == plan.id,
+                    MaintenanceLog.reset_counters.op("@>")(array([t_type])),
+                )
+                .order_by(MaintenanceLog.performed_at.desc())
+                .limit(1)
             )
-            .order_by(MaintenanceLog.performed_at.desc())
-            .limit(1)
-        )
-        baseline: datetime = log_res.scalar_one_or_none() or plan.created_at
+            baseline = log_res.scalar_one_or_none() or plan.created_at
 
         if t_type == "calendar_days":
             current = float(max(0, (datetime.now(timezone.utc) - baseline).days))
@@ -109,8 +147,13 @@ async def _compute_progress(plan: MaintenancePlan, db: AsyncSession) -> Maintena
     return MaintenanceProgress(status=overall, thresholds=results)
 
 
-async def _to_out(plan: MaintenancePlan, vehicle_name: str, db: AsyncSession) -> MaintenancePlanOut:
-    progress = await _compute_progress(plan, db)
+async def _to_out(
+    plan: MaintenancePlan,
+    vehicle_name: str,
+    db: AsyncSession,
+    baselines: dict[tuple[uuid.UUID, str], datetime] | None = None,
+) -> MaintenancePlanOut:
+    progress = await _compute_progress(plan, db, baselines=baselines)
     return MaintenancePlanOut(
         id=plan.id,
         vehicle_id=plan.vehicle_id,
@@ -150,7 +193,10 @@ async def list_plans(
         )
         vehicles = {row.id: row.name for row in v_res}
 
-    return [await _to_out(p, vehicles.get(p.vehicle_id, "—"), db) for p in plans]
+    plan_ids = [p.id for p in plans]
+    baselines = await _fetch_baselines(plan_ids, db)
+
+    return [await _to_out(p, vehicles.get(p.vehicle_id, "—"), db, baselines=baselines) for p in plans]
 
 
 @router.post("/maintenance/plans", response_model=MaintenancePlanOut, status_code=201)
