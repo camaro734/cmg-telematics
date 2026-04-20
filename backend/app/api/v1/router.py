@@ -9,6 +9,7 @@ from app.api.v1.settings import router as settings_router
 from app.api.v1.maintenance import router as maintenance_router
 from app.api.v1.users import router as users_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.devices import router as devices_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
@@ -20,3 +21,4 @@ api_router.include_router(settings_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(users_router)
 api_router.include_router(reports_router, prefix="/reports")
+api_router.include_router(devices_router, prefix="/devices")
