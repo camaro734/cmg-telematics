@@ -52,7 +52,7 @@ export default function DevicesPage() {
   const createMutation = useMutation({
     mutationFn: (payload: DeviceCreate) => apiClient.post<DeviceOut>('/api/v1/devices', payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.devices() })
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
       handleCloseModal()
     },
     onError: (err: Error) => {
