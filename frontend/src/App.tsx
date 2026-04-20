@@ -12,6 +12,9 @@ const RuleFormPage               = lazy(() => import('./features/rules/RuleFormP
 const MaintenancePage            = lazy(() => import('./features/maintenance/MaintenancePage'))
 const MaintenancePlanFormPage    = lazy(() => import('./features/maintenance/MaintenancePlanFormPage'))
 const MaintenancePlanDetailPage  = lazy(() => import('./features/maintenance/MaintenancePlanDetailPage'))
+const TenantsPage      = lazy(() => import('./features/clientes/TenantsPage'))
+const TenantFormPage   = lazy(() => import('./features/clientes/TenantFormPage'))
+const TenantDetailPage = lazy(() => import('./features/clientes/TenantDetailPage'))
 
 function Loading() {
   return (
@@ -49,6 +52,10 @@ export default function App() {
                 <Route path="maintenance/new"      element={<MaintenancePlanFormPage />} />
                 <Route path="maintenance/:id"      element={<MaintenancePlanDetailPage />} />
                 <Route path="maintenance/:id/edit" element={<MaintenancePlanFormPage />} />
+                <Route path="clientes"          element={<TenantsPage />} />
+                <Route path="clientes/new"      element={<TenantFormPage />} />
+                <Route path="clientes/:id"      element={<TenantDetailPage />} />
+                <Route path="clientes/:id/edit" element={<TenantFormPage />} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
-import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes } from './icons'
+import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes } from './icons'
 
 const NAV_ITEMS = [
   { to: '/fleet',       Icon: IconFlota,         label: 'Flota',         active: true },
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const { logoUrl, user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
+  const isCmg = user?.tenant_tier === 'cmg'
 
   return (
     <nav style={{
@@ -67,6 +68,23 @@ export default function Sidebar() {
             <Icon width={20} height={20}/>
           </div>
         )
+      )}
+
+      {isCmg && (
+        <NavLink
+          to="/clientes"
+          title="Clientes"
+          style={({ isActive }) => ({
+            width: 36, height: 36,
+            borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+            background: isActive ? 'rgba(249,115,22,0.15)' : 'transparent',
+            transition: 'background 0.15s, color 0.15s',
+          })}
+        >
+          <IconClientes width={20} height={20}/>
+        </NavLink>
       )}
 
       <div style={{ marginTop: 'auto' }}>
