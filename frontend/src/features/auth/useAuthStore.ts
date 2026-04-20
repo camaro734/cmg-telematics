@@ -68,6 +68,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   logout: () => {
     localStorage.removeItem(REFRESH_KEY)
     wsClient.disconnect()
+    document.documentElement.style.removeProperty('--accent-energy')
     set({ accessToken: null, user: null, brandName: null, logoUrl: null })
     window.location.href = '/login'
   },
@@ -95,21 +96,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   applyBrandTokens: (tokens) => {
     const root = document.documentElement
-    const SAFE_CSS_VALUE = /^[a-zA-Z0-9#()\s,./%-]+$/
-
-    Object.entries(tokens).forEach(([k, v]) => {
-      if (v && k.startsWith('--') && SAFE_CSS_VALUE.test(v)) {
-        root.style.setProperty(k, v)
-      }
-    })
-
-    const safeLogoUrl =
-      tokens['logo_url'] && tokens['logo_url'].startsWith('https://')
-        ? tokens['logo_url']
-        : get().logoUrl
-
+    if (tokens.brand_color && /^#[0-9a-fA-F]{6}$/.test(tokens.brand_color)) {
+      root.style.setProperty('--accent-energy', tokens.brand_color)
+    }
+    const safeLogoUrl = tokens.logo_url?.startsWith('https://') ? tokens.logo_url : get().logoUrl
     set({
-      brandName: tokens['brand_name'] ?? get().brandName,
+      brandName: tokens.brand_name ?? get().brandName,
       logoUrl: safeLogoUrl,
     })
   },
