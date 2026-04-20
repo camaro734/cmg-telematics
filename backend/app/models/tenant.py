@@ -28,3 +28,4 @@ class Tenant(Base):
     parent = relationship("Tenant", remote_side=[id], backref="children")
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     vehicles = relationship("Vehicle", back_populates="tenant", cascade="all, delete-orphan")
+    devices = relationship("Device", back_populates="tenant")
