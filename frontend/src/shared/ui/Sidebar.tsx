@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
-import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes } from './icons'
+import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes } from './icons'
 
 const NAV_ITEMS = [
   { to: '/fleet',       Icon: IconFlota,         label: 'Flota',         active: true },
@@ -84,6 +84,23 @@ export default function Sidebar() {
           })}
         >
           <IconClientes width={20} height={20}/>
+        </NavLink>
+      )}
+
+      {isAdmin && (
+        <NavLink
+          to="/reports"
+          title="Reportes"
+          style={({ isActive }) => ({
+            width: 36, height: 36,
+            borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+            background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
+            transition: 'background 0.15s, color 0.15s',
+          })}
+        >
+          <IconReportes width={20} height={20}/>
         </NavLink>
       )}
 
