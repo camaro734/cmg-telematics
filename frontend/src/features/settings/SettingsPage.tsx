@@ -2,11 +2,13 @@ import Shell from '../../shared/ui/Shell'
 import NotificationSettings from './NotificationSettings'
 import UsersSection from './UsersSection'
 import WorkCycleDefinitionsSection from './WorkCycleDefinitionsSection'
+import VehicleTypeSensorsSection from './VehicleTypeSensorsSection'
 import { useAuthStore } from '../auth/useAuthStore'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
+  const isCmg = user?.tenant_tier === 'cmg'
 
   return (
     <Shell title="Ajustes">
@@ -14,6 +16,7 @@ export default function SettingsPage() {
         <NotificationSettings />
         {isAdmin && <UsersSection />}
         {isAdmin && <WorkCycleDefinitionsSection />}
+        {isCmg && isAdmin && <VehicleTypeSensorsSection />}
       </div>
     </Shell>
   )
