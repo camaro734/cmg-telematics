@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycle } from '../../lib/types'
+import { exportToCsv } from '../../lib/csvExport'
 
 interface Props {
   vehicleId: string
@@ -86,6 +87,31 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
 
   const defnMap = Object.fromEntries(definitions.map(d => [d.id, d]))
 
+  function handleExport() {
+    const allCycleKeys = Array.from(
+      new Set(cycles.flatMap(c => Object.keys(c.cycle_data)))
+    ).sort()
+
+    const rows = cycles.map(cycle => {
+      const row: Record<string, string | number | null | undefined> = {
+        definition: defnMap[cycle.definition_id]?.name ?? cycle.definition_id,
+        started_at: cycle.started_at,
+        ended_at: cycle.ended_at,
+        duration_seconds: cycle.duration_seconds,
+        lat: cycle.lat,
+        lon: cycle.lon,
+      }
+      for (const key of allCycleKeys) {
+        const v = cycle.cycle_data[key]
+        row[key] = v != null ? String(v) : null
+      }
+      return row
+    })
+
+    const date = new Date().toISOString().slice(0, 10)
+    exportToCsv(`ciclos_${vehicleId}_${date}.csv`, rows)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Controls */}
@@ -126,6 +152,14 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
           <span style={{ fontSize: 12, color: 'var(--accent-ok)' }}>
             {computeMutation.data.computed} ciclos detectados
           </span>
+        )}
+        {cycles.length > 0 && (
+          <button
+            onClick={handleExport}
+            style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
+          >
+            Exportar CSV
+          </button>
         )}
       </div>
 
