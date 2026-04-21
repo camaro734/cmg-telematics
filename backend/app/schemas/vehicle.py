@@ -76,3 +76,7 @@ class KpiHour(BaseModel):
     pto_active_minutes: int | None = None
     engine_on_minutes: int | None = None
     record_count: int | None = None
+
+
+class VehicleTypeSensorSchemaUpdate(BaseModel):
+    sensor_schema: list[dict[str, Any]]

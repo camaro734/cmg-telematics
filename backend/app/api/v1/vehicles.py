@@ -11,7 +11,7 @@ from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleStatus,
-    TelemetryPoint, TrackPoint, KpiHour,
+    TelemetryPoint, TrackPoint, KpiHour, VehicleTypeSensorSchemaUpdate,
 )
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
@@ -37,6 +37,32 @@ async def list_vehicle_types(
 ):
     result = await db.execute(select(VehicleType).order_by(VehicleType.name))
     return result.scalars().all()
+
+
+@router.patch("/vehicle-types/{type_id}/sensor-schema", response_model=VehicleTypeOut)
+async def update_vehicle_type_sensor_schema(
+    type_id: uuid.UUID,
+    body: VehicleTypeSensorSchemaUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo CMG admin puede modificar tipos de vehículo",
+        )
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tipo de vehículo no encontrado",
+        )
+    from sqlalchemy.orm.attributes import flag_modified
+    vtype.sensor_schema = body.sensor_schema
+    flag_modified(vtype, "sensor_schema")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
 
 
 @router.get("/vehicles", response_model=list[VehicleOut])
