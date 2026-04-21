@@ -47,7 +47,9 @@ export default function FleetMap({ vehicles, statuses }: FleetMapProps) {
     mapRef.current = L.map(containerRef.current, {
       center: [40.416775, -3.70379], // Madrid default
       zoom: 6,
+      zoomControl: false,
     })
+    L.control.zoom({ position: 'topright' }).addTo(mapRef.current)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
