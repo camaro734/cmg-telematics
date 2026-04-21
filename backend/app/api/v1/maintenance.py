@@ -375,6 +375,15 @@ async def export_maintenance_logs_csv(
     result = await db.execute(query)
     rows = result.all()
 
+    # Batch lookup user emails to avoid N+1 queries
+    performed_by_ids = {log.performed_by for log, _, _ in rows if log.performed_by}
+    email_map: dict = {}
+    if performed_by_ids:
+        users_res = await db.execute(
+            select(User.id, User.email).where(User.id.in_(performed_by_ids))
+        )
+        email_map = {str(row.id): row.email for row in users_res}
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["id", "vehicle_name", "plan_name", "performed_at", "performed_by_email", "description", "cost_eur"])
@@ -384,7 +393,7 @@ async def export_maintenance_logs_csv(
             vehicle_name,
             plan_name,
             log.performed_at.isoformat() if log.performed_at else "",
-            str(log.performed_by) if log.performed_by else "",
+            email_map.get(str(log.performed_by), "") if log.performed_by else "",
             log.description or "",
             str(log.cost_eur) if log.cost_eur is not None else "",
         ])
