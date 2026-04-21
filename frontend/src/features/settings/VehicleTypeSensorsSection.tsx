@@ -37,6 +37,7 @@ export default function VehicleTypeSensorsSection() {
   const [selectedTypeId, setSelectedTypeId] = useState<string>('')
   const [showModal, setShowModal] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
   const [form, setForm] = useState<Partial<AddSensorForm>>({})
 
   const { data: vehicleTypes = [], isLoading } = useQuery({
@@ -102,9 +103,13 @@ export default function VehicleTypeSensorsSection() {
   }
 
   function handleRemove(avlId: number | undefined) {
-    if (!selectedType) return
+    if (!selectedType || avlId == null) return
+    setRemoveError(null)
     const updatedSchema = selectedType.sensor_schema.filter(s => s.avl_id !== avlId)
-    patchSchemaMutation.mutate({ id: selectedType.id, schema: updatedSchema })
+    patchSchemaMutation.mutate(
+      { id: selectedType.id, schema: updatedSchema },
+      { onError: (err: Error) => setRemoveError(`Error al eliminar: ${err.message}`) },
+    )
   }
 
   const activeAvlIds = new Set(selectedType?.sensor_schema.map(s => s.avl_id) ?? [])
@@ -126,7 +131,7 @@ export default function VehicleTypeSensorsSection() {
             <select
               style={{ ...inputStyle, maxWidth: 300 }}
               value={selectedTypeId}
-              onChange={e => { setSelectedTypeId(e.target.value); setModalError(null) }}
+              onChange={e => { setSelectedTypeId(e.target.value); setModalError(null); setRemoveError(null) }}
             >
               <option value="">Seleccionar tipo…</option>
               {vehicleTypes.map(vt => (
@@ -179,6 +184,10 @@ export default function VehicleTypeSensorsSection() {
                     ))}
                   </tbody>
                 </table>
+              )}
+
+              {removeError && (
+                <div style={{ color: 'var(--accent-crit)', fontSize: 12, marginBottom: 8 }}>{removeError}</div>
               )}
 
               <button
