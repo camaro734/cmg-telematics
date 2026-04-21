@@ -14,6 +14,11 @@ from sqlalchemy import text
 from app.models.work_cycle import WorkCycleDefinition, WorkCycle
 
 
+# Whitelist of allowed extra columns in _query_telemetry.
+# Protection against accidental exposure of non-scoped fields in future changes.
+_ALLOWED_EXTRA_COLS = frozenset({"pto_active", "ignition"})
+
+
 async def detect_and_store_cycles(
     db: AsyncSession,
     vehicle_id: uuid.UUID,
@@ -27,9 +32,10 @@ async def detect_and_store_cycles(
         text("""
             DELETE FROM work_cycle
             WHERE vehicle_id = :vid AND definition_id = :did
+              AND tenant_id = :tid
               AND started_at >= :from_dt AND started_at < :to_dt
         """),
-        {"vid": str(vehicle_id), "did": str(definition.id), "from_dt": from_dt, "to_dt": to_dt},
+        {"vid": str(vehicle_id), "did": str(definition.id), "tid": str(tenant_id), "from_dt": from_dt, "to_dt": to_dt},
     )
 
     trigger_type = definition.trigger_type
@@ -95,7 +101,8 @@ async def _query_telemetry(
     to_dt: datetime,
     extra_cols: list[str],
 ) -> list[dict]:
-    col_list = ", ".join(["recorded_at", "lat", "lon", "can_data"] + extra_cols)
+    safe_extras = [c for c in extra_cols if c in _ALLOWED_EXTRA_COLS]
+    col_list = ", ".join(["recorded_at", "lat", "lon", "can_data"] + safe_extras)
     result = await db.execute(
         text(f"""
             SELECT {col_list}
