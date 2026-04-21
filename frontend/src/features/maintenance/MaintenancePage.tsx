@@ -23,6 +23,20 @@ const STATUS_ORDER: Record<string, number> = { vencido: 0, 'próximo': 1, ok: 2 
 export default function MaintenancePage() {
   const [vehicleFilter, setVehicleFilter] = useState('')
 
+  async function handleExportCsv() {
+    const params = new URLSearchParams()
+    if (vehicleFilter) params.set('vehicle_id', vehicleFilter)
+    const blob = await apiClient.getBlob(`/api/v1/maintenance/logs/export.csv?${params}`)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'mantenimiento.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
   const { data: plans = [], isLoading } = useQuery({
     queryKey: keys.maintenancePlans(),
     queryFn: () => apiClient.get<MaintenancePlanOut[]>('/api/v1/maintenance/plans'),
@@ -57,20 +71,28 @@ export default function MaintenancePage() {
             <option value="">Todos los vehículos</option>
             {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
-          <Link
-            to="/maintenance/new"
-            style={{
-              background: 'var(--accent-energy)',
-              color: '#fff',
-              borderRadius: 6,
-              padding: '8px 16px',
-              fontSize: 12,
-              fontWeight: 600,
-              textDecoration: 'none',
-            }}
-          >
-            + Nuevo plan
-          </Link>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={handleExportCsv}
+              style={{ padding: '5px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+            >
+              Exportar CSV
+            </button>
+            <Link
+              to="/maintenance/new"
+              style={{
+                background: 'var(--accent-energy)',
+                color: '#fff',
+                borderRadius: 6,
+                padding: '8px 16px',
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              + Nuevo plan
+            </Link>
+          </div>
         </div>
 
         {isLoading ? (

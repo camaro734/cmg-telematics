@@ -14,6 +14,18 @@ const SECTION_LABEL: CSSProperties = {
 }
 
 export default function AlertsPage() {
+  async function handleExportCsv() {
+    const blob = await apiClient.getBlob('/api/v1/alerts/export.csv')
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'alertas.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
   const { data: vehicles = [] } = useQuery({
     queryKey: keys.vehicles(),
     queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
@@ -45,7 +57,15 @@ export default function AlertsPage() {
   return (
     <Shell title="Alertas">
       <div style={{ padding: 24, maxWidth: 1200, overflowY: 'auto', height: '100%' }}>
-        <div style={SECTION_LABEL}>ALERTAS ACTIVAS</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ ...SECTION_LABEL, marginBottom: 0 }}>ALERTAS ACTIVAS</div>
+          <button
+            onClick={handleExportCsv}
+            style={{ padding: '5px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+          >
+            Exportar CSV
+          </button>
+        </div>
         <ActiveAlertsList alerts={activeAlerts} vehicles={vehicles} rules={rules} />
 
         <div style={{ ...SECTION_LABEL, marginTop: 32 }}>HISTORIAL</div>

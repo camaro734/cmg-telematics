@@ -23,4 +23,9 @@ export const keys = {
   clienteUsers: (id: string) => ['tenants', id, 'users'] as const,
   clienteVehicles: (id: string) => ['tenants', id, 'vehicles'] as const,
   clienteGrants: (id: string) => ['tenants', id, 'grants'] as const,
+  workCycleDefinitions: (vehicleTypeId?: string) => vehicleTypeId
+    ? ['work-cycle-definitions', vehicleTypeId] as const
+    : ['work-cycle-definitions'] as const,
+  workCycles: (vehicleId: string, from: string, to: string) =>
+    ['work-cycles', vehicleId, from, to] as const,
 }

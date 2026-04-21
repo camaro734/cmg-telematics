@@ -10,15 +10,17 @@ import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut } from '../../lib/types'
+import WorkCyclesTab from './WorkCyclesTab'
 
 const PAGE_TABS = [
   { id: 'live', label: 'EN VIVO' },
   { id: 'historic', label: 'HISTÓRICO' },
+  { id: 'cycles', label: 'CICLOS' },
 ]
 
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [tab, setTab] = useState<'live' | 'historic'>('live')
+  const [tab, setTab] = useState<'live' | 'historic' | 'cycles'>('live')
 
   const { data: vehicle, isLoading: loadingVehicle, error: vehicleError } = useQuery({
     queryKey: keys.vehicle(id ?? ''),
@@ -116,7 +118,7 @@ export default function VehicleDetailPage() {
           <Tabs
             tabs={PAGE_TABS}
             activeTab={tab}
-            onTabChange={(newTab) => setTab(newTab as 'live' | 'historic')}
+            onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles')}
           />
         </div>
 
@@ -156,6 +158,16 @@ export default function VehicleDetailPage() {
         {tab === 'historic' && (
           <div style={{ padding: 24, maxWidth: 1400 }}>
             <KpiChart vehicleId={id} />
+          </div>
+        )}
+
+        {tab === 'cycles' && vehicle.vehicle_type_id && (
+          <div style={{ padding: 24, maxWidth: 1400 }}>
+            <WorkCyclesTab
+              vehicleId={vehicle.id}
+              vehicleTypeId={vehicle.vehicle_type_id}
+              tenantId={vehicle.tenant_id}
+            />
           </div>
         )}
       </div>

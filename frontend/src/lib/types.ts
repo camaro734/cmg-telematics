@@ -355,3 +355,38 @@ export interface DeviceCreate {
 export interface DeviceAssignVehicle {
   vehicle_id: string | null
 }
+
+export interface WorkCycleDefinition {
+  id: string
+  vehicle_type_id: string
+  tenant_id: string | null
+  name: string
+  trigger_type: 'pto_change' | 'threshold_exceeded' | 'sensor_pulse' | 'ignition_period'
+  trigger_config: Record<string, unknown>
+  snapshot_fields: string[]
+  aggregate_fields: string[]
+  active: boolean
+  created_at: string
+}
+
+export interface WorkCycleDefinitionCreate {
+  vehicle_type_id: string
+  name: string
+  trigger_type: string
+  trigger_config?: Record<string, unknown>
+  snapshot_fields?: string[]
+  aggregate_fields?: string[]
+}
+
+export interface WorkCycle {
+  id: string
+  vehicle_id: string
+  definition_id: string
+  tenant_id: string
+  started_at: string
+  ended_at: string | null
+  duration_seconds: number | null
+  cycle_data: Record<string, unknown>
+  lat: number | null
+  lon: number | null
+}
