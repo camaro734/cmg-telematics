@@ -6,6 +6,7 @@ import ProgressBar from './ProgressBar'
 import LogInterventionModal from './LogInterventionModal'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { exportToCsv } from '../../lib/csvExport'
 import type { MaintenancePlanOut, MaintenanceLogOut } from '../../lib/types'
 
 const THRESHOLD_LABEL: Record<string, string> = {
@@ -38,6 +39,17 @@ export default function MaintenancePlanDetailPage() {
     </div>
   )
   if (!plan) return <Navigate to="/maintenance" replace />
+
+  function handleExportLogs() {
+    const rows = logs.map(log => ({
+      performed_at: log.performed_at,
+      performed_by: log.performed_by_email ?? '',
+      description: log.description ?? '',
+      reset_counters: log.reset_counters.join('; '),
+      cost_eur: log.cost_eur,
+    }))
+    exportToCsv(`mantenimiento_${id}_logs.csv`, rows)
+  }
 
   return (
     <Shell title={plan.name}>
@@ -79,8 +91,18 @@ export default function MaintenancePlanDetailPage() {
 
         {/* History */}
         <div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 12 }}>
-            HISTORIAL DE INTERVENCIONES
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em' }}>
+              HISTORIAL DE INTERVENCIONES
+            </div>
+            {logs.length > 0 && (
+              <button
+                onClick={handleExportLogs}
+                style={{ padding: '4px 10px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}
+              >
+                Exportar CSV
+              </button>
+            )}
           </div>
           {logs.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin intervenciones registradas</div>
