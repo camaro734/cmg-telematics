@@ -1,7 +1,10 @@
 # backend/app/api/v1/maintenance.py
+import csv
+import io
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func, cast, or_
 from sqlalchemy.dialects.postgresql import array
@@ -350,3 +353,45 @@ async def list_logs(
         )
         for lg in logs
     ]
+
+
+@router.get("/logs/export.csv")
+async def export_maintenance_logs_csv(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.vehicle import Vehicle as VehicleModel
+    query = (
+        select(
+            MaintenanceLog,
+            MaintenancePlan.name.label("plan_name"),
+            VehicleModel.name.label("vehicle_name"),
+        )
+        .join(MaintenancePlan, MaintenancePlan.id == MaintenanceLog.plan_id)
+        .join(VehicleModel, VehicleModel.id == MaintenanceLog.vehicle_id)
+    )
+    if user.tenant_tier != "cmg":
+        query = query.where(MaintenancePlan.tenant_id == user.tenant_id)
+    query = query.order_by(MaintenanceLog.performed_at.desc())
+    result = await db.execute(query)
+    rows = result.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "vehicle_name", "plan_name", "performed_at", "performed_by_email", "description", "cost_eur"])
+    for log, plan_name, vehicle_name in rows:
+        writer.writerow([
+            str(log.id),
+            vehicle_name,
+            plan_name,
+            log.performed_at.isoformat() if log.performed_at else "",
+            log.performed_by_email or "",
+            log.description or "",
+            str(log.cost_eur) if log.cost_eur is not None else "",
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="mantenimiento.csv"'},
+    )
