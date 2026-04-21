@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
-import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos } from './icons'
+import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos, IconCanScanner } from './icons'
 
 const NAV_ITEMS = [
   { to: '/fleet',       Icon: IconFlota,         label: 'Flota',         active: true },
@@ -78,6 +78,12 @@ export default function Sidebar() {
       {isCmg && (
         <NavLink to="/devices" title="Dispositivos" style={navLinkStyle}>
           <IconDispositivos width={20} height={20}/>
+        </NavLink>
+      )}
+
+      {isCmg && (
+        <NavLink to="/can-scanner" title="CAN Scanner" style={navLinkStyle}>
+          <IconCanScanner width={20} height={20}/>
         </NavLink>
       )}
 

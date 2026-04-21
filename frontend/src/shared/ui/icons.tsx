@@ -124,3 +124,14 @@ export function IconDispositivos(props: IconProps) {
     </Icon>
   )
 }
+
+// CAN Scanner: oscilloscope waveform
+export function IconCanScanner(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="3" width="20" height="16" rx="2"/>
+      <polyline points="6,14 8,10 10,14 12,8 14,14 16,11 18,14"/>
+      <line x1="6" y1="19" x2="18" y2="19"/>
+    </Icon>
+  )
+}
