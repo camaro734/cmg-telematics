@@ -360,15 +360,14 @@ async def export_maintenance_logs_csv(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.models.vehicle import Vehicle as VehicleModel
     query = (
         select(
             MaintenanceLog,
             MaintenancePlan.name.label("plan_name"),
-            VehicleModel.name.label("vehicle_name"),
+            Vehicle.name.label("vehicle_name"),
         )
         .join(MaintenancePlan, MaintenancePlan.id == MaintenanceLog.plan_id)
-        .join(VehicleModel, VehicleModel.id == MaintenanceLog.vehicle_id)
+        .join(Vehicle, Vehicle.id == MaintenanceLog.vehicle_id)
     )
     if user.tenant_tier != "cmg":
         query = query.where(MaintenancePlan.tenant_id == user.tenant_id)
@@ -385,7 +384,7 @@ async def export_maintenance_logs_csv(
             vehicle_name,
             plan_name,
             log.performed_at.isoformat() if log.performed_at else "",
-            log.performed_by_email or "",
+            str(log.performed_by) if log.performed_by else "",
             log.description or "",
             str(log.cost_eur) if log.cost_eur is not None else "",
         ])
