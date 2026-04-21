@@ -74,7 +74,7 @@ def test_cmg_admin_can_update_sensor_schema():
     _override_db(db)
 
     # flag_modified requiere _sa_instance_state — no disponible en MagicMock
-    with patch("sqlalchemy.orm.attributes.flag_modified"):
+    with patch("sqlalchemy.orm.attributes.flag_modified") as mock_flag:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.patch(
             f"/api/v1/vehicle-types/{VTYPE_ID}/sensor-schema",
@@ -83,6 +83,8 @@ def test_cmg_admin_can_update_sensor_schema():
     assert resp.status_code == 200
     data = resp.json()
     assert data["sensor_schema"] == SENSOR_PAYLOAD
+    db.commit.assert_awaited_once()
+    mock_flag.assert_called_once_with(vt, "sensor_schema")
 
 
 def test_client_admin_cannot_update_sensor_schema():
@@ -126,7 +128,7 @@ def test_empty_schema_clears_sensors():
     _override_db(db)
 
     # flag_modified requiere _sa_instance_state — no disponible en MagicMock
-    with patch("sqlalchemy.orm.attributes.flag_modified"):
+    with patch("sqlalchemy.orm.attributes.flag_modified") as mock_flag:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.patch(
             f"/api/v1/vehicle-types/{VTYPE_ID}/sensor-schema",
@@ -134,3 +136,23 @@ def test_empty_schema_clears_sensors():
         )
     assert resp.status_code == 200
     assert resp.json()["sensor_schema"] == []
+    db.commit.assert_awaited_once()
+    mock_flag.assert_called_once_with(vt, "sensor_schema")
+
+
+def test_cmg_operator_cannot_update_sensor_schema():
+    """CMG con role operator (no admin) → 403."""
+    cmg_operator = CurrentUser(
+        user_id=uuid.uuid4(), tenant_id=CMG_TENANT_ID,
+        tenant_tier="cmg", role="operator", email="op@test.com",
+    )
+    db = AsyncMock()
+    _override_user(cmg_operator)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.patch(
+        f"/api/v1/vehicle-types/{VTYPE_ID}/sensor-schema",
+        json={"sensor_schema": []},
+    )
+    assert resp.status_code == 403
