@@ -28,9 +28,9 @@ def upgrade() -> None:
         ),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("trigger_type", sa.String(30), nullable=False),
-        sa.Column("trigger_config", JSONB, nullable=False, server_default="'{}'"),
-        sa.Column("snapshot_fields", JSONB, nullable=False, server_default="'[]'"),
-        sa.Column("aggregate_fields", JSONB, nullable=False, server_default="'[]'"),
+        sa.Column("trigger_config", JSONB, nullable=False, server_default=sa.text("'{}'")),
+        sa.Column("snapshot_fields", JSONB, nullable=False, server_default=sa.text("'[]'")),
+        sa.Column("aggregate_fields", JSONB, nullable=False, server_default=sa.text("'[]'")),
         sa.Column("active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
     )
@@ -55,7 +55,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("duration_seconds", sa.Integer(), nullable=True),
-        sa.Column("cycle_data", JSONB, nullable=False, server_default="'{}'"),
+        sa.Column("cycle_data", JSONB, nullable=False, server_default=sa.text("'{}'")),
         sa.Column("lat", sa.Numeric(9, 6), nullable=True),
         sa.Column("lon", sa.Numeric(9, 6), nullable=True),
     )

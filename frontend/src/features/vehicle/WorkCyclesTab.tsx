@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
@@ -10,12 +10,6 @@ interface Props {
   tenantId: string
 }
 
-const TRIGGER_LABELS: Record<string, string> = {
-  pto_change: 'PTO activo',
-  threshold_exceeded: 'Umbral superado',
-  sensor_pulse: 'Pulso sensor',
-  ignition_period: 'Período ignición',
-}
 
 function formatDuration(seconds: number | null): string {
   if (seconds === null) return '—'
@@ -47,7 +41,7 @@ const cardStyle: React.CSSProperties = {
   padding: 16,
 }
 
-export default function WorkCyclesTab({ vehicleId, vehicleTypeId, tenantId }: Props) {
+export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
   const defaultRange = getDefaultRange()
   const [fromDate, setFromDate] = useState(defaultRange.from)
   const [toDate, setToDate] = useState(defaultRange.to)
