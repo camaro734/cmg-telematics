@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
+import { exportToCsv } from '../../lib/csvExport'
 import type { TenantOut, VehicleOut } from '../../lib/types'
 
 // Mapa de AVL IDs conocidos → nombre legible + unidad
@@ -104,6 +105,30 @@ export default function CanScannerPage() {
     return na - nb
   })
 
+  function handleExport() {
+    const rows = records.map(r => {
+      const row: Record<string, string | number | boolean | null | undefined> = {
+        time: r.time,
+        lat: r.lat,
+        lon: r.lon,
+        speed_kmh: r.speed_kmh,
+        heading: r.heading,
+        altitude_m: r.altitude_m,
+        ignition: r.ignition,
+        pto_active: r.pto_active,
+        ext_voltage_mv: r.ext_voltage_mv,
+      }
+      for (const key of allCanKeys) {
+        const meta = AVL_NAMES[key]
+        const header = meta ? `${meta.name} (${key})` : key
+        row[header] = r.can_data[key] ?? null
+      }
+      return row
+    })
+    const date = new Date().toISOString().slice(0, 10)
+    exportToCsv(`can_scan_${vehicleId}_${date}.csv`, rows)
+  }
+
   const inputStyle = {
     background: 'var(--bg-elevated)',
     border: '1px solid var(--bg-border)',
@@ -151,6 +176,15 @@ export default function CanScannerPage() {
           >
             {autoRefresh ? '⏸ Auto (5s)' : '▶ Auto (5s)'}
           </button>
+
+          {records.length > 0 && (
+            <button
+              onClick={handleExport}
+              style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+            >
+              Exportar CSV
+            </button>
+          )}
 
           {dataUpdatedAt > 0 && (
             <span style={{ fontSize: 11, color: 'var(--accent-off)' }}>
