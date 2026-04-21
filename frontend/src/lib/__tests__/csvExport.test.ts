@@ -52,8 +52,6 @@ describe('exportToCsv', () => {
       return origCreate(tag)
     })
 
-    vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node)
-    vi.spyOn(document.body, 'removeChild').mockImplementation((node) => node)
   })
 
   afterEach(() => {

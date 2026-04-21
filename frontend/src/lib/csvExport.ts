@@ -21,12 +21,6 @@ export function exportToCsv(filename: string, rows: Record<string, CsvValue>[]):
   const a = document.createElement('a')
   a.href = url
   a.download = filename
-  document.body.appendChild(a)
   a.click()
-  try {
-    document.body.removeChild(a)
-  } catch {
-    // In test environment, removeChild might fail due to mocking
-  }
   URL.revokeObjectURL(url)
 }
