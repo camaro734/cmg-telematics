@@ -119,21 +119,24 @@ async def upload_vehicle_type_icon(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     if current_user.tenant_tier != "cmg" or current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo CMG admin")
-    if file.content_type != "image/png":
-        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PNG")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG admin")
+    if not (file.content_type or "").startswith("image/png"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo se aceptan archivos PNG")
     content = await file.read()
     if len(content) > 2 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Archivo demasiado grande (máx 2 MB)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archivo demasiado grande (máx 2 MB)")
 
     result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
     vehicle_type = result.scalar_one_or_none()
     if not vehicle_type:
-        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tipo de vehículo no encontrado")
 
     uploads_dir = Path("/app/uploads/icons")
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    (uploads_dir / f"{type_id}.png").write_bytes(content)
+    try:
+        (uploads_dir / f"{type_id}.png").write_bytes(content)
+    except OSError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error al guardar el archivo: {e}")
 
     vehicle_type.icon_url = f"/uploads/icons/{type_id}.png"
     await db.commit()
