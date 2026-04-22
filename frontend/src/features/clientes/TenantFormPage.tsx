@@ -17,6 +17,7 @@ export default function TenantFormPage() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [active, setActive] = useState(true)
+  const [formModules, setFormModules] = useState<string[]>([])
 
   const { data: tenant } = useQuery({
     queryKey: keys.cliente(id!),
@@ -29,6 +30,7 @@ export default function TenantFormPage() {
       setName(tenant.name)
       setSlug(tenant.slug)
       setActive(tenant.active)
+      setFormModules(tenant.enabled_modules ?? [])
     }
   }, [tenant])
 
@@ -47,7 +49,7 @@ export default function TenantFormPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (isEdit) {
-      mutation.mutate({ name: name.trim(), slug: slug.trim(), active } satisfies TenantUpdate)
+      mutation.mutate({ name: name.trim(), slug: slug.trim(), active, enabled_modules: formModules } satisfies TenantUpdate)
     } else {
       mutation.mutate({
         parent_id: user!.tenant_id,
@@ -57,6 +59,13 @@ export default function TenantFormPage() {
       } satisfies TenantCreate)
     }
   }
+
+  const AVAILABLE_MODULES = [
+    { key: 'fleet',       label: 'Flota' },
+    { key: 'alerts',      label: 'Alertas' },
+    { key: 'maintenance', label: 'Mantenimiento' },
+    { key: 'reports',     label: 'Reportes' },
+  ]
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 12px', background: 'var(--bg-elevated)',
@@ -92,6 +101,30 @@ export default function TenantFormPage() {
               <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
               <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>Activo</span>
             </label>
+          )}
+
+          {isEdit && tenant && (tenant.tier === 'client' || tenant.tier === 'subclient') && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Módulos habilitados
+              </div>
+              {AVAILABLE_MODULES.map(m => (
+                <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formModules.includes(m.key)}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setFormModules(prev => [...prev, m.key])
+                      } else {
+                        setFormModules(prev => prev.filter(k => k !== m.key))
+                      }
+                    }}
+                  />
+                  <span style={{ fontSize: 13, color: 'var(--text-default)' }}>{m.label}</span>
+                </label>
+              ))}
+            </div>
           )}
 
           {mutation.isError && (

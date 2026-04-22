@@ -279,6 +279,7 @@ export interface TenantUpdate {
   name?: string
   slug?: string
   active?: boolean
+  enabled_modules?: string[]
 }
 
 export interface UserOut {
