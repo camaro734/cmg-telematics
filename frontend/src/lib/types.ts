@@ -75,6 +75,7 @@ export interface TenantOut {
   custom_domain: string | null
   brand_tokens: BrandTokens | null
   created_at: string
+  enabled_modules: string[]
 }
 
 export interface SensorDef {

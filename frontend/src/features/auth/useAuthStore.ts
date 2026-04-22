@@ -4,6 +4,19 @@ import { wsClient } from '../../lib/wsClient'
 
 const REFRESH_KEY = 'cmg_refresh'
 
+async function fetchEnabledModules(token: string): Promise<string[]> {
+  try {
+    const res = await fetch('/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return []
+    const data = await res.json() as { enabled_modules: string[] }
+    return data.enabled_modules ?? []
+  } catch {
+    return []
+  }
+}
+
 function parseJwt(token: string): CurrentUser | null {
   try {
     let b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
@@ -37,6 +50,7 @@ function parseJwt(token: string): CurrentUser | null {
 interface AuthStore {
   accessToken: string | null
   user: CurrentUser | null
+  enabledModules: string[]
   brandName: string | null
   logoUrl: string | null
   login: (email: string, password: string) => Promise<void>
@@ -48,6 +62,7 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set, get) => ({
   accessToken: null,
   user: null,
+  enabledModules: [],
   brandName: null,
   logoUrl: null,
 
@@ -63,13 +78,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const user = parseJwt(data.access_token)
     if (!user) throw new Error('Token de acceso inválido')
     set({ accessToken: data.access_token, user })
+    const enabledModules = await fetchEnabledModules(data.access_token)
+    set({ enabledModules })
   },
 
   logout: () => {
     localStorage.removeItem(REFRESH_KEY)
     wsClient.disconnect()
     document.documentElement.style.removeProperty('--accent-energy')
-    set({ accessToken: null, user: null, brandName: null, logoUrl: null })
+    set({ accessToken: null, user: null, enabledModules: [], brandName: null, logoUrl: null })
     window.location.href = '/login'
   },
 
@@ -88,6 +105,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const user = parseJwt(data.access_token)
       if (!user) { localStorage.removeItem(REFRESH_KEY); return false }
       set({ accessToken: data.access_token, user })
+      const enabledModules = await fetchEnabledModules(data.access_token)
+      set({ enabledModules })
       return true
     } catch {
       return false
