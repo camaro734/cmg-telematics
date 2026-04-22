@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { VehicleTypeOut, SensorDef } from '../../lib/types'
+import type { VehicleTypeOut, SensorDef, MaintenanceTemplateItem, RuleOut } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
 
 // ── Form state types ───────────────────────────────────────────────────────
@@ -21,6 +22,16 @@ const emptySensorForm: SensorFormState = {
   avl_id: '', key: '', label: '', unit: '', gauge_type: 'numeric',
   bit_index: '', scale: '', min: '', max: '',
   warn_above: '', alert_above: '', warn_below: '', alert_below: '',
+}
+
+type TemplateFormState = {
+  name: string
+  thresholdType: 'pto_hours' | 'engine_hours' | 'calendar_days'
+  value: string
+  warn_before_pct: string
+}
+const emptyTemplateForm: TemplateFormState = {
+  name: '', thresholdType: 'pto_hours', value: '', warn_before_pct: '10',
 }
 
 function sensorDefToForm(def: SensorDef): SensorFormState {
@@ -129,6 +140,8 @@ const GAUGE_TYPES: SensorDef['gauge_type'][] = ['circular', 'linear', 'battery',
 
 export default function VehicleTypesPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const user = useAuthStore(s => s.user)
 
   const { data: vehicleTypes = [], isLoading } = useQuery<VehicleTypeOut[]>({
     queryKey: keys.vehicleTypes(),
@@ -237,6 +250,71 @@ export default function VehicleTypesPage() {
       uploadIcon(typeId, file),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.vehicleTypes() }),
   })
+
+  // ── Maintenance template modal state ──────────────────────────────────────
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [editingTemplateIdx, setEditingTemplateIdx] = useState<number | null>(null)
+  const [templateForm, setTemplateForm] = useState<TemplateFormState>(emptyTemplateForm)
+
+  function openNewTemplate() {
+    setEditingTemplateIdx(null)
+    setTemplateForm(emptyTemplateForm)
+    setShowTemplateModal(true)
+  }
+
+  function openEditTemplate(tmpl: MaintenanceTemplateItem, idx: number) {
+    setEditingTemplateIdx(idx)
+    setTemplateForm({
+      name: tmpl.name,
+      thresholdType: tmpl.thresholds[0]?.type ?? 'pto_hours',
+      value: tmpl.thresholds[0]?.value?.toString() ?? '',
+      warn_before_pct: tmpl.warn_before_pct.toString(),
+    })
+    setShowTemplateModal(true)
+  }
+
+  const updateTemplatesMutation = useMutation({
+    mutationFn: ({ typeId, templates }: { typeId: string; templates: MaintenanceTemplateItem[] }) =>
+      apiClient.patch<VehicleTypeOut>(`/api/v1/vehicle-types/${typeId}/maintenance-templates`, { templates }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.vehicleTypes() })
+      setShowTemplateModal(false)
+    },
+  })
+
+  function saveTemplate() {
+    if (!selectedType || !templateForm.name.trim() || !templateForm.value) return
+    const newTemplate: MaintenanceTemplateItem = {
+      name: templateForm.name.trim(),
+      thresholds: [{ type: templateForm.thresholdType, value: parseFloat(templateForm.value) }],
+      warn_before_pct: parseInt(templateForm.warn_before_pct) || 10,
+    }
+    const current: MaintenanceTemplateItem[] = selectedType.maintenance_templates ?? []
+    let next: MaintenanceTemplateItem[]
+    if (editingTemplateIdx === null) {
+      next = [...current, newTemplate]
+    } else {
+      next = current.map((t, i) => i === editingTemplateIdx ? newTemplate : t)
+    }
+    updateTemplatesMutation.mutate({ typeId: selectedType.id, templates: next })
+  }
+
+  function deleteTemplate(idx: number) {
+    if (!selectedType) return
+    const next = (selectedType.maintenance_templates ?? []).filter((_, i) => i !== idx)
+    updateTemplatesMutation.mutate({ typeId: selectedType.id, templates: next })
+  }
+
+  // ── Alert rules for this type ─────────────────────────────────────────────
+  const { data: allRules = [] } = useQuery({
+    queryKey: keys.rules(),
+    queryFn: () => apiClient.get<RuleOut[]>('/api/v1/rules'),
+    staleTime: 60_000,
+  })
+
+  const typeRules = allRules.filter(
+    r => r.vehicle_filter?.scope === 'type' && r.vehicle_filter?.vehicle_type_id === selectedType?.id
+  )
 
   const typeError = createTypeMutation.error?.message ?? updateTypeMutation.error?.message ?? null
   const sensorError = updateSchemaMutation.error?.message ?? null
@@ -398,6 +476,78 @@ export default function VehicleTypesPage() {
                     </tbody>
                   </table>
                 )}
+
+                {/* ── Maintenance templates section ──────────────────────────────────────── */}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        Planes de mantenimiento
+                      </span>
+                      <button style={btnPrimary} onClick={openNewTemplate}>+ Añadir</button>
+                    </div>
+                    {(selectedType.maintenance_templates ?? []).length === 0 ? (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin plantillas configuradas</p>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                            {['NOMBRE', 'UMBRAL', 'VALOR', '% AVISO', ''].map(h => (
+                              <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(selectedType.maintenance_templates ?? []).map((tmpl, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                              <td style={{ padding: '6px 8px' }}>{tmpl.name}</td>
+                              <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>
+                                {{ pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días' }[tmpl.thresholds[0]?.type] ?? tmpl.thresholds[0]?.type}
+                              </td>
+                              <td style={{ padding: '6px 8px', fontFamily: 'var(--font-data)' }}>{tmpl.thresholds[0]?.value}</td>
+                              <td style={{ padding: '6px 8px', fontFamily: 'var(--font-data)' }}>{tmpl.warn_before_pct}%</td>
+                              <td style={{ padding: '6px 8px', display: 'flex', gap: 6 }}>
+                                <button style={btnSecondary} onClick={() => openEditTemplate(tmpl, idx)}>Editar</button>
+                                <button style={{ ...btnSecondary, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }} onClick={() => deleteTemplate(idx)}>✕</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Alert rules for this type ──────────────────────────────────────────── */}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        Reglas de alerta
+                      </span>
+                      <button style={btnPrimary} onClick={() => navigate(`/rules/new?type_id=${selectedType.id}`)}>+ Nueva regla</button>
+                    </div>
+                    {typeRules.length === 0 ? (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin reglas configuradas para este tipo</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {typeRules.map(r => (
+                          <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-base)', borderRadius: 6, padding: '6px 10px' }}>
+                            <span style={{ fontSize: 12 }}>{r.name}</span>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: r.severity === 'critical' ? 'var(--accent-crit)' : r.severity === 'warning' ? 'var(--accent-warn)' : 'var(--accent-info)', color: '#fff', fontWeight: 600, textTransform: 'uppercase' }}>
+                                {r.severity}
+                              </span>
+                              <span style={{ fontSize: 10, color: r.active ? 'var(--accent-ok)' : 'var(--text-muted)' }}>
+                                {r.active ? 'Activa' : 'Inactiva'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -538,6 +688,41 @@ export default function VehicleTypesPage() {
               <button style={btnSecondary} onClick={() => setShowSensorModal(false)}>Cancelar</button>
               <button style={btnPrimary} onClick={saveSensor} disabled={!sensorForm.label.trim() || !sensorForm.avl_id}>
                 {editingSensorIdx === null ? 'Añadir' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Plantilla de mantenimiento ──────────────────────────── */}
+      {showTemplateModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--bg-border)' }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600 }}>
+              {editingTemplateIdx === null ? 'Nueva plantilla' : 'Editar plantilla'}
+            </h3>
+            <label style={labelStyle}>Nombre</label>
+            <input style={{ ...inputStyle, marginBottom: 12 }} value={templateForm.name}
+              onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} />
+            <label style={labelStyle}>Tipo de umbral</label>
+            <select style={{ ...inputStyle, marginBottom: 12 }}
+              value={templateForm.thresholdType}
+              onChange={e => setTemplateForm(f => ({ ...f, thresholdType: e.target.value as TemplateFormState['thresholdType'] }))}>
+              <option value="pto_hours">Horas PTO</option>
+              <option value="engine_hours">Horas motor</option>
+              <option value="calendar_days">Días naturales</option>
+            </select>
+            <label style={labelStyle}>Valor</label>
+            <input style={{ ...inputStyle, marginBottom: 12 }} type="number" min="1" value={templateForm.value}
+              onChange={e => setTemplateForm(f => ({ ...f, value: e.target.value }))} />
+            <label style={labelStyle}>% aviso previo</label>
+            <input style={{ ...inputStyle, marginBottom: 20 }} type="number" min="1" max="50" value={templateForm.warn_before_pct}
+              onChange={e => setTemplateForm(f => ({ ...f, warn_before_pct: e.target.value }))} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button style={btnSecondary} onClick={() => setShowTemplateModal(false)}>Cancelar</button>
+              <button style={btnPrimary} onClick={saveTemplate}
+                disabled={updateTemplatesMutation.isPending}>
+                {updateTemplatesMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>
             </div>
           </div>
