@@ -14,6 +14,9 @@ cmgtrack.com {
     handle /openapi.json {
         reverse_proxy core-api:8010
     }
+    handle /uploads/* {
+        reverse_proxy core-api:8010
+    }
     handle {
         reverse_proxy frontend:3000
     }
@@ -28,4 +31,30 @@ cmgtrack.com {
 
 www.cmgtrack.com {
     redir https://cmgtrack.com{uri} permanent
+}
+
+www.cmgnexus.es {
+    redir https://cmgnexus.es{uri} permanent
+}
+
+cmgnexus.es {
+    handle {
+        reverse_proxy 10.0.0.2:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+
+    @workshop_sw path /static/workshop/sw.js
+    header @workshop_sw Service-Worker-Allowed /taller/
+
+    @portal_sw path /static/sw.js
+    header @portal_sw Service-Worker-Allowed /
 }

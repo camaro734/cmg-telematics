@@ -92,6 +92,8 @@ services:
       REDIS_URL: ${REDIS_URL}
       SECRET_KEY: ${SECRET_KEY}
       ENVIRONMENT: ${ENVIRONMENT}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,3 +135,4 @@ volumes:
   redisdata:
   caddydata:
   caddyconfig:
+  uploads_data:
