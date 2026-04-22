@@ -18,11 +18,17 @@ from app.schemas.vehicle import (
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.maintenance import MaintenancePlan
-from app.schemas.maintenance import MaintenancePlanOut
+from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["vehicles"])
+
+
+class MaintenanceTemplatesUpdate(BaseModel):
+    templates: list[MaintenanceTemplateItem]
 
 
 def _check_vehicle_access(vehicle: Vehicle, user: CurrentUser) -> None:
@@ -62,6 +68,29 @@ async def update_vehicle_type_sensor_schema(
     from sqlalchemy.orm.attributes import flag_modified
     vtype.sensor_schema = body.sensor_schema
     flag_modified(vtype, "sensor_schema")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
+@router.patch("/vehicle-types/{type_id}/maintenance-templates", response_model=VehicleTypeOut)
+async def update_vehicle_type_maintenance_templates(
+    type_id: uuid.UUID,
+    body: MaintenanceTemplatesUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo CMG admin puede modificar tipos de vehículo",
+        )
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tipo de vehículo no encontrado")
+    from sqlalchemy.orm.attributes import flag_modified
+    vtype.maintenance_templates = [t.model_dump() for t in body.templates]
+    flag_modified(vtype, "maintenance_templates")
     await db.commit()
     await db.refresh(vtype)
     return vtype
@@ -186,6 +215,23 @@ async def create_vehicle(
     db.add(vehicle)
     await db.commit()
     await db.refresh(vehicle)
+    # Auto-create maintenance plans from vehicle type templates
+    templates = vtype.maintenance_templates or []
+    for tmpl in templates:
+        plan = MaintenancePlan(
+            vehicle_id=vehicle.id,
+            tenant_id=vehicle.tenant_id,
+            name=tmpl["name"],
+            trigger_condition={
+                "thresholds": tmpl["thresholds"],
+                "op": "OR",
+            },
+            warn_before_pct=tmpl.get("warn_before_pct", 10),
+            active=True,
+        )
+        db.add(plan)
+    if templates:
+        await db.commit()
     return vehicle
 
 
