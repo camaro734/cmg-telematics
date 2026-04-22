@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
@@ -62,8 +62,17 @@ export default function RuleFormPage() {
   const isEdit = !!id && id !== 'new'
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const prefilledTypeId = searchParams.get('type_id')
 
-  const [form, setForm] = useState<RuleCreate>(DEFAULT_FORM)
+  const [form, setForm] = useState<RuleCreate>({
+    ...DEFAULT_FORM,
+    vehicle_filter: {
+      scope: prefilledTypeId ? 'type' : 'all',
+      vehicle_id: '',
+      vehicle_type_id: prefilledTypeId ?? '',
+    },
+  })
   const [nameError, setNameError] = useState('')
   const [apiError, setApiError] = useState('')
 
