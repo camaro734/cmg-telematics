@@ -104,6 +104,7 @@ export interface VehicleTypeOut {
   slug: string
   name: string
   sensor_schema: SensorDef[]
+  icon_url: string | null
 }
 
 export interface AlertInstanceOut {
