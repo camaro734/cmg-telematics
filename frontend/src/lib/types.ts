@@ -106,6 +106,7 @@ export interface VehicleTypeOut {
   name: string
   sensor_schema: SensorDef[]
   icon_url: string | null
+  maintenance_templates: MaintenanceTemplateItem[]
 }
 
 export interface AlertInstanceOut {
@@ -210,6 +211,12 @@ export interface TriggerCondition {
   op: 'OR'
 }
 
+export interface MaintenanceTemplateItem {
+  name: string
+  thresholds: MaintenanceThreshold[]
+  warn_before_pct: number
+}
+
 export interface ThresholdProgress {
   type: string
   current: number
@@ -259,6 +266,7 @@ export interface MaintenanceLogOut {
   description: string | null
   reset_counters: string[]
   cost_eur: number | null
+  document_url: string | null
 }
 
 export interface MaintenanceLogCreate {
