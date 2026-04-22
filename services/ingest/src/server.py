@@ -10,7 +10,7 @@ import struct
 from redis.asyncio import Redis
 from src.codec8 import decode_packet, build_ack
 from src.writer import write_record, get_device_info, update_device_online
-from src.publisher import publish_record
+from src.publisher import publish_record, set_vehicle_offline
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,11 @@ class TeltonikaConnection:
             if self.imei:
                 async with self.db_pool.acquire() as conn:
                     await update_device_online(conn, self.imei, False)
+                if self.device_info:
+                    try:
+                        await set_vehicle_offline(self.redis, self.device_info["vehicle_id"])
+                    except Exception as e:
+                        logger.warning("No se pudo marcar offline en Redis: %s", e)
             self.writer.close()
 
     async def _handshake(self) -> None:
