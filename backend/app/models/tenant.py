@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, CheckConstraint, Text
+from sqlalchemy import String, ForeignKey, DateTime, Boolean, CheckConstraint, Text, ARRAY
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -23,6 +23,7 @@ class Tenant(Base):
     custom_domain: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     brand_tokens: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     notification_email: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    enabled_modules: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     parent = relationship("Tenant", remote_side=[id], backref="children")
