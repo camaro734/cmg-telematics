@@ -23,8 +23,8 @@
   --gauge-warn:  #EAB308;
   --gauge-crit:  #EF4444;
 
-  --sidebar-w: 56px;
-  --topbar-h:  48px;
+  --sidebar-w: 0px;
+  --topbar-h:  52px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

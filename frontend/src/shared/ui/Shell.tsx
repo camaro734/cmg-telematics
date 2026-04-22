@@ -1,18 +1,15 @@
-import Sidebar from './Sidebar'
-import Topbar from './Topbar'
+import TopNav from './TopNav'
 
 interface ShellProps {
-  title: string
+  title?: string
   children: React.ReactNode
 }
 
-export default function Shell({ title, children }: ShellProps) {
+export default function Shell({ children }: ShellProps) {
   return (
     <>
-      <Sidebar />
-      <Topbar title={title} />
+      <TopNav />
       <main style={{
-        marginLeft: 'var(--sidebar-w)',
         marginTop: 'var(--topbar-h)',
         height: 'calc(100vh - var(--topbar-h))',
         overflow: 'hidden',
