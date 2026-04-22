@@ -16,6 +16,8 @@ from app.core.security import hash_password
 
 router = APIRouter(tags=["tenants"])
 
+ALLOWED_MODULES = {"fleet", "alerts", "maintenance", "reports"}
+
 
 @router.get("/tenants", response_model=list[TenantOut])
 async def list_tenants(
@@ -112,6 +114,50 @@ async def update_tenant(
         tenant.slug = body.slug
     if body.active is not None:
         tenant.active = body.active
+    try:
+        await db.commit()
+        await db.refresh(tenant)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slug ya existe")
+    return tenant
+
+
+@router.patch("/tenants/{tenant_id}", response_model=TenantOut)
+async def patch_tenant(
+    tenant_id: uuid.UUID,
+    body: TenantUpdate,
+    user: CurrentUser = Depends(require_tier("cmg")),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    if body.enabled_modules is not None:
+        invalid = set(body.enabled_modules) - ALLOWED_MODULES
+        if invalid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Módulos no válidos: {invalid}",
+            )
+        if tenant.tier == "subclient" and tenant.parent_id:
+            parent = await db.get(Tenant, tenant.parent_id)
+            if parent:
+                not_allowed = set(body.enabled_modules) - set(parent.enabled_modules)
+                if not_allowed:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"El fabricante padre no tiene estos módulos: {not_allowed}",
+                    )
+        tenant.enabled_modules = body.enabled_modules
+
+    # update remaining fields (exclude enabled_modules — already handled above)
+    for field, value in body.model_dump(exclude_unset=True, exclude={"enabled_modules"}).items():
+        setattr(tenant, field, value)
+
     try:
         await db.commit()
         await db.refresh(tenant)

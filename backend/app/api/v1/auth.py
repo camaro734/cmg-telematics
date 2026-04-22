@@ -7,7 +7,8 @@ from app.core.database import get_db
 from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest
+from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, CurrentUser
+from app.api.v1.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -66,3 +67,16 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
         access_token=create_access_token(new_payload),
         refresh_token=create_refresh_token(new_payload),
     )
+
+
+@router.get("/me")
+async def get_me(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    return {
+        "tenant_id": str(current_user.tenant_id),
+        "tier": current_user.tenant_tier,
+        "enabled_modules": tenant.enabled_modules if tenant else [],
+    }
