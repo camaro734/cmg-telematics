@@ -4,6 +4,7 @@ import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, SensorDef } from '../../lib/types'
+import { useAuthStore } from '../auth/useAuthStore'
 
 // ── Form state types ───────────────────────────────────────────────────────
 
@@ -61,6 +62,22 @@ function formToSensorDef(f: SensorFormState): SensorDef {
     if (f.alert_below !== '') def.alert_below = parseFloat(f.alert_below)
   }
   return def
+}
+
+async function uploadIcon(typeId: string, file: File): Promise<VehicleTypeOut> {
+  const token = useAuthStore.getState().accessToken
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await fetch(`/api/v1/vehicle-types/${typeId}/icon`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`${res.status}: ${text}`)
+  }
+  return res.json()
 }
 
 // ── Shared styles ──────────────────────────────────────────────────────────
@@ -215,6 +232,12 @@ export default function VehicleTypesPage() {
     })
   }
 
+  const iconMutation = useMutation({
+    mutationFn: ({ typeId, file }: { typeId: string; file: File }) =>
+      uploadIcon(typeId, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.vehicleTypes() }),
+  })
+
   const typeError = createTypeMutation.error?.message ?? updateTypeMutation.error?.message ?? null
   const sensorError = updateSchemaMutation.error?.message ?? null
 
@@ -268,6 +291,58 @@ export default function VehicleTypesPage() {
               {/* Type header */}
               <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
+                  {/* Icon row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div style={{
+                      width: 40, height: 40,
+                      background: 'var(--bg-elevated)',
+                      borderRadius: 6,
+                      border: '1px solid var(--bg-border)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                    }}>
+                      {selectedType.icon_url
+                        ? <img
+                            src={selectedType.icon_url}
+                            alt="icon"
+                            style={{ width: 40, height: 40, objectFit: 'contain' }}
+                          />
+                        : <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>🚛</span>
+                      }
+                    </div>
+                    <div>
+                      <label style={{
+                        padding: '4px 10px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--bg-border)',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        color: 'var(--text-default)',
+                        cursor: iconMutation.isPending ? 'not-allowed' : 'pointer',
+                        opacity: iconMutation.isPending ? 0.6 : 1,
+                        display: 'inline-block',
+                      }}>
+                        {iconMutation.isPending ? 'Subiendo…' : 'Subir icono PNG'}
+                        <input
+                          type="file"
+                          accept="image/png"
+                          style={{ display: 'none' }}
+                          disabled={iconMutation.isPending}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (file) iconMutation.mutate({ typeId: selectedType.id, file })
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                      {iconMutation.isError && (
+                        <div style={{ fontSize: 11, color: 'var(--accent-crit)', marginTop: 4 }}>
+                          {(iconMutation.error as Error).message}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary, #E7E5E4)' }}>{selectedType.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--accent-off)', fontFamily: 'var(--font-data)', marginTop: 2 }}>slug: {selectedType.slug}</div>
                 </div>
