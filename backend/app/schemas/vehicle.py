@@ -36,6 +36,14 @@ class VehicleCreate(BaseModel):
     tenant_id: uuid.UUID | None = None
 
 
+class VehicleUpdate(BaseModel):
+    name: str | None = None
+    license_plate: str | None = None
+    vin: str | None = None
+    year: int | None = None
+    vehicle_type_id: uuid.UUID | None = None
+
+
 class VehicleStatus(BaseModel):
     vehicle_id: uuid.UUID
     online: bool
@@ -80,3 +88,13 @@ class KpiHour(BaseModel):
 
 class VehicleTypeSensorSchemaUpdate(BaseModel):
     sensor_schema: list[dict[str, Any]]
+
+
+class VehicleTypeCreate(BaseModel):
+    name: str
+    slug: str
+
+
+class VehicleTypeUpdate(BaseModel):
+    name: str | None = None
+    slug: str | None = None

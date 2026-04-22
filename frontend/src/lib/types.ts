@@ -91,6 +91,7 @@ export interface SensorDef {
   avl_id?: number
   scale?: number
   kpi_key?: string
+  bit_index?: number
 }
 
 export interface WsMessage {
@@ -330,6 +331,14 @@ export interface VehicleCreate {
   vin?: string | null
   year?: number | null
   tenant_id?: string | null
+}
+
+export interface VehicleUpdate {
+  name?: string | null
+  license_plate?: string | null
+  vin?: string | null
+  year?: number | null
+  vehicle_type_id?: string | null
 }
 
 export interface DeviceOut {

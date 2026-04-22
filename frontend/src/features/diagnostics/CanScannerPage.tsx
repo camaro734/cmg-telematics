@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { exportToCsv } from '../../lib/csvExport'
-import type { TenantOut, VehicleOut } from '../../lib/types'
+import { keys } from '../../lib/queryKeys'
+import type { TenantOut, VehicleOut, VehicleTypeOut, SensorDef } from '../../lib/types'
 
 // Mapa de AVL IDs conocidos → nombre legible + unidad
 const AVL_NAMES: Record<string, { name: string; unit: string }> = {
@@ -11,25 +12,102 @@ const AVL_NAMES: Record<string, { name: string; unit: string }> = {
   avl_2:   { name: 'DIN 2', unit: '0/1' },
   avl_3:   { name: 'DIN 3', unit: '0/1' },
   avl_4:   { name: 'DIN 4', unit: '0/1' },
+  avl_6:   { name: 'Dallas Temp 5', unit: '°C ×0.1' },
+  avl_8:   { name: 'Dallas Temp 6', unit: '°C ×0.1' },
   avl_9:   { name: 'AIN 1', unit: 'V ×0.001' },
   avl_10:  { name: 'AIN 2', unit: 'V ×0.001' },
   avl_11:  { name: 'AIN 3', unit: 'V ×0.001' },
-  avl_245: { name: 'AIN 4', unit: 'V ×0.001' },
-  avl_24:  { name: 'Speed (GPS)', unit: 'km/h' },
+  avl_14:  { name: 'Engine Worktime', unit: 'min' },
+  avl_16:  { name: 'Total Mileage (counted)', unit: 'm' },
+  avl_17:  { name: 'Fuel Consumed (counted)', unit: 'L ×0.1' },
+  avl_18:  { name: 'Fuel Rate', unit: 'L/h ×0.1' },
+  avl_19:  { name: 'AdBlue Level', unit: '%' },
+  avl_20:  { name: 'AdBlue Level', unit: 'L ×0.1' },
+  avl_21:  { name: 'GSM Signal', unit: '0–5' },
+  avl_23:  { name: 'Engine Load', unit: '%' },
+  avl_24:  { name: 'Speed (CAN)', unit: 'km/h' },
+  avl_25:  { name: 'Engine Temp', unit: '°C ×0.1' },
+  avl_30:  { name: 'Vehicle Speed', unit: 'km/h' },
+  avl_31:  { name: 'Accelerator Pedal', unit: '%' },
+  avl_33:  { name: 'Fuel Consumed', unit: 'L ×0.1' },
+  avl_34:  { name: 'Fuel Level', unit: 'L ×0.1' },
+  avl_35:  { name: 'Engine RPM', unit: 'rpm' },
+  avl_36:  { name: 'Total Mileage', unit: 'm' },
+  avl_37:  { name: 'Fuel Level', unit: '%' },
   avl_66:  { name: 'External Voltage', unit: 'mV' },
+  avl_67:  { name: 'Battery Voltage', unit: 'mV' },
+  avl_68:  { name: 'Battery Current', unit: 'mA' },
   avl_70:  { name: 'PCB Temperature', unit: '°C ×0.1' },
+  avl_71:  { name: 'GNSS Status', unit: '0–5' },
+  avl_72:  { name: 'Dallas Temp 1', unit: '°C ×0.1' },
+  avl_73:  { name: 'Dallas Temp 2', unit: '°C ×0.1' },
+  avl_74:  { name: 'Dallas Temp 3', unit: '°C ×0.1' },
+  avl_75:  { name: 'Dallas Temp 4', unit: '°C ×0.1' },
+  avl_78:  { name: 'iButton', unit: '' },
+  avl_79:  { name: 'Brake Switch', unit: '0/1' },
   avl_80:  { name: 'Wheel Speed (CAN)', unit: 'km/h' },
+  avl_81:  { name: 'Cruise Control', unit: '0/1' },
+  avl_82:  { name: 'Clutch Switch', unit: '0/1' },
   avl_83:  { name: 'PTO State (alt)', unit: '0/1' },
+  avl_84:  { name: 'Accel. Pedal Pos.', unit: '%' },
   avl_85:  { name: 'Engine Load', unit: '%' },
   avl_86:  { name: 'Total Fuel Used', unit: 'L' },
-  avl_87:  { name: 'Fuel Level', unit: '%' },
-  avl_88:  { name: 'Engine RPM', unit: 'rpm' },
+  avl_87:  { name: 'Fuel Level (J1939)', unit: '%' },
+  avl_88:  { name: 'Engine RPM (J1939)', unit: 'rpm' },
   avl_104: { name: 'Engine Hours', unit: 'h' },
+  avl_113: { name: 'Service Distance', unit: 'km' },
   avl_127: { name: 'Coolant Temp', unit: '°C' },
-  avl_135: { name: 'Fuel Rate', unit: 'L/h' },
+  avl_135: { name: 'Fuel Rate (J1939)', unit: 'L/h' },
   avl_139: { name: 'Gross Weight', unit: 'kg' },
+  avl_176: { name: 'DTC Errors Count', unit: '' },
   avl_179: { name: 'PTO State', unit: '0/1' },
+  avl_180: { name: 'Digital Output 2', unit: '0/1' },
+  avl_181: { name: 'GNSS PDOP', unit: '×0.1' },
+  avl_182: { name: 'GNSS HDOP', unit: '×0.1' },
+  avl_199: { name: 'Trip Odometer', unit: 'm' },
+  avl_200: { name: 'Sleep Mode', unit: '' },
+  avl_205: { name: 'GSM Cell ID', unit: '' },
+  avl_206: { name: 'GSM Area Code', unit: '' },
   avl_239: { name: 'Ignition', unit: '0/1' },
+  avl_240: { name: 'Movement', unit: '0/1' },
+  avl_245: { name: 'AIN 4', unit: 'V ×0.001' },
+}
+
+type ResolvedSensor = {
+  label: string
+  unit: string
+  value: number
+  isBit: boolean
+  source: 'custom' | 'std' | 'raw'
+}
+
+function resolveDisplayItems(
+  key: string,
+  raw: number,
+  sensorsByAvlId: Record<number, SensorDef[]>
+): ResolvedSensor[] {
+  const avlNum = parseInt(key.replace('avl_', ''))
+  const customs = sensorsByAvlId[avlNum]
+  if (customs?.length) {
+    return customs.map(def => ({
+      label: def.label,
+      unit: def.unit ?? '',
+      value: def.bit_index !== undefined ? (raw >> def.bit_index) & 1 : (def.scale !== undefined ? raw * def.scale : raw),
+      isBit: def.bit_index !== undefined,
+      source: 'custom' as const,
+    }))
+  }
+  const std = AVL_NAMES[key]
+  if (std) return [{ label: std.name, unit: std.unit, value: raw, isBit: false, source: 'std' as const }]
+  return [{ label: key.toUpperCase(), unit: '', value: raw, isBit: false, source: 'raw' as const }]
+}
+
+function resolveColumnHeader(key: string, sensorsByAvlId: Record<number, SensorDef[]>): string {
+  const avlNum = parseInt(key.replace('avl_', ''))
+  const customs = sensorsByAvlId[avlNum]
+  if (customs?.length === 1) return customs[0].label
+  if (customs?.length) return `${customs[0].label} (+${customs.length - 1})`
+  return AVL_NAMES[key]?.name ?? key
 }
 
 interface CanRecord {
@@ -63,7 +141,7 @@ export default function CanScannerPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const { data: tenants = [] } = useQuery<TenantOut[]>({
-    queryKey: ['tenants'],
+    queryKey: keys.tenants(),
     queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants'),
     staleTime: 60_000,
   })
@@ -75,6 +153,12 @@ export default function CanScannerPage() {
     queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles?tenant_id=${tenantId}`),
     enabled: !!tenantId,
     staleTime: 30_000,
+  })
+
+  const { data: vehicleTypes = [] } = useQuery<VehicleTypeOut[]>({
+    queryKey: keys.vehicleTypes(),
+    queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
+    staleTime: 60_000,
   })
 
   const { data: records = [], isLoading, dataUpdatedAt } = useQuery<CanRecord[]>({
@@ -95,6 +179,19 @@ export default function CanScannerPage() {
   }, [autoRefresh, vehicleId])
 
   const latest = records[0] ?? null
+
+  const selectedVehicle = vehicles.find(v => v.id === vehicleId)
+  const vehicleType = vehicleTypes.find(vt => vt.id === selectedVehicle?.vehicle_type_id)
+
+  const sensorsByAvlId = useMemo((): Record<number, SensorDef[]> => {
+    const map: Record<number, SensorDef[]> = {}
+    for (const s of (vehicleType?.sensor_schema ?? [])) {
+      if (s.avl_id === undefined) continue
+      if (!map[s.avl_id]) map[s.avl_id] = []
+      map[s.avl_id].push(s as SensorDef)
+    }
+    return map
+  }, [vehicleType])
 
   // Unión de todas las claves can_data vistas en los registros
   const allCanKeys = Array.from(
@@ -119,9 +216,16 @@ export default function CanScannerPage() {
         ext_voltage_mv: r.ext_voltage_mv,
       }
       for (const key of allCanKeys) {
-        const meta = AVL_NAMES[key]
-        const header = meta ? `${meta.name} (${key})` : key
-        row[header] = r.can_data[key] ?? null
+        const raw = r.can_data[key] ?? null
+        const items = raw !== null ? resolveDisplayItems(key, raw, sensorsByAvlId) : []
+        if (items.length <= 1) {
+          const header = items[0]?.label ? `${items[0].label} (${key})` : key
+          row[header] = items[0]?.isBit ? (items[0].value === 1 ? 'ON' : 'OFF') : (raw ?? null)
+        } else {
+          for (const item of items) {
+            row[`${item.label} (${key})`] = item.isBit ? (item.value === 1 ? 'ON' : 'OFF') : item.value
+          }
+        }
       }
       return row
     })
@@ -215,6 +319,11 @@ export default function CanScannerPage() {
             <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 12 }}>
                 ESTADO ACTUAL — {new Date(latest.time).toLocaleString('es-ES')}
+                {vehicleType && (
+                  <span style={{ marginLeft: 12, color: 'var(--accent-energy)', fontWeight: 400 }}>
+                    Tipo: {vehicleType.name}
+                  </span>
+                )}
               </div>
 
               {/* Standard fields */}
@@ -239,13 +348,15 @@ export default function CanScannerPage() {
               {allCanKeys.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
                   {allCanKeys.map(key => {
-                    const meta = AVL_NAMES[key]
-                    const value = latest.can_data[key]
-                    const isNew = value !== undefined
-                    return (
-                      <div key={key} style={{
+                    const raw = latest.can_data[key]
+                    const items = raw !== undefined ? resolveDisplayItems(key, raw, sensorsByAvlId) : []
+                    return items.map((item, itemIdx) => (
+                      <div key={`${key}-${itemIdx}`} style={{
                         background: 'var(--bg-elevated)',
-                        border: `1px solid ${isNew ? 'var(--accent-energy)' : 'var(--bg-border)'}`,
+                        border: `1px solid ${raw !== undefined
+                          ? item.source === 'custom' ? 'var(--accent-energy)'
+                          : 'var(--bg-border)'
+                          : 'var(--bg-border)'}`,
                         borderRadius: 6,
                         padding: '7px 10px',
                         display: 'flex',
@@ -253,21 +364,36 @@ export default function CanScannerPage() {
                         gap: 2,
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontSize: 11, color: 'var(--accent-energy)', fontWeight: 600 }}>
-                            {meta ? meta.name : key.toUpperCase()}
+                          <span style={{
+                            fontSize: 11, fontWeight: 600,
+                            color: item.source === 'custom' ? 'var(--accent-energy)'
+                                 : item.source === 'std' ? 'var(--text-primary, #E7E5E4)'
+                                 : 'var(--accent-off)',
+                          }}>
+                            {item.label}
                           </span>
                           <span style={{ fontSize: 10, color: 'var(--accent-off)', fontFamily: 'var(--font-data)' }}>
                             {key}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: isNew ? 'var(--text-primary, #E7E5E4)' : 'var(--accent-off)' }}>
-                            {isNew ? String(value) : '—'}
-                          </span>
-                          {meta && <span style={{ fontSize: 10, color: 'var(--accent-off)' }}>{meta.unit}</span>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {item.isBit ? (
+                            <span style={{
+                              fontSize: 12, fontWeight: 700,
+                              color: item.value === 1 ? 'var(--accent-ok)' : 'var(--accent-off)',
+                              fontFamily: 'var(--font-data)',
+                            }}>
+                              {item.value === 1 ? '● ON' : '○ OFF'}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: 'var(--text-primary, #E7E5E4)' }}>
+                              {raw !== undefined ? item.value.toFixed(item.value % 1 !== 0 ? 2 : 0) : '—'}
+                            </span>
+                          )}
+                          {item.unit && <span style={{ fontSize: 10, color: 'var(--accent-off)' }}>{item.unit}</span>}
                         </div>
                       </div>
-                    )
+                    ))
                   })}
                 </div>
               ) : (
@@ -295,8 +421,8 @@ export default function CanScannerPage() {
                       <th style={th}>Lat</th>
                       <th style={th}>Lon</th>
                       {allCanKeys.map(k => (
-                        <th key={k} style={th} title={AVL_NAMES[k]?.name}>
-                          {AVL_NAMES[k]?.name ?? k}
+                        <th key={k} style={th} title={k}>
+                          {resolveColumnHeader(k, sensorsByAvlId)}
                         </th>
                       ))}
                     </tr>

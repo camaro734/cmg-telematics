@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
-import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos, IconCanScanner } from './icons'
+import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos, IconCanScanner, IconVehiculos } from './icons'
 
 const NAV_ITEMS = [
   { to: '/fleet',       Icon: IconFlota,         label: 'Flota',         active: true },
@@ -67,6 +67,18 @@ export default function Sidebar() {
             <Icon width={20} height={20}/>
           </div>
         )
+      )}
+
+      {isCmg && isAdmin && (
+        <NavLink to="/vehiculos" title="Vehículos" style={navLinkStyle}>
+          <IconVehiculos width={20} height={20}/>
+        </NavLink>
+      )}
+
+      {isCmg && isAdmin && (
+        <NavLink to="/tipos-vehiculo" title="Tipos de Vehículo" style={navLinkStyle}>
+          <IconVehiculos width={20} height={20}/>
+        </NavLink>
       )}
 
       {isCmg && (

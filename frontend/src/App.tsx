@@ -18,6 +18,8 @@ const TenantDetailPage = lazy(() => import('./features/clientes/TenantDetailPage
 const ReportsPage      = lazy(() => import('./features/reports/ReportsPage'))
 const DevicesPage      = lazy(() => import('./features/devices/DevicesPage'))
 const CanScannerPage   = lazy(() => import('./features/diagnostics/CanScannerPage'))
+const VehiclesPage     = lazy(() => import('./features/vehicles/VehiclesPage'))
+const VehicleTypesPage = lazy(() => import('./features/vehicles/VehicleTypesPage'))
 
 function Loading() {
   return (
@@ -60,6 +62,8 @@ export default function App() {
                 <Route path="clientes/:id"      element={<TenantDetailPage />} />
                 <Route path="clientes/:id/edit" element={<TenantFormPage />} />
                 <Route path="reports"           element={<ReportsPage />} />
+                <Route path="vehiculos"         element={<VehiclesPage />} />
+                <Route path="tipos-vehiculo"   element={<VehicleTypesPage />} />
                 <Route path="devices"          element={<DevicesPage />} />
                 <Route path="can-scanner"      element={<CanScannerPage />} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />

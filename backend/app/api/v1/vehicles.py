@@ -10,8 +10,9 @@ from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
-    VehicleTypeOut, VehicleOut, VehicleCreate, VehicleStatus,
+    VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
     TelemetryPoint, TrackPoint, KpiHour, VehicleTypeSensorSchemaUpdate,
+    VehicleTypeCreate, VehicleTypeUpdate,
 )
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
@@ -65,6 +66,50 @@ async def update_vehicle_type_sensor_schema(
     return vtype
 
 
+@router.post("/vehicle-types", response_model=VehicleTypeOut, status_code=201)
+async def create_vehicle_type(
+    body: VehicleTypeCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin puede crear tipos de vehículo")
+    dup = await db.execute(select(VehicleType).where(VehicleType.slug == body.slug))
+    if dup.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Ya existe un tipo con ese slug")
+    vtype = VehicleType(name=body.name, slug=body.slug, sensor_schema=[])
+    db.add(vtype)
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
+@router.patch("/vehicle-types/{type_id}", response_model=VehicleTypeOut)
+async def update_vehicle_type(
+    type_id: uuid.UUID,
+    body: VehicleTypeUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin puede modificar tipos de vehículo")
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    if body.name is not None:
+        vtype.name = body.name
+    if body.slug is not None:
+        dup = await db.execute(
+            select(VehicleType).where(VehicleType.slug == body.slug, VehicleType.id != type_id)
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Ya existe un tipo con ese slug")
+        vtype.slug = body.slug
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
 @router.get("/vehicles", response_model=list[VehicleOut])
 async def list_vehicles(
     tenant_id: uuid.UUID | None = Query(None),
@@ -105,6 +150,30 @@ async def create_vehicle(
         year=body.year,
     )
     db.add(vehicle)
+    await db.commit()
+    await db.refresh(vehicle)
+    return vehicle
+
+
+@router.patch("/vehicles/{vehicle_id}", response_model=VehicleOut)
+async def update_vehicle(
+    vehicle_id: uuid.UUID,
+    body: VehicleUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+    if body.vehicle_type_id is not None:
+        vtype = await db.get(VehicleType, body.vehicle_type_id)
+        if not vtype:
+            raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(vehicle, field, value)
     await db.commit()
     await db.refresh(vehicle)
     return vehicle
