@@ -13,11 +13,10 @@ import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, Ma
 import WorkCyclesTab from './WorkCyclesTab'
 import { useAuthStore } from '../auth/useAuthStore'
 
-const PAGE_TABS = [
+const BASE_TABS = [
   { id: 'live', label: 'EN VIVO' },
   { id: 'historic', label: 'HISTÓRICO' },
   { id: 'cycles', label: 'CICLOS' },
-  { id: 'maintenance', label: 'MANTENIMIENTO' },
 ]
 
 export default function VehicleDetailPage() {
@@ -26,6 +25,10 @@ export default function VehicleDetailPage() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
+  const isCmgAdmin = isCmg && user?.role === 'admin'
+  const PAGE_TABS = isCmgAdmin
+    ? [...BASE_TABS, { id: 'maintenance', label: 'MANTENIMIENTO' }]
+    : BASE_TABS
 
   const [editingPlan, setEditingPlan] = useState<MaintenancePlanOut | null>(null)
   const [editPlanForm, setEditPlanForm] = useState({ name: '', value: '', warnPct: '10' })
