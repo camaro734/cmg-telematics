@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, Integer, Numeric, ARRAY
+from sqlalchemy import String, Text, ForeignKey, DateTime, Boolean, Integer, Numeric, ARRAY
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
@@ -43,3 +43,4 @@ class MaintenanceLog(Base):
     reset_counters: Mapped[list | None] = mapped_column(ARRAY(String), nullable=True)
     cost_eur: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     photo_urls: Mapped[list | None] = mapped_column(ARRAY(String), nullable=True)
+    document_url: Mapped[str | None] = mapped_column(Text, nullable=True)
