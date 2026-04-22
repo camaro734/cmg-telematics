@@ -3,7 +3,8 @@ import uuid
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db
@@ -108,6 +109,36 @@ async def update_vehicle_type(
     await db.commit()
     await db.refresh(vtype)
     return vtype
+
+
+@router.post("/vehicle-types/{type_id}/icon", response_model=VehicleTypeOut)
+async def upload_vehicle_type_icon(
+    type_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    if current_user.tenant_tier != "cmg" or current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin")
+    if file.content_type != "image/png":
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PNG")
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Archivo demasiado grande (máx 2 MB)")
+
+    result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
+    vehicle_type = result.scalar_one_or_none()
+    if not vehicle_type:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+
+    uploads_dir = Path("/app/uploads/icons")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    (uploads_dir / f"{type_id}.png").write_bytes(content)
+
+    vehicle_type.icon_url = f"/uploads/icons/{type_id}.png"
+    await db.commit()
+    await db.refresh(vehicle_type)
+    return vehicle_type
 
 
 @router.get("/vehicles", response_model=list[VehicleOut])

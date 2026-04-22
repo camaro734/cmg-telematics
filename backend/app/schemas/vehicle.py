@@ -12,6 +12,7 @@ class VehicleTypeOut(BaseModel):
     slug: str
     name: str
     sensor_schema: list[dict[str, Any]]
+    icon_url: str | None = None
 
 
 class VehicleOut(BaseModel):

@@ -1,10 +1,12 @@
 # backend/app/main.py
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.api.v1.ws import router as ws_router, ConnectionManager, broadcast_telemetry_task
@@ -13,14 +15,13 @@ from app.core.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialise Redis connection and WebSocket manager
+    Path("/app/uploads/icons").mkdir(parents=True, exist_ok=True)
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     app.state.ws_manager = ConnectionManager()
     task = asyncio.create_task(
         broadcast_telemetry_task(app.state.redis, app.state.ws_manager)
     )
     yield
-    # Shutdown: cancel broadcast task and close Redis connection
     task.cancel()
     try:
         await task
@@ -46,8 +47,8 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
-# WS router is registered without /api/v1 prefix — endpoint is /ws/fleet
 app.include_router(ws_router)
+app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
 
 
 @app.get("/health")
