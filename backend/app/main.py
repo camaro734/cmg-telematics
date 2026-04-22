@@ -16,17 +16,24 @@ from app.core.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Path("/app/uploads/icons").mkdir(parents=True, exist_ok=True)
+    Path("/app/uploads/maintenance_docs").mkdir(parents=True, exist_ok=True)
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     app.state.ws_manager = ConnectionManager()
+    from app.core.maintenance_notifier import maintenance_notification_task
     task = asyncio.create_task(
         broadcast_telemetry_task(app.state.redis, app.state.ws_manager)
     )
+    notifier_task = asyncio.create_task(
+        maintenance_notification_task(app.state.redis)
+    )
     yield
     task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    notifier_task.cancel()
+    for t in (task, notifier_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
     await app.state.redis.aclose()
 
 
