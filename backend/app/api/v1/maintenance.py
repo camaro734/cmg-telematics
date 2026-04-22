@@ -3,7 +3,8 @@ import csv
 import io
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pathlib import Path
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func, cast, or_
@@ -353,6 +354,84 @@ async def list_logs(
         )
         for lg in logs
     ]
+
+
+@router.post("/maintenance/plans/{plan_id}/complete", response_model=MaintenanceLogOut, status_code=201)
+async def complete_plan(
+    plan_id: uuid.UUID,
+    file: UploadFile | None = File(None),
+    description: str | None = Form(None),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    plan = await db.get(MaintenancePlan, plan_id)
+    if not plan or (user.tenant_tier != "cmg" and str(plan.tenant_id) != str(user.tenant_id)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan no encontrado")
+
+    has_file = file is not None and file.filename
+    if user.tenant_tier != "cmg" and not has_file:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debe adjuntar un documento (factura o albarán) para registrar el mantenimiento",
+        )
+
+    log_id = uuid.uuid4()
+    document_url: str | None = None
+
+    if has_file:
+        allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+        content_type = (file.content_type or "").split(";")[0].strip()
+        if content_type not in allowed_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Formato no válido. Use imagen (JPEG, PNG, WEBP) o PDF.",
+            )
+        contents = await file.read()
+        if len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El archivo supera el límite de 5 MB",
+            )
+        ext = Path(file.filename).suffix.lower() or ".pdf"
+        dest = Path("/app/uploads/maintenance_docs") / f"{log_id}{ext}"
+        dest.write_bytes(contents)
+        document_url = f"/uploads/maintenance_docs/{log_id}{ext}"
+
+    thresholds = plan.trigger_condition.get("thresholds", [])
+    reset_counters = [t["type"] for t in thresholds]
+    now = datetime.now(timezone.utc)
+
+    log = MaintenanceLog(
+        id=log_id,
+        vehicle_id=plan.vehicle_id,
+        plan_id=plan_id,
+        performed_at=now,
+        performed_by=uuid.UUID(str(user.user_id)),
+        description=description,
+        reset_counters=reset_counters,
+        document_url=document_url,
+    )
+    db.add(log)
+
+    for t in thresholds:
+        if t["type"] == "calendar_days":
+            from datetime import timedelta
+            plan.next_due_at = now + timedelta(days=float(t["value"]))
+            break
+
+    await db.commit()
+    await db.refresh(log)
+    return MaintenanceLogOut(
+        id=log.id,
+        plan_id=log.plan_id,
+        vehicle_id=log.vehicle_id,
+        performed_at=log.performed_at,
+        performed_by_email=user.email,
+        description=log.description,
+        reset_counters=log.reset_counters or [],
+        cost_eur=None,
+        document_url=log.document_url,
+    )
 
 
 @router.get("/logs/export.csv")
