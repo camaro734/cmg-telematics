@@ -37,7 +37,7 @@ export default function TenantFormPage() {
   const mutation = useMutation({
     mutationFn: (payload: TenantCreate | TenantUpdate) =>
       isEdit
-        ? apiClient.put<TenantOut>(`/api/v1/tenants/${id}`, payload)
+        ? apiClient.patch<TenantOut>(`/api/v1/tenants/${id}`, payload)
         : apiClient.post<TenantOut>('/api/v1/tenants', payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.tenants() })

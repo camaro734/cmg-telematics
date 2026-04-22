@@ -18,6 +18,10 @@ def upgrade() -> None:
         "tenant",
         sa.Column("enabled_modules", sa.ARRAY(sa.Text()), nullable=False, server_default="{}"),
     )
+    op.execute(
+        "UPDATE tenant SET enabled_modules = ARRAY['fleet','alerts','maintenance','reports'] "
+        "WHERE tier IN ('client', 'subclient')"
+    )
 
 
 def downgrade() -> None:
