@@ -15,6 +15,12 @@ class TriggerCondition(BaseModel):
     op: Literal['OR'] = 'OR'
 
 
+class MaintenanceTemplateItem(BaseModel):
+    name: str
+    thresholds: list[MaintenanceThreshold]
+    warn_before_pct: int = 10
+
+
 class ThresholdProgress(BaseModel):
     type: str
     current: float
@@ -73,3 +79,4 @@ class MaintenanceLogOut(BaseModel):
     description: str | None = None
     reset_counters: list[str]
     cost_eur: float | None = None
+    document_url: str | None = None

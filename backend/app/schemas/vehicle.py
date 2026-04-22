@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 from pydantic import BaseModel, ConfigDict
+from app.schemas.maintenance import MaintenanceTemplateItem
 
 
 class VehicleTypeOut(BaseModel):
@@ -13,6 +14,7 @@ class VehicleTypeOut(BaseModel):
     name: str
     sensor_schema: list[dict[str, Any]]
     icon_url: str | None = None
+    maintenance_templates: list[MaintenanceTemplateItem] = []
 
 
 class VehicleOut(BaseModel):
