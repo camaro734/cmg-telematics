@@ -167,7 +167,7 @@ export default function TopNav() {
       alignItems: 'center',
       padding: '0 16px',
       gap: 8,
-      zIndex: 100,
+      zIndex: 1000,
       fontFamily: 'var(--font-ui)',
     }}>
 
