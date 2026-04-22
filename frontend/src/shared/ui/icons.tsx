@@ -125,6 +125,21 @@ export function IconDispositivos(props: IconProps) {
   )
 }
 
+// Vehicles: car side-profile (sedan outline)
+export function IconVehiculos(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 17H2a1 1 0 0 1-1-1v-4l2-5h14l2 5v4a1 1 0 0 1-1 1h-2"/>
+      <path d="M7 17h8"/>
+      <circle cx="5" cy="17" r="2"/>
+      <circle cx="17" cy="17" r="2"/>
+      <path d="M4 11h14"/>
+      <path d="M7 6l-1 5"/>
+      <path d="M15 6l1 5"/>
+    </Icon>
+  )
+}
+
 // CAN Scanner: oscilloscope waveform
 export function IconCanScanner(props: IconProps) {
   return (

@@ -94,6 +94,21 @@ async def update_device(
     return device
 
 
+@router.delete("/{device_id}", status_code=204)
+async def delete_device(
+    device_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG admin puede eliminar dispositivos")
+    device = await db.get(Device, device_id)
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
+    await db.delete(device)
+    await db.commit()
+
+
 @router.patch("/{device_id}/vehicle", response_model=DeviceOut)
 async def assign_vehicle(
     device_id: uuid.UUID,

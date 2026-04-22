@@ -48,6 +48,20 @@ export default function DevicesPage() {
     staleTime: 30_000,
   })
 
+  // Mutación para eliminar dispositivo
+  const deleteMutation = useMutation({
+    mutationFn: (deviceId: string) => apiClient.delete(`/api/v1/devices/${deviceId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    },
+  })
+
+  function handleDelete(device: DeviceOut) {
+    const label = device.imei
+    if (!window.confirm(`¿Eliminar el dispositivo ${label}?\n\nEsta acción no se puede deshacer.`)) return
+    deleteMutation.mutate(device.id)
+  }
+
   // Mutación para crear dispositivo
   const createMutation = useMutation({
     mutationFn: (payload: DeviceCreate) => apiClient.post<DeviceOut>('/api/v1/devices', payload),
@@ -187,6 +201,7 @@ export default function DevicesPage() {
                     <th style={thStyle}>Estado</th>
                     <th style={thStyle}>Última señal</th>
                     <th style={thStyle}>Firmware</th>
+                    <th style={thStyle}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -224,6 +239,24 @@ export default function DevicesPage() {
                       </td>
                       <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', color: device.firmware_ver ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 12 }}>
                         {device.firmware_ver ?? '—'}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleDelete(device)}
+                          disabled={deleteMutation.isPending}
+                          style={{
+                            background: 'none',
+                            border: '1px solid var(--accent-crit)',
+                            color: 'var(--accent-crit)',
+                            borderRadius: 4,
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            opacity: deleteMutation.isPending ? 0.5 : 1,
+                          }}
+                        >
+                          Eliminar
+                        </button>
                       </td>
                     </tr>
                   ))}
