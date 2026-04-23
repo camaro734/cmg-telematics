@@ -353,6 +353,15 @@ export default function FleetPage() {
                     ))}
                   </div>
 
+                  {selectedStatus?.ext_voltage_mv != null && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Batería vehículo
+                      </div>
+                      <BatteryPanel mv={selectedStatus.ext_voltage_mv} />
+                    </div>
+                  )}
+
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     Última señal: {relativeTime(selectedStatus?.last_seen ?? null)}
                   </div>
@@ -374,6 +383,25 @@ function Row({ label, value }: { label: string; value: string }) {
       <span style={{ fontSize: 12, color: 'var(--text-default)', fontFamily: 'var(--font-data)', textAlign: 'right', maxWidth: '65%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {value}
       </span>
+    </div>
+  )
+}
+
+function BatteryPanel({ mv }: { mv: number }) {
+  const v = mv / 1000
+  const pct = Math.round(Math.max(0, Math.min(1, (mv - 11000) / (14400 - 11000))) * 100)
+  const color = mv < 11500 ? 'var(--accent-crit)' : mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)'
+  const label = mv < 11500 ? 'BAJA' : mv < 12000 ? 'ADVERTENCIA' : 'OK'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <div style={{ width: 44, height: 18, border: `2px solid var(--bg-border)`, borderRadius: 3, background: 'var(--bg-base)', overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.3s' }} />
+        </div>
+        <div style={{ width: 3, height: 8, background: 'var(--bg-border)', borderRadius: '0 2px 2px 0' }} />
+      </div>
+      <span style={{ fontSize: 13, fontFamily: 'var(--font-data)', color, fontWeight: 700 }}>{v.toFixed(2)} V</span>
+      <span style={{ fontSize: 10, color, fontWeight: 600 }}>{label}</span>
     </div>
   )
 }

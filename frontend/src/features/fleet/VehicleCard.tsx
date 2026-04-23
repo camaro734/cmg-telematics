@@ -1,22 +1,6 @@
 import { useFleetStore } from './useFleetStore'
 import type { VehicleOut, VehicleTypeOut, VehicleStatus } from '../../lib/types'
 
-function BatteryBar({ mv }: { mv: number }) {
-  const v = mv / 1000
-  const pct = Math.round(Math.max(0, Math.min(1, (mv - 11000) / (14400 - 11000))) * 100)
-  const color = mv < 11500 ? 'var(--accent-crit)' : mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)'
-  return (
-    <div style={{ width: '100%', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
-      <div style={{ flex: 1, height: 5, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.3s' }} />
-      </div>
-      <span style={{ fontSize: 9, fontFamily: 'var(--font-data)', color, whiteSpace: 'nowrap' }}>
-        {v.toFixed(1)}V
-      </span>
-    </div>
-  )
-}
-
 interface Props {
   vehicle: VehicleOut
   vehicleType: VehicleTypeOut | undefined
@@ -95,10 +79,6 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected }
       }}>
         {vehicle.license_plate ?? vehicle.name}
       </div>
-
-      {status?.ext_voltage_mv != null && (
-        <BatteryBar mv={status.ext_voltage_mv} />
-      )}
 
       <div style={{
         position: 'absolute',
