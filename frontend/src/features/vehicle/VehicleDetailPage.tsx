@@ -117,12 +117,16 @@ export default function VehicleDetailPage() {
 
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicle?.vehicle_type_id)
   const sensorSchema = vehicleType?.sensor_schema ?? []
+  const hasBatteryInSchema = sensorSchema.some(s => s.gauge_type === 'battery')
 
   const derivedValues = useMemo(() => ({
     pto_hours_today: kpis.length > 0
       ? Math.round(kpis.reduce((s, h) => s + (h.pto_active_minutes ?? 0), 0) / 60 * 10) / 10
       : null,
-  }), [kpis])
+    ext_voltage_v: status?.ext_voltage_mv != null
+      ? Math.round(status.ext_voltage_mv / 10) / 100
+      : null,
+  }), [kpis, status?.ext_voltage_mv])
 
   if (!id) return <Navigate to="/fleet" replace />
 
@@ -187,20 +191,47 @@ export default function VehicleDetailPage() {
               </div>
               <TrackMap track={track} status={status} />
             </div>
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 10 }}>
-                SENSORES EN VIVO
-              </div>
-              {sensorSchema.length > 0 ? (
-                <SensorGrid
-                  sensorSchema={sensorSchema}
-                  canData={status?.can_data ?? {}}
-                  derivedValues={derivedValues}
-                />
-              ) : (
-                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                  Sin schema de sensores configurado para este tipo de vehículo.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Tarjetas de estado siempre visibles */}
+              {status && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 10 }}>
+                    ESTADO DEL DISPOSITIVO
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+                    <StatusCard label="Ignición" value={status.ignition == null ? '—' : status.ignition ? 'ON' : 'OFF'} color={status.ignition ? 'var(--accent-ok)' : 'var(--accent-off)'} />
+                    <StatusCard label="PTO" value={status.pto_active == null ? '—' : status.pto_active ? 'ON' : 'OFF'} color={status.pto_active ? 'var(--accent-energy)' : 'var(--accent-off)'} />
+                    <StatusCard label="Velocidad" value={status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—'} />
+                    {status.ext_voltage_mv != null && !hasBatteryInSchema && (
+                      <StatusCard
+                        label="Batería"
+                        value={`${(status.ext_voltage_mv / 1000).toFixed(2)} V`}
+                        color={status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)'}
+                      />
+                    )}
+                  </div>
                 </div>
+              )}
+
+              {/* Sensores del schema */}
+              {sensorSchema.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 10 }}>
+                    SENSORES EN VIVO
+                  </div>
+                  <SensorGrid
+                    sensorSchema={sensorSchema}
+                    canData={{
+                      ...(status?.can_data ?? {}),
+                      ...(status?.ext_voltage_mv != null ? { avl_66: status.ext_voltage_mv } : {}),
+                    }}
+                    derivedValues={derivedValues}
+                  />
+                </div>
+              )}
+
+              {!status && (
+                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin datos en vivo para este vehículo.</div>
               )}
             </div>
           </div>
@@ -292,5 +323,14 @@ export default function VehicleDetailPage() {
         )}
       </div>
     </Shell>
+  )
+}
+
+function StatusCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '8px 12px' }}>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-primary, #E7E5E4)' }}>{value}</div>
+    </div>
   )
 }
