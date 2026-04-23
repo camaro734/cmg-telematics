@@ -55,6 +55,7 @@ app.add_middleware(
 
 app.include_router(api_router)
 app.include_router(ws_router)
+Path("/app/uploads").mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
 
 
