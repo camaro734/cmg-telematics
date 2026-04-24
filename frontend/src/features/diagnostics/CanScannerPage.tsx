@@ -1,77 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { exportToCsv } from '../../lib/csvExport'
 import { keys } from '../../lib/queryKeys'
 import type { TenantOut, VehicleOut, VehicleTypeOut, SensorDef } from '../../lib/types'
-
-// Mapa de AVL IDs conocidos → nombre legible + unidad
-const AVL_NAMES: Record<string, { name: string; unit: string }> = {
-  avl_1:   { name: 'DIN 1', unit: '0/1' },
-  avl_2:   { name: 'DIN 2', unit: '0/1' },
-  avl_3:   { name: 'DIN 3', unit: '0/1' },
-  avl_4:   { name: 'DIN 4', unit: '0/1' },
-  avl_6:   { name: 'Dallas Temp 5', unit: '°C ×0.1' },
-  avl_8:   { name: 'Dallas Temp 6', unit: '°C ×0.1' },
-  avl_9:   { name: 'AIN 1', unit: 'V ×0.001' },
-  avl_10:  { name: 'AIN 2', unit: 'V ×0.001' },
-  avl_11:  { name: 'AIN 3', unit: 'V ×0.001' },
-  avl_14:  { name: 'Engine Worktime', unit: 'min' },
-  avl_16:  { name: 'Total Mileage (counted)', unit: 'm' },
-  avl_17:  { name: 'Fuel Consumed (counted)', unit: 'L ×0.1' },
-  avl_18:  { name: 'Fuel Rate', unit: 'L/h ×0.1' },
-  avl_19:  { name: 'AdBlue Level', unit: '%' },
-  avl_20:  { name: 'AdBlue Level', unit: 'L ×0.1' },
-  avl_21:  { name: 'GSM Signal', unit: '0–5' },
-  avl_23:  { name: 'Engine Load', unit: '%' },
-  avl_24:  { name: 'Speed (CAN)', unit: 'km/h' },
-  avl_25:  { name: 'Engine Temp', unit: '°C ×0.1' },
-  avl_30:  { name: 'Vehicle Speed', unit: 'km/h' },
-  avl_31:  { name: 'Accelerator Pedal', unit: '%' },
-  avl_33:  { name: 'Fuel Consumed', unit: 'L ×0.1' },
-  avl_34:  { name: 'Fuel Level', unit: 'L ×0.1' },
-  avl_35:  { name: 'Engine RPM', unit: 'rpm' },
-  avl_36:  { name: 'Total Mileage', unit: 'm' },
-  avl_37:  { name: 'Fuel Level', unit: '%' },
-  avl_66:  { name: 'External Voltage', unit: 'mV' },
-  avl_67:  { name: 'Battery Voltage', unit: 'mV' },
-  avl_68:  { name: 'Battery Current', unit: 'mA' },
-  avl_70:  { name: 'PCB Temperature', unit: '°C ×0.1' },
-  avl_71:  { name: 'GNSS Status', unit: '0–5' },
-  avl_72:  { name: 'Dallas Temp 1', unit: '°C ×0.1' },
-  avl_73:  { name: 'Dallas Temp 2', unit: '°C ×0.1' },
-  avl_74:  { name: 'Dallas Temp 3', unit: '°C ×0.1' },
-  avl_75:  { name: 'Dallas Temp 4', unit: '°C ×0.1' },
-  avl_78:  { name: 'iButton', unit: '' },
-  avl_79:  { name: 'Brake Switch', unit: '0/1' },
-  avl_80:  { name: 'Wheel Speed (CAN)', unit: 'km/h' },
-  avl_81:  { name: 'Cruise Control', unit: '0/1' },
-  avl_82:  { name: 'Clutch Switch', unit: '0/1' },
-  avl_83:  { name: 'PTO State (alt)', unit: '0/1' },
-  avl_84:  { name: 'Accel. Pedal Pos.', unit: '%' },
-  avl_85:  { name: 'Engine Load', unit: '%' },
-  avl_86:  { name: 'Total Fuel Used', unit: 'L' },
-  avl_87:  { name: 'Fuel Level (J1939)', unit: '%' },
-  avl_88:  { name: 'Engine RPM (J1939)', unit: 'rpm' },
-  avl_104: { name: 'Engine Hours', unit: 'h' },
-  avl_113: { name: 'Service Distance', unit: 'km' },
-  avl_127: { name: 'Coolant Temp', unit: '°C' },
-  avl_135: { name: 'Fuel Rate (J1939)', unit: 'L/h' },
-  avl_139: { name: 'Gross Weight', unit: 'kg' },
-  avl_176: { name: 'DTC Errors Count', unit: '' },
-  avl_179: { name: 'PTO State', unit: '0/1' },
-  avl_180: { name: 'Digital Output 2', unit: '0/1' },
-  avl_181: { name: 'GNSS PDOP', unit: '×0.1' },
-  avl_182: { name: 'GNSS HDOP', unit: '×0.1' },
-  avl_199: { name: 'Trip Odometer', unit: 'm' },
-  avl_200: { name: 'Sleep Mode', unit: '' },
-  avl_205: { name: 'GSM Cell ID', unit: '' },
-  avl_206: { name: 'GSM Area Code', unit: '' },
-  avl_239: { name: 'Ignition', unit: '0/1' },
-  avl_240: { name: 'Movement', unit: '0/1' },
-  avl_245: { name: 'AIN 4', unit: 'V ×0.001' },
-}
+import { AVL_NAMES } from '../../lib/avlNames'
 
 type ResolvedSensor = {
   label: string
@@ -134,11 +68,83 @@ function Badge({ on, label }: { on: boolean | null; label: string }) {
 }
 
 export default function CanScannerPage() {
+  const queryClient = useQueryClient()
   const [tenantId, setTenantId] = useState('')
   const [vehicleId, setVehicleId] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [refreshCount, setRefreshCount] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [labelingKey, setLabelingKey] = useState<string | null>(null)
+  const [labelMode, setLabelMode] = useState<'numeric' | 'bits'>('numeric')
+  const [labelForm, setLabelForm] = useState({ label: '', unit: '' })
+  const [bitForms, setBitForms] = useState<{ label: string; enabled: boolean }[]>(
+    Array.from({ length: 8 }, () => ({ label: '', enabled: false }))
+  )
+
+  const patchSchemaMutation = useMutation({
+    mutationFn: ({ id, schema }: { id: string; schema: SensorDef[] }) =>
+      apiClient.patch<VehicleTypeOut>(`/api/v1/vehicle-types/${id}/sensor-schema`, { sensor_schema: schema }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(keys.vehicleTypes(), (old: VehicleTypeOut[] | undefined) =>
+        old?.map(vt => vt.id === updated.id ? updated : vt) ?? [updated]
+      )
+      setLabelingKey(null)
+    },
+  })
+
+  function openLabelModal(key: string) {
+    // Pre-populate from existing sensor_schema if already defined
+    const avlNum = parseInt(key.replace('avl_', ''))
+    const existing = vehicleType?.sensor_schema ?? []
+    const bitDefs = existing.filter(s => s.avl_id === avlNum && s.bit_index !== undefined)
+    const numericDef = existing.find(s => s.avl_id === avlNum && s.bit_index === undefined)
+    if (bitDefs.length) {
+      const forms = Array.from({ length: 8 }, (_, i) => {
+        const d = bitDefs.find(b => b.bit_index === i)
+        return d ? { label: d.label, enabled: true } : { label: '', enabled: false }
+      })
+      setBitForms(forms)
+      setLabelMode('bits')
+    } else {
+      setLabelForm({ label: numericDef?.label ?? '', unit: numericDef?.unit ?? '' })
+      setLabelMode('numeric')
+      setBitForms(Array.from({ length: 8 }, () => ({ label: '', enabled: false })))
+    }
+    setLabelingKey(key)
+  }
+
+  function saveLabel() {
+    if (!vehicleType || !labelingKey) return
+    const avlNum = parseInt(labelingKey.replace('avl_', ''))
+    const existing = vehicleType.sensor_schema ?? []
+
+    if (labelMode === 'numeric') {
+      if (!labelForm.label.trim()) return
+      const newDef: SensorDef = {
+        key: labelingKey,
+        label: labelForm.label.trim(),
+        unit: labelForm.unit.trim() || null,
+        avl_id: avlNum,
+        gauge_type: 'numeric',
+      }
+      const updated = [...existing.filter(s => s.avl_id !== avlNum || s.bit_index !== undefined), newDef]
+      patchSchemaMutation.mutate({ id: vehicleType.id, schema: updated })
+    } else {
+      const activeBits = bitForms.filter(b => b.enabled && b.label.trim())
+      if (!activeBits.length) return
+      const newDefs: SensorDef[] = bitForms
+        .flatMap((b, i) => b.enabled && b.label.trim() ? [{
+          key: `${labelingKey}_bit${i}`,
+          label: b.label.trim(),
+          unit: '0/1',
+          avl_id: avlNum,
+          bit_index: i,
+          gauge_type: 'led' as const,
+        }] : [])
+      const updated = [...existing.filter(s => s.avl_id !== avlNum || s.bit_index === undefined), ...newDefs]
+      patchSchemaMutation.mutate({ id: vehicleType.id, schema: updated })
+    }
+  }
 
   const { data: tenants = [] } = useQuery<TenantOut[]>({
     queryKey: keys.tenants(),
@@ -313,6 +319,108 @@ export default function CanScannerPage() {
           </div>
         )}
 
+        {labelingKey && vehicleType && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 420, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #E7E5E4)' }}>
+                Etiquetar{' '}
+                <span style={{ fontFamily: 'var(--font-data)', color: 'var(--accent-energy)' }}>{labelingKey}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--accent-off)', lineHeight: 1.5 }}>
+                Tipo de vehículo: <strong style={{ color: 'var(--text-primary, #E7E5E4)' }}>{vehicleType.name}</strong>.
+                Los nombres serán visibles en todos los vehículos de este tipo.
+              </div>
+
+              {/* Selector de modo */}
+              <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--bg-border)' }}>
+                {(['numeric', 'bits'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setLabelMode(mode)}
+                    style={{
+                      flex: 1, padding: '7px 0', fontSize: 12, border: 'none', cursor: 'pointer',
+                      background: labelMode === mode ? 'var(--accent-energy)' : 'var(--bg-elevated)',
+                      color: labelMode === mode ? '#fff' : 'var(--accent-off)',
+                      fontWeight: labelMode === mode ? 600 : 400,
+                    }}
+                  >
+                    {mode === 'numeric' ? 'Valor numérico' : 'Campo de bits (ON/OFF)'}
+                  </button>
+                ))}
+              </div>
+
+              {labelMode === 'numeric' ? (
+                <>
+                  <input
+                    autoFocus
+                    placeholder="Nombre del sensor (ej. Presión hidráulica)"
+                    value={labelForm.label}
+                    onChange={e => setLabelForm(f => ({ ...f, label: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && saveLabel()}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
+                  />
+                  <input
+                    placeholder="Unidad (ej. bar, °C, %) — opcional"
+                    value={labelForm.unit}
+                    onChange={e => setLabelForm(f => ({ ...f, unit: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && saveLabel()}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
+                  />
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--accent-off)', marginBottom: 2 }}>
+                    Activa los bits que quieras etiquetar (bit 0 = bit menos significativo):
+                  </div>
+                  {bitForms.map((b, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={b.enabled}
+                        onChange={e => setBitForms(f => f.map((x, j) => j === i ? { ...x, enabled: e.target.checked } : x))}
+                        style={{ accentColor: 'var(--accent-energy)', width: 14, height: 14, flexShrink: 0 }}
+                      />
+                      <span style={{ fontSize: 11, fontFamily: 'var(--font-data)', color: 'var(--accent-off)', width: 34, flexShrink: 0 }}>
+                        bit {i}
+                      </span>
+                      <input
+                        disabled={!b.enabled}
+                        placeholder={`Nombre (ej. Válvula ${i + 1} abierta)`}
+                        value={b.label}
+                        onChange={e => setBitForms(f => f.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                        style={{
+                          flex: 1, background: 'var(--bg-elevated)', color: b.enabled ? 'var(--text-primary, #E7E5E4)' : 'var(--accent-off)',
+                          border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px', fontSize: 12,
+                          opacity: b.enabled ? 1 : 0.4,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {patchSchemaMutation.isError && (
+                <div style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{(patchSchemaMutation.error as Error).message}</div>
+              )}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setLabelingKey(null)}
+                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveLabel}
+                  disabled={patchSchemaMutation.isPending || (labelMode === 'numeric' ? !labelForm.label.trim() : !bitForms.some(b => b.enabled && b.label.trim()))}
+                  style={{ padding: '6px 14px', background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 600, opacity: patchSchemaMutation.isPending ? 0.7 : 1 }}
+                >
+                  {patchSchemaMutation.isPending ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {latest && (
           <>
             {/* Live snapshot */}
@@ -392,6 +500,14 @@ export default function CanScannerPage() {
                           )}
                           {item.unit && <span style={{ fontSize: 10, color: 'var(--accent-off)' }}>{item.unit}</span>}
                         </div>
+                        {item.source === 'raw' && vehicleType && (
+                          <button
+                            onClick={() => openLabelModal(key)}
+                            style={{ fontSize: 9, color: 'var(--accent-info)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2, textAlign: 'left' }}
+                          >
+                            ✎ etiquetar
+                          </button>
+                        )}
                       </div>
                     ))
                   })}

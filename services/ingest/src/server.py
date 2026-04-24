@@ -5,15 +5,19 @@ Flujo: IMEI handshake → ACK/NACK → receive Codec 8 loop → write DB + publi
 """
 import asyncio
 import asyncpg
+import json
 import logging
 import struct
 from redis.asyncio import Redis
-from src.codec8 import decode_packet, build_ack
+from src.codec8 import decode_packet, build_ack, build_codec12_command
 from src.writer import write_record, get_device_info, update_device_online
 from src.publisher import publish_record, set_vehicle_offline
 from src.config import settings
 
 logger = logging.getLogger(__name__)
+
+# IMEI → StreamWriter registry for active connections
+_active_writers: dict[str, asyncio.StreamWriter] = {}
 
 
 class TeltonikaConnection:
@@ -45,6 +49,7 @@ class TeltonikaConnection:
             logger.error("Error en conexión %s: %s", self.peer, e)
         finally:
             if self.imei:
+                _active_writers.pop(self.imei, None)
                 async with self.db_pool.acquire() as conn:
                     await update_device_online(conn, self.imei, False)
                 if self.device_info:
@@ -75,6 +80,8 @@ class TeltonikaConnection:
         await self.writer.drain()
         logger.info("IMEI aceptado: %s → vehicle %s", self.imei, self.device_info["vehicle_id"])
 
+        _active_writers[self.imei] = self.writer
+
         async with self.db_pool.acquire() as conn:
             await update_device_online(conn, self.imei, True)
 
@@ -89,7 +96,12 @@ class TeltonikaConnection:
             try:
                 records = decode_packet(packet)
             except ValueError as e:
-                logger.error("Paquete inválido de %s: %s", self.imei, e)
+                codec_id = packet[8] if len(packet) > 8 else 0
+                if codec_id == 0x0C:
+                    # Codec 12 response from device (ACK to a GPRS command) — expected, discard
+                    logger.debug("Codec 12 response de %s (ignorado)", self.imei)
+                else:
+                    logger.error("Paquete inválido de %s (codec=0x%02x): %s", self.imei, codec_id, e)
                 continue
 
             async with self.db_pool.acquire() as conn:
@@ -113,6 +125,30 @@ class TeltonikaConnection:
             self.writer.write(ack)
             await self.writer.drain()
             logger.debug("Procesados %d registros de %s", len(records), self.imei)
+
+
+async def command_listener(redis: Redis) -> None:
+    """Escucha el canal Redis 'cmg:dout_commands' y envía comandos Codec 12 al dispositivo."""
+    pubsub = redis.pubsub()
+    await pubsub.subscribe("cmg:dout_commands")
+    logger.info("command_listener suscrito a cmg:dout_commands")
+    async for message in pubsub.listen():
+        if message["type"] != "message":
+            continue
+        try:
+            data = json.loads(message["data"])
+            imei: str = data["imei"]
+            command: str = data["command"]
+            writer = _active_writers.get(imei)
+            if writer is None:
+                logger.warning("DOUT: dispositivo %s no está conectado", imei)
+                continue
+            packet = build_codec12_command(command)
+            writer.write(packet)
+            await writer.drain()
+            logger.info("DOUT enviado a %s: %s", imei, command)
+        except Exception as e:
+            logger.error("Error procesando comando DOUT: %s", e)
 
 
 async def run_server(db_pool: asyncpg.Pool, redis: Redis) -> None:

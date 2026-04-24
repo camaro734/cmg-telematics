@@ -62,7 +62,7 @@ IO Elements: — variables según configuración
 
 Cada IO element es un par `(ID, Valor)`. El ID identifica qué parámetro es.
 
-> **Nota:** El servidor actualmente soporta Codec 8 (ID 0x08). Si el dispositivo está configurado en Codec 8 Extended (0x8E), los paquetes se rechazarán. Usa siempre **Codec 8** en la configuración.
+> **Nota:** El servidor soporta tanto **Codec 8** (ID 0x08) como **Codec 8 Extended** (ID 0x8E). Usa Codec 8 si solo necesitas los primeros 10 slots de CAN Manual. Si necesitas más de 10 slots de CAN Manual (AVL IDs > 255), configura el dispositivo en **Codec 8 Extended**.
 
 ---
 
@@ -130,7 +130,7 @@ Todos los demás IDs llegan al campo `can_data` con la clave `avl_{ID}`. Ejemplo
 | Domain (Server) | `cmgtrack.com` |
 | Port | `5027` |
 | Protocol | `TCP` |
-| Codec | `Codec 8` ← **importante, no Codec 8 Extended** |
+| Codec | `Codec 8` para slots CAN Manual 1–10 / `Codec 8 Extended` para slots 11+ |
 
 También en esta sección configura el **APN** de la SIM:
 - SIM 1: APN, usuario y contraseña según operador (Movistar/Vodafone/Orange)
