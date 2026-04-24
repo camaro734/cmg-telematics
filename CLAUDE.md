@@ -287,19 +287,49 @@ pero con estética contemporánea. Único, no derivado de competidores.
 - Fase 2: App React Native + Expo
 
 ═══════════════════════════════════════════════════════════════
-## 10. SECCIONES DE DISEÑO PENDIENTES
+## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-04-24)
 ═══════════════════════════════════════════════════════════════
 
-### ✅ Completadas
-- [x] Arquitectura de servicios (Sección 1)
-- [x] Modelo de datos completo (Sección 2)
-- [x] Rules Engine: evaluador, hot-reload, escalado (Sección 3)
+La plataforma está en producción con datos reales. Los servicios están desplegados como contenedores Docker en el VPS.
 
-### ⏳ Pendientes (continuar en docs/design/progress.md)
-- [ ] Sección 4 — API REST: endpoints, auth JWT, multi-tenant scope, WebSocket
-- [ ] Sección 5 — Frontend: páginas, componentes, gauges hidráulicos, rule builder
-- [ ] Sección 6 — Infraestructura: docker-compose, Caddy, variables de entorno
-- [ ] Sección 7 — Plan de implementación por sprints
+### Servicios desplegados
+
+| Contenedor | Imagen | Estado |
+|-----------|--------|--------|
+| `ingest-svc` | cmg-ingest | ✅ Activo, recibiendo datos FMC650 |
+| `core-api` | cmg-core-api | ✅ Activo |
+| `frontend` | cmg-frontend | ✅ Activo |
+| `caddy` | caddy | ✅ HTTPS reverse proxy |
+| `timescaledb` | timescaledb | ✅ PostgreSQL + TimescaleDB |
+| `redis` | redis | ✅ Activo |
+
+### Migraciones Alembic aplicadas
+001 → 012 (última: `012_vehicle_type_dout_config`)
+
+### Frontend — páginas implementadas
+- `/fleet` — FleetPage con mapa Leaflet + grid de vehículos + panel lateral
+- `/vehicles` — VehiclesPage (lista de vehículos con CRUD)
+- `/tipos-vehiculo` — VehicleTypesPage (sensor_schema, mantenimiento templates, DOUT config, icono)
+- `/diagnostics/can-scanner` — CAN Scanner con histórico, etiquetado, exportación CSV
+- `/vehicles/:id` — VehicleDetailPage (live, mantenimiento, alertas, ciclos, histórico)
+- `/alerts` — AlertsPage
+- `/reports` — ReportsPage
+- `/devices` — DevicesPage
+
+### Funcionalidades clave implementadas
+- **Codec 8 + Codec 8 Extended**: decodificación correcta incluyendo el grupo X-byte del Extended
+- **CAN Manual slots 0–19**: AVL IDs 145–154 (Codec 8) y 380–389 (Codec 8 Extended)
+- **DOUT**: control de salidas digitales vía Codec 12, persistencia en Redis, restore automático al reconectar
+- **sensor_schema**: definición por tipo de vehículo con selector de canal CAN + modo Byte/Bit
+- **CAN Scanner**: indicador de antigüedad de datos (badge + banner cuando PLC apagado)
+- **Mantenimiento predictivo**: planes por vehículo, templates por tipo, intervenciones con reset
+- **Alertas**: rules engine con condiciones JSONB, instancias, escalación
+- **Exportación CSV**: CAN Scanner, ciclos de trabajo, intervenciones de mantenimiento
+- **Iconos por tipo de vehículo**: upload PNG, StaticFiles en /uploads
+- **White-label**: brand_tokens JSONB por tenant
+
+### GitHub
+Repositorio: https://github.com/camaro734/cmg-telematics (rama master)
 
 ═══════════════════════════════════════════════════════════════
 ## 11. REGLAS GLOBALES — APLICAN A TODOS LOS AGENTES
