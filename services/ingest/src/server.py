@@ -85,6 +85,36 @@ class TeltonikaConnection:
         async with self.db_pool.acquire() as conn:
             await update_device_online(conn, self.imei, True)
 
+        # Re-aplicar último estado DOUT conocido al reconectar
+        await self._restore_dout_state()
+
+    async def _restore_dout_state(self) -> None:
+        """Re-envía el último estado DOUT al dispositivo al reconectar."""
+        dout_key = f"vehicle:{self.device_info['vehicle_id']}:dout"
+        dout_raw = await self.redis.get(dout_key)
+        if not dout_raw:
+            return
+        try:
+            dout_state: dict[str, bool] = json.loads(dout_raw)
+        except (ValueError, TypeError):
+            return
+
+        # Solo re-enviar si alguna salida está activa
+        if not any(dout_state.values()):
+            return
+
+        chars = ["?", "?", "?", "?"]
+        for slot_str, state in dout_state.items():
+            slot = int(slot_str)
+            if 1 <= slot <= 4:
+                chars[slot - 1] = "1" if state else "0"
+
+        command = f"setdigout {''.join(chars)} 0"
+        packet = build_codec12_command(command)
+        self.writer.write(packet)
+        await self.writer.drain()
+        logger.info("DOUT restaurado al reconectar %s: %s", self.imei, command)
+
     async def _receive_loop(self) -> None:
         """Recibe paquetes Codec 8 en bucle hasta que la conexión se cierre."""
         while True:
@@ -98,8 +128,13 @@ class TeltonikaConnection:
             except ValueError as e:
                 codec_id = packet[8] if len(packet) > 8 else 0
                 if codec_id == 0x0C:
-                    # Codec 12 response from device (ACK to a GPRS command) — expected, discard
-                    logger.debug("Codec 12 response de %s (ignorado)", self.imei)
+                    # Codec 12 response del dispositivo — logueamos la respuesta para diagnóstico
+                    try:
+                        resp_size = struct.unpack_from(">I", packet, 11)[0]
+                        resp_text = packet[15:15 + resp_size].decode("ascii", errors="replace").strip()
+                        logger.info("Codec 12 ACK de %s: %r", self.imei, resp_text)
+                    except Exception:
+                        logger.info("Codec 12 ACK de %s (sin texto)", self.imei)
                 else:
                     logger.error("Paquete inválido de %s (codec=0x%02x): %s", self.imei, codec_id, e)
                 continue
