@@ -14,6 +14,7 @@ vi.mock('../../../lib/apiClient', () => ({
 }))
 
 import { apiClient } from '../../../lib/apiClient'
+import { keys } from '../../../lib/queryKeys'
 
 const mockDef: WorkCycleDefinition = {
   id: 'def-1',
@@ -35,7 +36,7 @@ const mockSchema: SensorDef[] = [
 
 function wrap(definitions: WorkCycleDefinition[] = []) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
-  qc.setQueryData(['work-cycle-definitions', 'type-1'], definitions)
+  qc.setQueryData(keys.workCycleDefinitions('type-1'), definitions)
   return render(
     <QueryClientProvider client={qc}>
       <WorkCycleDefsSection typeId="type-1" sensorSchema={mockSchema} />
@@ -127,5 +128,29 @@ describe('WorkCycleDefsSection', () => {
     fireEvent.change(select, { target: { value: 'threshold_exceeded' } })
     expect(screen.getByText('SENSOR (CLAVE EN can_data)')).toBeInTheDocument()
     expect(screen.getByText('UMBRAL')).toBeInTheDocument()
+  })
+
+  it('llama a POST con trigger_config correcto para threshold_exceeded', async () => {
+    wrap([])
+    fireEvent.click(screen.getByText('+ Añadir definición'))
+    fireEvent.change(screen.getByPlaceholderText('ej. Ciclo bomba agua'), { target: { value: 'Ciclo presión' } })
+    const triggerSelect = screen.getByRole('combobox', { name: /tipo de trigger/i })
+    fireEvent.change(triggerSelect, { target: { value: 'threshold_exceeded' } })
+    const sensorSelect = screen.getAllByRole('combobox')[1]
+    fireEvent.change(sensorSelect, { target: { value: 'hydraulic_pressure' } })
+    const opSelect = screen.getByDisplayValue('>')
+    fireEvent.change(opSelect, { target: { value: '>=' } })
+    fireEvent.change(screen.getByPlaceholderText('ej. 280'), { target: { value: '300' } })
+    fireEvent.click(screen.getByText('Crear'))
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/v1/work-cycles/definitions',
+        expect.objectContaining({
+          name: 'Ciclo presión',
+          trigger_type: 'threshold_exceeded',
+          trigger_config: { sensor: 'hydraulic_pressure', op: '>=', threshold: 300 },
+        })
+      )
+    })
   })
 })

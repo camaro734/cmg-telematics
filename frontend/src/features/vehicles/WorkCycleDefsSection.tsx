@@ -240,6 +240,10 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) { setModalError('El nombre es obligatorio'); return }
+    if (form.trigger_type === 'threshold_exceeded' && form.threshold.trim() === '') {
+      setModalError('El umbral es obligatorio para este tipo de trigger')
+      return
+    }
     const payload = formToPayload(form, typeId)
     if (editingDef === 'new') {
       createMutation.mutate(payload)
@@ -297,12 +301,14 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                     {d.active ? 'Activo' : 'Inactivo'}
                   </button>
                 </td>
-                <td style={{ padding: '6px 8px', display: 'flex', gap: 6 }}>
-                  <button style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11 }} onClick={() => openEdit(d)}>✎</button>
-                  <button
-                    style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }}
-                    onClick={() => deleteMutation.mutate(d.id)}
-                  >✕</button>
+                <td style={{ padding: '6px 8px' }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11 }} onClick={() => openEdit(d)}>✎</button>
+                    <button
+                      style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }}
+                      onClick={() => deleteMutation.mutate(d.id)}
+                    >✕</button>
+                  </div>
                 </td>
               </tr>
             ))}
