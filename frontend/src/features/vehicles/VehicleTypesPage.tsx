@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
-import WorkCycleDefsSection from './WorkCycleDefsSection'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, SensorDef, MaintenanceTemplateItem, RuleOut, HistoricMetricItem, DoutSlot } from '../../lib/types'
@@ -746,14 +745,6 @@ export default function VehicleTypesPage() {
                       </table>
                     )}
                   </div>
-                )}
-
-                {/* ── Ciclos de trabajo ─────────────────────────────────────────── */}
-                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
-                  <WorkCycleDefsSection
-                    typeId={selectedType.id}
-                    sensorSchema={selectedType.sensor_schema as SensorDef[]}
-                  />
                 )}
 
                 {/* ── Alert rules for this type ──────────────────────────────────────────── */}

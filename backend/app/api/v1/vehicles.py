@@ -13,11 +13,12 @@ from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
     TelemetryPoint, TrackPoint, KpiHour, VehicleTypeSensorSchemaUpdate,
-    VehicleTypeCreate, VehicleTypeUpdate,
+    VehicleTypeCreate, VehicleTypeUpdate, HistoricMetricItem, DoutSlot,
 )
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.maintenance import MaintenancePlan
+from app.models.device import Device
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 
 from pydantic import BaseModel
@@ -91,6 +92,56 @@ async def update_vehicle_type_maintenance_templates(
     from sqlalchemy.orm.attributes import flag_modified
     vtype.maintenance_templates = [t.model_dump() for t in body.templates]
     flag_modified(vtype, "maintenance_templates")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
+class HistoricMetricsUpdate(BaseModel):
+    metrics: list[HistoricMetricItem]
+
+
+class DoutConfigUpdate(BaseModel):
+    dout_config: list[DoutSlot]
+
+
+@router.patch("/vehicle-types/{type_id}/historic-metrics", response_model=VehicleTypeOut)
+async def update_vehicle_type_historic_metrics(
+    type_id: uuid.UUID,
+    body: HistoricMetricsUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+    result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
+    vtype = result.scalar_one_or_none()
+    if not vtype:
+        raise HTTPException(status_code=404)
+    from sqlalchemy.orm.attributes import flag_modified
+    vtype.historic_metrics = [m.model_dump() for m in body.metrics]
+    flag_modified(vtype, "historic_metrics")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
+@router.patch("/vehicle-types/{type_id}/dout-config", response_model=VehicleTypeOut)
+async def update_vehicle_type_dout_config(
+    type_id: uuid.UUID,
+    body: DoutConfigUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+    result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
+    vtype = result.scalar_one_or_none()
+    if not vtype:
+        raise HTTPException(status_code=404)
+    from sqlalchemy.orm.attributes import flag_modified
+    vtype.dout_config = [s.model_dump() for s in body.dout_config]
+    flag_modified(vtype, "dout_config")
     await db.commit()
     await db.refresh(vtype)
     return vtype
@@ -338,7 +389,23 @@ async def get_vehicle_status(
     speed_str = _get("speed_kmh")
     ignition_str = _get("ignition")
     pto_str = _get("pto_active")
+    ext_voltage_str = _get("ext_voltage_mv")
     can_str = _get("can_data")
+
+    ext_voltage_mv = None
+    if ext_voltage_str:
+        try:
+            ext_voltage_mv = int(float(ext_voltage_str))
+        except (ValueError, TypeError):
+            pass
+
+    dout_raw = await redis.get(f"vehicle:{vehicle_id}:dout")
+    dout_state: dict[int, bool] = {}
+    if dout_raw:
+        try:
+            dout_state = {int(k): bool(v) for k, v in json.loads(dout_raw).items()}
+        except (ValueError, TypeError):
+            pass
 
     return VehicleStatus(
         vehicle_id=vehicle_id,
@@ -349,7 +416,9 @@ async def get_vehicle_status(
         speed_kmh=_parse_float(speed_str),
         ignition=_parse_bool(ignition_str),
         pto_active=_parse_bool(pto_str),
+        ext_voltage_mv=ext_voltage_mv,
         can_data=_parse_json(can_str),
+        dout_state=dout_state,
     )
 
 
@@ -515,3 +584,55 @@ async def list_vehicle_maintenance(
     # Import here to avoid circular import at module level
     from app.api.v1.maintenance import _to_out as _maintenance_to_out
     return [await _maintenance_to_out(p, vehicle.name, db) for p in plans]
+
+
+class DoutCommand(BaseModel):
+    slot: int
+    state: bool
+
+
+@router.post("/vehicles/{vehicle_id}/dout", status_code=200)
+async def send_dout_command(
+    vehicle_id: uuid.UUID,
+    body: DoutCommand,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+
+    result = await db.execute(
+        select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="No hay dispositivo activo vinculado al vehículo")
+
+    # Build setdigout command: "setdigout XXXX 0" — FMC650 has 4 DOUTs, needs exactly 4 chars
+    chars = ["?", "?", "?", "?"]
+    if 1 <= body.slot <= 4:
+        chars[body.slot - 1] = "1" if body.state else "0"
+    command = f"setdigout {''.join(chars)} 0"
+
+    redis = request.app.state.redis
+
+    # Persist state so it survives browser refresh / other sessions
+    dout_key = f"vehicle:{vehicle_id}:dout"
+    dout_raw = await redis.get(dout_key)
+    dout_state: dict[str, bool] = {}
+    if dout_raw:
+        try:
+            dout_state = json.loads(dout_raw)
+        except (ValueError, TypeError):
+            pass
+    dout_state[str(body.slot)] = body.state
+    await redis.set(dout_key, json.dumps(dout_state))
+
+    await redis.publish("cmg:dout_commands", json.dumps({"imei": device.imei, "command": command}))
+    logger.info("DOUT publicado → IMEI %s slot=%s state=%s", device.imei, body.slot, body.state)
+    return {"ok": True, "imei": device.imei, "command": command}

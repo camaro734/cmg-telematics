@@ -2,6 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import StatusBadge from '../../shared/ui/StatusBadge'
 import type { VehicleOut, VehicleStatus } from '../../lib/types'
 
+function batteryColor(mv: number): string {
+  const v = mv / 1000
+  if (v < 11.5 || (v > 15 && v < 22)) return 'var(--accent-crit)'
+  if (v < 12.0 || (v > 14.8 && v < 22)) return 'var(--accent-warn)'
+  return 'var(--accent-ok)'
+}
+
 function relativeTime(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
   if (diff < 60) return 'hace un momento'
@@ -50,12 +57,15 @@ export default function VehicleHeader({ vehicle, status }: VehicleHeaderProps) {
           <StatusBadge variant={online ? 'online' : 'offline'} size="md" />
           {status?.pto_active && <StatusBadge variant="pto" size="md" />}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--font-data)' }}>
-          {vehicle.license_plate ?? '—'}
-          {status?.last_seen && (
-            <span style={{ marginLeft: 12 }}>
-              Última señal: {relativeTime(status.last_seen)}
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--font-data)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span>{vehicle.license_plate ?? '—'}</span>
+          {status?.ext_voltage_mv != null && (
+            <span style={{ color: batteryColor(status.ext_voltage_mv) }}>
+              ⚡ {(status.ext_voltage_mv / 1000).toFixed(2)} V
             </span>
+          )}
+          {status?.last_seen && (
+            <span>Última señal: {relativeTime(status.last_seen)}</span>
           )}
         </div>
       </div>

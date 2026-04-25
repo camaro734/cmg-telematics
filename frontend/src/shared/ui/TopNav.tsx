@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/useAuthStore'
+import { useReportsTabStore, REPORTS_TABS } from '../../features/reports/useReportsTabStore'
 import { CmgMark } from './CmgLogo'
 import {
   IconFlota,
@@ -120,9 +121,12 @@ function DropdownMenu({ items, onClose }: DropdownMenuProps) {
 export default function TopNav() {
   const { logoUrl, brandName, user, enabledModules, logout } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { tab: reportsTab, setTab: setReportsTab } = useReportsTabStore()
 
   const isCmg   = user?.tenant_tier === 'cmg'
   const isAdmin  = user?.role === 'admin'
+  const onReports = location.pathname === '/reports'
 
   const [adminOpen, setAdminOpen] = useState(false)
   const [userOpen,  setUserOpen]  = useState(false)
@@ -192,38 +196,68 @@ export default function TopNav() {
         }
       </button>
 
-      {/* ── Module nav links (flex-grow center area) ───────────────────── */}
+      {/* ── Nav links (modules or reports sub-tabs) ────────────────────── */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 2,
         flex: 1,
       }}>
-        {visibleModules.map(({ key, label, Icon, to }) => (
-          <NavLink
-            key={key}
-            to={to}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              padding: '0 12px',
-              height: 'var(--topbar-h, 52px)',
-              color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              borderBottom: isActive
-                ? '2px solid var(--accent-energy)'
-                : '2px solid transparent',
-              textDecoration: 'none',
-              fontSize: 13,
-              fontWeight: isActive ? 500 : 400,
-              transition: 'color 0.15s, border-color 0.15s',
-              whiteSpace: 'nowrap',
-            })}
-          >
-            <Icon width={16} height={16}/>
-            {label}
-          </NavLink>
-        ))}
+        {onReports ? (
+          REPORTS_TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setReportsTab(key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 14px',
+                height: 'var(--topbar-h, 52px)',
+                background: 'none',
+                border: 'none',
+                borderBottom: reportsTab === key
+                  ? '2px solid var(--accent-energy)'
+                  : '2px solid transparent',
+                color: reportsTab === key ? 'var(--accent-energy)' : 'var(--text-muted)',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 13,
+                fontWeight: reportsTab === key ? 600 : 400,
+                cursor: 'pointer',
+                transition: 'color 0.15s, border-color 0.15s',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {label}
+            </button>
+          ))
+        ) : (
+          visibleModules.map(({ key, label, Icon, to }) => (
+            <NavLink
+              key={key}
+              to={to}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '0 12px',
+                height: 'var(--topbar-h, 52px)',
+                color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                borderBottom: isActive
+                  ? '2px solid var(--accent-energy)'
+                  : '2px solid transparent',
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: isActive ? 500 : 400,
+                transition: 'color 0.15s, border-color 0.15s',
+                whiteSpace: 'nowrap',
+              })}
+            >
+              <Icon width={16} height={16}/>
+              {label}
+            </NavLink>
+          ))
+        )}
       </div>
 
       {/* ── Right-side controls ────────────────────────────────────────── */}

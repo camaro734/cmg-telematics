@@ -52,6 +52,7 @@ const tdStyle = {
 interface FormState {
   license_plate: string
   vin: string
+  driver_name: string
   vehicle_type_id: string
   name: string
   year: string
@@ -62,6 +63,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   license_plate: '',
   vin: '',
+  driver_name: '',
   vehicle_type_id: '',
   name: '',
   year: '',
@@ -128,6 +130,7 @@ export default function VehiclesPage() {
     setForm({
       license_plate: v.license_plate ?? '',
       vin: v.vin ?? '',
+      driver_name: v.driver_name ?? '',
       vehicle_type_id: v.vehicle_type_id,
       name: v.name,
       year: v.year?.toString() ?? '',
@@ -183,6 +186,7 @@ export default function VehiclesPage() {
       name: effectiveName,
       license_plate: form.license_plate.trim() || null,
       vin: form.vin.trim() || null,
+      driver_name: form.driver_name.trim() || null,
       year: form.year ? parseInt(form.year) : null,
       tenant_id: form.tenant_id || null,
     })
@@ -205,6 +209,7 @@ export default function VehiclesPage() {
       name: effectiveName || undefined,
       license_plate: form.license_plate.trim() || null,
       vin: form.vin.trim() || null,
+      driver_name: form.driver_name.trim() || null,
       year: form.year ? parseInt(form.year) : null,
     })
     // Si no tenía dispositivo y se ha introducido un IMEI, crear y asignar
@@ -405,6 +410,18 @@ export default function VehiclesPage() {
                   maxLength={17}
                   required
                   style={{ ...inputStyle, fontFamily: 'var(--font-data)' }}
+                />
+              </div>
+
+              {/* Conductor */}
+              <div>
+                <label style={labelStyle}>Conductor (nombre)</label>
+                <input
+                  type="text"
+                  value={form.driver_name}
+                  onChange={e => setField('driver_name', e.target.value)}
+                  placeholder="Nombre del conductor habitual"
+                  style={inputStyle}
                 />
               </div>
 

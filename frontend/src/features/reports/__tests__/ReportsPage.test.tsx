@@ -1,33 +1,49 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import ReportsPage from '../ReportsPage'
 import type { TenantOut, VehicleOut } from '../../../lib/types'
 
-const mockGetBlob = vi.hoisted(() => vi.fn())
-
 vi.mock('../../../lib/apiClient', () => ({
   apiClient: {
     get: vi.fn(),
-    getBlob: mockGetBlob,
   },
 }))
 vi.mock('../../auth/useAuthStore', () => ({
   useAuthStore: vi.fn(),
 }))
+// Fleet statuses hook — returns empty map to avoid individual vehicle status requests
+vi.mock('../../fleet/useVehicleStatuses', () => ({
+  useVehicleStatuses: vi.fn(() => new Map()),
+}))
 
 import { apiClient } from '../../../lib/apiClient'
 import { useAuthStore } from '../../auth/useAuthStore'
 
-const cmgUser = { user_id: 'u1', tenant_id: 't0', tenant_tier: 'cmg', role: 'admin', email: 'cmg@test.com' }
+const cmgUser    = { user_id: 'u1', tenant_id: 't0', tenant_tier: 'cmg',    role: 'admin', email: 'cmg@test.com' }
 const clientUser = { user_id: 'u2', tenant_id: 't1', tenant_tier: 'client', role: 'admin', email: 'c@test.com' }
+
+function makeStore(userData: typeof clientUser) {
+  const store = {
+    user: userData,
+    enabledModules: [] as string[],
+    logoUrl: null,
+    brandName: null,
+    logout: vi.fn(),
+  }
+  // Support both useAuthStore() and useAuthStore(selector) call patterns
+  const mockFn = vi.fn((selector?: (s: typeof store) => unknown) =>
+    selector ? selector(store) : store
+  )
+  return mockFn
+}
 
 const mockTenants: TenantOut[] = [
   {
     id: 't1', parent_id: 't0', tier: 'client', name: 'Wasterent', slug: 'wasterent', active: true,
     brand_name: null, brand_color: null, logo_url: null, custom_domain: null, brand_tokens: null,
-    created_at: '2026-01-01T00:00:00Z',
+    created_at: '2026-01-01T00:00:00Z', enabled_modules: [],
   },
 ]
 const mockVehicles: VehicleOut[] = [
@@ -38,11 +54,12 @@ const mockVehicles: VehicleOut[] = [
 ]
 
 function wrap(userData = clientUser, tenants: TenantOut[] = [], vehicles: VehicleOut[] = []) {
-  vi.mocked(useAuthStore).mockReturnValue(userData as any)
+  vi.mocked(useAuthStore).mockImplementation(makeStore(userData) as unknown as typeof useAuthStore)
   vi.mocked(apiClient.get).mockImplementation((path: string) => {
-    if (path.includes('tenants')) return Promise.resolve(tenants) as any
-    if (path.includes('vehicles')) return Promise.resolve(vehicles) as any
-    return Promise.resolve([]) as any
+    if (path.includes('tenants'))      return Promise.resolve(tenants) as never
+    if (path.includes('vehicle-types')) return Promise.resolve([]) as never
+    if (path.includes('vehicles'))     return Promise.resolve(vehicles) as never
+    return Promise.resolve([]) as never
   })
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
   return render(
@@ -60,62 +77,33 @@ describe('ReportsPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('renderiza formulario con mes anterior por defecto', () => {
+  it('renderiza la página mostrando el HOME tab por defecto', () => {
     wrap()
-    const now = new Date()
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const expectedYear = prev.getFullYear()
-    expect(screen.getByDisplayValue(String(expectedYear))).toBeInTheDocument()
+    // HOME tab is default — shows fleet header
+    expect(screen.getByText(/Flota/)).toBeInTheDocument()
   })
 
-  it('CMG admin ve selector de cliente', async () => {
+  it('HOME tab muestra lista de vehículos', async () => {
+    wrap(clientUser, [], mockVehicles)
+    await waitFor(() => expect(screen.getByText('WAS-001')).toBeInTheDocument())
+    expect(screen.getByText('WAS001')).toBeInTheDocument()
+  })
+
+  it('HOME tab muestra mensaje de flota vacía', async () => {
+    wrap(clientUser, [], [])
+    await waitFor(() => expect(screen.getByText(/Sin vehículos/i)).toBeInTheDocument())
+  })
+
+  it('CMG admin ve selector de cliente en tab HISTÓRICO', async () => {
     wrap(cmgUser, mockTenants)
-    expect(await screen.findByText('Cliente')).toBeInTheDocument()
+    // Switch to historico — the selector bar appears
+    const { useReportsTabStore } = await import('../useReportsTabStore')
+    useReportsTabStore.getState().setTab('historico')
+    await waitFor(() => expect(screen.queryByText('— Cliente —')).toBeInTheDocument())
   })
 
   it('client admin no ve selector de cliente', () => {
     wrap(clientUser, [])
-    expect(screen.queryByText('Cliente')).not.toBeInTheDocument()
-  })
-
-  it('llama a getBlob con params correctos al enviar', async () => {
-    mockGetBlob.mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }))
-    global.URL.createObjectURL = vi.fn(() => 'blob:fake')
-    global.URL.revokeObjectURL = vi.fn()
-
-    // Render first so React DOM is complete
-    wrap(clientUser, [], mockVehicles)
-    const btn = await screen.findByText('↓ Generar PDF')
-
-    // Spy on body.appendChild to capture the anchor and intercept its click
-    const mockClick = vi.fn()
-    vi.spyOn(document.body, 'appendChild').mockImplementation((node: Node) => {
-      const el = node as HTMLAnchorElement
-      el.click = mockClick
-      return node
-    })
-
-    fireEvent.click(btn)
-    await waitFor(() => expect(mockGetBlob).toHaveBeenCalled())
-    const calledUrl: string = mockGetBlob.mock.calls[0][0]
-    expect(calledUrl).toContain('/api/v1/reports/monthly')
-    expect(calledUrl).toContain('year=')
-    expect(calledUrl).toContain('month=')
-    expect(mockClick).toHaveBeenCalled()
-  })
-
-  it('muestra estado de carga mientras genera', async () => {
-    let resolve!: (v: Blob) => void
-    mockGetBlob.mockReturnValue(new Promise<Blob>(r => { resolve = r }))
-    global.URL.createObjectURL = vi.fn(() => 'blob:fake')
-    global.URL.revokeObjectURL = vi.fn()
-
-    wrap(clientUser)
-    const btn = screen.getByText('↓ Generar PDF')
-    fireEvent.click(btn)
-    await waitFor(() => expect(screen.getByText('Generando…')).toBeInTheDocument())
-    expect(screen.getByText('Generando…')).toBeDisabled()
-    resolve(new Blob(['%PDF'], { type: 'application/pdf' }))
-    await waitFor(() => expect(screen.getByText('↓ Generar PDF')).toBeInTheDocument())
+    expect(screen.queryByText('— Cliente —')).not.toBeInTheDocument()
   })
 })

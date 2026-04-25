@@ -21,6 +21,7 @@ export interface VehicleOut {
   name: string
   license_plate: string | null
   vin: string | null
+  driver_name: string | null
   year: number | null
   active: boolean
   created_at: string
@@ -35,7 +36,9 @@ export interface VehicleStatus {
   speed_kmh: number | null
   ignition: boolean | null
   pto_active: boolean | null
+  ext_voltage_mv: number | null
   can_data: Record<string, unknown> | null
+  dout_state: Record<number, boolean>
 }
 
 export interface TrackPoint {
@@ -100,6 +103,20 @@ export interface WsMessage {
   data: VehicleStatus
 }
 
+export interface DoutSlot {
+  slot: number
+  label: string
+  enabled: boolean
+}
+
+export interface HistoricMetricItem {
+  key: string
+  label: string
+  color: string
+  unit: string
+  transform: number
+}
+
 export interface VehicleTypeOut {
   id: string
   slug: string
@@ -107,6 +124,8 @@ export interface VehicleTypeOut {
   sensor_schema: SensorDef[]
   icon_url: string | null
   maintenance_templates: MaintenanceTemplateItem[]
+  historic_metrics: HistoricMetricItem[]
+  dout_config: DoutSlot[]
 }
 
 export interface AlertInstanceOut {
@@ -340,6 +359,7 @@ export interface VehicleCreate {
   name: string
   license_plate?: string | null
   vin?: string | null
+  driver_name?: string | null
   year?: number | null
   tenant_id?: string | null
 }
@@ -348,6 +368,7 @@ export interface VehicleUpdate {
   name?: string | null
   license_plate?: string | null
   vin?: string | null
+  driver_name?: string | null
   year?: number | null
   vehicle_type_id?: string | null
 }

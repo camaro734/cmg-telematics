@@ -7,6 +7,20 @@ from pydantic import BaseModel, ConfigDict
 from app.schemas.maintenance import MaintenanceTemplateItem
 
 
+class DoutSlot(BaseModel):
+    slot: int        # DOUT number (1–4 on FMC650)
+    label: str       # Human-readable action name, e.g. "Parar motor"
+    enabled: bool = True
+
+
+class HistoricMetricItem(BaseModel):
+    key: str          # e.g. "engine_on_minutes", "pto_active_minutes", "distance_km"
+    label: str        # e.g. "Horas motor"
+    color: str        # e.g. "#22C55E"
+    unit: str = ""    # e.g. "h", "km", "km/h"
+    transform: float = 1.0  # multiply raw value by this (e.g. 1/60 to convert minutes→hours)
+
+
 class VehicleTypeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -15,6 +29,8 @@ class VehicleTypeOut(BaseModel):
     sensor_schema: list[dict[str, Any]]
     icon_url: str | None = None
     maintenance_templates: list[MaintenanceTemplateItem] = []
+    historic_metrics: list[HistoricMetricItem] = []
+    dout_config: list[DoutSlot] = []
 
 
 class VehicleOut(BaseModel):
@@ -25,6 +41,7 @@ class VehicleOut(BaseModel):
     name: str
     license_plate: str | None = None
     vin: str | None = None
+    driver_name: str | None = None
     year: int | None = None
     active: bool
     created_at: datetime
@@ -43,6 +60,7 @@ class VehicleUpdate(BaseModel):
     name: str | None = None
     license_plate: str | None = None
     vin: str | None = None
+    driver_name: str | None = None
     year: int | None = None
     vehicle_type_id: uuid.UUID | None = None
 
@@ -56,7 +74,9 @@ class VehicleStatus(BaseModel):
     speed_kmh: float | None = None
     ignition: bool | None = None
     pto_active: bool | None = None
+    ext_voltage_mv: int | None = None
     can_data: dict[str, Any] | None = None
+    dout_state: dict[int, bool] = {}
 
 
 class TelemetryPoint(BaseModel):

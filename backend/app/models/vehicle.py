@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, SmallInteger
+from sqlalchemy import String, Text, ForeignKey, DateTime, Boolean, SmallInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -14,6 +14,7 @@ class Vehicle(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     license_plate: Mapped[str | None] = mapped_column(String(20), nullable=True)
     vin: Mapped[str | None] = mapped_column(String(17), unique=True, nullable=True)
+    driver_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     year: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)

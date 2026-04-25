@@ -62,6 +62,7 @@ async def _update_status_hash(
     ignition = avl.io_elements.get(239, 0) == 1
     pto_active = avl.io_elements.get(179, 0) == 1
 
+    ext_voltage_mv = avl.io_elements.get(66)
     mapping = {
         "online": "true",
         "last_seen": avl.datetime_utc.isoformat(),
@@ -70,6 +71,8 @@ async def _update_status_hash(
         "pto_active": "true" if pto_active else "false",
         "can_data": json.dumps(can_data),
     }
+    if ext_voltage_mv is not None:
+        mapping["ext_voltage_mv"] = str(ext_voltage_mv)
     if lat is not None:
         mapping["lat"] = str(lat)
         mapping["lon"] = str(lon)
