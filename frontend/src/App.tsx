@@ -1,7 +1,21 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
 import RequireAuth from './features/auth/RequireAuth'
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null }
+  static getDerivedStateFromError(e: Error) { return { error: e } }
+  componentDidCatch(e: Error, info: ErrorInfo) { console.error('[EB]', e, info) }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: 24, background: '#1C1917', color: '#ef4444', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
+        <b>ERROR (ErrorBoundary):</b>{'\n'}{String(this.state.error)}{'\n'}{(this.state.error as Error).stack}
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 const FleetPage         = lazy(() => import('./features/fleet/FleetPage'))
 const VehicleDetailPage = lazy(() => import('./features/vehicle/VehicleDetailPage'))
@@ -44,6 +58,7 @@ export default function App() {
         path="/*"
         element={
           <RequireAuth>
+            <ErrorBoundary>
             <Suspense fallback={<Loading />}>
               <Routes>
                 <Route path="fleet"        element={<FleetPage />} />
@@ -69,6 +84,7 @@ export default function App() {
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
           </RequireAuth>
         }
       />

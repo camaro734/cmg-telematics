@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import FleetMap from './FleetMap'
 import VehicleCard from './VehicleCard'
 import { useFleetStore } from './useFleetStore'
 import { useVehicleStatuses } from './useVehicleStatuses'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, TenantOut } from '../../lib/types'
 
 interface AlertRuleBrief { id: string; name: string }
@@ -23,6 +24,7 @@ function relativeTime(iso: string | null): string {
 export default function FleetDashboard() {
   const selectedId = useFleetStore(s => s.selectedId)
   const setSelected = useFleetStore(s => s.setSelected)
+  const isMobile = useIsMobile()
 
   const { data: vehicles = [] } = useQuery({
     queryKey: keys.vehicles(),
@@ -92,6 +94,76 @@ export default function FleetDashboard() {
       })
   })()
 
+  const navigate = useNavigate()
+
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+        {/* Map — full width, fixed height */}
+        <div style={{ width: '100%', height: '50vh', minHeight: 240, flexShrink: 0 }}>
+          <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} />
+        </div>
+
+        {/* Fleet header */}
+        <div style={{
+          padding: '10px 14px',
+          borderBottom: '1px solid var(--bg-border)',
+          borderTop: '1px solid var(--bg-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexShrink: 0,
+          background: 'var(--bg-surface)',
+        }}>
+          <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 14 }}>FLOTA</span>
+          <span style={{ fontSize: 12, color: 'var(--accent-ok)' }}>● {onlineCount} activos</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>○ {offlineCount} inactivos</span>
+        </div>
+
+        {/* Vehicle cards — single column on mobile, tap → detail */}
+        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {vehicles.map(vehicle => (
+            <div key={vehicle.id} onClick={() => navigate(`/vehicles/${vehicle.id}`)} style={{ cursor: 'pointer' }}>
+            <VehicleCard
+              vehicle={vehicle}
+              vehicleType={typeById.get(vehicle.vehicle_type_id)}
+              status={statuses.get(vehicle.id)}
+              isSelected={vehicle.id === selectedId}
+            />
+            </div>
+          ))}
+          {vehicles.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, paddingTop: 20 }}>
+              Sin vehículos registrados
+            </div>
+          )}
+        </div>
+
+        {/* Incidencias activas — simple list on mobile */}
+        <div style={{ borderTop: '1px solid var(--bg-border)', padding: '10px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Incidencias activas</div>
+          {topAlerts.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--accent-ok)' }}>✓ Sin incidencias activas</div>
+          ) : (
+            topAlerts.map(alert => {
+              const v = vehicleById.get(alert.vehicle_id)
+              const rule = ruleById.get(alert.rule_id)
+              return (
+                <div key={alert.id} style={{ borderBottom: '1px solid var(--bg-border)', padding: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--accent-warn)', fontWeight: 500 }}>{rule?.name ?? alert.rule_id.slice(0, 8)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{v?.license_plate ?? v?.name ?? '—'} · {relativeTime(alert.triggered_at)}</div>
+                  </div>
+                  <Link to="/alerts" style={{ fontSize: 11, color: 'var(--accent-info)', flexShrink: 0 }}>Ver →</Link>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
@@ -153,7 +225,7 @@ export default function FleetDashboard() {
 
         {/* Right: map */}
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          <FleetMap vehicles={vehicles} statuses={statuses} />
+          <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} />
         </div>
       </div>
 

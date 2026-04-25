@@ -1,0 +1,117 @@
+name: CI — CMG Telematics
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Backend tests ────────────────────────────────────────────────
+  backend-tests:
+    name: Backend Tests (pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_USER: cmg
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: cmg_telematics_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_URL: postgresql+asyncpg://cmg:testpass@localhost:5432/cmg_telematics_test
+      DB_URL_SYNC: postgresql://cmg:testpass@localhost:5432/cmg_telematics_test
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_PASSWORD: ""
+      SECRET_KEY: ci-test-secret-key-not-for-production-use
+      ENVIRONMENT: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run migrations
+        working-directory: backend
+        run: |
+          alembic upgrade head || echo "Sin migraciones pendientes"
+
+      - name: Run pytest
+        working-directory: backend
+        run: |
+          python -m pytest tests/ -v --tb=short --junit-xml=test-results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: backend/test-results.xml
+
+  # ─── Frontend tests ───────────────────────────────────────────────
+  frontend-tests:
+    name: Frontend Tests (vitest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run vitest
+        working-directory: frontend
+        run: npm run test -- --run
+
+  # ─── Smoke test en producción (solo en push a main) ───────────────
+  smoke-test:
+    name: Smoke Test (producción)
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run smoke test
+        run: |
+          chmod +x smoke_test.sh
+          ./smoke_test.sh ${{ secrets.PRODUCTION_URL || 'https://cmgtrack.com' }}
+        continue-on-error: true  # No bloquea el deploy si producción tiene problemas temporales

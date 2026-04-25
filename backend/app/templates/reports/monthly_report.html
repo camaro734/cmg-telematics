@@ -10,128 +10,250 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background: #1C1917;
-    color: #E7E5E4;
+    background: #ffffff;
+    color: #111827;
     font-size: 9pt;
-    line-height: 1.4;
+    line-height: 1.45;
   }
   .page-break { page-break-before: always; }
 
   /* ── Cover ── */
   .cover {
+    min-height: 25cm;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 24cm;
-    text-align: center;
   }
-  .cover-logo {
-    width: 64px;
-    height: 64px;
-    border-radius: 12px;
-    background: #F97316;
+  .cover-header {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28pt;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 24px;
+    border-bottom: 3px solid #1e40af;
+    margin-bottom: 48px;
+  }
+  .cover-brand-name {
+    font-size: 10pt;
     font-weight: 700;
-    color: #fff;
-    margin-bottom: 16px;
+    color: #374151;
+    letter-spacing: 0.04em;
   }
-  .cover-brand { font-size: 22pt; font-weight: 700; color: #E7E5E4; margin-bottom: 4px; }
-  .cover-subtitle { font-size: 10pt; color: #A8A29E; margin-bottom: 20px; }
-  .cover-period { font-size: 28pt; font-weight: 700; color: #F97316; margin-bottom: 6px; }
-  .cover-generated { font-size: 8pt; color: #78716C; margin-bottom: 32px; }
-  .kpi-row { display: flex; gap: 16px; justify-content: center; }
+  .cover-brand-sub { font-size: 7.5pt; color: #9ca3af; }
+  .cover-logo-img { height: 48px; object-fit: contain; }
+  .cover-client-name {
+    font-size: 10pt;
+    font-weight: 700;
+    color: #374151;
+    text-align: right;
+  }
+
+  .cover-main { flex: 1; padding: 8px 0; }
+  .cover-badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    font-size: 7.5pt;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 100px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .cover-vehicle-name {
+    font-size: 30pt;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.1;
+    margin-bottom: 10px;
+  }
+  .cover-plate {
+    display: inline-block;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12pt;
+    font-weight: 700;
+    color: #374151;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 3px 12px;
+    margin-bottom: 8px;
+    letter-spacing: 0.1em;
+  }
+  .cover-type-label {
+    font-size: 9pt;
+    color: #6b7280;
+    margin-bottom: 32px;
+    margin-top: 4px;
+  }
+  .cover-period {
+    font-size: 22pt;
+    font-weight: 700;
+    color: #1e40af;
+    margin-bottom: 4px;
+  }
+  .cover-generated { font-size: 8pt; color: #9ca3af; margin-bottom: 40px; }
+
+  .kpi-row { display: flex; gap: 16px; }
   .kpi-box {
-    background: #292524;
-    border-radius: 8px;
-    padding: 14px 24px;
+    flex: 1;
+    border: 1px solid #e5e7eb;
+    border-top: 3px solid;
+    border-radius: 6px;
+    padding: 14px 20px;
     text-align: center;
-    min-width: 90px;
   }
-  .kpi-value { font-size: 28pt; font-weight: 700; }
-  .kpi-label { font-size: 8pt; color: #78716C; margin-top: 2px; }
+  .kpi-box-vehicles { border-top-color: #1e40af; }
+  .kpi-box-alerts   { border-top-color: #ef4444; }
+  .kpi-box-maint    { border-top-color: #16a34a; }
+  .kpi-value { font-size: 26pt; font-weight: 700; }
+  .kpi-vehicles { color: #1e40af; }
+  .kpi-alerts   { color: #ef4444; }
+  .kpi-maint    { color: #16a34a; }
+  .kpi-label { font-size: 7.5pt; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 
   /* ── Section header ── */
   .section-title {
-    font-size: 8pt;
+    font-size: 8.5pt;
     font-weight: 700;
-    color: #F97316;
+    color: #1e40af;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin-bottom: 10px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #3C3330;
+    margin-bottom: 12px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #1e40af;
   }
+  .page-section { margin-bottom: 24px; }
 
   /* ── Tables ── */
   table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  thead tr { background: #f9fafb; }
   th {
     text-align: left;
-    padding: 5px 8px;
-    color: #78716C;
-    font-weight: 600;
-    border-bottom: 1px solid #3C3330;
+    padding: 7px 10px;
+    color: #6b7280;
+    font-weight: 700;
+    border-bottom: 2px solid #e5e7eb;
     font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
   }
-  td { padding: 5px 8px; border-bottom: 1px solid #292524; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
   tr:last-child td { border-bottom: none; }
   .mono { font-family: "Courier New", Courier, monospace; }
   .right { text-align: right; }
-  .muted { color: #78716C; }
+  .muted { color: #6b7280; }
+  .striped tbody tr:nth-child(even) { background: #f9fafb; }
 
-  /* ── Alert severity colors ── */
-  .sev-critical { color: #EF4444; }
-  .sev-warning  { color: #EAB308; }
-  .sev-info     { color: #38BDF8; }
+  /* ── Alert severity badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 7pt;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .badge-critical { background: #fee2e2; color: #b91c1c; }
+  .badge-warning  { background: #fef9c3; color: #92400e; }
+  .badge-info     { background: #dbeafe; color: #1e40af; }
+  .badge-ok       { background: #dcfce7; color: #15803d; }
 
-  /* ── Summary cards ── */
-  .card-row { display: flex; gap: 12px; margin-bottom: 16px; }
-  .card {
+  /* ── Stat cards ── */
+  .card-row { display: flex; gap: 12px; margin-bottom: 20px; }
+  .stat-card {
     flex: 1;
-    background: #292524;
+    border: 1px solid #e5e7eb;
     border-radius: 6px;
+    padding: 12px 16px;
+    text-align: center;
+  }
+  .stat-value { font-size: 22pt; font-weight: 700; }
+  .stat-label { font-size: 7pt; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* ── Map section ── */
+  .map-img { width: 100%; border-radius: 6px; border: 1px solid #e5e7eb; margin-bottom: 8px; }
+  .map-legend {
+    font-size: 7.5pt;
+    color: #6b7280;
+    margin-bottom: 14px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .map-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+  .vehicle-kpi-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .vehicle-kpi-card {
+    flex: 1;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
     padding: 10px 14px;
     text-align: center;
   }
-  .card-value { font-size: 22pt; font-weight: 700; }
-  .card-label { font-size: 7pt; color: #78716C; margin-top: 2px; }
+  .vehicle-kpi-value { font-size: 16pt; font-weight: 700; }
+  .vehicle-kpi-label { font-size: 7pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
 
-  /* ── Map section ── */
-  .map-img { width: 100%; border-radius: 6px; margin-bottom: 12px; }
-  .map-legend { font-size: 7.5pt; color: #A8A29E; margin-top: -8px; margin-bottom: 12px; }
-  .vehicle-kpis { display: flex; gap: 10px; margin-bottom: 12px; }
-  .vehicle-kpi {
-    flex: 1;
-    background: #292524;
-    border-radius: 5px;
-    padding: 8px 12px;
-    text-align: center;
-  }
-  .vehicle-kpi-value { font-size: 16pt; font-weight: 700; color: #F97316; }
-  .vehicle-kpi-label { font-size: 7pt; color: #78716C; }
-
-  /* ── SVG chart container ── */
+  /* ── SVG chart ── */
   .chart-box {
-    background: #292524;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
     border-radius: 6px;
-    padding: 12px;
+    padding: 14px;
     margin-bottom: 16px;
   }
-  .chart-label { font-size: 7.5pt; color: #78716C; margin-top: 4px; }
+  .chart-label { font-size: 7.5pt; color: #6b7280; margin-top: 6px; }
 
   /* ── Cost footer ── */
   .cost-total {
     text-align: right;
-    font-size: 9pt;
+    font-size: 9.5pt;
     font-weight: 700;
-    color: #E7E5E4;
-    padding: 8px 8px 0;
-    border-top: 1px solid #3C3330;
-    margin-top: 4px;
+    color: #111827;
+    padding: 10px 10px 0;
+    border-top: 2px solid #e5e7eb;
+    margin-top: 6px;
   }
+
+  /* ── Page footer ── */
+  .page-footer {
+    margin-top: 24px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 7pt;
+    color: #9ca3af;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── Vehicle page header ── */
+  .vehicle-page-header { margin-bottom: 16px; }
+  .vehicle-page-name {
+    font-size: 15pt;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 6px;
+  }
+  .vehicle-page-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .inline-plate {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 8.5pt;
+    font-weight: 700;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    padding: 2px 8px;
+    letter-spacing: 0.06em;
+  }
+  .period-label { font-size: 8.5pt; color: #1e40af; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -140,30 +262,54 @@
      Página 1 — Portada
      ═══════════════════════════════════════════ -->
 <div class="cover">
-  {% if logo_url %}
-    <img src="{{ logo_url }}" alt="logo" style="width:64px;height:64px;object-fit:contain;border-radius:10px;margin-bottom:16px;">
-  {% else %}
-    <div class="cover-logo">{{ tenant_name[0] | upper }}</div>
-  {% endif %}
+  <div class="cover-header">
+    <div>
+      <div class="cover-brand-name">CMG Telematic</div>
+      <div class="cover-brand-sub">Sistema de telemetría industrial</div>
+    </div>
+    {% if logo_url %}
+      <img src="{{ logo_url }}" alt="{{ tenant_name }}" class="cover-logo-img">
+    {% else %}
+      <div class="cover-client-name">{{ tenant_name }}</div>
+    {% endif %}
+  </div>
 
-  <div class="cover-brand">{{ tenant_name }}</div>
-  <div class="cover-subtitle">Informe mensual de operaciones</div>
-  <div class="cover-period">{{ month_name }} {{ year }}</div>
-  <div class="cover-generated">Generado el {{ generated_at }} — CMG Telematic</div>
+  <div class="cover-main">
+    <div class="cover-badge">Informe mensual de operaciones</div>
 
-  <div class="kpi-row">
-    <div class="kpi-box">
-      <div class="kpi-value" style="color:#F97316">{{ kpi_vehicles }}</div>
-      <div class="kpi-label">Vehículos</div>
+    {% if kpi_vehicles == 1 and fleet_rows %}
+      <div class="cover-vehicle-name">{{ fleet_rows[0].name }}</div>
+      {% if fleet_rows[0].license_plate %}
+        <div><span class="cover-plate">{{ fleet_rows[0].license_plate }}</span></div>
+      {% endif %}
+      <div class="cover-type-label">{{ fleet_rows[0].type_name or 'Vehículo' }}</div>
+    {% else %}
+      <div class="cover-vehicle-name">Flota {{ tenant_name }}</div>
+      <div class="cover-type-label">{{ kpi_vehicles }} vehículos</div>
+    {% endif %}
+
+    <div class="cover-period">{{ month_name }} {{ year }}</div>
+    <div class="cover-generated">Generado el {{ generated_at }}</div>
+
+    <div class="kpi-row">
+      <div class="kpi-box kpi-box-vehicles">
+        <div class="kpi-value kpi-vehicles">{{ kpi_vehicles }}</div>
+        <div class="kpi-label">Vehículos</div>
+      </div>
+      <div class="kpi-box kpi-box-alerts">
+        <div class="kpi-value kpi-alerts">{{ kpi_alerts }}</div>
+        <div class="kpi-label">Alertas</div>
+      </div>
+      <div class="kpi-box kpi-box-maint">
+        <div class="kpi-value kpi-maint">{{ kpi_interventions }}</div>
+        <div class="kpi-label">Intervenciones</div>
+      </div>
     </div>
-    <div class="kpi-box">
-      <div class="kpi-value" style="color:#EF4444">{{ kpi_alerts }}</div>
-      <div class="kpi-label">Alertas</div>
-    </div>
-    <div class="kpi-box">
-      <div class="kpi-value" style="color:#22C55E">{{ kpi_interventions }}</div>
-      <div class="kpi-label">Intervenciones</div>
-    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>CMG Telematic · Informe generado automáticamente</span>
+    <span>Período: {{ month_name }} {{ year }}</span>
   </div>
 </div>
 
@@ -171,37 +317,51 @@
      Página 2 — Resumen de flota + Gráfica PTO
      ═══════════════════════════════════════════ -->
 <div class="page-break">
-  <div class="section-title">Flota — Resumen del mes</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Vehículo</th>
-        <th>Matrícula</th>
-        <th class="right">H. Motor</th>
-        <th class="right">H. PTO</th>
-        <th class="right">Alertas</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in fleet_rows %}
-      <tr>
-        <td>{{ row.name }}</td>
-        <td class="muted">{{ row.license_plate }}</td>
-        <td class="right mono">{{ row.engine_hours }}h</td>
-        <td class="right mono" style="color:#F97316">{{ row.pto_hours }}h</td>
-        <td class="right mono {% if row.alert_count > 0 %}sev-critical{% else %}muted{% endif %}">
-          {{ row.alert_count }}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="page-section">
+    <div class="section-title">Resumen del período — Actividad por vehículo</div>
+    <table class="striped">
+      <thead>
+        <tr>
+          <th>Vehículo</th>
+          <th>Matrícula</th>
+          <th>Tipo</th>
+          <th class="right">H. Motor</th>
+          <th class="right">H. PTO</th>
+          <th class="right">Alertas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in fleet_rows %}
+        <tr>
+          <td style="font-weight: 600;">{{ row.name }}</td>
+          <td class="mono muted">{{ row.license_plate or '—' }}</td>
+          <td class="muted" style="font-size: 8pt;">{{ row.type_name or '—' }}</td>
+          <td class="right mono">{{ row.engine_hours }}h</td>
+          <td class="right mono" style="color:#f97316; font-weight:700;">{{ row.pto_hours }}h</td>
+          <td class="right">
+            {% if row.alert_count > 0 %}
+              <span class="badge badge-critical">{{ row.alert_count }}</span>
+            {% else %}
+              <span class="muted">0</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
-  <br>
-  <div class="section-title">Actividad diaria — Horas PTO (global flota)</div>
-  <div class="chart-box">
-    {{ pto_bar_chart_svg | safe }}
-    <div class="chart-label">Días del mes (barras = horas PTO acumuladas de todos los vehículos)</div>
+  <div class="page-section">
+    <div class="section-title">Actividad diaria — Horas PTO acumuladas (flota)</div>
+    <div class="chart-box">
+      {{ pto_bar_chart_svg | safe }}
+      <div class="chart-label">Barras naranjas: horas PTO acumuladas de todos los vehículos por día del mes</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>CMG Telematic</span>
+    <span>{{ month_name }} {{ year }}</span>
   </div>
 </div>
 
@@ -209,84 +369,114 @@
      Página 3 — Alertas del período
      ═══════════════════════════════════════════ -->
 <div class="page-break">
-  <div class="section-title">Alertas del período</div>
+  <div class="page-section">
+    <div class="section-title">Alertas del período</div>
 
-  <div class="card-row">
-    <div class="card">
-      <div class="card-value sev-critical">{{ critical_count }}</div>
-      <div class="card-label">Críticas</div>
+    <div class="card-row">
+      <div class="stat-card">
+        <div class="stat-value" style="color:#ef4444;">{{ critical_count }}</div>
+        <div class="stat-label">Críticas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#d97706;">{{ warning_count }}</div>
+        <div class="stat-label">Advertencia</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:#16a34a;">{{ resolved_count }}</div>
+        <div class="stat-label">Resueltas</div>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-value sev-warning">{{ warning_count }}</div>
-      <div class="card-label">Advertencia</div>
-    </div>
-    <div class="card">
-      <div class="card-value" style="color:#22C55E">{{ resolved_count }}</div>
-      <div class="card-label">Resueltas</div>
-    </div>
+
+    {% if alerts %}
+    <table class="striped">
+      <thead>
+        <tr>
+          <th>Severidad</th>
+          <th>Regla</th>
+          <th>Vehículo</th>
+          <th>Fecha / Hora</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr>
+          <td>
+            {% if a.severity == 'critical' %}
+              <span class="badge badge-critical">crítica</span>
+            {% elif a.severity == 'warning' %}
+              <span class="badge badge-warning">aviso</span>
+            {% else %}
+              <span class="badge badge-info">{{ a.severity }}</span>
+            {% endif %}
+          </td>
+          <td style="font-weight: 600;">{{ a.rule_name }}</td>
+          <td class="muted">{{ a.vehicle_name }}</td>
+          <td class="mono muted" style="font-size: 8pt; white-space: nowrap;">{{ a.triggered_at_fmt }}</td>
+          <td>
+            {% if a.status == 'resolved' %}
+              <span class="badge badge-ok">resuelta</span>
+            {% else %}
+              <span class="muted" style="font-size: 8pt;">{{ a.status }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted" style="font-size: 8.5pt; padding: 8px 0;">Sin alertas registradas en este período.</p>
+    {% endif %}
   </div>
 
-  {% if alerts %}
-  <table>
-    <thead>
-      <tr>
-        <th>Regla</th>
-        <th>Vehículo</th>
-        <th>Fecha</th>
-        <th>Estado</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for a in alerts %}
-      <tr>
-        <td class="sev-{{ a.severity }}">{{ a.rule_name }}</td>
-        <td class="muted">{{ a.vehicle_name }}</td>
-        <td class="muted mono">{{ a.triggered_at_fmt }}</td>
-        <td class="muted">{{ a.status }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-    <p class="muted">Sin alertas en este período.</p>
-  {% endif %}
+  <div class="page-footer">
+    <span>CMG Telematic</span>
+    <span>{{ month_name }} {{ year }}</span>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
      Página 4 — Mantenimiento
      ═══════════════════════════════════════════ -->
 <div class="page-break">
-  <div class="section-title">Intervenciones de mantenimiento</div>
+  <div class="page-section">
+    <div class="section-title">Intervenciones de mantenimiento</div>
 
-  {% if maintenance %}
-  <table>
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Plan</th>
-        <th>Vehículo</th>
-        <th>Descripción</th>
-        <th class="right">Coste</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for m in maintenance %}
-      <tr>
-        <td class="mono muted">{{ m.performed_at_fmt }}</td>
-        <td>{{ m.plan_name }}</td>
-        <td class="muted">{{ m.vehicle_name }}</td>
-        <td class="muted">{{ m.description or "—" }}</td>
-        <td class="right mono">
-          {% if m.cost_eur is not none %}{{ "%.2f"|format(m.cost_eur) }} €{% else %}—{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="cost-total">Total: {{ "%.2f"|format(total_cost) }} €</div>
-  {% else %}
-    <p class="muted">Sin intervenciones registradas en este período.</p>
-  {% endif %}
+    {% if maintenance %}
+    <table class="striped">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Plan</th>
+          <th>Vehículo</th>
+          <th>Descripción</th>
+          <th class="right">Coste</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in maintenance %}
+        <tr>
+          <td class="mono muted" style="font-size: 8pt; white-space: nowrap;">{{ m.performed_at_fmt }}</td>
+          <td style="font-weight: 600;">{{ m.plan_name }}</td>
+          <td class="muted">{{ m.vehicle_name }}</td>
+          <td class="muted" style="font-size: 8pt;">{{ m.description or "—" }}</td>
+          <td class="right mono" style="font-weight: 600;">
+            {% if m.cost_eur is not none %}{{ "%.2f"|format(m.cost_eur) }} €{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="cost-total">Coste total del período: {{ "%.2f"|format(total_cost) }} €</div>
+    {% else %}
+      <p class="muted" style="font-size: 8.5pt; padding: 8px 0;">Sin intervenciones registradas en este período.</p>
+    {% endif %}
+  </div>
+
+  <div class="page-footer">
+    <span>CMG Telematic</span>
+    <span>{{ month_name }} {{ year }}</span>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
@@ -294,28 +484,54 @@
      ═══════════════════════════════════════════ -->
 {% for v in vehicles_with_gps %}
 <div class="page-break">
-  <div class="section-title">{{ v.name }}{% if v.license_plate %} — {{ v.license_plate }}{% endif %} — Recorrido {{ month_name }} {{ year }}</div>
+  <div class="vehicle-page-header">
+    <div class="vehicle-page-name">{{ v.name }}</div>
+    <div class="vehicle-page-meta">
+      {% if v.license_plate %}
+        <span class="inline-plate">{{ v.license_plate }}</span>
+      {% endif %}
+      {% if v.type_name %}
+        <span class="muted" style="font-size: 8pt;">{{ v.type_name }}</span>
+      {% endif %}
+      <span class="period-label">{{ month_name }} {{ year }}</span>
+    </div>
+  </div>
+
+  <div class="section-title">Recorrido GPS del período</div>
 
   {% if v.map_base64 %}
     <img class="map-img" src="data:image/png;base64,{{ v.map_base64 }}" alt="Mapa GPS {{ v.name }}">
-    <div class="map-legend">● Verde = inicio &nbsp; ● Azul = fin &nbsp; ● Rojo = alerta crítica</div>
+    <div class="map-legend">
+      <span><span class="dot" style="background:#16a34a;"></span> Inicio</span>
+      <span><span class="dot" style="background:#2563eb;"></span> Fin</span>
+      <span><span class="dot" style="background:#ef4444;"></span> Alerta crítica</span>
+    </div>
   {% else %}
-    <p class="muted" style="margin-bottom:12px">Mapa no disponible (sin conexión a tiles OSM).</p>
+    <p class="muted" style="font-size: 8.5pt; padding: 8px 0; margin-bottom: 12px;">Mapa no disponible (sin conexión a tiles OSM).</p>
   {% endif %}
 
-  <div class="vehicle-kpis">
-    <div class="vehicle-kpi">
-      <div class="vehicle-kpi-value">{{ v.engine_hours }}h</div>
+  <div class="vehicle-kpi-row">
+    <div class="vehicle-kpi-card">
+      <div class="vehicle-kpi-value" style="color:#1e40af;">{{ v.engine_hours }}h</div>
       <div class="vehicle-kpi-label">Motor</div>
     </div>
-    <div class="vehicle-kpi">
-      <div class="vehicle-kpi-value">{{ v.pto_hours }}h</div>
+    <div class="vehicle-kpi-card">
+      <div class="vehicle-kpi-value" style="color:#f97316;">{{ v.pto_hours }}h</div>
       <div class="vehicle-kpi-label">PTO</div>
     </div>
-    <div class="vehicle-kpi">
-      <div class="vehicle-kpi-value {% if v.alert_count > 0 %}sev-critical{% endif %}">{{ v.alert_count }}</div>
+    <div class="vehicle-kpi-card">
+      {% if v.alert_count > 0 %}
+        <div class="vehicle-kpi-value" style="color:#ef4444;">{{ v.alert_count }}</div>
+      {% else %}
+        <div class="vehicle-kpi-value" style="color:#16a34a;">0</div>
+      {% endif %}
       <div class="vehicle-kpi-label">Alertas</div>
     </div>
+  </div>
+
+  <div class="page-footer">
+    <span>CMG Telematic · {{ v.name }}{% if v.license_plate %} · {{ v.license_plate }}{% endif %}</span>
+    <span>{{ month_name }} {{ year }}</span>
   </div>
 </div>
 {% endfor %}

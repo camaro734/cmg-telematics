@@ -150,3 +150,173 @@ export function IconCanScanner(props: IconProps) {
     </Icon>
   )
 }
+
+// ── Vehicle type icons — 64×32 side-view, stroke-based ───────────────────────
+
+type TruckIconProps = React.SVGProps<SVGSVGElement>
+
+// ── Truck icons v2 — modern detailed style ──────────────────────────────────
+// viewBox 0 0 80 36, stroke-based, color currentColor
+
+// Generic box truck — enclosed cargo body, dual rear axle
+export function IconTruckGeneric({ style, className, ...props }: TruckIconProps) {
+  return (
+    <svg viewBox="0 0 80 36" fill="none" stroke="currentColor" strokeWidth={1.4}
+      strokeLinecap="round" strokeLinejoin="round" style={style} className={className} {...props}>
+      {/* chassis */}
+      <line x1="4" y1="28" x2="76" y2="28" />
+      {/* cab */}
+      <path d="M4,28 L4,14 Q4,10 8,10 L22,10 L22,28" />
+      <path d="M8,10 L8,6 Q8,4 11,4 L19,4 Q22,4 22,8 L22,10" />
+      {/* windshield */}
+      <rect x="9" y="5" width="11" height="7" rx="1" strokeWidth={1} opacity="0.6" />
+      {/* cargo body */}
+      <rect x="22" y="10" width="52" height="18" rx="2" />
+      {/* cargo door lines */}
+      <line x1="58" y1="10" x2="58" y2="28" strokeDasharray="2 2" opacity="0.5" />
+      <line x1="38" y1="10" x2="38" y2="28" strokeDasharray="2 2" opacity="0.5" />
+      {/* wheels */}
+      <circle cx="13" cy="29" r="4.5" />
+      <circle cx="13" cy="29" r="2" />
+      <circle cx="54" cy="29" r="4.5" />
+      <circle cx="54" cy="29" r="2" />
+      <circle cx="64" cy="29" r="4.5" />
+      <circle cx="64" cy="29" r="2" />
+      {/* exhaust */}
+      <line x1="6" y1="10" x2="6" y2="4" strokeWidth={2} />
+      <line x1="6" y1="4" x2="8" y2="4" />
+    </svg>
+  )
+}
+
+// Cistern truck — elliptical tank with ribs, fill port, rear valve
+export function IconTruckCistern({ style, className, ...props }: TruckIconProps) {
+  return (
+    <svg viewBox="0 0 80 36" fill="none" stroke="currentColor" strokeWidth={1.4}
+      strokeLinecap="round" strokeLinejoin="round" style={style} className={className} {...props}>
+      {/* chassis */}
+      <line x1="4" y1="28" x2="76" y2="28" />
+      {/* cab */}
+      <path d="M4,28 L4,14 Q4,10 8,10 L22,10 L22,28" />
+      <path d="M8,10 L8,6 Q8,4 11,4 L19,4 Q22,4 22,8 L22,10" />
+      <rect x="9" y="5" width="11" height="7" rx="1" strokeWidth={1} opacity="0.6" />
+      {/* tank — elliptical */}
+      <ellipse cx="48" cy="19" rx="27" ry="10" />
+      {/* tank ribs */}
+      <line x1="32" y1="10" x2="32" y2="28" opacity="0.4" />
+      <line x1="42" y1="9.5" x2="42" y2="28.5" opacity="0.4" />
+      <line x1="52" y1="9.5" x2="52" y2="28.5" opacity="0.4" />
+      <line x1="62" y1="10" x2="62" y2="28" opacity="0.4" />
+      {/* fill port on top */}
+      <rect x="44" y="8" width="8" height="3" rx="1.5" />
+      <line x1="48" y1="8" x2="48" y2="5" />
+      <circle cx="48" cy="4.5" r="1.5" />
+      {/* rear valve */}
+      <rect x="73" y="17" width="4" height="5" rx="1" />
+      <line x1="75" y1="17" x2="75" y2="15" />
+      {/* wheels */}
+      <circle cx="13" cy="29" r="4.5" />
+      <circle cx="13" cy="29" r="2" />
+      <circle cx="54" cy="29" r="4.5" />
+      <circle cx="54" cy="29" r="2" />
+      <circle cx="64" cy="29" r="4.5" />
+      <circle cx="64" cy="29" r="2" />
+      {/* exhaust */}
+      <line x1="6" y1="10" x2="6" y2="4" strokeWidth={2} />
+      <line x1="6" y1="4" x2="8" y2="4" />
+    </svg>
+  )
+}
+
+// Vacuum/pressure truck — tank + rear pump unit + hose reel
+export function IconTruckVacuum({ style, className, ...props }: TruckIconProps) {
+  return (
+    <svg viewBox="0 0 80 36" fill="none" stroke="currentColor" strokeWidth={1.4}
+      strokeLinecap="round" strokeLinejoin="round" style={style} className={className} {...props}>
+      {/* chassis */}
+      <line x1="4" y1="28" x2="76" y2="28" />
+      {/* cab */}
+      <path d="M4,28 L4,14 Q4,10 8,10 L22,10 L22,28" />
+      <path d="M8,10 L8,6 Q8,4 11,4 L19,4 Q22,4 22,8 L22,10" />
+      <rect x="9" y="5" width="11" height="7" rx="1" strokeWidth={1} opacity="0.6" />
+      {/* tank — shorter */}
+      <ellipse cx="43" cy="19" rx="20" ry="9.5" />
+      {/* tank ribs */}
+      <line x1="30" y1="10" x2="30" y2="28" opacity="0.4" />
+      <line x1="40" y1="9.5" x2="40" y2="28.5" opacity="0.4" />
+      <line x1="50" y1="9.5" x2="50" y2="28.5" opacity="0.4" />
+      {/* fill port */}
+      <rect x="40" y="8" width="6" height="3" rx="1.5" />
+      <line x1="43" y1="8" x2="43" y2="5.5" />
+      {/* rear pump unit */}
+      <rect x="63" y="12" width="12" height="16" rx="2" />
+      <circle cx="69" cy="20" r="4" />
+      <circle cx="69" cy="20" r="1.5" />
+      {/* hose outlet */}
+      <path d="M75,22 Q78,22 78,26 L76,28" strokeWidth={1.2} />
+      {/* pressure gauge */}
+      <circle cx="69" cy="13" r="1.5" strokeWidth={1} />
+      {/* wheels */}
+      <circle cx="13" cy="29" r="4.5" />
+      <circle cx="13" cy="29" r="2" />
+      <circle cx="48" cy="29" r="4.5" />
+      <circle cx="48" cy="29" r="2" />
+      <circle cx="58" cy="29" r="4.5" />
+      <circle cx="58" cy="29" r="2" />
+      {/* exhaust */}
+      <line x1="6" y1="10" x2="6" y2="4" strokeWidth={2} />
+      <line x1="6" y1="4" x2="8" y2="4" />
+    </svg>
+  )
+}
+
+// Crane truck — flatbed + knuckle-boom crane with hook
+export function IconTruckCrane({ style, className, ...props }: TruckIconProps) {
+  return (
+    <svg viewBox="0 0 80 36" fill="none" stroke="currentColor" strokeWidth={1.4}
+      strokeLinecap="round" strokeLinejoin="round" style={style} className={className} {...props}>
+      {/* chassis */}
+      <line x1="4" y1="28" x2="76" y2="28" />
+      {/* cab */}
+      <path d="M4,28 L4,14 Q4,10 8,10 L22,10 L22,28" />
+      <path d="M8,10 L8,6 Q8,4 11,4 L19,4 Q22,4 22,8 L22,10" />
+      <rect x="9" y="5" width="11" height="7" rx="1" strokeWidth={1} opacity="0.6" />
+      {/* flatbed */}
+      <rect x="22" y="24" width="52" height="4" rx="1" />
+      {/* crane base */}
+      <rect x="30" y="18" width="8" height="6" rx="1" />
+      {/* main boom */}
+      <line x1="34" y1="18" x2="58" y2="4" strokeWidth={2} />
+      {/* knuckle */}
+      <circle cx="58" cy="4" r="2" />
+      {/* jib */}
+      <line x1="58" y1="4" x2="72" y2="10" strokeWidth={1.6} />
+      {/* hoist rope */}
+      <line x1="72" y1="10" x2="72" y2="20" strokeDasharray="2 1.5" />
+      {/* hook */}
+      <path d="M70,20 Q68,22 70,24 Q72,26 74,24" strokeWidth={1.2} />
+      {/* outrigger hint */}
+      <line x1="44" y1="28" x2="44" y2="32" strokeWidth={1} />
+      <line x1="40" y1="32" x2="48" y2="32" strokeWidth={1} />
+      {/* wheels */}
+      <circle cx="13" cy="29" r="4.5" />
+      <circle cx="13" cy="29" r="2" />
+      <circle cx="54" cy="29" r="4.5" />
+      <circle cx="54" cy="29" r="2" />
+      <circle cx="64" cy="29" r="4.5" />
+      <circle cx="64" cy="29" r="2" />
+      {/* exhaust */}
+      <line x1="6" y1="10" x2="6" y2="4" strokeWidth={2} />
+      <line x1="6" y1="4" x2="8" y2="4" />
+    </svg>
+  )
+}
+
+// Returns the right truck icon component based on vehicle type slug
+export function getVehicleIconForSlug(slug: string): React.FC<TruckIconProps> {
+  const s = slug.toLowerCase()
+  if (s.includes('cistern') || s.includes('tanque') || s.includes('tank')) return IconTruckCistern
+  if (s.includes('vacuum') || s.includes('vac') || s.includes('aspirad') || s.includes('barred') || s.includes('vaciado')) return IconTruckVacuum
+  if (s.includes('crane') || s.includes('grua') || s.includes('grú') || s.includes('elevad') || s.includes('brazo')) return IconTruckCrane
+  return IconTruckGeneric
+}

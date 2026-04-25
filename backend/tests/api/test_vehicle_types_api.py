@@ -46,7 +46,13 @@ def _make_vtype() -> MagicMock:
     vt.id = VTYPE_ID
     vt.slug = "cisterna"
     vt.name = "Cisterna"
+    vt.icon_url = None
     vt.sensor_schema = []
+    vt.maintenance_templates = []
+    vt.historic_metrics = []
+    vt.dout_config = []
+    vt.created_at = None
+    vt.updated_at = None
     return vt
 
 
@@ -73,8 +79,8 @@ def test_cmg_admin_can_update_sensor_schema():
     _override_user(CMG_USER)
     _override_db(db)
 
-    # flag_modified requiere _sa_instance_state — no disponible en MagicMock
-    with patch("sqlalchemy.orm.attributes.flag_modified") as mock_flag:
+    # Parcheamos flag_modified donde se importa en el módulo de producción
+    with patch("app.api.v1.vehicles.flag_modified") as mock_flag:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.patch(
             f"/api/v1/vehicle-types/{VTYPE_ID}/sensor-schema",
@@ -127,8 +133,7 @@ def test_empty_schema_clears_sensors():
     _override_user(CMG_USER)
     _override_db(db)
 
-    # flag_modified requiere _sa_instance_state — no disponible en MagicMock
-    with patch("sqlalchemy.orm.attributes.flag_modified") as mock_flag:
+    with patch("app.api.v1.vehicles.flag_modified") as mock_flag:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.patch(
             f"/api/v1/vehicle-types/{VTYPE_ID}/sensor-schema",

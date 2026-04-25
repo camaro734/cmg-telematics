@@ -7,6 +7,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, SensorDef, MaintenanceTemplateItem, RuleOut, HistoricMetricItem, DoutSlot } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
 import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
+import WorkCycleDefsSection from './WorkCycleDefsSection'
 
 // ── Form state types ───────────────────────────────────────────────────────
 
@@ -155,9 +156,13 @@ type MetricFormState = {
   color: string
   unit: string
   transform: string
+  avl_id: string
+  chart_type: 'line' | 'donut' | 'bar'
+  show_in_pdf: boolean
 }
 const emptyMetricForm: MetricFormState = {
   key: '', label: '', color: '#22C55E', unit: '', transform: '1',
+  avl_id: '', chart_type: 'line', show_in_pdf: true,
 }
 
 type DoutFormState = { slot: string; label: string; enabled: boolean }
@@ -351,13 +356,16 @@ export default function VehicleTypesPage() {
       color: m.color,
       unit: m.unit,
       transform: m.transform.toString(),
+      avl_id: m.avl_id?.toString() ?? '',
+      chart_type: m.chart_type ?? 'line',
+      show_in_pdf: m.show_in_pdf ?? true,
     })
     setShowMetricModal(true)
   }
 
   const updateMetricsMutation = useMutation({
     mutationFn: ({ typeId, metrics }: { typeId: string; metrics: HistoricMetricItem[] }) =>
-      apiClient.patch<VehicleTypeOut>(`/api/v1/vehicle-types/${typeId}/historic-metrics`, { metrics }),
+      apiClient.patch<VehicleTypeOut>(`/api/v1/vehicle-types/${typeId}/historic-metrics`, { report_metrics: metrics }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.vehicleTypes() })
       setShowMetricModal(false)
@@ -372,6 +380,9 @@ export default function VehicleTypesPage() {
       color: metricForm.color,
       unit: metricForm.unit,
       transform: parseFloat(metricForm.transform) || 1,
+      avl_id: metricForm.avl_id ? parseInt(metricForm.avl_id) : undefined,
+      chart_type: metricForm.chart_type,
+      show_in_pdf: metricForm.show_in_pdf,
     }
     const current: HistoricMetricItem[] = selectedType.historic_metrics ?? []
     let next: HistoricMetricItem[]
@@ -454,7 +465,7 @@ export default function VehicleTypesPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Shell title="Tipos de Vehículo">
+    <Shell title="Plantillas de Vehículo">
       <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
         {/* Left panel — type list */}
@@ -668,7 +679,7 @@ export default function VehicleTypesPage() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                            {['MÉTRICA', 'ETIQUETA', 'COLOR', 'UNIDAD', ''].map(h => (
+                            {['MÉTRICA', 'ETIQUETA', 'COLOR', 'TIPO GRÁFICO', 'PDF', ''].map(h => (
                               <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
                             ))}
                           </tr>
@@ -680,13 +691,25 @@ export default function VehicleTypesPage() {
                               <td style={{ padding: '6px 8px' }}>{m.label}</td>
                               <td style={{ padding: '6px 8px' }}>
                                 <span style={{
-                                  display: 'inline-block', width: 16, height: 16, borderRadius: 3,
+                                  display: 'inline-block', width: 14, height: 14, borderRadius: 3,
                                   background: m.color, verticalAlign: 'middle',
                                   border: '1px solid rgba(255,255,255,0.15)',
                                 }} />
-                                <span style={{ marginLeft: 6, fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--accent-off)' }}>{m.color}</span>
                               </td>
-                              <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{m.unit || '—'}</td>
+                              <td style={{ padding: '6px 8px' }}>
+                                <span style={{
+                                  fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+                                  background: 'var(--bg-base)',
+                                  color: m.chart_type === 'line' ? 'var(--accent-info)' : m.chart_type === 'donut' ? 'var(--accent-energy)' : 'var(--accent-ok)',
+                                }}>
+                                  {m.chart_type === 'donut' ? 'Dona' : m.chart_type === 'bar' ? 'Barra' : 'Línea'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                <span style={{ fontSize: 10, color: (m.show_in_pdf ?? true) ? 'var(--accent-ok)' : 'var(--text-muted)' }}>
+                                  {(m.show_in_pdf ?? true) ? '✓' : '—'}
+                                </span>
+                              </td>
                               <td style={{ padding: '6px 8px', display: 'flex', gap: 6 }}>
                                 <button style={btnSecondary} onClick={() => openEditMetric(m, idx)}>✎</button>
                                 <button style={{ ...btnSecondary, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }} onClick={() => deleteMetric(idx)}>✕</button>
@@ -745,6 +768,14 @@ export default function VehicleTypesPage() {
                       </table>
                     )}
                   </div>
+                )}
+
+                {/* ── Work cycle definitions section ──────────────────────────────────── */}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <WorkCycleDefsSection
+                    typeId={selectedType.id}
+                    sensorSchema={selectedType.sensor_schema as SensorDef[]}
+                  />
                 )}
 
                 {/* ── Alert rules for this type ──────────────────────────────────────────── */}
@@ -1018,16 +1049,16 @@ export default function VehicleTypesPage() {
 
       {/* ── Modal: Métrica del histórico ───────────────────────────────── */}
       {showMetricModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, overflow: 'auto', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setShowMetricModal(false) }}
         >
-          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 400, border: '1px solid var(--bg-border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 440, border: '1px solid var(--bg-border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #E7E5E4)' }}>
-              {editingMetricIdx === null ? 'Nueva métrica' : 'Editar métrica'}
+              {editingMetricIdx === null ? 'Nueva métrica de reporte' : 'Editar métrica de reporte'}
             </h3>
 
             <div>
-              <label style={labelStyle}>MÉTRICA</label>
+              <label style={labelStyle}>MÉTRICA (KPI)</label>
               <select
                 style={inputStyle}
                 value={metricForm.key}
@@ -1050,14 +1081,58 @@ export default function VehicleTypesPage() {
               </select>
             </div>
 
-            <div>
-              <label style={labelStyle}>ETIQUETA</label>
-              <input
-                style={inputStyle}
-                value={metricForm.label}
-                onChange={e => setMetricForm(f => ({ ...f, label: e.target.value }))}
-                placeholder="Nombre visible en el histórico"
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>ETIQUETA</label>
+                <input
+                  style={inputStyle}
+                  value={metricForm.label}
+                  onChange={e => setMetricForm(f => ({ ...f, label: e.target.value }))}
+                  placeholder="Nombre visible en el histórico"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>SEÑAL FMC650</label>
+                <select
+                  style={inputStyle}
+                  value={AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) ? metricForm.avl_id : metricForm.avl_id ? '__custom__' : ''}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setMetricForm(f => ({ ...f, avl_id: '' }))
+                    } else if (e.target.value === '') {
+                      setMetricForm(f => ({ ...f, avl_id: '' }))
+                    } else {
+                      const info = AVL_NAMES[`avl_${e.target.value}`]
+                      setMetricForm(f => ({
+                        ...f,
+                        avl_id: e.target.value,
+                        label: f.label || (info?.name ?? ''),
+                        unit: f.unit || (info?.unit ?? ''),
+                      }))
+                    }
+                  }}
+                >
+                  <option value="">-- Selecciona señal --</option>
+                  {AVL_OPTIONS.map(opt => (
+                    <option key={opt.id} value={String(opt.id)}>
+                      AVL {opt.id} — {opt.name}{opt.unit ? ` (${opt.unit})` : ''}
+                    </option>
+                  ))}
+                  <option value="__custom__">Otro AVL ID personalizado...</option>
+                </select>
+                {(!AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) && metricForm.avl_id !== '') || metricForm.avl_id === '' && !AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) ? null : null}
+                {!AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) && (
+                  <input
+                    type="number"
+                    min="1"
+                    max="65535"
+                    style={{ ...inputStyle, marginTop: 6 }}
+                    value={metricForm.avl_id}
+                    onChange={e => setMetricForm(f => ({ ...f, avl_id: e.target.value }))}
+                    placeholder="AVL ID numérico (1–65535)"
+                  />
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1095,6 +1170,43 @@ export default function VehicleTypesPage() {
                 onChange={e => setMetricForm(f => ({ ...f, transform: e.target.value }))}
                 placeholder="1"
               />
+            </div>
+
+            <div>
+              <label style={labelStyle}>TIPO DE GRÁFICO</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([
+                  { value: 'line', label: 'Línea' },
+                  { value: 'donut', label: 'Dona' },
+                  { value: 'bar', label: 'Barra' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setMetricForm(f => ({ ...f, chart_type: opt.value }))}
+                    style={{
+                      flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      border: metricForm.chart_type === opt.value ? '2px solid var(--accent-energy)' : '1px solid var(--bg-border)',
+                      background: metricForm.chart_type === opt.value ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface)',
+                      color: metricForm.chart_type === opt.value ? 'var(--accent-energy)' : 'var(--accent-off)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="checkbox"
+                id="metric-pdf"
+                checked={metricForm.show_in_pdf}
+                onChange={e => setMetricForm(f => ({ ...f, show_in_pdf: e.target.checked }))}
+              />
+              <label htmlFor="metric-pdf" style={{ fontSize: 13, color: 'var(--text-primary, #E7E5E4)', cursor: 'pointer' }}>
+                Incluir en informe PDF
+              </label>
             </div>
 
             {updateMetricsMutation.isError && (

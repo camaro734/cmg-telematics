@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useParams, Navigate, Link } from 'react-router-dom'
+import { useParams, Navigate, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import Tabs from '../../shared/ui/Tabs'
@@ -9,6 +9,7 @@ import SensorGrid from './SensorGrid'
 import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut } from '../../lib/types'
 import WorkCyclesTab from './WorkCyclesTab'
 import { useAuthStore } from '../auth/useAuthStore'
@@ -21,10 +22,13 @@ const BASE_TABS = [
 
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<'live' | 'historic' | 'cycles' | 'maintenance'>('live')
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
+  const isMobile = useIsMobile()
+  const [pdfModalOpen, setPdfModalOpen] = useState(false)
   const isCmgAdmin = isCmg && user?.role === 'admin'
   const PAGE_TABS = isCmgAdmin
     ? [...BASE_TABS, { id: 'maintenance', label: 'MANTENIMIENTO' }]
@@ -61,7 +65,7 @@ export default function VehicleDetailPage() {
 
   async function sendDout(slot: number) {
     if (!id || doutLoading[slot]) return
-    const newState = !doutState[slot]
+    const newState = !(doutState[slot] ?? false)
     setDoutLoading(prev => ({ ...prev, [slot]: true }))
     setDoutOverride(prev => ({ ...prev, [slot]: newState }))
     try {
@@ -219,18 +223,23 @@ export default function VehicleDetailPage() {
       )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <VehicleHeader vehicle={vehicle} status={status} />
-        <div style={{ padding: '0 24px', flexShrink: 0 }}>
-          <Tabs tabs={PAGE_TABS} activeTab={tab} onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles' | 'maintenance')} />
+        <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', flexShrink: 0 }}>
+            <Tabs tabs={PAGE_TABS} activeTab={tab} onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles' | 'maintenance')} />
+          </div>
+          <div style={{ flexShrink: 0, marginLeft: 8 }}>
+            <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
+          </div>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflow: tab === 'live' ? 'hidden' : 'auto', ...(tab !== 'live' && { padding: 24 }) }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: (tab === 'live' && !isMobile) ? 'hidden' : 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 
           {tab === 'live' && (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: isMobile ? undefined : '100%' }}>
               {/* Main area */}
-              <div style={{ display: 'grid', gridTemplateColumns: '35% 65%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '35% 65%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-                {/* Left: map + vehicle info */}
-                <div style={{ borderRight: '1px solid var(--bg-border)', overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Left/top: map + vehicle info */}
+                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <TrackMap track={track} status={status} />
                   <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '12px 14px' }}>
                     <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent-info)', fontFamily: 'var(--font-data)', marginBottom: 10 }}>
@@ -244,9 +253,9 @@ export default function VehicleDetailPage() {
                   </div>
                 </div>
 
-                {/* Right: KPIs + telemetry + controls */}
-                <div style={{ overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {/* Right/bottom: KPIs + telemetry + controls */}
+                <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
                     <VDKpiCard title="Días operativos" value={operativeDays} color="var(--accent-ok)" />
                     <VDKpiCard title="Fuera de servicio" value={Math.max(0, 30 - operativeDays)} color="var(--text-muted)" />
                     <VDKpiCard title="En mantenimiento" value={maintenancePlans.filter(p => p.progress.status !== 'ok').length} color="var(--accent-warn)" />
@@ -258,7 +267,7 @@ export default function VehicleDetailPage() {
                     {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length === 0 ? (
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin salidas configuradas</div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                         {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
                           const active = !!doutState[d.slot]
                           const loading = !!doutLoading[d.slot]
@@ -333,12 +342,72 @@ export default function VehicleDetailPage() {
                       <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Sin datos en vivo</div>
                     )}
                   </div>
+
+                  {/* Quick-access report cards */}
+                  <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 10 }}>ACCESO RÁPIDO A REPORTES</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
+                      <QuickReportCard
+                        label="Desempeño histórico"
+                        accent="var(--accent-info)"
+                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico' } })}
+                        icon={
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                          </svg>
+                        }
+                      />
+                      <QuickReportCard
+                        label="Rutas del mes"
+                        accent="var(--accent-ok)"
+                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'rutas' } })}
+                        icon={
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                          </svg>
+                        }
+                      />
+                      <QuickReportCard
+                        label="Alertas activas"
+                        accent={activeAlertsCount > 0 ? 'var(--accent-crit)' : 'var(--text-muted)'}
+                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'alertas' } })}
+                        badge={activeAlertsCount > 0 ? String(activeAlertsCount) : undefined}
+                        icon={
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                          </svg>
+                        }
+                      />
+                      <QuickReportCard
+                        label="Descargar PDF"
+                        accent="var(--accent-energy)"
+                        onClick={() => setPdfModalOpen(true)}
+                        icon={
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
+                          </svg>
+                        }
+                      />
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
+              {/* PDF modal triggered from quick-access card */}
+              {pdfModalOpen && id && vehicle && (
+                <PdfQuickModal
+                  vehicleId={id}
+                  vehicleName={vehicle.name}
+                  isCmg={isCmg}
+                  tenantId={vehicle.tenant_id}
+                  onClose={() => setPdfModalOpen(false)}
+                />
+              )}
+
               {/* Bottom section */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', borderTop: '1px solid var(--bg-border)', height: 180, overflow: 'hidden', flexShrink: 0 }}>
-                <div style={{ borderRight: '1px solid var(--bg-border)', padding: '10px 14px', overflowY: 'auto' }}>
+              <div style={isMobile ? { display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--bg-border)' } : { display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', borderTop: '1px solid var(--bg-border)', height: 180, overflow: 'hidden', flexShrink: 0 }}>
+                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>ESTADO CHASIS</div>
                   {/* AVL 16: Total Odometer (m → km) */}
                   <VDFluidRow
@@ -364,7 +433,7 @@ export default function VehicleDetailPage() {
                     color={status?.can_data?.avl_67 != null && Number(status.can_data.avl_67) < 3500 ? 'var(--accent-warn)' : undefined}
                   />
                 </div>
-                <div style={{ borderRight: '1px solid var(--bg-border)', padding: '10px 14px', overflowY: 'auto' }}>
+                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
                 </div>
@@ -465,6 +534,142 @@ export default function VehicleDetailPage() {
   )
 }
 
+// ── Quick-access report card ────────────────────────────────────────────────
+
+function QuickReportCard({
+  label, accent, onClick, icon, badge,
+}: {
+  label: string
+  accent: string
+  onClick: () => void
+  icon: React.ReactNode
+  badge?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: 'var(--bg-surface)',
+        border: `1px solid var(--bg-border)`,
+        borderRadius: 8,
+        padding: '10px 10px 8px',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        transition: 'border-color 0.15s, background 0.15s',
+        position: 'relative',
+        textAlign: 'center',
+      }}
+      onMouseEnter={e => {
+        const el = e.currentTarget as HTMLButtonElement
+        el.style.borderColor = accent
+        el.style.background = `color-mix(in srgb, ${accent} 8%, var(--bg-surface))`
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLButtonElement
+        el.style.borderColor = 'var(--bg-border)'
+        el.style.background = 'var(--bg-surface)'
+      }}
+    >
+      {badge && (
+        <span style={{
+          position: 'absolute', top: 4, right: 6,
+          fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 8,
+          background: accent, color: '#fff',
+        }}>
+          {badge}
+        </span>
+      )}
+      <span style={{ color: accent }}>{icon}</span>
+      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', lineHeight: 1.3 }}>{label}</span>
+    </button>
+  )
+}
+
+// ── PDF Quick Modal (standalone, opened from quick-access card) ──────────────
+
+function PdfQuickModal({
+  vehicleId, vehicleName, isCmg, tenantId, onClose,
+}: {
+  vehicleId: string
+  vehicleName: string
+  isCmg: boolean
+  tenantId: string
+  onClose: () => void
+}) {
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [loading, setLoading] = useState(false)
+
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+  async function download() {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ year: String(year), month: String(month) })
+      params.append('vehicle_ids', vehicleId)
+      if (isCmg && tenantId) params.append('tenant_id', tenantId)
+      const blob = await apiClient.getBlob(`/api/v1/reports/monthly?${params}`)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `informe-${vehicleName.replace(/\s+/g, '-')}-${year}-${String(month).padStart(2, '0')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      onClose()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Error al generar el informe')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selStyle: React.CSSProperties = {
+    fontSize: 12, background: 'var(--bg-elevated)',
+    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px',
+    color: 'var(--text-default)', flex: 1,
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 320, border: '1px solid var(--bg-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-default)' }}>Descargar Informe PDF</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Vehículo: <strong style={{ color: 'var(--text-default)' }}>{vehicleName}</strong></div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <select value={month} onChange={e => setMonth(Number(e.target.value))} style={selStyle}>
+            {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ ...selStyle, flex: 'none', width: 80 }}>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <button
+          onClick={download}
+          disabled={loading}
+          style={{
+            width: '100%', background: 'var(--accent-energy)', color: '#fff',
+            border: 'none', borderRadius: 6, padding: '9px 16px',
+            fontSize: 13, cursor: 'pointer', fontWeight: 600,
+            opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          {loading ? 'Generando…' : '⬇ Descargar PDF'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function StatusCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '8px 12px' }}>
@@ -514,6 +719,102 @@ function VDFluidRow({ label, value, color }: { label: string; value: string; col
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontSize: 12, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-muted)' }}>{value}</span>
+    </div>
+  )
+}
+
+function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
+  vehicleId: string
+  vehicleName: string
+  isCmg: boolean
+  tenantId: string
+}) {
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+  async function download() {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ year: String(year), month: String(month) })
+      params.append('vehicle_ids', vehicleId)
+      if (isCmg && tenantId) params.append('tenant_id', tenantId)
+      const blob = await apiClient.getBlob(`/api/v1/reports/monthly?${params}`)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `informe-${vehicleName.replace(/\s+/g, '-')}-${year}-${String(month).padStart(2, '0')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      setOpen(false)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Error al generar el informe')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selStyle: React.CSSProperties = {
+    fontSize: 12, background: 'var(--bg-elevated)',
+    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '4px 8px',
+    color: 'var(--text-default)',
+  }
+
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--bg-border)',
+          borderRadius: 6,
+          padding: '5px 12px',
+          fontSize: 12,
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+        }}
+      >
+        ⬇ Informe PDF
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: '110%', zIndex: 200,
+          background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+          borderRadius: 8, padding: 14, minWidth: 240, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-default)' }}>Selecciona período</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selStyle, flex: 1 }}>
+              {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+            </select>
+            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selStyle}>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Vehículo: {vehicleName}</div>
+          <button
+            onClick={download}
+            disabled={loading}
+            style={{
+              background: 'var(--accent-energy)', color: '#fff',
+              border: 'none', borderRadius: 6, padding: '7px 14px',
+              fontSize: 12, cursor: 'pointer', fontWeight: 600,
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            {loading ? 'Generando…' : '⬇ Descargar PDF'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

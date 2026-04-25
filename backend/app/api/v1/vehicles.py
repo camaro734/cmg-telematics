@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
+from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
@@ -14,6 +15,7 @@ from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
     TelemetryPoint, TrackPoint, KpiHour, VehicleTypeSensorSchemaUpdate,
     VehicleTypeCreate, VehicleTypeUpdate, HistoricMetricItem, DoutSlot,
+    VehicleTypeReportMetricsUpdate,
 )
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
@@ -21,7 +23,7 @@ from app.models.maintenance import MaintenancePlan
 from app.models.device import Device
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,6 @@ async def update_vehicle_type_sensor_schema(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tipo de vehículo no encontrado",
         )
-    from sqlalchemy.orm.attributes import flag_modified
     vtype.sensor_schema = body.sensor_schema
     flag_modified(vtype, "sensor_schema")
     await db.commit()
@@ -89,16 +90,11 @@ async def update_vehicle_type_maintenance_templates(
     vtype = await db.get(VehicleType, type_id)
     if not vtype:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tipo de vehículo no encontrado")
-    from sqlalchemy.orm.attributes import flag_modified
     vtype.maintenance_templates = [t.model_dump() for t in body.templates]
     flag_modified(vtype, "maintenance_templates")
     await db.commit()
     await db.refresh(vtype)
     return vtype
-
-
-class HistoricMetricsUpdate(BaseModel):
-    metrics: list[HistoricMetricItem]
 
 
 class DoutConfigUpdate(BaseModel):
@@ -108,7 +104,7 @@ class DoutConfigUpdate(BaseModel):
 @router.patch("/vehicle-types/{type_id}/historic-metrics", response_model=VehicleTypeOut)
 async def update_vehicle_type_historic_metrics(
     type_id: uuid.UUID,
-    body: HistoricMetricsUpdate,
+    body: VehicleTypeReportMetricsUpdate,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -118,8 +114,7 @@ async def update_vehicle_type_historic_metrics(
     vtype = result.scalar_one_or_none()
     if not vtype:
         raise HTTPException(status_code=404)
-    from sqlalchemy.orm.attributes import flag_modified
-    vtype.historic_metrics = [m.model_dump() for m in body.metrics]
+    vtype.historic_metrics = [m.model_dump() for m in body.report_metrics]
     flag_modified(vtype, "historic_metrics")
     await db.commit()
     await db.refresh(vtype)
@@ -139,7 +134,6 @@ async def update_vehicle_type_dout_config(
     vtype = result.scalar_one_or_none()
     if not vtype:
         raise HTTPException(status_code=404)
-    from sqlalchemy.orm.attributes import flag_modified
     vtype.dout_config = [s.model_dump() for s in body.dout_config]
     flag_modified(vtype, "dout_config")
     await db.commit()
@@ -526,6 +520,37 @@ async def get_vehicle_track_today(
     return [TrackPoint(**dict(r._mapping)) for r in rows]
 
 
+@router.get("/vehicles/{vehicle_id}/track", response_model=list[TrackPoint])
+async def get_vehicle_track(
+    vehicle_id: uuid.UUID,
+    from_: datetime = Query(alias="from"),
+    to: datetime = Query(...),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+    if from_ > to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from debe ser anterior a to")
+
+    rows = (
+        await db.execute(
+            text(
+                "SELECT time, lat, lon FROM telemetry_record "
+                "WHERE vehicle_id = :vid AND tenant_id = :tid "
+                "AND time >= :from_ AND time <= :to "
+                "AND lat IS NOT NULL AND lon IS NOT NULL "
+                "ORDER BY time ASC LIMIT 2000"
+            ),
+            {"vid": vehicle_id, "tid": vehicle.tenant_id, "from_": from_, "to": to},
+        )
+    ).fetchall()
+
+    return [TrackPoint(**dict(r._mapping)) for r in rows]
+
+
 @router.get("/vehicles/{vehicle_id}/kpis", response_model=list[KpiHour])
 async def get_vehicle_kpis(
     vehicle_id: uuid.UUID,
@@ -587,7 +612,7 @@ async def list_vehicle_maintenance(
 
 
 class DoutCommand(BaseModel):
-    slot: int
+    slot: int = Field(..., ge=1, le=4)
     state: bool
 
 

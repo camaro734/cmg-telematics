@@ -89,6 +89,14 @@ def decode_packet(data: bytes) -> list[AVLRecord]:
     if num_records_2 != num_records:
         raise ValueError(f"Mismatch registros: {num_records} vs {num_records_2}")
 
+    # Verificar CRC-16/IBM — cubre desde Codec ID (byte 8) hasta num_records_2 inclusive
+    crc_received = struct.unpack_from(">I", data, offset + 1)[0]
+    crc_calculated = _crc16(data[8:offset + 1])
+    if crc_received != crc_calculated:
+        raise ValueError(
+            f"CRC inválido: calculado {crc_calculated:#06x}, recibido {crc_received:#06x}"
+        )
+
     return records
 
 

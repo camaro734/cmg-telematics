@@ -62,7 +62,7 @@ async def _send_email(action: dict, context: dict) -> None:
 
 
 def _smtp_send(msg: EmailMessage) -> None:
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as s:
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as s:
         if settings.smtp_user:
             s.starttls()
             s.login(settings.smtp_user, settings.smtp_password)

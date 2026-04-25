@@ -2,7 +2,7 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 from app.schemas.maintenance import MaintenanceTemplateItem
 
@@ -19,6 +19,16 @@ class HistoricMetricItem(BaseModel):
     color: str        # e.g. "#22C55E"
     unit: str = ""    # e.g. "h", "km", "km/h"
     transform: float = 1.0  # multiply raw value by this (e.g. 1/60 to convert minutes→hours)
+    avl_id: int | None = None
+    chart_type: Literal['line', 'donut', 'bar'] = 'line'
+    show_in_pdf: bool = True
+
+
+ReportMetricItem = HistoricMetricItem
+
+
+class VehicleTypeReportMetricsUpdate(BaseModel):
+    report_metrics: list[HistoricMetricItem]
 
 
 class VehicleTypeOut(BaseModel):

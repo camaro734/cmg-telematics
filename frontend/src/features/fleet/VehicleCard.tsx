@@ -1,4 +1,6 @@
 import { useFleetStore } from './useFleetStore'
+import { getVehicleIconForSlug } from '../../shared/ui/icons'
+import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleTypeOut, VehicleStatus } from '../../lib/types'
 
 interface Props {
@@ -8,26 +10,76 @@ interface Props {
   isSelected: boolean
 }
 
-function TruckSvg() {
-  return (
-    <svg width="64" height="52" viewBox="0 0 64 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2" y="10" width="38" height="24" rx="3" fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="1.5"/>
-      <rect x="40" y="16" width="20" height="18" rx="3" fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="1.5"/>
-      <rect x="43" y="17" width="10" height="9" rx="1.5" fill="var(--accent-info)" opacity="0.3"/>
-      <rect x="2" y="34" width="58" height="4" rx="1" fill="var(--bg-border)"/>
-      <circle cx="13" cy="42" r="5" fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="2"/>
-      <circle cx="49" cy="42" r="5" fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="2"/>
-    </svg>
-  )
-}
-
 export default function VehicleCard({ vehicle, vehicleType, status, isSelected }: Props) {
   const setSelected = useFleetStore(s => s.setSelected)
   const online = status?.online ?? false
+  const isMobile = useIsMobile()
 
   const borderColor = isSelected
     ? 'var(--accent-energy)'
     : online ? 'var(--accent-ok)' : 'var(--bg-border)'
+
+  const VehicleIcon = getVehicleIconForSlug(vehicleType?.slug ?? '')
+
+  const iconEl = vehicleType?.icon_url ? (
+    <img
+      src={vehicleType.icon_url}
+      alt={vehicleType.name}
+      style={{ maxHeight: isMobile ? 40 : 80, maxWidth: isMobile ? 60 : '100%', objectFit: 'contain' }}
+    />
+  ) : (
+    <VehicleIcon
+      width={isMobile ? 48 : 96}
+      height={isMobile ? 28 : 48}
+      style={{ color: online ? 'var(--accent-ok)' : 'var(--bg-border)', opacity: online ? 1 : 0.6 }}
+    />
+  )
+
+  if (isMobile) {
+    return (
+      <div
+        onClick={() => setSelected(isSelected ? null : vehicle.id)}
+        title={vehicle.license_plate ?? vehicle.name}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: 'var(--bg-surface)',
+          border: `2px solid ${borderColor}`,
+          borderRadius: 8,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          position: 'relative',
+          transition: 'border-color 0.15s',
+          userSelect: 'none',
+        }}
+      >
+        <div style={{ width: 56, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {iconEl}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontFamily: 'var(--font-data)', color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {vehicle.license_plate ?? vehicle.name}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            {vehicleType?.name ?? '—'}
+          </div>
+        </div>
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontSize: 10, padding: '2px 8px', borderRadius: 10,
+            background: online ? 'color-mix(in srgb, var(--accent-ok) 20%, transparent)' : 'var(--bg-elevated)',
+            color: online ? 'var(--accent-ok)' : 'var(--text-muted)',
+            border: `1px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+            fontWeight: 500,
+          }}>
+            {online ? 'Activo' : 'Inactivo'}
+          </span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -57,14 +109,7 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected }
         justifyContent: 'center',
         overflow: 'hidden',
       }}>
-        {vehicleType?.icon_url
-          ? <img
-              src={vehicleType.icon_url}
-              alt={vehicleType.name}
-              style={{ maxHeight: 80, maxWidth: '100%', objectFit: 'contain' }}
-            />
-          : <TruckSvg />
-        }
+        {iconEl}
       </div>
 
       <div style={{

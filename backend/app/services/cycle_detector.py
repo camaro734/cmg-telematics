@@ -102,14 +102,14 @@ async def _query_telemetry(
     extra_cols: list[str],
 ) -> list[dict]:
     safe_extras = [c for c in extra_cols if c in _ALLOWED_EXTRA_COLS]
-    col_list = ", ".join(["recorded_at", "lat", "lon", "can_data"] + safe_extras)
+    col_list = ", ".join(["time AS recorded_at", "lat", "lon", "can_data"] + safe_extras)
     result = await db.execute(
         text(f"""
             SELECT {col_list}
             FROM telemetry_record
             WHERE vehicle_id = :vid
-              AND recorded_at >= :from_dt AND recorded_at < :to_dt
-            ORDER BY recorded_at
+              AND time >= :from_dt AND time < :to_dt
+            ORDER BY time
         """),
         {"vid": str(vehicle_id), "from_dt": from_dt, "to_dt": to_dt},
     )

@@ -54,8 +54,8 @@ export default function LoginPage() {
       <div style={{
         background: 'var(--bg-surface)',
         borderRadius: 12,
-        padding: '40px 36px',
-        width: 380,
+        padding: 'clamp(24px, 5vw, 40px) clamp(20px, 5vw, 36px)',
+        width: 'min(380px, calc(100vw - 32px))',
         border: '1px solid var(--bg-border)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>

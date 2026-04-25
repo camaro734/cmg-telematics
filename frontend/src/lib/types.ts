@@ -115,6 +115,9 @@ export interface HistoricMetricItem {
   color: string
   unit: string
   transform: number
+  avl_id?: number
+  chart_type?: 'line' | 'donut' | 'bar'
+  show_in_pdf?: boolean
 }
 
 export interface VehicleTypeOut {

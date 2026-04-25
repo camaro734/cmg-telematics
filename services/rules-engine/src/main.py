@@ -123,7 +123,11 @@ async def _listen_rule_changes(db_pool: asyncpg.Pool) -> None:
     conn = await asyncpg.connect(dsn=dsn)
     try:
         def _on_notify(conn, pid, channel, payload):
-            asyncio.ensure_future(_reload_rules(db_pool))
+            task = asyncio.get_event_loop().create_task(_reload_rules(db_pool))
+            task.add_done_callback(
+                lambda t: logger.error("Rule reload task failed: %s", t.exception())
+                if not t.cancelled() and t.exception() else None
+            )
 
         await conn.add_listener("rules_changed", _on_notify)
         logger.info("Listening for rule changes on PostgreSQL NOTIFY 'rules_changed'")

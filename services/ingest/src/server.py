@@ -49,7 +49,10 @@ class TeltonikaConnection:
             logger.error("Error en conexión %s: %s", self.peer, e)
         finally:
             if self.imei:
-                _active_writers.pop(self.imei, None)
+                # Solo eliminar si aún apunta a este writer; una reconexión rápida
+                # del mismo IMEI habría registrado un writer nuevo que no debemos borrar.
+                if _active_writers.get(self.imei) is self.writer:
+                    _active_writers.pop(self.imei, None)
                 async with self.db_pool.acquire() as conn:
                     await update_device_online(conn, self.imei, False)
                 if self.device_info:
@@ -64,7 +67,20 @@ class TeltonikaConnection:
         imei_len_bytes = await self.reader.readexactly(2)
         imei_len = struct.unpack(">H", imei_len_bytes)[0]
         imei_bytes = await self.reader.readexactly(imei_len)
-        self.imei = imei_bytes.decode("ascii")
+        try:
+            self.imei = imei_bytes.decode("ascii").strip()
+        except UnicodeDecodeError:
+            logger.warning("IMEI con bytes no-ASCII desde %s — rechazando", self.peer)
+            self.writer.write(b"\x00")
+            await self.writer.drain()
+            return
+
+        if not self.imei.isdigit() or not (10 <= len(self.imei) <= 20):
+            logger.warning("IMEI con formato inválido %r desde %s — rechazando", self.imei, self.peer)
+            self.writer.write(b"\x00")
+            await self.writer.drain()
+            return
+
         logger.info("IMEI recibido: %s", self.imei)
 
         async with self.db_pool.acquire() as conn:

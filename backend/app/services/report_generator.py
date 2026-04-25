@@ -87,9 +87,14 @@ async def generate_monthly_pdf(
     tenant_display_name = (tenant["brand_name"] or tenant["name"]) if tenant else "Cliente"
     tenant_logo_url = tenant["logo_url"] if tenant else None
 
-    # 2. Vehicle names
+    # 2. Vehicle names + type
     vehicles_row = await db.execute(
-        text("SELECT id, name, license_plate FROM vehicle WHERE tenant_id = :tid AND id = ANY(:vids)"),
+        text("""
+            SELECT v.id, v.name, v.license_plate, vt.name AS type_name
+            FROM vehicle v
+            LEFT JOIN vehicle_type vt ON vt.id = v.vehicle_type_id
+            WHERE v.tenant_id = :tid AND v.id = ANY(:vids)
+        """),
         {"tid": tid, "vids": vids},
     )
     vehicles = [dict(r) for r in vehicles_row.mappings().all()]
@@ -170,8 +175,8 @@ async def generate_monthly_pdf(
             text("""
                 SELECT lat, lon FROM telemetry_record
                 WHERE vehicle_id = :vid
-                  AND recorded_at BETWEEN :t_min AND :t_max
-                ORDER BY ABS(EXTRACT(EPOCH FROM (recorded_at - :t_ref)))
+                  AND time BETWEEN :t_min AND :t_max
+                ORDER BY ABS(EXTRACT(EPOCH FROM (time - :t_ref)))
                 LIMIT 1
             """),
             {
@@ -190,12 +195,13 @@ async def generate_monthly_pdf(
     # 6. Maintenance
     maint_row = await db.execute(
         text("""
-            SELECT ml.performed_at, ml.performed_by_email,
+            SELECT ml.performed_at, u.email AS performed_by_email,
                    ml.description, ml.cost_eur,
                    mp.name AS plan_name, v.name AS vehicle_name
             FROM maintenance_log ml
             JOIN maintenance_plan mp ON mp.id = ml.plan_id
             JOIN vehicle v ON v.id = ml.vehicle_id
+            LEFT JOIN "user" u ON u.id = ml.performed_by
             WHERE mp.tenant_id = :tid
               AND ml.performed_at >= :start AND ml.performed_at < :end
               AND ml.vehicle_id = ANY(:vids)
@@ -216,11 +222,11 @@ async def generate_monthly_pdf(
             text("""
                 SELECT lat, lon FROM (
                   SELECT lat, lon,
-                         ROW_NUMBER() OVER (ORDER BY recorded_at) AS rn,
+                         ROW_NUMBER() OVER (ORDER BY time) AS rn,
                          COUNT(*) OVER () AS total
                   FROM telemetry_record
                   WHERE vehicle_id = :vid
-                    AND recorded_at >= :start AND recorded_at < :end
+                    AND time >= :start AND time < :end
                     AND lat IS NOT NULL AND lon IS NOT NULL
                 ) sub
                 WHERE rn % GREATEST(total / 500, 1) = 0
@@ -236,6 +242,7 @@ async def generate_monthly_pdf(
         vehicles_with_gps.append({
             "name": v["name"],
             "license_plate": v.get("license_plate") or "",
+            "type_name": v.get("type_name") or "",
             "map_base64": map_b64,
             "engine_hours": round(totals["engine_hours"], 1),
             "pto_hours": round(totals["pto_hours"], 1),
@@ -250,6 +257,7 @@ async def generate_monthly_pdf(
         fleet_rows.append({
             "name": v["name"],
             "license_plate": v.get("license_plate") or "",
+            "type_name": v.get("type_name") or "",
             "engine_hours": round(t["engine_hours"], 1),
             "pto_hours": round(t["pto_hours"], 1),
             "alert_count": t["alert_count"],
