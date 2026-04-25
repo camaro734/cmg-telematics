@@ -33,6 +33,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     return TokenResponse(
         access_token=create_access_token(payload),
         refresh_token=create_refresh_token(payload),
+        logo_url=tenant.logo_url,
+        brand_name=tenant.brand_name,
+        enabled_modules=tenant.enabled_modules or [],
     )
 
 
@@ -66,6 +69,9 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     return TokenResponse(
         access_token=create_access_token(new_payload),
         refresh_token=create_refresh_token(new_payload),
+        logo_url=tenant.logo_url,
+        brand_name=tenant.brand_name,
+        enabled_modules=tenant.enabled_modules or [],
     )
 
 

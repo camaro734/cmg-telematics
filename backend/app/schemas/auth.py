@@ -12,6 +12,9 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    logo_url: str | None = None
+    brand_name: str | None = None
+    enabled_modules: list[str] = []
 
 
 class RefreshRequest(BaseModel):
