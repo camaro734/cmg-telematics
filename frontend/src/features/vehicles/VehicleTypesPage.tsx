@@ -339,6 +339,7 @@ export default function VehicleTypesPage() {
 
   // ── Historic metrics modal state ──────────────────────────────────────────
   const [showMetricModal, setShowMetricModal] = useState(false)
+  const [metricError, setMetricError] = useState<string | null>(null)
   const [editingMetricIdx, setEditingMetricIdx] = useState<number | null>(null)
   const [metricForm, setMetricForm] = useState<MetricFormState>(emptyMetricForm)
 
@@ -373,9 +374,20 @@ export default function VehicleTypesPage() {
   })
 
   function saveMetric() {
-    if (!selectedType || !metricForm.key) return
+    if (!selectedType) return
+    if (!metricForm.label.trim()) {
+      setMetricError('El nombre de la métrica es obligatorio')
+      return
+    }
+    if (!metricForm.avl_id) {
+      setMetricError('Debes seleccionar una señal FMC650')
+      return
+    }
+    setMetricError(null)
+    // Generar key automática siempre
+    const autoKey = metricForm.key || `custom_avl_${metricForm.avl_id}`
     const newMetric: HistoricMetricItem = {
-      key: metricForm.key,
+      key: autoKey,
       label: metricForm.label.trim() || metricForm.key,
       color: metricForm.color,
       unit: metricForm.unit,
@@ -1215,12 +1227,18 @@ export default function VehicleTypesPage() {
               </div>
             )}
 
+            {metricError && (
+              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#ef4444' }}>
+                ⚠️ {metricError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button style={btnSecondary} onClick={() => setShowMetricModal(false)}>Cancelar</button>
+              <button style={btnSecondary} onClick={() => { setShowMetricModal(false); setMetricError(null) }}>Cancelar</button>
               <button
                 style={btnPrimary}
                 onClick={saveMetric}
-                disabled={!metricForm.key || updateMetricsMutation.isPending}
+                disabled={updateMetricsMutation.isPending}
               >
                 {updateMetricsMutation.isPending ? 'Guardando…' : 'Guardar'}
               </button>

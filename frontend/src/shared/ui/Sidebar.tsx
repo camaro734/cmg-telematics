@@ -76,7 +76,7 @@ export default function Sidebar() {
       )}
 
       {isCmg && isAdmin && (
-        <NavLink to="/tipos-vehiculo" title="Tipos de Vehículo" style={navLinkStyle}>
+        <NavLink to="/tipos-vehiculo" title="Plantillas" style={navLinkStyle}>
           <IconVehiculos width={20} height={20}/>
         </NavLink>
       )}

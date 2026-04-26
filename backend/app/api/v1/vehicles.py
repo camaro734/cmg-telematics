@@ -551,6 +551,43 @@ async def get_vehicle_track(
     return [TrackPoint(**dict(r._mapping)) for r in rows]
 
 
+@router.get("/vehicles/{vehicle_id}/avl-series")
+async def get_vehicle_avl_series(
+    vehicle_id: uuid.UUID,
+    avl_id: int = Query(..., description="AVL ID a consultar (ej: 145)"),
+    hours: int = Query(24, ge=1, le=720),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve serie temporal de cualquier AVL ID desde telemetry_record.io_data."""
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    key = f"avl_{avl_id}"
+
+    rows = await db.execute(
+        text("""
+            SELECT time AS bucket,
+                   (io_data->>:key)::numeric AS value
+            FROM telemetry_record
+            WHERE vehicle_id = :vid
+              AND time >= :since
+              AND io_data ? :key
+              AND (io_data->>:key) IS NOT NULL
+            ORDER BY time ASC
+        """),
+        {"vid": str(vehicle_id), "key": key, "since": since},
+    )
+    data = rows.fetchall()
+    return [
+        {"bucket": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}
+        for r in data
+    ]
+
+
 @router.get("/vehicles/{vehicle_id}/kpis", response_model=list[KpiHour])
 async def get_vehicle_kpis(
     vehicle_id: uuid.UUID,

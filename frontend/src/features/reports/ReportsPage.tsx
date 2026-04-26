@@ -88,6 +88,36 @@ function groupByPeriod(
     }))
 }
 
+function buildAvlSeriesData(
+  avlData: {bucket: string; value: number | null}[],
+  period: Period,
+  _metricKey: string,
+  transform: number,
+): {label: string; value: number}[] {
+  if (!avlData.length) return []
+  if (period === 'dia') {
+    return avlData
+      .filter(d => d.value !== null)
+      .map(d => ({
+        label: new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        value: Math.round((d.value! * transform) * 100) / 100,
+      }))
+  }
+  const byDay = new Map<string, number[]>()
+  for (const d of avlData) {
+    if (d.value === null) continue
+    const day = d.bucket.slice(0, 10)
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day)!.push(d.value * transform)
+  }
+  return Array.from(byDay.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, vals]) => ({
+      label: day.slice(5).replace('-', '/'),
+      value: Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100,
+    }))
+}
+
 function buildMultiSeriesData(
   kpis: KpiHour[],
   period: Period,
@@ -333,6 +363,23 @@ function HistoricoTab({
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicleTypeId)
   const metrics = vehicleType?.historic_metrics ?? []
 
+  // Cargar series AVL personalizadas para métricas con avl_id
+  const avlMetrics = metrics.filter(m => m.avl_id !== undefined && m.avl_id !== null)
+  const avlQueries = avlMetrics.map(m =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useQuery<{bucket: string; value: number | null}[]>({
+      queryKey: ['avl-series', vehicleId, m.avl_id, hours],
+      queryFn: () => apiClient.get(`/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${m.avl_id}&hours=${hours}`),
+      enabled: Boolean(vehicleId) && m.avl_id !== undefined,
+      staleTime: 60_000,
+    })
+  )
+  // Mapa avl_id -> datos de serie
+  const avlDataMap = new Map<number, {bucket: string; value: number | null}[]>()
+  avlMetrics.forEach((m, i) => {
+    if (avlQueries[i].data) avlDataMap.set(m.avl_id!, avlQueries[i].data!)
+  })
+
   // Split metrics by chart_type
   const lineMetrics = metrics.filter(m => !m.chart_type || m.chart_type === 'line')
   const donutMetrics = metrics.filter(m => m.chart_type === 'donut')
@@ -402,7 +449,20 @@ function HistoricoTab({
       ? [{ key: 'pto_active_minutes', label: 'H. PTO', color: '#F97316', unit: 'min', transform: 1 }]
       : []),
   ]
-  const lineData = buildMultiSeriesData(kpis, period, allLineMetrics)
+  // Para métricas con avl_id, usar datos AVL directos; para el resto, usar KPIs
+  const kpiLineMetrics = allLineMetrics.filter(m => !(m as any).avl_id)
+  const avlLineMetrics = allLineMetrics.filter(m => (m as any).avl_id !== undefined)
+  const lineData = buildMultiSeriesData(kpis, period, kpiLineMetrics)
+  // Datos individuales por cada métrica AVL personalizada
+  const avlLineData = avlLineMetrics.map(m => ({
+    metric: m,
+    data: buildAvlSeriesData(
+      avlDataMap.get((m as any).avl_id) ?? [],
+      period,
+      m.key,
+      m.transform ?? 1,
+    ),
+  }))
 
   const tooltipStyle = {
     contentStyle: {
@@ -442,7 +502,7 @@ function HistoricoTab({
               <>
                 <span>Sin métricas de línea configuradas.</span>
                 <span style={{ fontSize: 11, opacity: 0.7 }}>
-                  Ve a <strong style={{ color: 'var(--accent-energy)' }}>Tipos de vehículo</strong> y añade métricas con tipo gráfico Línea o Barra.
+                  Ve a <strong style={{ color: 'var(--accent-energy)' }}>Plantillas</strong> y añade métricas con tipo gráfico Línea o Barra.
                 </span>
               </>
             ) : (
@@ -538,6 +598,42 @@ function HistoricoTab({
 
         </div>
       )}
+
+      {/* Gráficos de línea para métricas AVL personalizadas */}
+      {avlLineData.map(({ metric, data }) => (
+        <div key={metric.key} style={card}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-default)', marginBottom: 10 }}>
+            {metric.label}{metric.unit ? ` (${metric.unit})` : ''} — {PERIOD_LABELS[period]}
+          </div>
+          {data.length === 0 ? (
+            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+              Sin datos para este período
+            </div>
+          ) : (
+            <div style={{ height: isMobile ? 160 : 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716C' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#78716C' }} />
+                  <Tooltip
+                    {...tooltipStyle}
+                    formatter={(v: number) => [`${v}${metric.unit ? ' ' + metric.unit : ''}`, metric.label]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={metric.color || '#6EC5B1'}
+                    strokeWidth={2}
+                    dot={false}
+                    name={metric.label}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      ))}
 
       {/* Configurable donut charts — metrics with chart_type='donut' */}
       {donutMetrics.length > 0 && customDonutData.length > 0 && (
