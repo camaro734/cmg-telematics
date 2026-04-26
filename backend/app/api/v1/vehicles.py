@@ -658,6 +658,12 @@ async def send_dout_command(
     dout_state[str(body.slot)] = body.state
     await redis.set(dout_key, json.dumps(dout_state))
 
-    await redis.publish("cmg:dout_commands", json.dumps({"imei": device.imei, "command": command}))
+    await redis.publish("cmg:dout_commands", json.dumps({
+        "imei": device.imei,
+        "command": command,
+        "device_id": str(device.id),
+        "vehicle_id": str(vehicle_id),
+        "tenant_id": str(vehicle.tenant_id),
+    }))
     logger.info("DOUT publicado → IMEI %s slot=%s state=%s", device.imei, body.slot, body.state)
     return {"ok": True, "imei": device.imei, "command": command}

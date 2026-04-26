@@ -5,6 +5,12 @@ cmgtrack.com {
     handle /ws/* {
         reverse_proxy core-api:8010
     }
+    handle /static/* {
+        reverse_proxy core-api:8010
+    }
+    handle /uploads/* {
+        reverse_proxy core-api:8010
+    }
     handle /docs* {
         reverse_proxy core-api:8010
     }
@@ -12,9 +18,6 @@ cmgtrack.com {
         reverse_proxy core-api:8010
     }
     handle /openapi.json {
-        reverse_proxy core-api:8010
-    }
-    handle /uploads/* {
         reverse_proxy core-api:8010
     }
     handle {

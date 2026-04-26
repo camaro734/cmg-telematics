@@ -47,6 +47,18 @@ export interface TrackPoint {
   lon: number | null
 }
 
+export interface CommandLogEntry {
+  id: string
+  device_id: string
+  vehicle_id: string
+  tenant_id: string
+  command: string
+  status: 'pending' | 'sent' | 'failed' | 'confirmed'
+  sent_at: string
+  response: string | null
+  error_message: string | null
+}
+
 export interface KpiHour {
   bucket: string
   avg_pressure_1: number | null

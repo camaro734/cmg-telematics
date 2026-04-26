@@ -20,22 +20,23 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales incorrectas")
 
-    tenant = await db.get(Tenant, user.tenant_id)
-    if tenant is None:
+    t_result = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules).where(Tenant.id == user.tenant_id))
+    tenant_row = t_result.mappings().one_or_none()
+    if tenant_row is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno")
     payload = {
         "sub": str(user.id),
         "tenant_id": str(user.tenant_id),
-        "tenant_tier": tenant.tier,
+        "tenant_tier": tenant_row["tier"],
         "role": user.role,
         "email": user.email,
     }
     return TokenResponse(
         access_token=create_access_token(payload),
         refresh_token=create_refresh_token(payload),
-        logo_url=tenant.logo_url,
-        brand_name=tenant.brand_name,
-        enabled_modules=tenant.enabled_modules or [],
+        logo_url=tenant_row["logo_url"],
+        brand_name=tenant_row["brand_name"],
+        enabled_modules=tenant_row["enabled_modules"] or [],
     )
 
 
@@ -55,23 +56,24 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 
-    tenant = await db.get(Tenant, user.tenant_id)
-    if tenant is None:
+    t_result2 = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules).where(Tenant.id == user.tenant_id))
+    tenant_row2 = t_result2.mappings().one_or_none()
+    if tenant_row2 is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 
     new_payload = {
         "sub": str(user.id),
         "tenant_id": str(user.tenant_id),
-        "tenant_tier": tenant.tier,
+        "tenant_tier": tenant_row2["tier"],
         "role": user.role,
         "email": user.email,
     }
     return TokenResponse(
         access_token=create_access_token(new_payload),
         refresh_token=create_refresh_token(new_payload),
-        logo_url=tenant.logo_url,
-        brand_name=tenant.brand_name,
-        enabled_modules=tenant.enabled_modules or [],
+        logo_url=tenant_row2["logo_url"],
+        brand_name=tenant_row2["brand_name"],
+        enabled_modules=tenant_row2["enabled_modules"] or [],
     )
 
 

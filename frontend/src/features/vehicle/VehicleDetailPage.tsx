@@ -10,7 +10,7 @@ import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
-import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut, CommandLogEntry } from '../../lib/types'
 import WorkCyclesTab from './WorkCyclesTab'
 import { useAuthStore } from '../auth/useAuthStore'
 
@@ -149,6 +149,13 @@ export default function VehicleDetailPage() {
   const { data: firingAlerts = [] } = useQuery<AlertInstanceOut[]>({
     queryKey: [...keys.alerts(), 'firing', id],
     queryFn: () => apiClient.get<AlertInstanceOut[]>('/api/v1/alerts?status=firing'),
+    refetchInterval: 30_000,
+    enabled: !!vehicle,
+  })
+
+  const { data: commandHistory = [] } = useQuery<CommandLogEntry[]>({
+    queryKey: keys.vehicleCommands(id ?? ''),
+    queryFn: () => apiClient.get<CommandLogEntry[]>(`/api/v1/vehicles/${id}/commands?limit=10`),
     refetchInterval: 30_000,
     enabled: !!vehicle,
   })
@@ -435,7 +442,30 @@ export default function VehicleDetailPage() {
                 </div>
                 <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
+                  {commandHistory.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {commandHistory.map(entry => (
+                        <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'start', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4 }}>
+                          <div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                              {new Date(entry.sent_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-default)', fontFamily: 'var(--font-data)' }}>
+                              {entry.command}
+                            </div>
+                            {(entry.response || entry.error_message) && (
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                                {entry.response ?? entry.error_message}
+                              </div>
+                            )}
+                          </div>
+                          <CommandStatusBadge status={entry.status} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{ padding: '10px 14px', overflowY: 'auto' }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>INCIDENCIAS</div>
@@ -711,6 +741,25 @@ function VDControlBadge({ label, active }: { label: string; active: boolean }) {
         {active ? 'On' : 'Off'}
       </span>
     </div>
+  )
+}
+
+function CommandStatusBadge({ status }: { status: CommandLogEntry['status'] }) {
+  const map: Record<CommandLogEntry['status'], { label: string; color: string }> = {
+    pending:   { label: 'Pendiente',  color: 'var(--accent-off)' },
+    sent:      { label: 'Enviado',    color: 'var(--accent-info)' },
+    failed:    { label: 'Fallido',    color: 'var(--accent-crit)' },
+    confirmed: { label: 'Confirmado', color: 'var(--accent-ok)' },
+  }
+  const { label, color } = map[status] ?? map.pending
+  return (
+    <span style={{
+      fontSize: 9, padding: '2px 6px', borderRadius: 8, fontWeight: 600,
+      background: `color-mix(in srgb, ${color} 15%, transparent)`,
+      color, border: `1px solid ${color}`, whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
   )
 }
 

@@ -176,7 +176,12 @@ async def get_brand_tokens(
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
-    return tenant.brand_tokens or {}
+    result = dict(tenant.brand_tokens or {})
+    if tenant.logo_url:
+        result["logo_url"] = tenant.logo_url
+    if tenant.brand_name:
+        result["brand_name"] = tenant.brand_name
+    return result
 
 
 @router.put("/tenants/{tenant_id}/brand-tokens")

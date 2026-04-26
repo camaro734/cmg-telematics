@@ -361,7 +361,7 @@ export default function TopNav() {
         }}
       >
         {logoUrl
-          ? <img src={logoUrl} alt="logo" style={{ height: 30, objectFit: 'contain' }}/>
+          ? <img src={logoUrl} alt="logo" style={{ height: isMobile ? 32 : 30, maxWidth: isMobile ? 120 : 160, objectFit: 'contain', display: 'block' }}/>
           : <CmgMark size={28}/>
         }
       </button>

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     tcp_host: str = "0.0.0.0"
     tcp_port: int = 5027
     environment: str = "development"
+    core_api_url: str = "http://core-api:8010"
 
 
 settings = Settings()

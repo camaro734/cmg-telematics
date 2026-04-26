@@ -1,0 +1,127 @@
+import uuid
+import logging
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from pydantic import BaseModel
+
+from app.core.database import get_db
+from app.api.v1.deps import get_current_user
+from app.schemas.auth import CurrentUser
+from app.models.command_log import CommandLog
+from app.models.vehicle import Vehicle
+from app.models.device import Device
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["commands"])
+internal_router = APIRouter(tags=["internal"])
+
+
+class CommandLogOut(BaseModel):
+    id: uuid.UUID
+    device_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    tenant_id: uuid.UUID
+    command: str
+    status: str
+    sent_at: datetime
+    response: str | None
+    error_message: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class CommandLogCreate(BaseModel):
+    device_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    tenant_id: uuid.UUID
+    command: str
+    status: str = "sent"
+    response: str | None = None
+    error_message: str | None = None
+
+
+class CommandLogConfirm(BaseModel):
+    response: str | None = None
+    status: str = "confirmed"
+
+
+@router.get("/vehicles/{vehicle_id}/commands", response_model=list[CommandLogOut])
+async def list_vehicle_commands(
+    vehicle_id: uuid.UUID,
+    limit: int = Query(50, le=200),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    if user.tenant_tier != "cmg" and str(vehicle.tenant_id) != str(user.tenant_id):
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    result = await db.execute(
+        select(CommandLog)
+        .where(CommandLog.vehicle_id == vehicle_id)
+        .order_by(CommandLog.sent_at.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+@router.get("/devices/{device_id}/commands", response_model=list[CommandLogOut])
+async def list_device_commands(
+    device_id: uuid.UUID,
+    limit: int = Query(50, le=200),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    device = await db.get(Device, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    if user.tenant_tier != "cmg" and (device.tenant_id is None or str(device.tenant_id) != str(user.tenant_id)):
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    result = await db.execute(
+        select(CommandLog)
+        .where(CommandLog.device_id == device_id)
+        .order_by(CommandLog.sent_at.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+@internal_router.post("/commands/log", response_model=CommandLogOut, status_code=201)
+async def log_command(
+    body: CommandLogCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    log = CommandLog(
+        device_id=body.device_id,
+        vehicle_id=body.vehicle_id,
+        tenant_id=body.tenant_id,
+        command=body.command,
+        status=body.status,
+        response=body.response,
+        error_message=body.error_message,
+    )
+    db.add(log)
+    await db.commit()
+    await db.refresh(log)
+    return log
+
+
+@internal_router.patch("/commands/{log_id}/confirm", response_model=CommandLogOut)
+async def confirm_command(
+    log_id: uuid.UUID,
+    body: CommandLogConfirm,
+    db: AsyncSession = Depends(get_db),
+):
+    log = await db.get(CommandLog, log_id)
+    if not log:
+        raise HTTPException(status_code=404, detail="Log no encontrado")
+    log.status = body.status
+    if body.response is not None:
+        log.response = body.response
+    await db.commit()
+    await db.refresh(log)
+    return log

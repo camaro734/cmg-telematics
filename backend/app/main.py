@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.api.v1.ws import router as ws_router, ConnectionManager, broadcast_telemetry_task
+from app.api.v1.commands import internal_router
 from app.core.config import settings
 
 
@@ -55,8 +56,10 @@ app.add_middleware(
 
 app.include_router(api_router)
 app.include_router(ws_router)
+app.include_router(internal_router, prefix="/internal")
 Path("/app/uploads").mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
 
 
 @app.get("/health")

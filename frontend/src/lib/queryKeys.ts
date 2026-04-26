@@ -28,4 +28,5 @@ export const keys = {
     : ['work-cycle-definitions'] as const,
   workCycles: (vehicleId: string, from: string, to: string) =>
     ['work-cycles', vehicleId, from, to] as const,
+  vehicleCommands: (id: string) => ['vehicles', id, 'commands'] as const,
 }

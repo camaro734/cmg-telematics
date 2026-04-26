@@ -5,6 +5,7 @@ Flujo: IMEI handshake → ACK/NACK → receive Codec 8 loop → write DB + publi
 """
 import asyncio
 import asyncpg
+import httpx
 import json
 import logging
 import struct
@@ -18,6 +19,48 @@ logger = logging.getLogger(__name__)
 
 # IMEI → StreamWriter registry for active connections
 _active_writers: dict[str, asyncio.StreamWriter] = {}
+
+
+async def _log_command(
+    device_id: str,
+    vehicle_id: str,
+    tenant_id: str,
+    command: str,
+    status: str,
+    error_message: str | None = None,
+) -> str | None:
+    """Registra un comando DOUT en core-api. Devuelve el ID del log o None si falla."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.post(
+                f"{settings.core_api_url}/internal/commands/log",
+                json={
+                    "device_id": device_id,
+                    "vehicle_id": vehicle_id,
+                    "tenant_id": tenant_id,
+                    "command": command,
+                    "status": status,
+                    "error_message": error_message,
+                },
+            )
+            if r.status_code == 201:
+                return r.json()["id"]
+            logger.warning("_log_command: respuesta inesperada %s", r.status_code)
+    except Exception as e:
+        logger.warning("No se pudo registrar comando en BD: %s", e)
+    return None
+
+
+async def _confirm_command(log_id: str, response: str) -> None:
+    """Actualiza un registro de comando a status=confirmed con el ACK del dispositivo."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.patch(
+                f"{settings.core_api_url}/internal/commands/{log_id}/confirm",
+                json={"response": response, "status": "confirmed"},
+            )
+    except Exception as e:
+        logger.warning("No se pudo confirmar comando %s: %s", log_id, e)
 
 
 class TeltonikaConnection:
@@ -144,11 +187,15 @@ class TeltonikaConnection:
             except ValueError as e:
                 codec_id = packet[8] if len(packet) > 8 else 0
                 if codec_id == 0x0C:
-                    # Codec 12 response del dispositivo — logueamos la respuesta para diagnóstico
+                    # Codec 12 response del dispositivo — logueamos y confirmamos el comando
                     try:
                         resp_size = struct.unpack_from(">I", packet, 11)[0]
                         resp_text = packet[15:15 + resp_size].decode("ascii", errors="replace").strip()
                         logger.info("Codec 12 ACK de %s: %r", self.imei, resp_text)
+                        last_log_id = await self.redis.get(f"command:{self.imei}:last_log_id")
+                        if last_log_id:
+                            await _confirm_command(last_log_id, resp_text)
+                            await self.redis.delete(f"command:{self.imei}:last_log_id")
                     except Exception:
                         logger.info("Codec 12 ACK de %s (sin texto)", self.imei)
                 else:
@@ -190,14 +237,30 @@ async def command_listener(redis: Redis) -> None:
             data = json.loads(message["data"])
             imei: str = data["imei"]
             command: str = data["command"]
+            device_id: str | None = data.get("device_id")
+            vehicle_id: str | None = data.get("vehicle_id")
+            tenant_id: str | None = data.get("tenant_id")
+
             writer = _active_writers.get(imei)
             if writer is None:
                 logger.warning("DOUT: dispositivo %s no está conectado", imei)
+                if device_id and vehicle_id and tenant_id:
+                    await _log_command(
+                        device_id, vehicle_id, tenant_id, command,
+                        "failed", error_message="Dispositivo no conectado",
+                    )
                 continue
+
             packet = build_codec12_command(command)
             writer.write(packet)
             await writer.drain()
             logger.info("DOUT enviado a %s: %s", imei, command)
+
+            if device_id and vehicle_id and tenant_id:
+                log_id = await _log_command(device_id, vehicle_id, tenant_id, command, "sent")
+                if log_id:
+                    # TTL 120s — suficiente para que el ACK llegue del dispositivo
+                    await redis.set(f"command:{imei}:last_log_id", log_id, ex=120)
         except Exception as e:
             logger.error("Error procesando comando DOUT: %s", e)
 
