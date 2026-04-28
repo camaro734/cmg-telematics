@@ -1,166 +1,284 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ComposedChart, Line, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { KpiHour } from '../../lib/types'
+import type { KpiHour, VehicleTypeOut } from '../../lib/types'
 
-const RANGES = [
-  { label: '24h', hours: 24 },
-  { label: '7d', hours: 168 },
-  { label: '30d', hours: 720 },
-]
+type Period = 'dia' | 'semana' | 'mes'
+const PERIOD_HOURS: Record<Period, number> = { dia: 24, semana: 168, mes: 720 }
 
-const BTN_BASE = {
-  padding: '4px 14px',
-  fontSize: 11,
-  fontWeight: 600,
-  fontFamily: 'var(--font-ui)',
-  borderRadius: 4,
+function fmtH(min: number) {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return `${h}h ${String(m).padStart(2, '0')}m`
+}
+
+function buildEngPtoData(kpis: KpiHour[], period: Period) {
+  if (period === 'dia') {
+    return [...kpis].reverse().map(h => ({
+      label: new Date(h.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      motor: Math.round(((h.engine_on_minutes ?? 0) / 60) * 100) / 100,
+      pto: Math.round(((h.pto_active_minutes ?? 0) / 60) * 100) / 100,
+    }))
+  }
+  const byDay = new Map<string, { motor: number; pto: number }>()
+  for (const h of kpis) {
+    const day = h.bucket.slice(0, 10)
+    const cur = byDay.get(day) ?? { motor: 0, pto: 0 }
+    byDay.set(day, {
+      motor: cur.motor + (h.engine_on_minutes ?? 0) / 60,
+      pto: cur.pto + (h.pto_active_minutes ?? 0) / 60,
+    })
+  }
+  return Array.from(byDay.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, v]) => ({
+      label: day.slice(5).replace('-', '/'),
+      motor: Math.round(v.motor * 100) / 100,
+      pto: Math.round(v.pto * 100) / 100,
+    }))
+}
+
+function buildKpiSeries(kpis: KpiHour[], key: string, transform: number, period: Period) {
+  if (period === 'dia') {
+    return [...kpis].reverse()
+      .filter(h => h[key as keyof KpiHour] != null)
+      .map(h => ({
+        label: new Date(h.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        value: Math.round((Number(h[key as keyof KpiHour])) * transform * 100) / 100,
+      }))
+  }
+  const byDay = new Map<string, number[]>()
+  for (const h of kpis) {
+    if (h[key as keyof KpiHour] == null) continue
+    const day = h.bucket.slice(0, 10)
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day)!.push(Number(h[key as keyof KpiHour]) * transform)
+  }
+  return Array.from(byDay.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, vals]) => ({
+      label: day.slice(5).replace('-', '/'),
+      value: Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100,
+    }))
+}
+
+function buildAvlSeries(
+  raw: { bucket: string; value: number | null }[],
+  transform: number,
+  period: Period,
+) {
+  if (period === 'dia') {
+    return raw
+      .filter(d => d.value !== null)
+      .map(d => ({
+        label: new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        value: Math.round(d.value! * transform * 100) / 100,
+      }))
+  }
+  const byDay = new Map<string, number[]>()
+  for (const d of raw) {
+    if (d.value === null) continue
+    const day = d.bucket.slice(0, 10)
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day)!.push(d.value * transform)
+  }
+  return Array.from(byDay.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, vals]) => ({
+      label: day.slice(5).replace('-', '/'),
+      value: Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100,
+    }))
+}
+
+function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
+  return (
+    <div style={{
+      background: 'var(--bg-surface)', border: '1px solid var(--bg-border)',
+      borderRadius: 8, padding: '12px 14px', flex: 1, minWidth: 120,
+    }}>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-data)', color: accent ?? 'var(--text-default)' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
+    </div>
+  )
+}
+
+const chartCard: React.CSSProperties = {
+  background: 'var(--bg-surface)',
   border: '1px solid var(--bg-border)',
-  cursor: 'pointer',
-  outline: 'none',
-  transition: 'background 0.15s',
+  borderRadius: 8,
+  padding: '14px 16px',
 }
 
-function formatBucket(bucket: string, hours: number): string {
-  const d = new Date(bucket)
-  if (hours <= 24) return `${d.getHours()}:00`
-  return `${d.getMonth() + 1}/${d.getDate()}`
+const chartTitle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+  marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em',
 }
 
-interface KpiChartProps {
-  vehicleId: string
+const tooltipStyle: React.CSSProperties = {
+  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+  borderRadius: 6, fontSize: 12,
 }
 
-export default function KpiChart({ vehicleId }: KpiChartProps) {
-  const [hours, setHours] = useState(24)
+export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: string; vehicleTypeId?: string }) {
+  const [period, setPeriod] = useState<Period>('semana')
+  const hours = PERIOD_HOURS[period]
 
-  const { data: kpis = [], isLoading } = useQuery({
+  const { data: kpis = [], isLoading } = useQuery<KpiHour[]>({
     queryKey: [...keys.vehicleKpis(vehicleId), hours],
     queryFn: () => apiClient.get<KpiHour[]>(`/api/v1/vehicles/${vehicleId}/kpis?hours=${hours}`),
+    enabled: Boolean(vehicleId),
+    staleTime: 60_000,
   })
 
-  const chartData = kpis.map(h => ({
-    time: formatBucket(h.bucket, hours),
-    pressure: h.avg_pressure_1,
-    temp: h.avg_oil_temp,
-    pto: h.pto_active_minutes,
-  }))
+  const { data: vehicleTypes = [] } = useQuery<VehicleTypeOut[]>({
+    queryKey: keys.vehicleTypes(),
+    queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
+    staleTime: 300_000,
+    enabled: Boolean(vehicleTypeId),
+  })
+  const vehicleType = vehicleTypes.find(vt => vt.id === vehicleTypeId)
+  const metrics = vehicleType?.historic_metrics ?? []
+
+  const avlMetrics = metrics.filter(m => m.avl_id !== undefined && m.avl_id !== null)
+  const kpiMetrics = metrics.filter(m => m.avl_id === undefined || m.avl_id === null)
+  const avlIds = avlMetrics.map(m => m.avl_id!)
+
+  const { data: avlSeriesRaw } = useQuery<Record<string, { bucket: string; value: number | null }[]>>({
+    queryKey: ['avl-series-multi', vehicleId, avlIds.join(','), hours],
+    queryFn: async () => {
+      const results: Record<string, { bucket: string; value: number | null }[]> = {}
+      await Promise.all(avlIds.map(async avlId => {
+        try {
+          results[String(avlId)] = await apiClient.get(
+            `/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${avlId}&hours=${hours}`
+          )
+        } catch { results[String(avlId)] = [] }
+      }))
+      return results
+    },
+    enabled: Boolean(vehicleId) && avlIds.length > 0,
+    staleTime: 60_000,
+  })
+
+  const totalEngMin = kpis.reduce((s, h) => s + (h.engine_on_minutes ?? 0), 0)
+  const totalPtoMin = kpis.reduce((s, h) => s + (h.pto_active_minutes ?? 0), 0)
+  const diasTrabajados = period === 'dia'
+    ? (kpis.some(h => (h.engine_on_minutes ?? 0) > 0) ? 1 : 0)
+    : new Set(kpis.filter(h => (h.engine_on_minutes ?? 0) > 0).map(h => h.bucket.slice(0, 10))).size
+  const ptoPct = totalEngMin > 0 ? Math.round((totalPtoMin / totalEngMin) * 100) : null
+
+  const engPtoData = buildEngPtoData(kpis, period)
+
+  const periodBtn = (p: Period): React.CSSProperties => ({
+    padding: '4px 12px', fontSize: 12, fontWeight: 600,
+    border: '1px solid var(--bg-border)', borderRadius: 20, cursor: 'pointer',
+    background: period === p ? 'var(--accent-energy)' : 'transparent',
+    color: period === p ? '#fff' : 'var(--text-muted)',
+    transition: 'background 0.15s',
+  })
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+        Cargando…
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {RANGES.map(r => (
-          <button
-            key={r.hours}
-            onClick={() => setHours(r.hours)}
-            style={{
-              ...BTN_BASE,
-              background: hours === r.hours ? 'var(--accent-energy)' : 'var(--bg-surface)',
-              color: hours === r.hours ? 'var(--bg-base)' : 'var(--text-muted)',
-            }}
-          >
-            {r.label}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Period selector */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {(['dia', 'semana', 'mes'] as Period[]).map(p => (
+          <button key={p} style={periodBtn(p)} onClick={() => setPeriod(p)}>
+            {p === 'dia' ? '24h' : p === 'semana' ? '7 días' : '30 días'}
           </button>
         ))}
       </div>
 
-      {isLoading && (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '40px 0', textAlign: 'center' }}>
-          Cargando…
-        </div>
-      )}
+      {/* KPI summary */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <KpiCard label="Días operativos" value={String(diasTrabajados)} accent="var(--accent-ok)" />
+        <KpiCard label="Horas motor" value={fmtH(totalEngMin)} />
+        <KpiCard label="Horas PTO" value={fmtH(totalPtoMin)} accent="var(--accent-energy)" />
+        <KpiCard
+          label="Eficiencia PTO"
+          value={ptoPct !== null ? `${ptoPct}%` : '—'}
+          sub="tiempo PTO / motor"
+          accent={ptoPct !== null ? (ptoPct > 50 ? 'var(--accent-ok)' : 'var(--accent-warn)') : undefined}
+        />
+      </div>
 
-      {!isLoading && chartData.length === 0 && (
-        <div style={{
-          color: 'var(--text-muted)',
-          fontSize: 13,
-          padding: '60px 0',
-          textAlign: 'center',
-          background: 'var(--bg-surface)',
-          borderRadius: 8,
-          border: '1px solid var(--bg-elevated)',
-        }}>
+      {/* Motor / PTO chart */}
+      {engPtoData.length === 0 ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--bg-border)', color: 'var(--text-muted)', fontSize: 13 }}>
           Sin datos para el período seleccionado
         </div>
+      ) : (
+        <div style={chartCard}>
+          <div style={chartTitle}>Motor y PTO — horas</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={engPtoData} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} unit="h" />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}h`]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="motor" name="Motor" stroke="#38BDF8" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="pto" name="PTO" stroke="#F97316" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       )}
 
-      {!isLoading && chartData.length > 0 && (
-        <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 8, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-elevated)" />
-            <XAxis
-              dataKey="time"
-              tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}
-              tickLine={false}
-              axisLine={{ stroke: 'var(--bg-border)' }}
-            />
-            <YAxis
-              yAxisId="pressure"
-              orientation="left"
-              tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}
-              tickLine={false}
-              axisLine={false}
-              label={{ value: 'bar', position: 'insideLeft', offset: 10, fill: 'var(--text-muted)', fontSize: 10 }}
-            />
-            <YAxis
-              yAxisId="temp"
-              orientation="right"
-              tick={{ fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}
-              tickLine={false}
-              axisLine={false}
-              label={{ value: '°C', position: 'insideRight', offset: -10, fill: 'var(--text-muted)', fontSize: 10 }}
-            />
-            <Tooltip
-              contentStyle={{
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--bg-border)',
-                borderRadius: 6,
-                fontSize: 12,
-                fontFamily: 'var(--font-data)',
-              }}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 10, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)' }}
-            />
-            <Area
-              yAxisId="pressure"
-              type="monotone"
-              dataKey="pressure"
-              name="Presión media (bar)"
-              stroke="var(--accent-energy)"
-              fill="var(--accent-energy)"
-              fillOpacity={0.1}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              yAxisId="temp"
-              type="monotone"
-              dataKey="temp"
-              name="Temp. aceite (°C)"
-              stroke="var(--accent-warn)"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              yAxisId="pressure"
-              type="monotone"
-              dataKey="pto"
-              name="PTO activo (min)"
-              stroke="var(--accent-info)"
-              strokeWidth={1.5}
-              strokeDasharray="4 2"
-              dot={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      )}
+      {/* KPI-based custom metrics (no avl_id) */}
+      {kpiMetrics.map(metric => {
+        const data = buildKpiSeries(kpis, metric.key, metric.transform ?? 1, period)
+        if (!data.length) return null
+        return (
+          <div key={metric.key} style={chartCard}>
+            <div style={chartTitle}>{metric.label}{metric.unit ? ` — ${metric.unit}` : ''}</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={data} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? '#F97316'} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      })}
+
+      {/* AVL series charts */}
+      {avlMetrics.map(metric => {
+        const raw = avlSeriesRaw?.[String(metric.avl_id!)] ?? []
+        const data = buildAvlSeries(raw, metric.transform ?? 1, period)
+        if (!data.length) return null
+        return (
+          <div key={`avl-${metric.avl_id}`} style={chartCard}>
+            <div style={chartTitle}>{metric.label}{metric.unit ? ` — ${metric.unit}` : ''}</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={data} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? '#38BDF8'} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      })}
+
     </div>
   )
 }

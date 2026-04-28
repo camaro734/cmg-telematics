@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useIsMobile } from '../../lib/useIsMobile'
 import {
@@ -151,7 +151,7 @@ function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): num
 function SelectorBar({
   isCmg, tenants, tenantId, setTenantId,
   vehicles, vehicleId, setVehicleId,
-  period, setPeriod, pdfSlot,
+  period, setPeriod, pdfSlot, onBack,
 }: {
   isCmg: boolean
   tenants: TenantOut[]
@@ -163,6 +163,7 @@ function SelectorBar({
   period: Period
   setPeriod: (p: Period) => void
   pdfSlot?: React.ReactNode
+  onBack?: () => void
 }) {
   const selStyle: React.CSSProperties = {
     fontSize: 12, background: 'var(--bg-elevated)',
@@ -188,6 +189,26 @@ function SelectorBar({
       gap: 12,
       flexWrap: 'wrap',
     }}>
+      {onBack && (
+        <button
+          onClick={onBack}
+          style={{
+            background: 'none',
+            border: '1px solid var(--bg-border)',
+            borderRadius: 6,
+            padding: '4px 10px',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            flexShrink: 0,
+          }}
+        >
+          ‹ Volver
+        </button>
+      )}
       <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-default)', marginRight: 4, letterSpacing: '-0.01em' }}>
         Reportes
       </div>
@@ -363,21 +384,31 @@ function HistoricoTab({
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicleTypeId)
   const metrics = vehicleType?.historic_metrics ?? []
 
-  // Cargar series AVL personalizadas para métricas con avl_id
+  // Cargar series AVL — una sola query con todos los AVL IDs (evita hooks en bucle)
   const avlMetrics = metrics.filter(m => m.avl_id !== undefined && m.avl_id !== null)
-  const avlQueries = avlMetrics.map(m =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useQuery<{bucket: string; value: number | null}[]>({
-      queryKey: ['avl-series', vehicleId, m.avl_id, hours],
-      queryFn: () => apiClient.get(`/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${m.avl_id}&hours=${hours}`),
-      enabled: Boolean(vehicleId) && m.avl_id !== undefined,
-      staleTime: 60_000,
-    })
-  )
+  const avlIds = avlMetrics.map(m => m.avl_id!)
+
+  const { data: avlSeriesRaw } = useQuery<Record<string, {bucket: string; value: number | null}[]>>({
+    queryKey: ['avl-series-multi', vehicleId, avlIds.join(','), hours],
+    queryFn: async () => {
+      if (!avlIds.length) return {}
+      const results: Record<string, {bucket: string; value: number | null}[]> = {}
+      await Promise.all(avlIds.map(async avlId => {
+        try {
+          results[avlId] = await apiClient.get(`/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${avlId}&hours=${hours}`)
+        } catch { results[avlId] = [] }
+      }))
+      return results
+    },
+    enabled: Boolean(vehicleId) && avlIds.length > 0,
+    staleTime: 60_000,
+  })
+
   // Mapa avl_id -> datos de serie
   const avlDataMap = new Map<number, {bucket: string; value: number | null}[]>()
-  avlMetrics.forEach((m, i) => {
-    if (avlQueries[i].data) avlDataMap.set(m.avl_id!, avlQueries[i].data!)
+  avlMetrics.forEach(m => {
+    const d = avlSeriesRaw?.[m.avl_id!]
+    if (d) avlDataMap.set(m.avl_id!, d)
   })
 
   // Split metrics by chart_type
@@ -1170,15 +1201,21 @@ export default function ReportsPage() {
   const user = useAuthStore(s => s.user)
   const isCmg = user?.tenant_tier === 'cmg'
   const location = useLocation()
+  const navigate = useNavigate()
 
   const { tab, setTab } = useReportsTabStore()
   const [period, setPeriod] = useState<Period>('semana')
   const [vehicleId, setVehicleId] = useState('')
   const [tenantId, setTenantId] = useState('')
 
+  const fromVehicleId = useRef(
+    (location.state as { vehicleId?: string } | null)?.vehicleId ?? null
+  ).current
+
   // Initialize from navigation state (e.g. from VehicleDetailPage quick-access cards)
   useEffect(() => {
-    const state = location.state as { vehicleId?: string; tab?: string } | null
+    const state = location.state as { vehicleId?: string; tab?: string; tenantId?: string } | null
+    if (state?.tenantId) setTenantId(state.tenantId)
     if (state?.vehicleId) setVehicleId(state.vehicleId)
     if (state?.tab && ['historico', 'mantenimiento', 'rutas', 'alertas'].includes(state.tab)) {
       setTab(state.tab as Parameters<typeof setTab>[0])
@@ -1230,6 +1267,7 @@ export default function ReportsPage() {
           setVehicleId={setVehicleId}
           period={period}
           setPeriod={setPeriod}
+          onBack={fromVehicleId ? () => navigate(-1) : undefined}
           pdfSlot={
             <PdfDownloadBtn
               vehicleId={vehicleId}

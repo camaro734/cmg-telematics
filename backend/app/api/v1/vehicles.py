@@ -97,6 +97,58 @@ async def update_vehicle_type_maintenance_templates(
     return vtype
 
 
+class ApplyTemplatesResponse(BaseModel):
+    created: int
+
+
+@router.post("/vehicle-types/{type_id}/apply-maintenance-templates", response_model=ApplyTemplatesResponse)
+async def apply_vehicle_type_maintenance_templates(
+    type_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea planes de mantenimiento en todos los vehículos activos del tipo, solo si no existen ya."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin")
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    templates = vtype.maintenance_templates or []
+    if not templates:
+        return ApplyTemplatesResponse(created=0)
+    result = await db.execute(
+        select(Vehicle).where(
+            Vehicle.vehicle_type_id == type_id,
+            Vehicle.active == True,
+        )
+    )
+    vehicles = result.scalars().all()
+    created = 0
+    for vehicle in vehicles:
+        for tmpl in templates:
+            existing = await db.execute(
+                select(MaintenancePlan).where(
+                    MaintenancePlan.vehicle_id == vehicle.id,
+                    MaintenancePlan.name == tmpl["name"],
+                )
+            )
+            if existing.scalar_one_or_none():
+                continue
+            plan = MaintenancePlan(
+                vehicle_id=vehicle.id,
+                tenant_id=vehicle.tenant_id,
+                name=tmpl["name"],
+                trigger_condition={"thresholds": tmpl["thresholds"], "op": "OR"},
+                warn_before_pct=tmpl.get("warn_before_pct", 10),
+                active=True,
+            )
+            db.add(plan)
+            created += 1
+    if created > 0:
+        await db.commit()
+    return ApplyTemplatesResponse(created=created)
+
+
 class DoutConfigUpdate(BaseModel):
     dout_config: list[DoutSlot]
 
@@ -183,6 +235,30 @@ async def update_vehicle_type(
     await db.commit()
     await db.refresh(vtype)
     return vtype
+
+
+@router.delete("/vehicle-types/{type_id}", status_code=204)
+async def delete_vehicle_type(
+    type_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Eliminar un tipo de vehículo. Solo CMG admin. Falla si hay vehículos asignados."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin puede eliminar tipos de vehículo")
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    # Verificar que no hay vehículos asignados
+    from app.models.vehicle import Vehicle
+    result = await db.execute(select(Vehicle).where(Vehicle.vehicle_type_id == type_id).limit(1))
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede eliminar: hay vehículos asignados a este tipo. Reasigna los vehículos primero."
+        )
+    await db.delete(vtype)
+    await db.commit()
 
 
 @router.post("/vehicle-types/{type_id}/icon", response_model=VehicleTypeOut)
@@ -378,6 +454,14 @@ async def get_vehicle_status(
 
     online_str = _get("online")
     last_seen_str = _get("last_seen")
+
+    # Determinar online real basado en last_seen (máx 5 minutos)
+    # No fiarse solo del flag Redis que puede quedar obsoleto
+    _last_seen_dt = _parse_datetime(last_seen_str)
+    _now = datetime.now(timezone.utc)
+    if _last_seen_dt is not None:
+        _elapsed = (_now - _last_seen_dt).total_seconds()
+        online_str = "true" if _elapsed < 300 else "false"  # 5 minutos
     lat_str = _get("lat")
     lon_str = _get("lon")
     speed_str = _get("speed_kmh")
@@ -591,6 +675,7 @@ async def get_vehicle_avl_series(
 @router.get("/vehicles/{vehicle_id}/kpis", response_model=list[KpiHour])
 async def get_vehicle_kpis(
     vehicle_id: uuid.UUID,
+    hours: int | None = None,
     start: datetime | None = None,
     end: datetime | None = None,
     user: CurrentUser = Depends(get_current_user),
@@ -601,10 +686,10 @@ async def get_vehicle_kpis(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
     _check_vehicle_access(vehicle, user)
 
-    if start is None:
-        start = datetime.now(timezone.utc) - timedelta(hours=24)
     if end is None:
         end = datetime.now(timezone.utc)
+    if start is None:
+        start = end - timedelta(hours=hours if hours and hours > 0 else 24)
     if start > end:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start must be <= end")
 
