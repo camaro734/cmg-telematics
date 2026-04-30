@@ -1,6 +1,6 @@
 # backend/app/api/v1/auth.py
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -12,9 +12,31 @@ from app.api.v1.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 60
+
+
+async def _check_login_rate_limit(request: Request) -> None:
+    """Rate limit: máx 10 intentos de login por IP en 60 segundos."""
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        return
+    ip = request.client.host if request.client else "unknown"
+    key = f"ratelimit:login:{ip}"
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.expire(key, _LOGIN_WINDOW_SECONDS)
+    if count > _LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos. Inténtalo de nuevo en 60 segundos.",
+            headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
+        )
+
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    await _check_login_rate_limit(request)
     result = await db.execute(select(User).where(User.email == body.email, User.active == True))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.hashed_password):

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import TopNav from './TopNav'
 import { useIsMobile } from '../../lib/useIsMobile'
 
@@ -6,8 +7,16 @@ interface ShellProps {
   children: React.ReactNode
 }
 
-export default function Shell({ children }: ShellProps) {
+const BRAND = 'CMG Track'
+
+export default function Shell({ title, children }: ShellProps) {
   const isMobile = useIsMobile()
+
+  useEffect(() => {
+    document.title = title ? `${title} — ${BRAND}` : BRAND
+    return () => { document.title = BRAND }
+  }, [title])
+
   return (
     <>
       <TopNav />

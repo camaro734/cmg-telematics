@@ -9,39 +9,57 @@ interface CircularGaugeProps {
   alertAbove?: number
   warnBelow?: number
   alertBelow?: number
+  // Alias modernos (compatibles con diseño nuevo)
+  warnThreshold?: number
+  critThreshold?: number
+  colorOverride?: string
 }
 
-const CX = 70
-const CY = 72
-const R = 50
-const START_DEG = 135
-const TOTAL_DEG = 270
+// ── Speedometer moderno — arco de 240° con stroke-dasharray ─────────────────
+//
+// Geometría del arco:
+//   - El arco completo abarca 240° (de -210° a +30° respecto al eje X positivo).
+//   - Esto coloca el inicio en la esquina inferior-izquierda y el final en la
+//     inferior-derecha, como un velocímetro real.
+//   - Para un círculo completo: circumference = 2π·r
+//   - Para un arco de 240°: arcLength = circumference × (240/360)
+//   - El offset para el arco vacío: dashoffset = arcLength (oculta todo el arco)
+//   - El arco SVG empieza a las 3 en punto (0°) y avanza en sentido horario.
+//     Rotamos el grupo SVG -210° para que el inicio quede abajo-izquierda.
+//
+// Marcas de escala:
+//   - TICK_COUNT marcas distribuidas uniformemente sobre los 240°
+//   - Calculadas en coordenadas polares dentro del grupo rotado
+
+const SWEEP_DEG = 240        // arco total en grados
+const ROTATION_DEG = -210    // rotación para colocar inicio abajo-izquierda
+const STROKE_W = 14          // grosor del arco (track y fill)
+const TICK_COUNT = 5         // número de marcas en la escala
 
 const cardStyle = {
   background: 'var(--bg-surface)',
-  borderRadius: 8,
-  padding: 8,
+  borderRadius: 10,
+  padding: '10px 8px 6px',
   textAlign: 'center' as const,
   border: '1px solid var(--bg-elevated)',
+  display: 'flex',
+  flexDirection: 'column' as const,
+  alignItems: 'center',
 }
 
-function arcPath(startDeg: number, sweepDeg: number): string {
-  if (sweepDeg < 0.3) return ''
-  const rad = Math.PI / 180
-  const sx = CX + R * Math.cos(startDeg * rad)
-  const sy = CY + R * Math.sin(startDeg * rad)
-  const ex = CX + R * Math.cos((startDeg + sweepDeg) * rad)
-  const ey = CY + R * Math.sin((startDeg + sweepDeg) * rad)
-  return `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${R} ${R} 0 ${sweepDeg > 180 ? 1 : 0} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`
-}
-
-function gaugeColor(
-  value: number,
-  alertAbove?: number,
+// Calcula el color del arco según umbrales.
+// Usa variables CSS del design system para que los tests de atributo stroke
+// puedan comparar con 'var(--accent-energy)', 'var(--accent-warn)', etc.
+function arcColor(
+  value: number | null,
   warnAbove?: number,
+  alertAbove?: number,
   warnBelow?: number,
   alertBelow?: number,
+  colorOverride?: string,
 ): string {
+  if (colorOverride) return colorOverride
+  if (value == null) return 'var(--accent-off)'
   if (alertAbove != null && value >= alertAbove) return 'var(--accent-crit)'
   if (warnAbove != null && value >= warnAbove) return 'var(--accent-warn)'
   if (alertBelow != null && value <= alertBelow) return 'var(--accent-crit)'
@@ -49,90 +67,191 @@ function gaugeColor(
   return 'var(--accent-energy)'
 }
 
+// Convierte grados polares a coordenadas cartesianas (origen en cx, cy)
+function polar(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = angleDeg * Math.PI / 180
+  return {
+    x: cx + r * Math.cos(rad),
+    y: cy + r * Math.sin(rad),
+  }
+}
+
+// Genera las marcas de escala como elementos SVG <line>
+function ScaleTicks({ cx, cy, r, strokeW }: { cx: number; cy: number; r: number; strokeW: number }) {
+  const marks = []
+  // Las marcas se distribuyen de 0° a SWEEP_DEG dentro del espacio del grupo rotado.
+  for (let i = 0; i <= TICK_COUNT; i++) {
+    const angleDeg = (i / TICK_COUNT) * SWEEP_DEG
+    const rOuter = r + strokeW / 2 + 4
+    const rInner = r + strokeW / 2 + 1
+    const outer = polar(cx, cy, rOuter, angleDeg)
+    const inner = polar(cx, cy, rInner, angleDeg)
+    marks.push(
+      <line
+        key={i}
+        x1={inner.x.toFixed(2)} y1={inner.y.toFixed(2)}
+        x2={outer.x.toFixed(2)} y2={outer.y.toFixed(2)}
+        stroke="#57534E"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    )
+  }
+  return <>{marks}</>
+}
+
 export default function CircularGauge({
   value, min, max, unit, label,
-  size = 120,
+  size = 140,
   warnAbove, alertAbove, warnBelow, alertBelow,
+  warnThreshold, critThreshold,
+  colorOverride,
 }: CircularGaugeProps) {
-  if (import.meta.env.DEV && alertAbove != null && warnAbove != null && alertAbove <= warnAbove) {
-    console.warn(`CircularGauge "${label}": alertAbove (${alertAbove}) must be > warnAbove (${warnAbove})`)
-  }
-  if (import.meta.env.DEV && alertBelow != null && warnBelow != null && alertBelow >= warnBelow) {
-    console.warn(`CircularGauge "${label}": alertBelow (${alertBelow}) must be < warnBelow (${warnBelow})`)
-  }
+  // Soporte para alias modernos (warnThreshold → warnAbove, critThreshold → alertAbove)
+  const effectiveWarnAbove = warnAbove ?? warnThreshold
+  const effectiveAlertAbove = alertAbove ?? critThreshold
 
-  const hasValue = value != null
-  const range = max - min
-  const pct = hasValue && range !== 0 ? Math.max(0, Math.min(1, (value - min) / range)) : 0
-  const valueDeg = pct * TOTAL_DEG
-  const color = hasValue
-    ? gaugeColor(value, alertAbove, warnAbove, warnBelow, alertBelow)
-    : 'var(--accent-off)'
+  // Normalize value: treat NaN as null so gauge renders in "no data" state
+  const safeValue = value != null && !Number.isNaN(value) ? value : null
+  // hasValue: true solo cuando hay un valor por encima del mínimo (evita arco vacío en value=min)
+  const hasValue = safeValue != null && safeValue > min
+  // Guard against min === max to avoid division by zero
+  const range = max - min || 1
+  const pct = safeValue != null ? Math.max(0, Math.min(1, (safeValue - min) / range)) : 0
 
-  const dotAngle = (START_DEG + valueDeg) * Math.PI / 180
-  const dotX = CX + R * Math.cos(dotAngle)
-  const dotY = CY + R * Math.sin(dotAngle)
-  const displayHeight = Math.round(size * 128 / 120)
+  // ── Geometría SVG ──────────────────────────────────────────────────────────
+  // viewBox fija a 160×160 para tener espacio para las marcas externas
+  const VB = 160
+  const cx = VB / 2   // 80
+  const cy = VB / 2   // 80
+
+  // Radio del arco: deja margen para las marcas (strokeW/2 + 8px) y el borde (4px)
+  const r = cx - STROKE_W / 2 - 12
+
+  // Circunferencia completa y longitud del arco de 240°
+  const circumference = 2 * Math.PI * r
+  const arcLength = circumference * (SWEEP_DEG / 360)
+
+  // Dashoffset para el arco de valor:
+  //   dashoffset = arcLength × (1 - pct)  →  pct=0 oculta todo, pct=1 muestra todo
+  const valueDashOffset = arcLength * (1 - pct)
+
+  const color = arcColor(safeValue, effectiveWarnAbove, effectiveAlertAbove, warnBelow, alertBelow, colorOverride)
+
+  // ── Posiciones del texto min/max en los extremos del arco ─────────────────
+  // Los extremos del arco (tras la rotación del grupo) están en:
+  //   inicio: ROTATION_DEG grados desde eje X+
+  //   fin:    ROTATION_DEG + SWEEP_DEG grados desde eje X+
+  const minAngleFinal = ROTATION_DEG
+  const maxAngleFinal = ROTATION_DEG + SWEEP_DEG
+  const labelR = r + STROKE_W / 2 + 10
+  const minPos = polar(cx, cy, labelR, minAngleFinal)
+  const maxPos = polar(cx, cy, labelR, maxAngleFinal)
+
+  // Formato del valor: entero → sin decimales; float → 1 decimal
+  const displayValue = safeValue != null
+    ? (Number.isInteger(safeValue) ? String(safeValue) : safeValue.toFixed(1))
+    : '—'
 
   return (
     <div style={cardStyle}>
-      <svg width={size} height={displayHeight} viewBox="0 0 140 140" aria-label={label}>
-        {/* Track */}
-        <path
-          className="g-track"
-          d={arcPath(START_DEG, TOTAL_DEG - 0.3)}
-          fill="none"
-          stroke="var(--gauge-track)"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-        {/* Value arc */}
-        <path
-          className="g-val"
-          d={hasValue && valueDeg > 0.3 ? arcPath(START_DEG, valueDeg) : ''}
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-        {/* Glowing dot */}
-        {hasValue && valueDeg > 0.3 && (
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${VB} ${VB}`}
+        aria-label={label}
+      >
+        {/* ── Grupo rotado para orientar el arco (inicio: abajo-izquierda) ── */}
+        <g transform={`rotate(${ROTATION_DEG} ${cx} ${cy})`}>
+
+          {/* Track de fondo — arco completo de 240° */}
+          <circle
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke="#3C3330"
+            strokeWidth={STROKE_W}
+            strokeLinecap="round"
+            strokeDasharray={`${arcLength.toFixed(2)} ${circumference.toFixed(2)}`}
+            strokeDashoffset={0}
+          />
+
+          {/* Arco de valor — clase g-val para tests */}
+          <circle
+            className="g-val"
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={STROKE_W}
+            strokeLinecap="round"
+            strokeDasharray={`${arcLength.toFixed(2)} ${circumference.toFixed(2)}`}
+            strokeDashoffset={hasValue ? valueDashOffset.toFixed(2) : arcLength.toFixed(2)}
+            style={{ transition: 'stroke-dashoffset 0.4s ease, stroke 0.3s ease' }}
+          />
+
+          {/* Marcas de escala */}
+          <ScaleTicks cx={cx} cy={cy} r={r} strokeW={STROKE_W} />
+
+        </g>
+
+        {/* Punto central activo — clase g-dot para tests */}
+        {hasValue && (
           <circle
             className="g-dot"
-            cx={dotX}
-            cy={dotY}
-            r="5"
+            cx={cx} cy={cy} r={4}
             fill={color}
-            style={{ filter: `drop-shadow(0 0 5px ${color})` }}
+            style={{ transition: 'fill 0.3s ease' }}
           />
         )}
-        {/* Value number */}
+
+        {/* ── Texto: valor principal ── */}
         <text
-          x="70" y="64"
+          x={cx} y={cy + 8}
           textAnchor="middle"
-          fontSize="22"
+          fontSize="30"
           fontWeight="700"
-          fill={hasValue ? color : 'var(--text-muted)'}
+          fill={safeValue != null ? '#FFFFFF' : '#4B5563'}
           fontFamily="var(--font-data)"
         >
-          {hasValue ? value : '—'}
+          {displayValue}
         </text>
-        {/* Max + unit */}
+
+        {/* ── Texto: "/ max unidad" debajo del valor ── */}
         <text
-          x="70" y="79"
+          x={cx} y={cy + 22}
           textAnchor="middle"
-          fontSize="10"
-          fill={hasValue ? color : 'var(--text-muted)'}
+          fontSize="9"
+          fill="#78716C"
           fontFamily="var(--font-data)"
         >
           {`/ ${max} ${unit}`}
         </text>
-        {/* Label */}
+
+        {/* ── Etiquetas min/max en los extremos del arco ── */}
         <text
-          x="70" y="116"
+          x={minPos.x.toFixed(2)} y={(minPos.y + 3).toFixed(2)}
+          textAnchor="middle"
+          fontSize="9"
+          fill="#78716C"
+          fontFamily="var(--font-data)"
+        >
+          {min}
+        </text>
+        <text
+          x={maxPos.x.toFixed(2)} y={(maxPos.y + 3).toFixed(2)}
+          textAnchor="middle"
+          fontSize="9"
+          fill="#78716C"
+          fontFamily="var(--font-data)"
+        >
+          {max}
+        </text>
+
+        {/* ── Label del sensor (abajo, centrado) ── */}
+        <text
+          x={cx} y={VB - 8}
           textAnchor="middle"
           fontSize="8"
-          fill="var(--text-muted)"
+          fill="#A8A29E"
           fontFamily="var(--font-ui)"
           letterSpacing="0.8"
         >

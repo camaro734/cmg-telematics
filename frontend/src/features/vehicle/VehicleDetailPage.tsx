@@ -10,7 +10,7 @@ import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
-import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, MaintenancePlanCreate, AlertInstanceOut, TenantOut, CommandLogEntry } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut, CommandLogEntry } from '../../lib/types'
 import WorkCyclesTab from './WorkCyclesTab'
 import { useAuthStore } from '../auth/useAuthStore'
 
@@ -37,18 +37,6 @@ export default function VehicleDetailPage() {
   const [doutOverride, setDoutOverride] = useState<Record<number, boolean>>({})
   const [doutLoading, setDoutLoading] = useState<Record<number, boolean>>({})
 
-  // Editar conductor
-  const [editingDriver, setEditingDriver] = useState(false)
-  const [driverInput, setDriverInput] = useState('')
-  const updateDriverMutation = useMutation({
-    mutationFn: (name: string) =>
-      apiClient.patch<VehicleOut>(`/api/v1/vehicles/${id}`, { driver_name: name || null }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.vehicle(id!) })
-      setEditingDriver(false)
-    },
-  })
-
   const [editingPlan, setEditingPlan] = useState<MaintenancePlanOut | null>(null)
   const [editPlanForm, setEditPlanForm] = useState({ name: '', value: '', warnPct: '10' })
   const [editPlanError, setEditPlanError] = useState('')
@@ -63,12 +51,6 @@ export default function VehicleDetailPage() {
     })
     setEditPlanError('')
   }
-
-  const createFromTemplateMutation = useMutation({
-    mutationFn: (body: MaintenancePlanCreate) =>
-      apiClient.post<MaintenancePlanOut>('/api/v1/maintenance/plans', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.vehicleMaintenance(id!) }),
-  })
 
   const editPlanMutation = useMutation({
     mutationFn: ({ planId, body }: { planId: string; body: object }) =>
@@ -272,29 +254,7 @@ export default function VehicleDetailPage() {
                     </div>
                     <VDRow label="Cliente" value={vehicleTenant?.name ?? '—'} />
                     <VDRow label="Modelo" value={vehicleType?.name ?? '—'} />
-                    {/* Conductor editable */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--bg-border)' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 90 }}>Conductor</span>
-                      {editingDriver ? (
-                        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input
-                            autoFocus
-                            value={driverInput}
-                            onChange={e => setDriverInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') updateDriverMutation.mutate(driverInput); if (e.key === 'Escape') setEditingDriver(false) }}
-                            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--accent-energy)', borderRadius: 4, padding: '2px 6px', color: 'var(--text-primary)', fontSize: 12, width: 130 }}
-                            placeholder="Nombre conductor"
-                          />
-                          <button onClick={() => updateDriverMutation.mutate(driverInput)} style={{ background: 'var(--accent-energy)', border: 'none', borderRadius: 4, color: '#fff', padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}>OK</button>
-                          <button onClick={() => setEditingDriver(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}>✕</button>
-                        </span>
-                      ) : (
-                        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <span style={{ fontSize: 12 }}>{vehicle.driver_name ?? '—'}</span>
-                          <button onClick={() => { setDriverInput(vehicle.driver_name ?? ''); setEditingDriver(true) }} style={{ background: 'none', border: 'none', color: 'var(--accent-energy)', fontSize: 12, cursor: 'pointer', opacity: 0.8 }} title="Editar conductor">✏</button>
-                        </span>
-                      )}
-                    </div>
+                    <VDRow label="Conductor" value={vehicle.driver_name ?? '—'} />
                     <VDRow label="Matrícula" value={vehicle.license_plate ?? '—'} />
                     <VDRow label="VIN" value={vehicle.vin ?? '—'} />
                   </div>
@@ -354,24 +314,12 @@ export default function VehicleDetailPage() {
                     </div>
                     {status ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {/* Aviso offline — oculta datos obsoletos */}
-                        {!status.online && (
-                          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 16 }}>📡</span>
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-crit)' }}>Dispositivo sin conexión</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                                Úlfima señal: {status.last_seen ? new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 6, opacity: status.online ? 1 : 0.35, pointerEvents: status.online ? 'auto' : 'none' }}>
-                          <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--accent-ok)' : 'var(--text-muted)'} />
-                          <StatusCard label="PTO" value={status.online ? ((status.pto_active ?? false) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active ?? false) ? 'var(--accent-energy)' : 'var(--text-muted)'} />
-                          <StatusCard label="Velocidad" value={status.online && status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—'} />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 6 }}>
+                          <StatusCard label="Ignición" value={status.ignition ? 'ON' : 'OFF'} color={status.ignition ? 'var(--accent-ok)' : 'var(--text-muted)'} />
+                          <StatusCard label="PTO" value={(status.pto_active ?? false) ? 'ON' : 'OFF'} color={(status.pto_active ?? false) ? 'var(--accent-energy)' : 'var(--text-muted)'} />
+                          <StatusCard label="Velocidad" value={status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—'} />
                           {status.ext_voltage_mv != null && (
-                            <StatusCard label="Alimentación" value={status.online ? `${(status.ext_voltage_mv / 1000).toFixed(2)} V` : '—'} color={status.online ? (status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)') : undefined} />
+                            <StatusCard label="Voltaje" value={`${(status.ext_voltage_mv / 1000).toFixed(2)} V`} color={status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)'} />
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11 }}>
@@ -379,7 +327,7 @@ export default function VehicleDetailPage() {
                           <span><span style={{ color: 'var(--text-muted)' }}>Lon </span><span style={{ fontFamily: 'var(--font-data)' }}>{status.lon != null ? status.lon.toFixed(6) : '—'}</span></span>
                           <span><span style={{ color: 'var(--text-muted)' }}>Señal </span><span>{status.last_seen ? new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</span></span>
                         </div>
-                        {status.online && sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null).length > 0 && (
+                        {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null).length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                             {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null).map(s => {
                               const raw = status.can_data?.[`avl_${s.avl_id}`]
@@ -389,7 +337,7 @@ export default function VehicleDetailPage() {
                             })}
                           </div>
                         )}
-                        {status.online && sensorSchema.some(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led') && (
+                        {sensorSchema.some(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led') && (
                           <SensorGrid
                             sensorSchema={sensorSchema.filter(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led')}
                             canData={{ ...(status.can_data ?? {}), ...(status.ext_voltage_mv != null ? { avl_66: status.ext_voltage_mv } : {}) }}
@@ -409,7 +357,7 @@ export default function VehicleDetailPage() {
                       <QuickReportCard
                         label="Desempeño histórico"
                         accent="var(--accent-info)"
-                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico', tenantId: vehicle.tenant_id } })}
+                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico' } })}
                         icon={
                           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -419,7 +367,7 @@ export default function VehicleDetailPage() {
                       <QuickReportCard
                         label="Rutas del mes"
                         accent="var(--accent-ok)"
-                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'rutas', tenantId: vehicle.tenant_id } })}
+                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'rutas' } })}
                         icon={
                           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
@@ -429,7 +377,7 @@ export default function VehicleDetailPage() {
                       <QuickReportCard
                         label="Alertas activas"
                         accent={activeAlertsCount > 0 ? 'var(--accent-crit)' : 'var(--text-muted)'}
-                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'alertas', tenantId: vehicle.tenant_id } })}
+                        onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'alertas' } })}
                         badge={activeAlertsCount > 0 ? String(activeAlertsCount) : undefined}
                         icon={
                           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -535,7 +483,7 @@ export default function VehicleDetailPage() {
             </div>
           )}
 
-          {tab === 'historic' && <KpiChart vehicleId={id} vehicleTypeId={vehicle.vehicle_type_id ?? undefined} />}
+          {tab === 'historic' && <KpiChart vehicleId={id} />}
 
           {tab === 'cycles' && vehicle.vehicle_type_id && (
             <WorkCyclesTab vehicleId={vehicle.id} vehicleTypeId={vehicle.vehicle_type_id} tenantId={vehicle.tenant_id} />
@@ -544,41 +492,7 @@ export default function VehicleDetailPage() {
           {tab === 'maintenance' && (
             <div>
               {maintenancePlans.length === 0 ? (
-                <div>
-                  {(vehicleType?.maintenance_templates ?? []).length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        No hay planes creados para este vehículo. Puedes crearlos desde las plantillas del tipo de vehículo:
-                      </div>
-                      {vehicleType!.maintenance_templates.map((tmpl, i) => (
-                        <div key={i} style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{tmpl.name}</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                              {tmpl.thresholds.map(t => `${t.value} ${{ pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días' }[t.type] ?? t.type}`).join(' / ')}
-                              {' '}· Aviso al {tmpl.warn_before_pct}%
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => createFromTemplateMutation.mutate({
-                              vehicle_id: id!,
-                              name: tmpl.name,
-                              trigger_condition: { thresholds: tmpl.thresholds, op: 'OR' },
-                              warn_before_pct: tmpl.warn_before_pct,
-                              active: true,
-                            })}
-                            disabled={createFromTemplateMutation.isPending}
-                            style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600, opacity: createFromTemplateMutation.isPending ? 0.6 : 1 }}
-                          >
-                            + Crear plan
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin planes de mantenimiento. Define plantillas en el tipo de vehículo primero.</p>
-                  )}
-                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin planes de mantenimiento para este vehículo</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {maintenancePlans.map(plan => (

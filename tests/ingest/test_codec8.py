@@ -26,7 +26,7 @@ SAMPLE_PACKET = bytes.fromhex(
     "00"                # 4-byte IOs count = 0
     "00"                # 8-byte IOs count = 0
     "01"                # number of data 2 = 1
-    "D6B2FEAA"          # CRC
+    "00007B6F"          # CRC (CRC-16/IBM sobre data field, 0x7b6f como uint32 big-endian)
 )
 
 

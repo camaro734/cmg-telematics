@@ -1,7 +1,7 @@
 services:
 
   postgres:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.17.2-pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -18,7 +18,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD} --save 60 1 --loglevel warning
     volumes:
@@ -41,6 +41,7 @@ services:
       DB_URL: ${DB_URL}
       REDIS_URL: ${REDIS_URL}
       ENVIRONMENT: ${ENVIRONMENT}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +93,7 @@ services:
       REDIS_URL: ${REDIS_URL}
       SECRET_KEY: ${SECRET_KEY}
       ENVIRONMENT: ${ENVIRONMENT}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -107,7 +109,7 @@ services:
       start_period: 30s
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.9-alpine
     restart: unless-stopped
     ports:
       - "80:80"

@@ -93,8 +93,9 @@ def _check_schedule(schedule: dict, ts: datetime) -> bool:
         start_minutes = start_h * 60 + start_m
         end_minutes = end_h * 60 + end_m
         return start_minutes <= current_minutes < end_minutes
-    # Unknown type — default to active
-    return True
+    # Unknown type — no disparar (safe default)
+    logger.warning("Tipo de schedule desconocido: %r — no se dispara", sched_type)
+    return False
 
 
 async def _eval_condition(cond: dict, rule: Rule, msg: TelemetryMsg, redis: Any) -> RuleMatch | None:
@@ -161,8 +162,12 @@ async def _eval_condition(cond: dict, rule: Rule, msg: TelemetryMsg, redis: Any)
 
     if cond_type == "composite":
         op = cond.get("op_composite") or cond.get("op", "AND")
+        sub_conditions = cond.get("conditions", [])
+        if not sub_conditions:
+            # Lista vacía no debe disparar — evita falsos positivos
+            return None
         if op == "AND":
-            for sub in cond.get("conditions", []):
+            for sub in sub_conditions:
                 r = await _eval_condition(sub, rule, msg, redis)
                 if r is None:
                     return None

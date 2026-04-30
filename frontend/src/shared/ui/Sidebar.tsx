@@ -1,7 +1,25 @@
 import { NavLink } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
 import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos, IconCanScanner, IconVehiculos } from './icons'
+import { apiClient } from '../../lib/apiClient'
+
+function useActiveAlertCount() {
+  const { data } = useQuery({
+    queryKey: ['alerts', 'active-count'],
+    queryFn: async () => {
+      const [firing, escalated] = await Promise.all([
+        apiClient.get<unknown[]>('/api/v1/alerts?status=firing&limit=200'),
+        apiClient.get<unknown[]>('/api/v1/alerts?status=escalated&limit=200'),
+      ])
+      return (firing?.length ?? 0) + (escalated?.length ?? 0)
+    },
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
+  return data ?? 0
+}
 
 const NAV_ITEMS = [
   { to: '/fleet',       Icon: IconFlota,         label: 'Flota',         active: true },
@@ -25,6 +43,7 @@ export default function Sidebar() {
   const { logoUrl, brandName, user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const isCmg = user?.tenant_tier === 'cmg'
+  const alertCount = useActiveAlertCount()
 
   return (
     <nav style={{
@@ -50,7 +69,20 @@ export default function Sidebar() {
       {NAV_ITEMS.map(({ to, Icon, label, active }) =>
         active ? (
           <NavLink key={to} to={to} title={label} style={navLinkStyle}>
-            <Icon width={20} height={20}/>
+            <div style={{ position: 'relative' }}>
+              <Icon width={20} height={20}/>
+              {label === 'Alertas' && alertCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -6, right: -8,
+                  background: 'var(--accent-crit)',
+                  color: '#fff', borderRadius: 99,
+                  fontSize: 9, fontWeight: 700, lineHeight: 1,
+                  padding: '2px 4px', minWidth: 14, textAlign: 'center',
+                }}>
+                  {alertCount > 99 ? '99+' : alertCount}
+                </span>
+              )}
+            </div>
           </NavLink>
         ) : (
           <div

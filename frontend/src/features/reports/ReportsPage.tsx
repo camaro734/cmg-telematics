@@ -549,7 +549,7 @@ function HistoricoTab({
                 <YAxis tick={{ fontSize: 10, fill: '#78716C' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
-                {allLineMetrics.map((m, i) => (
+                {kpiLineMetrics.map((m, i) => (
                   <Line
                     key={m.key}
                     type="monotone"
@@ -820,7 +820,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                   {allLogs.map(log => (
                     <tr key={log.id}>
                       <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', fontSize: 11, whiteSpace: 'nowrap' }}>
-                        {new Date(log.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        {log.performed_at ? new Date(log.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                       </td>
                       <td style={tdStyle}>{log.description ?? '—'}</td>
                       <td style={tdStyle}>
@@ -888,8 +888,9 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
   const today = new Date().toISOString().slice(0, 10)
   const [date, setDate] = useState(today)
 
-  const from = `${date}T00:00:00Z`
-  const to = `${date}T23:59:59Z`
+  // Build local midnight timestamps to avoid off-by-one when user is not in UTC
+  const from = new Date(`${date}T00:00:00`).toISOString()
+  const to = new Date(`${date}T23:59:59`).toISOString()
 
   const { data: track = [], isFetching } = useQuery<TrackPoint[]>({
     queryKey: [...keys.vehicleTrack(vehicleId), date],
@@ -1092,7 +1093,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
     const csvRows = rows.map(a => {
       const rule = ruleMap.get(a.rule_id)
       return {
-        'Fecha': new Date(a.triggered_at).toLocaleString('es-ES'),
+        'Fecha': a.triggered_at ? new Date(a.triggered_at).toLocaleString('es-ES') : '—',
         'Regla': rule?.name ?? a.rule_id,
         'Severidad': rule?.severity ?? '—',
         'Estado': statusLabels[a.status] ?? a.status,
@@ -1151,10 +1152,10 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                 return (
                   <tr key={a.id}>
                     <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', fontSize: 11, whiteSpace: 'nowrap' }}>
-                      {new Date(a.triggered_at).toLocaleString('es-ES', {
+                      {a.triggered_at ? new Date(a.triggered_at).toLocaleString('es-ES', {
                         day: '2-digit', month: '2-digit', year: '2-digit',
                         hour: '2-digit', minute: '2-digit',
-                      })}
+                      }) : '—'}
                     </td>
                     <td style={{ ...tdStyle, fontSize: 12 }}>
                       {rule?.name ?? (

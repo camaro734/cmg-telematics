@@ -20,6 +20,20 @@ logger = logging.getLogger(__name__)
 # IMEI → StreamWriter registry for active connections
 _active_writers: dict[str, asyncio.StreamWriter] = {}
 
+# Límite de conexiones TCP concurrentes — previene agotamiento de recursos
+_MAX_CONCURRENT_CONNECTIONS = 500
+_connection_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_CONNECTIONS)
+
+# Máximo tamaño de paquete Codec 8 — previene ataques de memoria
+_MAX_PACKET_BYTES = 65_536
+
+
+def _internal_headers() -> dict[str, str]:
+    """Cabecera de autenticación interna para llamadas a core-api /internal."""
+    if settings.internal_api_key:
+        return {"X-Internal-Key": settings.internal_api_key}
+    return {}
+
 
 async def _log_command(
     device_id: str,
@@ -34,6 +48,7 @@ async def _log_command(
         async with httpx.AsyncClient(timeout=5.0) as client:
             r = await client.post(
                 f"{settings.core_api_url}/internal/commands/log",
+                headers=_internal_headers(),
                 json={
                     "device_id": device_id,
                     "vehicle_id": vehicle_id,
@@ -57,6 +72,7 @@ async def _confirm_command(log_id: str, response: str) -> None:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.patch(
                 f"{settings.core_api_url}/internal/commands/{log_id}/confirm",
+                headers=_internal_headers(),
                 json={"response": response, "status": "confirmed"},
             )
     except Exception as e:
@@ -82,10 +98,13 @@ class TeltonikaConnection:
     async def handle(self) -> None:
         logger.info("Conexión nueva desde %s", self.peer)
         try:
-            await self._handshake()
+            # Timeout en handshake: previene conexiones que nunca envían IMEI (DoS)
+            await asyncio.wait_for(self._handshake(), timeout=30.0)
             if not self.device_info:
                 return
             await self._receive_loop()
+        except asyncio.TimeoutError:
+            logger.warning("Timeout en handshake desde %s — conexión cerrada", self.peer)
         except (asyncio.IncompleteReadError, ConnectionResetError):
             logger.info("Conexión cerrada por dispositivo %s", self.imei or self.peer)
         except Exception as e:
@@ -179,6 +198,12 @@ class TeltonikaConnection:
         while True:
             header = await self.reader.readexactly(8)
             data_length = struct.unpack_from(">I", header, 4)[0]
+            if data_length > _MAX_PACKET_BYTES:
+                logger.warning(
+                    "Paquete sospechosamente grande (%d bytes) desde %s — cerrando conexión",
+                    data_length, self.peer,
+                )
+                return
             body = await self.reader.readexactly(data_length + 4)  # +4 para CRC
             packet = header + body
 
@@ -226,43 +251,49 @@ class TeltonikaConnection:
 
 
 async def command_listener(redis: Redis) -> None:
-    """Escucha el canal Redis 'cmg:dout_commands' y envía comandos Codec 12 al dispositivo."""
-    pubsub = redis.pubsub()
-    await pubsub.subscribe("cmg:dout_commands")
-    logger.info("command_listener suscrito a cmg:dout_commands")
-    async for message in pubsub.listen():
-        if message["type"] != "message":
-            continue
+    """Escucha el canal Redis 'cmg:dout_commands' y envía comandos Codec 12 al dispositivo.
+    Se reinicia automáticamente si Redis se desconecta temporalmente."""
+    while True:
         try:
-            data = json.loads(message["data"])
-            imei: str = data["imei"]
-            command: str = data["command"]
-            device_id: str | None = data.get("device_id")
-            vehicle_id: str | None = data.get("vehicle_id")
-            tenant_id: str | None = data.get("tenant_id")
+            pubsub = redis.pubsub()
+            await pubsub.subscribe("cmg:dout_commands")
+            logger.info("command_listener suscrito a cmg:dout_commands")
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                try:
+                    data = json.loads(message["data"])
+                    imei: str = data["imei"]
+                    command: str = data["command"]
+                    device_id: str | None = data.get("device_id")
+                    vehicle_id: str | None = data.get("vehicle_id")
+                    tenant_id: str | None = data.get("tenant_id")
 
-            writer = _active_writers.get(imei)
-            if writer is None:
-                logger.warning("DOUT: dispositivo %s no está conectado", imei)
-                if device_id and vehicle_id and tenant_id:
-                    await _log_command(
-                        device_id, vehicle_id, tenant_id, command,
-                        "failed", error_message="Dispositivo no conectado",
-                    )
-                continue
+                    writer = _active_writers.get(imei)
+                    if writer is None:
+                        logger.warning("DOUT: dispositivo %s no está conectado", imei)
+                        if device_id and vehicle_id and tenant_id:
+                            await _log_command(
+                                device_id, vehicle_id, tenant_id, command,
+                                "failed", error_message="Dispositivo no conectado",
+                            )
+                        continue
 
-            packet = build_codec12_command(command)
-            writer.write(packet)
-            await writer.drain()
-            logger.info("DOUT enviado a %s: %s", imei, command)
+                    packet = build_codec12_command(command)
+                    writer.write(packet)
+                    await writer.drain()
+                    logger.info("DOUT enviado a %s: %s", imei, command)
 
-            if device_id and vehicle_id and tenant_id:
-                log_id = await _log_command(device_id, vehicle_id, tenant_id, command, "sent")
-                if log_id:
-                    # TTL 120s — suficiente para que el ACK llegue del dispositivo
-                    await redis.set(f"command:{imei}:last_log_id", log_id, ex=120)
+                    if device_id and vehicle_id and tenant_id:
+                        log_id = await _log_command(device_id, vehicle_id, tenant_id, command, "sent")
+                        if log_id:
+                            # TTL 120s — suficiente para que el ACK llegue del dispositivo
+                            await redis.set(f"command:{imei}:last_log_id", log_id, ex=120)
+                except Exception as e:
+                    logger.error("Error procesando comando DOUT: %s", e)
         except Exception as e:
-            logger.error("Error procesando comando DOUT: %s", e)
+            logger.error("command_listener: error en pubsub, reintentando en 5s: %s", e)
+            await asyncio.sleep(5)
 
 
 async def run_server(db_pool: asyncpg.Pool, redis: Redis) -> None:

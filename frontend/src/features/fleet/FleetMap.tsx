@@ -36,6 +36,7 @@ function makeVehicleIcon(status: VehicleStatus): L.DivIcon {
 interface FleetMapProps {
   vehicles: VehicleOut[]
   statuses: Map<string, VehicleStatus>
+  vehicleTypes?: unknown[]
 }
 
 export default function FleetMap({ vehicles, statuses }: FleetMapProps) {
@@ -46,21 +47,34 @@ export default function FleetMap({ vehicles, statuses }: FleetMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const initialFitDoneRef = useRef(false)
 
-  // Init map
+  // Init map — Leaflet requiere que el contenedor tenga altura > 0
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    mapRef.current = L.map(containerRef.current, {
-      center: [40.416775, -3.70379], // Madrid default
-      zoom: 6,
-      zoomControl: false,
-    })
-    L.control.zoom({ position: 'topright' }).addTo(mapRef.current)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(mapRef.current)
+
+    function initMap() {
+      if (!containerRef.current || mapRef.current) return
+      mapRef.current = L.map(containerRef.current, {
+        center: [40.416775, -3.70379], // Madrid default
+        zoom: 6,
+        zoomControl: false,
+      })
+      L.control.zoom({ position: 'topright' }).addTo(mapRef.current)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(mapRef.current)
+    }
+
+    // Guard: if container has no height yet, defer init to next paint frame
+    let raf: number | null = null
+    if (containerRef.current.clientHeight === 0) {
+      raf = requestAnimationFrame(initMap)
+    } else {
+      initMap()
+    }
 
     return () => {
+      if (raf !== null) cancelAnimationFrame(raf)
       mapRef.current?.remove()
       mapRef.current = null
     }
@@ -96,13 +110,16 @@ export default function FleetMap({ vehicles, statuses }: FleetMapProps) {
         marker.setLatLng([lat, lon])
         marker.setIcon(icon)
       } else {
+        const plateLine = vehicle.license_plate ? `${vehicle.license_plate}<br/>` : ''
+        const speedLine = status.speed_kmh != null && !Number.isNaN(status.speed_kmh)
+          ? `${Math.round(status.speed_kmh)} km/h<br/>`
+          : ''
         const marker = L.marker([lat, lon], { icon })
           .addTo(map)
           .bindPopup(`
             <div style="font-family:sans-serif;min-width:140px">
               <strong>${vehicle.name}</strong><br/>
-              ${vehicle.license_plate ?? ''}<br/>
-              ${status.speed_kmh != null ? `${Math.round(status.speed_kmh)} km/h<br/>` : ''}
+              ${plateLine}${speedLine}
               <a href="/vehicles/${vehicle.id}" style="color:#F97316;font-size:12px">Ver detalle →</a>
             </div>
           `)

@@ -1,11 +1,13 @@
+import secrets
 import uuid
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
@@ -17,6 +19,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["commands"])
 internal_router = APIRouter(tags=["internal"])
+
+
+async def _require_internal_key(
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+) -> None:
+    """Valida clave compartida para endpoints /internal (solo acceso inter-servicio).
+    Si INTERNAL_API_KEY no está configurada, bloquea en producción."""
+    if not settings.internal_api_key:
+        if settings.is_production:
+            raise HTTPException(status_code=500, detail="INTERNAL_API_KEY no configurada")
+        logger.warning("INTERNAL_API_KEY no configurada — /internal desprotegido (solo dev)")
+        return
+    if x_internal_key is None or not secrets.compare_digest(x_internal_key, settings.internal_api_key):
+        raise HTTPException(status_code=403, detail="No autorizado")
 
 
 class CommandLogOut(BaseModel):
@@ -93,6 +109,7 @@ async def list_device_commands(
 @internal_router.post("/commands/log", response_model=CommandLogOut, status_code=201)
 async def log_command(
     body: CommandLogCreate,
+    _: None = Depends(_require_internal_key),
     db: AsyncSession = Depends(get_db),
 ):
     log = CommandLog(
@@ -114,6 +131,7 @@ async def log_command(
 async def confirm_command(
     log_id: uuid.UUID,
     body: CommandLogConfirm,
+    _: None = Depends(_require_internal_key),
     db: AsyncSession = Depends(get_db),
 ):
     log = await db.get(CommandLog, log_id)

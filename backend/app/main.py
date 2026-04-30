@@ -50,16 +50,25 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Internal-Key"],
 )
 
 app.include_router(api_router)
 app.include_router(ws_router)
 app.include_router(internal_router, prefix="/internal")
-Path("/app/uploads").mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
-app.mount("/static", StaticFiles(directory="/app/static"), name="static")
+
+# Resuelve las rutas de ficheros estáticos de forma portable:
+# - En producción (Docker) se usan /app/uploads y /app/static
+# - En desarrollo/tests se buscan relativo al directorio del paquete backend
+_THIS_DIR = Path(__file__).parent.parent  # directorio backend/
+_UPLOADS_DIR = Path("/app/uploads") if Path("/app/uploads").exists() else _THIS_DIR / "uploads"
+_STATIC_DIR = Path("/app/static") if Path("/app/static").exists() else _THIS_DIR / "static"
+
+_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+_STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_UPLOADS_DIR)), name="uploads")
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 
 @app.get("/health")

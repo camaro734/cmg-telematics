@@ -142,12 +142,13 @@ const btnSecondary: React.CSSProperties = {
 
 const GAUGE_TYPES: SensorDef['gauge_type'][] = ['circular', 'linear', 'battery', 'numeric', 'led']
 
+// Solo campos que existen realmente en la vista telemetry_1h (aggregate continua de TimescaleDB)
+// distance_km, max_speed_kmh y pto_cycles NO están en esa vista — usar AVL ID para esos datos
 const KPI_OPTIONS = [
-  { key: 'engine_on_minutes', label: 'Horas motor',  unit: 'h',    transform: 0.01667, color: '#22C55E' },
-  { key: 'pto_active_minutes', label: 'Horas PTO',   unit: 'h',    transform: 0.01667, color: '#F97316' },
-  { key: 'distance_km',        label: 'Distancia',   unit: 'km',   transform: 1,       color: '#38BDF8' },
-  { key: 'max_speed_kmh',      label: 'Vel. máxima', unit: 'km/h', transform: 1,       color: '#EAB308' },
-  { key: 'pto_cycles',         label: 'Ciclos PTO',  unit: '',     transform: 1,       color: '#A78BFA' },
+  { key: 'engine_on_minutes', label: 'Horas motor',      unit: 'h', transform: 0.01667, color: '#22C55E' },
+  { key: 'pto_active_minutes', label: 'Horas PTO',       unit: 'h', transform: 0.01667, color: '#F97316' },
+  { key: 'avg_pressure_1',     label: 'Presión media 1', unit: 'bar', transform: 1,     color: '#38BDF8' },
+  { key: 'avg_oil_temp',       label: 'Temp. aceite',    unit: '°C',  transform: 1,     color: '#EAB308' },
 ]
 
 type MetricFormState = {
@@ -182,7 +183,15 @@ export default function VehicleTypesPage() {
   })
 
   const [selectedTypeId, setSelectedTypeId] = useState<string>('')
-  const selectedType = vehicleTypes.find(vt => vt.id === selectedTypeId) ?? vehicleTypes[0]
+  // Auto-select first type only when no explicit selection has been made
+  const selectedType = vehicleTypes.find(vt => vt.id === selectedTypeId)
+    ?? (selectedTypeId === '' ? vehicleTypes[0] : undefined)
+
+  // Limpiar resultado de apply al cambiar de tipo de vehículo
+  function selectType(id: string) {
+    setSelectedTypeId(id)
+    setApplyResult(null)
+  }
 
   // ── Type modal state ──────────────────────────────────────────────────────
   const [showTypeModal, setShowTypeModal] = useState(false)
@@ -287,6 +296,8 @@ export default function VehicleTypesPage() {
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplateIdx, setEditingTemplateIdx] = useState<number | null>(null)
   const [templateForm, setTemplateForm] = useState<TemplateFormState>(emptyTemplateForm)
+  // Resultado de aplicar plantillas a vehículos existentes (feedback al usuario)
+  const [applyResult, setApplyResult] = useState<{ created: number } | null>(null)
 
   function openNewTemplate() {
     setEditingTemplateIdx(null)
@@ -305,12 +316,26 @@ export default function VehicleTypesPage() {
     setShowTemplateModal(true)
   }
 
+  const applyTemplatesMutation = useMutation({
+    mutationFn: (typeId: string) =>
+      apiClient.post<{ created: number }>(`/api/v1/vehicle-types/${typeId}/apply-maintenance-templates`, {}),
+    onSuccess: (result) => {
+      // Invalidar todos los queries de mantenimiento para que VehicleDetailPage
+      // y ReportsPage vean los nuevos planes creados
+      qc.invalidateQueries({ queryKey: ['maintenance'] })   // MaintenancePage / ReportsPage
+      qc.invalidateQueries({ queryKey: ['vehicles'] })      // VehicleDetailPage usa ['vehicles', id, 'maintenance']
+      setApplyResult(result)
+    },
+  })
+
   const updateTemplatesMutation = useMutation({
     mutationFn: ({ typeId, templates }: { typeId: string; templates: MaintenanceTemplateItem[] }) =>
       apiClient.patch<VehicleTypeOut>(`/api/v1/vehicle-types/${typeId}/maintenance-templates`, { templates }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: keys.vehicleTypes() })
       setShowTemplateModal(false)
+      // Propagar automáticamente los planes a vehículos existentes del tipo
+      applyTemplatesMutation.mutate(variables.typeId)
     },
   })
 
@@ -497,7 +522,7 @@ export default function VehicleTypesPage() {
             {vehicleTypes.map(vt => (
               <div
                 key={vt.id}
-                onClick={() => setSelectedTypeId(vt.id)}
+                onClick={() => selectType(vt.id)}
                 style={{
                   padding: '8px 14px',
                   cursor: 'pointer',
@@ -588,7 +613,7 @@ export default function VehicleTypesPage() {
 
               {/* Sensor table */}
               <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-                {(selectedType.sensor_schema as SensorDef[]).length === 0 ? (
+                {((selectedType.sensor_schema as SensorDef[]) ?? []).length === 0 ? (
                   <div style={{ color: 'var(--accent-off)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
                     No hay sensores configurados. Pulsa "+ Añadir sensor" para mapear un AVL ID.
                   </div>
@@ -602,7 +627,7 @@ export default function VehicleTypesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(selectedType.sensor_schema as SensorDef[]).map((def, idx) => (
+                      {((selectedType.sensor_schema as SensorDef[]) ?? []).map((def, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--bg-elevated)' }}
                           onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -640,8 +665,40 @@ export default function VehicleTypesPage() {
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                         Planes de mantenimiento
                       </span>
-                      <button style={btnPrimary} onClick={openNewTemplate}>+ Añadir</button>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {(selectedType.maintenance_templates ?? []).length > 0 && (
+                          <button
+                            style={{ ...btnSecondary, fontSize: 11 }}
+                            onClick={() => { setApplyResult(null); applyTemplatesMutation.mutate(selectedType.id) }}
+                            disabled={applyTemplatesMutation.isPending}
+                            title="Crear planes en todos los vehículos activos de este tipo que aún no los tengan"
+                          >
+                            {applyTemplatesMutation.isPending ? 'Aplicando…' : 'Aplicar a vehículos existentes'}
+                          </button>
+                        )}
+                        <button style={btnPrimary} onClick={openNewTemplate}>+ Añadir</button>
+                      </div>
                     </div>
+                    {applyResult !== null && (
+                      <div style={{
+                        fontSize: 12,
+                        color: applyResult.created > 0 ? 'var(--accent-ok)' : 'var(--accent-off)',
+                        background: applyResult.created > 0 ? 'rgba(34,197,94,0.08)' : 'rgba(120,113,108,0.08)',
+                        border: `1px solid ${applyResult.created > 0 ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+                        borderRadius: 6,
+                        padding: '6px 10px',
+                        marginBottom: 8,
+                      }}>
+                        {applyResult.created > 0
+                          ? `Se crearon ${applyResult.created} plan${applyResult.created > 1 ? 'es' : ''} de mantenimiento en vehículos existentes`
+                          : 'Todos los vehículos activos ya tienen estos planes de mantenimiento'}
+                      </div>
+                    )}
+                    {applyTemplatesMutation.isError && (
+                      <div style={{ fontSize: 12, color: 'var(--accent-crit)', marginBottom: 8 }}>
+                        Error al aplicar plantillas: {(applyTemplatesMutation.error as Error).message}
+                      </div>
+                    )}
                     {(selectedType.maintenance_templates ?? []).length === 0 ? (
                       <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin plantillas configuradas</p>
                     ) : (
