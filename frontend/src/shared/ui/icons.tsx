@@ -18,16 +18,24 @@ function Icon({ children, ...props }: IconProps & { children: React.ReactNode })
   )
 }
 
-// Fleet: truck side-profile with GPS signal arcs from cab
+// Fleet: truck side-profile — cab + cargo box, dual rear axle
 export function IconFlota(props: IconProps) {
   return (
     <Icon {...props}>
-      <rect x="1" y="7" width="9" height="8" rx="0.5"/>
-      <path d="M10 10h3l3 5H10V10z"/>
-      <circle cx="4" cy="18" r="2"/>
-      <circle cx="13" cy="18" r="2"/>
-      <path d="M16 10a2.5 2.5 0 0 1 0 5"/>
-      <path d="M16 8a5 5 0 0 1 0 9"/>
+      {/* chassis rail */}
+      <line x1="1" y1="19" x2="23" y2="19" />
+      {/* cab lower */}
+      <path d="M2,19 L2,13 L8,13 L8,19" />
+      {/* cab upper / roof */}
+      <path d="M3,13 L3,8 Q3,7 5,7 L9,7 L9,13" />
+      {/* cargo body */}
+      <rect x="9" y="9" width="13" height="10" rx="1" />
+      {/* wheels */}
+      <circle cx="5" cy="20.5" r="2" />
+      <circle cx="15.5" cy="20.5" r="2" />
+      <circle cx="19.5" cy="20.5" r="2" />
+      {/* exhaust stack */}
+      <line x1="3.5" y1="13" x2="3.5" y2="8" strokeWidth={2} />
     </Icon>
   )
 }

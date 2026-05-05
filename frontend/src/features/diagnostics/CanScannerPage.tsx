@@ -250,7 +250,7 @@ export default function CanScannerPage() {
   const inputStyle = {
     background: 'var(--bg-elevated)',
     border: '1px solid var(--bg-border)',
-    color: 'var(--text-primary, #E7E5E4)',
+    color: 'var(--text-primary)',
     borderRadius: 6,
     padding: '6px 10px',
     fontSize: 13,
@@ -275,7 +275,7 @@ export default function CanScannerPage() {
           <button
             onClick={() => setRefreshCount(c => c + 1)}
             disabled={!vehicleId}
-            style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '6px 14px', fontSize: 13, cursor: vehicleId ? 'pointer' : 'not-allowed' }}
+            style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '6px 14px', fontSize: 13, cursor: vehicleId ? 'pointer' : 'not-allowed' }}
           >
             ↻ Actualizar
           </button>
@@ -285,7 +285,7 @@ export default function CanScannerPage() {
             disabled={!vehicleId}
             style={{
               background: autoRefresh ? 'var(--accent-ok)' : 'var(--bg-elevated)',
-              color: autoRefresh ? '#fff' : 'var(--text-primary, #E7E5E4)',
+              color: autoRefresh ? '#fff' : 'var(--text-primary)',
               border: '1px solid var(--bg-border)',
               borderRadius: 6, padding: '6px 14px', fontSize: 13,
               cursor: vehicleId ? 'pointer' : 'not-allowed',
@@ -298,7 +298,7 @@ export default function CanScannerPage() {
           {records.length > 0 && (
             <button
               onClick={handleExport}
-              style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+              style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
             >
               Exportar CSV
             </button>
@@ -330,12 +330,12 @@ export default function CanScannerPage() {
         {labelingKey && vehicleType && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 420, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #E7E5E4)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                 Etiquetar{' '}
                 <span style={{ fontFamily: 'var(--font-data)', color: 'var(--accent-energy)' }}>{labelingKey}</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--accent-off)', lineHeight: 1.5 }}>
-                Tipo de vehículo: <strong style={{ color: 'var(--text-primary, #E7E5E4)' }}>{vehicleType.name}</strong>.
+                Tipo de vehículo: <strong style={{ color: 'var(--text-primary)' }}>{vehicleType.name}</strong>.
                 Los nombres serán visibles en todos los vehículos de este tipo.
               </div>
 
@@ -365,14 +365,14 @@ export default function CanScannerPage() {
                     value={labelForm.label}
                     onChange={e => setLabelForm(f => ({ ...f, label: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && saveLabel()}
-                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
                   />
                   <input
                     placeholder="Unidad (ej. bar, °C, %) — opcional"
                     value={labelForm.unit}
                     onChange={e => setLabelForm(f => ({ ...f, unit: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && saveLabel()}
-                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
                   />
                 </>
               ) : (
@@ -397,7 +397,7 @@ export default function CanScannerPage() {
                         value={b.label}
                         onChange={e => setBitForms(f => f.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
                         style={{
-                          flex: 1, background: 'var(--bg-elevated)', color: b.enabled ? 'var(--text-primary, #E7E5E4)' : 'var(--accent-off)',
+                          flex: 1, background: 'var(--bg-elevated)', color: b.enabled ? 'var(--text-primary)' : 'var(--accent-off)',
                           border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px', fontSize: 12,
                           opacity: b.enabled ? 1 : 0.4,
                         }}
@@ -413,7 +413,7 @@ export default function CanScannerPage() {
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setLabelingKey(null)}
-                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}
+                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
@@ -488,16 +488,16 @@ export default function CanScannerPage() {
               <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 12 }}>
                 <Badge on={latest.ignition} label="Ignición" />
                 <Badge on={latest.pto_active} label="PTO" />
-                <span style={{ fontSize: 12, color: 'var(--text-primary, #E7E5E4)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
                   Velocidad: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.speed_kmh?.toFixed(0) ?? '—'} km/h</strong>
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary, #E7E5E4)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
                   Voltaje ext: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.ext_voltage_mv != null ? `${(latest.ext_voltage_mv / 1000).toFixed(2)} V` : '—'}</strong>
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary, #E7E5E4)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
                   GPS: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.lat != null ? `${latest.lat.toFixed(5)}, ${latest.lon?.toFixed(5)}` : '—'}</strong>
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary, #E7E5E4)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
                   Altitud: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.altitude_m != null ? `${latest.altitude_m} m` : '—'}</strong>
                 </span>
               </div>
@@ -526,7 +526,7 @@ export default function CanScannerPage() {
                           <span style={{
                             fontSize: 11, fontWeight: 600,
                             color: item.source === 'custom' ? 'var(--accent-energy)'
-                                 : item.source === 'std' ? 'var(--text-primary, #E7E5E4)'
+                                 : item.source === 'std' ? 'var(--text-primary)'
                                  : 'var(--accent-off)',
                           }}>
                             {item.label}
@@ -545,7 +545,7 @@ export default function CanScannerPage() {
                               {item.value === 1 ? '● ON' : '○ OFF'}
                             </span>
                           ) : (
-                            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: 'var(--text-primary, #E7E5E4)' }}>
+                            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: 'var(--text-primary)' }}>
                               {raw !== undefined ? item.value.toFixed(item.value % 1 !== 0 ? 2 : 0) : '—'}
                             </span>
                           )}
@@ -645,6 +645,6 @@ const th: React.CSSProperties = {
 
 const td: React.CSSProperties = {
   padding: '5px 10px',
-  color: 'var(--text-primary, #E7E5E4)',
+  color: 'var(--text-primary)',
   whiteSpace: 'nowrap',
 }

@@ -13,9 +13,9 @@ interface NumericDisplayProps {
 
 // Tamaños de fuente por variante
 const SIZE_MAP: Record<NumericSize, number> = {
-  sm: 20,
-  md: 28,
-  lg: 36,
+  sm: 16,
+  md: 22,
+  lg: 28,
 }
 
 // Colores por estado — usan variables CSS del design system
@@ -26,17 +26,17 @@ const STATUS_COLOR: Record<NumericStatus, string> = {
   offline: 'var(--accent-off)',      // gris cálido
 }
 
-// Estilos de la tarjeta definidos a nivel de módulo (no por render)
-const cardStyle = {
-  background: 'var(--bg-surface)',
+// Estilos base de la tarjeta — border se calcula en render según status
+const cardBaseStyle = {
+  background: 'var(--bg-elevated)',
   borderRadius: 8,
-  padding: '12px 16px',
-  border: '1px solid var(--bg-elevated)',
-  display: 'inline-flex',
+  padding: '10px 14px',
+  display: 'flex',
   flexDirection: 'column' as const,
   alignItems: 'center',
   gap: 4,
-  minWidth: 80,
+  minWidth: 90,
+  position: 'relative' as const,
 }
 
 // Formatea el valor: entero → sin decimales, float → 1 decimal por defecto.
@@ -61,17 +61,30 @@ export default function NumericDisplay({
   const fontSize = SIZE_MAP[size]
   const valueColor = STATUS_COLOR[status]
 
+  const isLive = value !== null && value !== undefined && !Number.isNaN(value)
+  const borderColor = status === 'warn' ? 'color-mix(in srgb, var(--accent-warn) 30%, var(--bg-border))'
+    : status === 'alert' ? 'color-mix(in srgb, var(--accent-crit) 30%, var(--bg-border))'
+    : isLive ? 'color-mix(in srgb, var(--accent-info) 25%, var(--bg-border))'
+    : 'var(--bg-border)'
+
   return (
-    <div style={cardStyle} aria-label={label}>
-      {/* Label superior */}
-      <div style={{
-        fontFamily: 'var(--font-ui)',
-        fontSize: 9,
-        color: 'var(--text-muted)',
-        letterSpacing: '0.8px',
-        textTransform: 'uppercase' as const,
-      }}>
-        {label}
+    <div style={{ ...cardBaseStyle, border: `1px solid ${borderColor}` }} aria-label={label}>
+      {/* Live indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{
+          fontFamily: 'var(--font-ui)',
+          fontSize: 9,
+          color: 'var(--text-muted)',
+          letterSpacing: '0.8px',
+          textTransform: 'uppercase' as const,
+          textAlign: 'center' as const,
+          lineHeight: 1.35,
+          wordBreak: 'break-word' as const,
+          flex: 1,
+        }}>
+          {label}
+        </div>
+        {isLive && <span className="live-dot" />}
       </div>
 
       {/* Valor principal */}
@@ -88,9 +101,9 @@ export default function NumericDisplay({
       {/* Unidad */}
       <div style={{
         fontFamily: 'var(--font-data)',
-        fontSize: Math.round(fontSize * 0.35),
-        color: '#78716C',
-        marginTop: 4,
+        fontSize: Math.round(fontSize * 0.42),
+        color: 'var(--accent-off)',
+        marginTop: 2,
       }}>
         {unit}
       </div>

@@ -20,7 +20,7 @@ const sectionStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-base, #E7E5E4)',
+  color: 'var(--text-base)',
   border: '1px solid var(--bg-border)',
   borderRadius: 5,
   padding: '6px 10px',
@@ -75,7 +75,7 @@ export default function WorkCycleDefinitionsSection() {
   return (
     <div style={sectionStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--text-base, #E7E5E4)' }}>Ciclos de trabajo</h3>
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--text-base)' }}>Ciclos de trabajo</h3>
         <button
           onClick={() => setShowModal(true)}
           style={{ padding: '5px 12px', background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
@@ -105,7 +105,7 @@ export default function WorkCycleDefinitionsSection() {
               const isGlobal = d.tenant_id === null
               return (
                 <tr key={d.id} style={{ borderBottom: '1px solid var(--bg-elevated)' }}>
-                  <td style={{ padding: '5px 8px', color: 'var(--text-base, #E7E5E4)' }}>{d.name}</td>
+                  <td style={{ padding: '5px 8px', color: 'var(--text-base)' }}>{d.name}</td>
                   <td style={{ padding: '5px 8px', color: 'var(--accent-off)' }}>{vt?.name ?? d.vehicle_type_id.slice(0, 8)}</td>
                   <td style={{ padding: '5px 8px', color: 'var(--accent-energy)', fontFamily: 'var(--font-data)', fontSize: 11 }}>{d.trigger_type}</td>
                   <td style={{ padding: '5px 8px' }}>
@@ -189,7 +189,7 @@ export default function WorkCycleDefinitionsSection() {
               {modalError && <div style={{ color: 'var(--accent-crit)', fontSize: 12 }}>{modalError}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button type="button" onClick={() => { setShowModal(false); setModalError(null) }}
-                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}>
+                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-base)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}>
                   Cancelar
                 </button>
                 <button type="submit" disabled={createMutation.isPending}

@@ -11,7 +11,7 @@ vi.mock('../../../features/auth/useAuthStore', () => ({ useAuthStore: vi.fn() })
 import { apiClient } from '../../../lib/apiClient'
 import { useAuthStore } from '../../../features/auth/useAuthStore'
 
-const cmgUser = { user_id: 'u1', tenant_id: 't0', tenant_tier: 'cmg' as const, role: 'admin' as const, email: 'admin@cmg.es' }
+const cmgUser = { user_id: 'u1', tenant_id: 't0', tenant_tier: 'cmg' as const, role: 'admin' as const, email: 'admin@cmg.es', enabledModules: [] as string[], logoUrl: null, brandName: null, logout: vi.fn(), user: { user_id: 'u1', tenant_id: 't0', tenant_tier: 'cmg' as const, role: 'admin' as const, email: 'admin@cmg.es' } }
 const mockTenants: TenantOut[] = [
   { id: 't1', parent_id: 't0', tier: 'client', name: 'Wasterent', slug: 'wasterent', active: true, brand_name: null, brand_color: null, logo_url: null, custom_domain: null, brand_tokens: null, created_at: '2026-01-01T00:00:00Z' },
 ]

@@ -14,7 +14,7 @@ const TRIGGER_OPTIONS = [
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
   border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary, #E7E5E4)',
+  color: 'var(--text-primary)',
   borderRadius: 6,
   padding: '6px 10px',
   fontSize: 13,
@@ -44,7 +44,7 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-primary, #E7E5E4)',
+  color: 'var(--text-primary)',
   border: '1px solid var(--bg-border)',
   borderRadius: 6,
   padding: '7px 16px',
@@ -155,7 +155,7 @@ function FieldPicker({ label, schemaKeys, checked, custom, onCheckedChange, onCu
               display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer',
               padding: '3px 8px', borderRadius: 4, border: '1px solid var(--bg-border)',
               background: checked.has(k) ? 'rgba(249,115,22,0.12)' : 'var(--bg-elevated)',
-              color: checked.has(k) ? 'var(--accent-energy)' : 'var(--text-primary, #E7E5E4)',
+              color: checked.has(k) ? 'var(--accent-energy)' : 'var(--text-primary)',
             }}>
               <input type="checkbox" style={{ display: 'none' }} checked={checked.has(k)} onChange={() => toggle(k)} />
               {k}
@@ -322,7 +322,7 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
           onClick={e => { if (e.target === e.currentTarget) closeModal() }}
         >
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 520, maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary, #E7E5E4)' }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
               {editingDef === 'new' ? 'Nueva definición de ciclo' : 'Editar definición de ciclo'}
             </h3>
 

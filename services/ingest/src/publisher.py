@@ -36,7 +36,7 @@ async def publish_record(
         "speed_kmh": avl.speed_kmh,
         "heading": avl.heading,
         "altitude_m": avl.altitude_m,
-        "ignition": avl.io_elements.get(239, 0),
+        "ignition": 1 if (avl.io_elements.get(239, 0) == 1 or avl.io_elements.get(1, 0) == 1) else 0,
         "pto_active": avl.io_elements.get(179, 0),
         "ext_voltage_mv": avl.io_elements.get(66),
         "can_data": can_data,
@@ -59,7 +59,7 @@ async def _update_status_hash(
     """Escribe el hash vehicle:{vehicle_id}:status que lee el core-api."""
     lat = avl.latitude if avl.latitude and avl.latitude != 0 else None
     lon = avl.longitude if avl.longitude and avl.longitude != 0 else None
-    ignition = avl.io_elements.get(239, 0) == 1
+    ignition = (avl.io_elements.get(239, 0) == 1) or (avl.io_elements.get(1, 0) == 1)  # 239=ignition CAN, 1=DIN1
     pto_active = avl.io_elements.get(179, 0) == 1
 
     ext_voltage_mv = avl.io_elements.get(66)

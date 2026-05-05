@@ -2,9 +2,9 @@ name: CI — CMG Telematics
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   # ─── Backend tests ────────────────────────────────────────────────
@@ -105,7 +105,7 @@ jobs:
     name: Smoke Test (producción)
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
 
     steps:
       - uses: actions/checkout@v4

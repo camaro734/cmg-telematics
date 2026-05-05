@@ -1,32 +1,104 @@
+import { useEffect } from 'react'
 import { useFleetStore } from './useFleetStore'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
 import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleTypeOut, VehicleStatus } from '../../lib/types'
+
+export type VehicleState = 'moving' | 'idle' | 'offline' | 'alert'
+
+const CARD_PULSE_CSS = `
+@keyframes cmg-card-pulse {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+.cmg-card-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: cmg-card-pulse 1.5s ease-out infinite;
+}
+.cmg-card-pulse-dot {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.25);
+}
+`
+
+function injectCardPulseCSS() {
+  if (typeof document === 'undefined') return
+  if (document.getElementById('cmg-card-pulse-css')) return
+  const style = document.createElement('style')
+  style.id = 'cmg-card-pulse-css'
+  style.textContent = CARD_PULSE_CSS
+  document.head.appendChild(style)
+}
+
+const STATE_COLORS: Record<VehicleState, { dot: string; ring: string; border: string }> = {
+  moving:  { dot: 'var(--accent-ok)',   ring: 'rgba(34,197,94,0.45)',  border: 'var(--accent-ok)' },
+  idle:    { dot: 'var(--accent-warn)', ring: 'rgba(234,179,8,0.4)',   border: 'var(--accent-warn)' },
+  offline: { dot: 'var(--bg-border)',   ring: '',                       border: 'var(--bg-border)' },
+  alert:   { dot: 'var(--accent-crit)', ring: 'rgba(239,68,68,0.5)',   border: 'var(--accent-crit)' },
+}
+
+function StateDot({ state }: { state: VehicleState }) {
+  const { dot, ring } = STATE_COLORS[state]
+  const pulse = state !== 'offline'
+  return (
+    <div style={{ position: 'relative', width: 12, height: 12, flexShrink: 0 }}>
+      {pulse && ring && (
+        <div className="cmg-card-pulse-ring" style={{ background: ring }} />
+      )}
+      <div className="cmg-card-pulse-dot" style={{ background: dot }} />
+    </div>
+  )
+}
+
+function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { text: string; color: string } {
+  if (!status) return { text: 'Sin señal', color: 'var(--accent-crit)' }
+  switch (state) {
+    case 'moving':
+      return { text: `${Math.round(status.speed_kmh ?? 0)} km/h`, color: 'var(--accent-ok)' }
+    case 'idle':
+      return status.ignition
+        ? { text: 'Parado · motor ON', color: 'var(--accent-warn)' }
+        : { text: 'Parado', color: 'var(--accent-off)' }
+    case 'alert':
+      return { text: '⚠ Alerta', color: 'var(--accent-crit)' }
+    case 'offline': {
+      const ls = status.last_seen
+      if (!ls) return { text: 'Sin señal', color: 'var(--accent-crit)' }
+      const mins = Math.floor((Date.now() - new Date(ls).getTime()) / 60000)
+      if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--accent-crit)' }
+      return { text: `Sin señal · ${Math.floor(mins / 60)}h`, color: 'var(--accent-crit)' }
+    }
+  }
+}
 
 interface Props {
   vehicle: VehicleOut
   vehicleType: VehicleTypeOut | undefined
   status: VehicleStatus | undefined
   isSelected: boolean
+  vehicleState: VehicleState
 }
 
-export default function VehicleCard({ vehicle, vehicleType, status, isSelected }: Props) {
+export default function VehicleCard({ vehicle, vehicleType, status, isSelected, vehicleState }: Props) {
+  useEffect(() => { injectCardPulseCSS() }, [])
+
   const setSelected = useFleetStore(s => s.setSelected)
-  const online = status?.online ?? false
   const isMobile = useIsMobile()
 
-  const borderColor = isSelected
-    ? 'var(--accent-energy)'
-    : online ? 'var(--accent-ok)' : 'var(--bg-border)'
+  const { border } = STATE_COLORS[vehicleState]
+  const borderColor = isSelected ? 'var(--accent-energy)' : border
+  const online = vehicleState !== 'offline'
 
   const VehicleIcon = getVehicleIconForSlug(vehicleType?.slug ?? '')
+  const { text: labelText, color: labelColor } = stateLabel(vehicleState, status)
 
   const iconEl = vehicleType?.icon_url ? (
-    <img
-      src={vehicleType.icon_url}
-      alt={vehicleType.name}
-      style={{ maxHeight: isMobile ? 40 : 80, maxWidth: isMobile ? 60 : '100%', objectFit: 'contain' }}
-    />
+    <img src={vehicleType.icon_url} alt={vehicleType.name}
+      style={{ maxHeight: isMobile ? 40 : 80, maxWidth: isMobile ? 60 : '100%', objectFit: 'contain' }} />
   ) : (
     <VehicleIcon
       width={isMobile ? 48 : 96}
@@ -66,15 +138,10 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected }
             {vehicleType?.name ?? '—'}
           </div>
         </div>
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{
-            fontSize: 10, padding: '2px 8px', borderRadius: 10,
-            background: online ? 'color-mix(in srgb, var(--accent-ok) 20%, transparent)' : 'var(--bg-elevated)',
-            color: online ? 'var(--accent-ok)' : 'var(--text-muted)',
-            border: `1px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
-            fontWeight: 500,
-          }}>
-            {online ? 'Activo' : 'Inactivo'}
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <StateDot state={vehicleState} />
+          <span style={{ fontSize: 11, color: labelColor, fontWeight: 500, whiteSpace: 'nowrap' }}>
+            {labelText}
           </span>
         </div>
       </div>
@@ -101,6 +168,10 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected }
         userSelect: 'none',
       }}
     >
+      <div style={{ position: 'absolute', top: 8, right: 8 }}>
+        <StateDot state={vehicleState} />
+      </div>
+
       <div style={{
         height: 80,
         width: '100%',
@@ -116,7 +187,7 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected }
         marginTop: 6,
         fontSize: 12,
         fontFamily: 'var(--font-data)',
-        color: 'var(--text-default)',
+        color: 'var(--text-primary)',
         textAlign: 'center',
         lineHeight: 1.3,
         wordBreak: 'break-all',
@@ -126,14 +197,18 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected }
       </div>
 
       <div style={{
-        position: 'absolute',
-        bottom: 7,
-        right: 7,
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: online ? 'var(--accent-ok)' : 'var(--bg-border)',
-      }} />
+        marginTop: 4,
+        fontSize: 10,
+        color: labelColor,
+        textAlign: 'center',
+        width: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        paddingBottom: 2,
+      }}>
+        {labelText}
+      </div>
     </div>
   )
 }

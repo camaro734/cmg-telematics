@@ -45,6 +45,7 @@ export interface TrackPoint {
   time: string
   lat: number | null
   lon: number | null
+  speed_kmh?: number | null
 }
 
 export interface CommandLogEntry {
@@ -106,8 +107,10 @@ export interface SensorDef {
   alert_below?: number
   avl_id?: number
   scale?: number
+  offset?: number
   kpi_key?: string
   bit_index?: number
+  visible_in_detail?: boolean
 }
 
 export interface WsMessage {
@@ -130,6 +133,7 @@ export interface HistoricMetricItem {
   avl_id?: number
   chart_type?: 'line' | 'donut' | 'bar'
   show_in_pdf?: boolean
+  group?: string | null
 }
 
 export interface VehicleTypeOut {

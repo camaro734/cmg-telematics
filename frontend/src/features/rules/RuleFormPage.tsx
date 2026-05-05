@@ -151,7 +151,15 @@ export default function RuleFormPage() {
 
   return (
     <Shell title={isEdit ? 'Editar regla' : 'Nueva regla'}>
-      <div style={{ padding: 24, maxWidth: 640, overflowY: 'auto', height: '100%' }}>
+      <div style={{ 
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24
+      }}>
+      <div style={{ 
+        background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 12,
+        width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)', padding: 28
+      }}>
 
         {/* Identificación */}
         <div style={SECTION}>
@@ -283,6 +291,7 @@ export default function RuleFormPage() {
             Cancelar
           </button>
         </div>
+      </div>
       </div>
     </Shell>
   )

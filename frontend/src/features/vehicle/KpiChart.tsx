@@ -102,7 +102,7 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string; 
       borderRadius: 8, padding: '12px 14px', flex: 1, minWidth: 120,
     }}>
       <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-data)', color: accent ?? 'var(--text-default)' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-data)', color: accent ?? 'var(--text-primary)' }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
@@ -131,7 +131,11 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
 
   const { data: kpis = [], isLoading } = useQuery<KpiHour[]>({
     queryKey: [...keys.vehicleKpis(vehicleId), hours],
-    queryFn: () => apiClient.get<KpiHour[]>(`/api/v1/vehicles/${vehicleId}/kpis?hours=${hours}`),
+    queryFn: () => {
+      const endDate = new Date()
+      const startDate = new Date(endDate.getTime() - hours * 60 * 60 * 1000)
+      return apiClient.get<KpiHour[]>(`/api/v1/vehicles/${vehicleId}/kpis?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`)
+    },
     enabled: Boolean(vehicleId),
     staleTime: 60_000,
   })

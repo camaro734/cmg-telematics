@@ -51,6 +51,16 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             fields["payload"] if isinstance(fields, dict) and "payload" in fields
                             else fields[b"payload"]
                         )
+                        # Recalcular online según last_seen (< 5 min)
+                        from datetime import datetime, timezone
+                        last_seen_str = payload.get("last_seen")
+                        if last_seen_str:
+                            try:
+                                ls = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
+                                age_min = (datetime.now(timezone.utc) - ls).total_seconds() / 60
+                                payload["online"] = age_min < 5
+                            except Exception:
+                                pass
                         tenant_id = payload.get("tenant_id")
                         if tenant_id:
                             await manager.broadcast_to_tenant(

@@ -366,19 +366,6 @@ async def update_vehicle(
     return vehicle
 
 
-@router.get("/vehicles/{vehicle_id}", response_model=VehicleOut)
-async def get_vehicle(
-    vehicle_id: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
-    return vehicle
-
-
 @router.get("/vehicles/statuses", response_model=list[VehicleStatus])
 async def get_vehicles_statuses_bulk(
     ids: str = Query(..., description="UUIDs separados por coma, máx 200"),
@@ -517,6 +504,19 @@ async def get_vehicles_statuses_bulk(
         ))
 
     return statuses
+
+
+@router.get("/vehicles/{vehicle_id}", response_model=VehicleOut)
+async def get_vehicle(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+    _check_vehicle_access(vehicle, user)
+    return vehicle
 
 
 @router.get("/vehicles/{vehicle_id}/status", response_model=VehicleStatus)

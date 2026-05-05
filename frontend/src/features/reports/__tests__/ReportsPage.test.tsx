@@ -77,28 +77,23 @@ describe('ReportsPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('renderiza la página mostrando el HOME tab por defecto', () => {
+  it('renderiza la página mostrando el título Reportes', () => {
     wrap()
-    // HOME tab is default — shows fleet header
-    expect(screen.getByText(/Flota/)).toBeInTheDocument()
+    expect(screen.getByText('Reportes')).toBeInTheDocument()
   })
 
-  it('HOME tab muestra lista de vehículos', async () => {
+  it('muestra selector de vehículo con placeholder', () => {
     wrap(clientUser, [], mockVehicles)
-    await waitFor(() => expect(screen.getByText('WAS-001')).toBeInTheDocument())
-    expect(screen.getByText('WAS001')).toBeInTheDocument()
+    expect(screen.getByText('— Selecciona un vehículo —')).toBeInTheDocument()
   })
 
-  it('HOME tab muestra mensaje de flota vacía', async () => {
+  it('muestra mensaje de selección cuando no hay vehículo elegido', () => {
     wrap(clientUser, [], [])
-    await waitFor(() => expect(screen.getByText(/Sin vehículos/i)).toBeInTheDocument())
+    expect(screen.getByText(/Selecciona un vehículo para ver el histórico/i)).toBeInTheDocument()
   })
 
-  it('CMG admin ve selector de cliente en tab HISTÓRICO', async () => {
+  it('CMG admin ve selector de cliente en la barra', async () => {
     wrap(cmgUser, mockTenants)
-    // Switch to historico — the selector bar appears
-    const { useReportsTabStore } = await import('../useReportsTabStore')
-    useReportsTabStore.getState().setTab('historico')
     await waitFor(() => expect(screen.queryByText('— Cliente —')).toBeInTheDocument())
   })
 

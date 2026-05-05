@@ -120,13 +120,21 @@ async def _compute_progress(
             current = float(max(0, (datetime.now(timezone.utc) - baseline).days))
         elif t_type in _COUNTER_COLUMNS:
             col = _COUNTER_COLUMNS[t_type]
+            # Usar el mínimo entre el baseline del plan y el primer dato disponible
+            # para no perder datos históricos anteriores a la creación del plan
+            first_data_row = await db.execute(
+                text("SELECT MIN(bucket) FROM telemetry_1h WHERE vehicle_id = :vid"),
+                {"vid": plan.vehicle_id},
+            )
+            first_data = first_data_row.scalar_one_or_none()
+            effective_baseline = min(baseline, first_data) if first_data else baseline
             row = await db.execute(
                 text(
                     f"SELECT COALESCE(SUM({col}), 0) / 60.0 "
                     "FROM telemetry_1h "
                     "WHERE vehicle_id = :vid AND bucket >= :baseline"
                 ),
-                {"vid": plan.vehicle_id, "baseline": baseline},
+                {"vid": plan.vehicle_id, "baseline": effective_baseline},
             )
             current = float(row.scalar_one() or 0.0)
         else:

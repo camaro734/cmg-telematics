@@ -9,7 +9,7 @@ vi.mock('../../../lib/apiClient', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
 }))
 vi.mock('../../../features/auth/useAuthStore', () => ({
-  useAuthStore: vi.fn(() => ({ user: { role: 'admin', tenant_tier: 'client' } })),
+  useAuthStore: vi.fn(() => ({ user: { role: 'admin', tenant_tier: 'client' }, enabledModules: [], logoUrl: null, brandName: null, logout: vi.fn() })),
 }))
 
 import { apiClient } from '../../../lib/apiClient'

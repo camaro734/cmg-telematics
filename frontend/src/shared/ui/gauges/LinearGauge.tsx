@@ -19,7 +19,7 @@ const cardStyle = {
   borderRadius: 8,
   padding: 8,
   border: '1px solid var(--bg-elevated)',
-  display: 'inline-flex',
+  display: 'flex',
   flexDirection: 'column' as const,
   alignItems: 'center',
   gap: 6,
@@ -170,13 +170,17 @@ export default function LinearGauge({
 
   return (
     <div style={cardStyle} aria-label={label}>
-      {/* Label superior */}
+      {/* Label superior — permite wrap a 2 líneas */}
       <div style={{
         fontFamily: 'var(--font-ui)',
         fontSize: 9,
         color: 'var(--text-muted)',
         letterSpacing: '0.8px',
         textTransform: 'uppercase' as const,
+        textAlign: 'center' as const,
+        lineHeight: 1.35,
+        wordBreak: 'break-word' as const,
+        width: '100%',
       }}>
         {label}
       </div>

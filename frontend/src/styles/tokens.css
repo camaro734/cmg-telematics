@@ -24,7 +24,12 @@
   --gauge-crit:  #EF4444;
 
   --sidebar-w: 0px;
-  --topbar-h:  52px;
+  --topbar-h:  62px;
+  /* ── Compatibility aliases ─────────────────────────────────────────────── */
+  --accent:        var(--accent-energy);   /* shorthand */
+  --accent-orange: #F97316;               /* naranja CAN/PTO */
+  --text-default:  var(--text-primary);   /* alias (legacy) */
+  --text-base:     var(--text-primary);   /* alias (legacy) */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,6 +45,16 @@ html, body, #root {
 
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-ok);
+  animation: live-pulse 2s ease-in-out infinite;
+}
 input { font: inherit; }
 
 /* ── Responsive utilities ──────────────────────────────────────────────────── */
@@ -57,4 +72,34 @@ input { font: inherit; }
   html, body, #root {
     overflow-x: hidden;
   }
+}
+
+/* ── Escala tipográfica ─────────────────────────────────────────────────────
+   Nota: --text-base omitida (conflicto con alias legado de color)           */
+:root {
+  --text-xs:   10px;
+  --text-sm:   11px;
+  --text-md:   13px;
+  --text-lg:   14px;
+  --text-xl:   16px;
+  --text-2xl:  18px;
+  --text-3xl:  20px;
+  --text-4xl:  24px;
+
+  /* Escala de espaciado */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* Paleta de datos para gráficas */
+  --chart-1: #00C8C8;
+  --chart-2: #F97316;
+  --chart-3: #3B82F6;
+  --chart-4: #A78BFA;
+  --chart-5: #34D399;
+  --chart-6: #FB923C;
 }

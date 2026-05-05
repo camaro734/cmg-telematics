@@ -6,7 +6,8 @@ import KpiChart from '../KpiChart'
 
 function renderChart(kpis: unknown[] = []) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  queryClient.setQueryData(['vehicles', 'v1', 'kpis', 24], kpis)
+  // El componente usa period='semana' por defecto (168 horas)
+  queryClient.setQueryData(['vehicles', 'v1', 'kpis', 168], kpis)
   return render(
     <QueryClientProvider client={queryClient}>
       <KpiChart vehicleId="v1" />
@@ -17,14 +18,14 @@ function renderChart(kpis: unknown[] = []) {
 describe('KpiChart', () => {
   it('muestra "Sin datos" cuando no hay registros', () => {
     const { getByText } = renderChart([])
-    expect(getByText(/sin datos/i)).toBeInTheDocument()
+    expect(getByText(/Sin datos para el período seleccionado/i)).toBeInTheDocument()
   })
 
   it('muestra los botones de rango de tiempo', () => {
     const { getByText } = renderChart([])
     expect(getByText('24h')).toBeInTheDocument()
-    expect(getByText('7d')).toBeInTheDocument()
-    expect(getByText('30d')).toBeInTheDocument()
+    expect(getByText('7 días')).toBeInTheDocument()
+    expect(getByText('30 días')).toBeInTheDocument()
   })
 
   it('no muestra "Sin datos" cuando hay registros', () => {
@@ -43,13 +44,13 @@ describe('KpiChart', () => {
     // ResponsiveContainer usa ResizeObserver que jsdom no procesa de forma síncrona;
     // verificamos que el mensaje vacío no aparece cuando hay datos
     const { queryByText } = renderChart(kpis)
-    expect(queryByText(/sin datos/i)).not.toBeInTheDocument()
+    expect(queryByText(/Sin datos para el período seleccionado/i)).not.toBeInTheDocument()
   })
 
-  it('cambia el rango al hacer clic en 7d', async () => {
+  it('cambia el rango al hacer clic en 7 días', async () => {
     const user = userEvent.setup()
     const { getByText } = renderChart([])
-    const btn = getByText('7d')
+    const btn = getByText('7 días')
     await user.click(btn)
     expect(btn).toBeInTheDocument()
   })

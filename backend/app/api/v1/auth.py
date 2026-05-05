@@ -1,23 +1,26 @@
 # backend/app/api/v1/auth.py
 import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
 from app.core.database import get_db
 from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, CurrentUser
+from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutRequest, CurrentUser
 from app.api.v1.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _LOGIN_MAX_ATTEMPTS = 10
-_LOGIN_WINDOW_SECONDS = 60
+_LOGIN_WINDOW_SECONDS = 900  # 15 minutos
 
 
 async def _check_login_rate_limit(request: Request) -> None:
-    """Rate limit: máx 10 intentos de login por IP en 60 segundos."""
+    """Rate limit: máx 5 intentos de login por IP en 15 minutos."""
     redis = getattr(request.app.state, "redis", None)
     if redis is None:
         return
@@ -27,11 +30,23 @@ async def _check_login_rate_limit(request: Request) -> None:
     if count == 1:
         await redis.expire(key, _LOGIN_WINDOW_SECONDS)
     if count > _LOGIN_MAX_ATTEMPTS:
+        ttl = await redis.ttl(key)
+        retry_after = str(ttl) if ttl > 0 else str(_LOGIN_WINDOW_SECONDS)
+        minutes = max(1, int(ttl / 60) + 1) if ttl > 0 else 15
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiados intentos. Inténtalo de nuevo en 60 segundos.",
-            headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
+            detail=f"Demasiados intentos. Inténtalo de nuevo en {minutes} minuto{'s' if minutes != 1 else ''}.",
+            headers={"Retry-After": retry_after},
         )
+
+
+async def _check_jti_revoked(request: Request, jti: str | None) -> None:
+    """Lanza 401 si el JTI del refresh token está en la blacklist de Redis."""
+    if not jti:
+        return
+    redis = getattr(request.app.state, "redis", None)
+    if redis and await redis.exists(f"auth:revoked:{jti}"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revocado")
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -63,13 +78,15 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
         payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":
             raise ValueError("Not a refresh token")
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+
+    await _check_jti_revoked(request, payload.get("jti"))
 
     result = await db.execute(
         select(User).where(User.id == uuid.UUID(payload["sub"]), User.active == True)
@@ -97,6 +114,25 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
         brand_name=tenant_row2["brand_name"],
         enabled_modules=tenant_row2["enabled_modules"] or [],
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(request: Request, body: LogoutRequest):
+    """Revoca el refresh token añadiendo su JTI a la blacklist de Redis."""
+    try:
+        payload = decode_token(body.refresh_token)
+        if payload.get("type") != "refresh":
+            return
+    except ValueError:
+        return  # token ya expirado o inválido — nada que revocar
+
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    redis = getattr(request.app.state, "redis", None)
+    if redis and jti and exp:
+        ttl = int(exp - datetime.now(timezone.utc).timestamp())
+        if ttl > 0:
+            await redis.set(f"auth:revoked:{jti}", "1", ex=ttl)
 
 
 @router.get("/me")

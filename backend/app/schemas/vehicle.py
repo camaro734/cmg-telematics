@@ -22,6 +22,7 @@ class HistoricMetricItem(BaseModel):
     avl_id: int | None = None
     chart_type: Literal['line', 'donut', 'bar'] = 'line'
     show_in_pdf: bool = True
+    group: str | None = None  # métricas con el mismo grupo se muestran en un solo gráfico multi-serie
 
 
 ReportMetricItem = HistoricMetricItem
@@ -54,6 +55,7 @@ class VehicleOut(BaseModel):
     driver_name: str | None = None
     year: int | None = None
     active: bool
+    type_slug: str | None = None
     created_at: datetime
 
 

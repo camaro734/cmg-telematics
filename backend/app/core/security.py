@@ -1,4 +1,5 @@
 # backend/app/core/security.py
+import uuid as _uuid_lib
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, ExpiredSignatureError, jwt
 import bcrypt
@@ -26,6 +27,7 @@ def create_access_token(data: dict) -> str:
 
 def create_refresh_token(data: dict) -> str:
     payload = data.copy()
+    payload["jti"] = str(_uuid_lib.uuid4())
     payload["exp"] = datetime.now(timezone.utc) + timedelta(
         days=settings.refresh_token_expire_days
     )

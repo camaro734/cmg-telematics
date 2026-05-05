@@ -76,6 +76,25 @@ function polar(cx: number, cy: number, r: number, angleDeg: number) {
   }
 }
 
+// Divide un label largo en hasta 2 líneas para SVG
+function splitSvgLabel(text: string, maxCharsPerLine = 15): [string, string | null] {
+  const upper = text.toUpperCase()
+  if (upper.length <= maxCharsPerLine) return [upper, null]
+  // Buscar espacio cerca del punto medio
+  const mid = Math.ceil(upper.length / 2)
+  let breakAt = -1
+  for (let i = mid; i >= 1; i--) {
+    if (upper[i] === ' ') { breakAt = i; break }
+  }
+  if (breakAt === -1) {
+    for (let i = mid + 1; i < upper.length; i++) {
+      if (upper[i] === ' ') { breakAt = i; break }
+    }
+  }
+  if (breakAt === -1) return [upper.slice(0, maxCharsPerLine), upper.slice(maxCharsPerLine)]
+  return [upper.slice(0, breakAt), upper.slice(breakAt + 1)]
+}
+
 // Genera las marcas de escala como elementos SVG <line>
 function ScaleTicks({ cx, cy, r, strokeW }: { cx: number; cy: number; r: number; strokeW: number }) {
   const marks = []
@@ -91,7 +110,7 @@ function ScaleTicks({ cx, cy, r, strokeW }: { cx: number; cy: number; r: number;
         key={i}
         x1={inner.x.toFixed(2)} y1={inner.y.toFixed(2)}
         x2={outer.x.toFixed(2)} y2={outer.y.toFixed(2)}
-        stroke="#57534E"
+        stroke="var(--bg-border)"
         strokeWidth={1.5}
         strokeLinecap="round"
       />
@@ -168,7 +187,7 @@ export default function CircularGauge({
           <circle
             cx={cx} cy={cy} r={r}
             fill="none"
-            stroke="#3C3330"
+            stroke="var(--gauge-track)"
             strokeWidth={STROKE_W}
             strokeLinecap="round"
             strokeDasharray={`${arcLength.toFixed(2)} ${circumference.toFixed(2)}`}
@@ -220,7 +239,7 @@ export default function CircularGauge({
           x={cx} y={cy + 22}
           textAnchor="middle"
           fontSize="9"
-          fill="#78716C"
+          fill="var(--accent-off)"
           fontFamily="var(--font-data)"
         >
           {`/ ${max} ${unit}`}
@@ -231,7 +250,7 @@ export default function CircularGauge({
           x={minPos.x.toFixed(2)} y={(minPos.y + 3).toFixed(2)}
           textAnchor="middle"
           fontSize="9"
-          fill="#78716C"
+          fill="var(--accent-off)"
           fontFamily="var(--font-data)"
         >
           {min}
@@ -240,23 +259,32 @@ export default function CircularGauge({
           x={maxPos.x.toFixed(2)} y={(maxPos.y + 3).toFixed(2)}
           textAnchor="middle"
           fontSize="9"
-          fill="#78716C"
+          fill="var(--accent-off)"
           fontFamily="var(--font-data)"
         >
           {max}
         </text>
 
-        {/* ── Label del sensor (abajo, centrado) ── */}
-        <text
-          x={cx} y={VB - 8}
-          textAnchor="middle"
-          fontSize="8"
-          fill="#A8A29E"
-          fontFamily="var(--font-ui)"
-          letterSpacing="0.8"
-        >
-          {label.toUpperCase()}
-        </text>
+        {/* ── Label del sensor (abajo, 1 o 2 líneas) ── */}
+        {(() => {
+          const [line1, line2] = splitSvgLabel(label)
+          const textProps = {
+            textAnchor: 'middle' as const,
+            fontSize: '8',
+            fill: '#A8A29E',
+            fontFamily: 'var(--font-ui)',
+            letterSpacing: '0.8',
+          }
+          if (!line2) {
+            return <text x={cx} y={VB - 8} {...textProps}>{line1}</text>
+          }
+          return (
+            <>
+              <text x={cx} y={VB - 18} {...textProps}>{line1}</text>
+              <text x={cx} y={VB - 7} {...textProps}>{line2}</text>
+            </>
+          )
+        })()}
       </svg>
     </div>
   )

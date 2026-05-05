@@ -16,7 +16,7 @@ const sectionStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-base, #E7E5E4)',
+  color: 'var(--text-base)',
   border: '1px solid var(--bg-border)',
   borderRadius: 5,
   padding: '6px 10px',
@@ -116,7 +116,7 @@ export default function VehicleTypeSensorsSection() {
 
   return (
     <div style={sectionStyle}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--text-base, #E7E5E4)' }}>
+      <h3 style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--text-base)' }}>
         Sensores por tipo de vehículo
       </h3>
 
@@ -161,7 +161,7 @@ export default function VehicleTypeSensorsSection() {
                   <tbody>
                     {selectedType.sensor_schema.map(s => (
                       <tr key={s.key} style={{ borderBottom: '1px solid var(--bg-elevated)' }}>
-                        <td style={{ padding: '5px 8px', color: 'var(--text-base, #E7E5E4)' }}>{s.label}</td>
+                        <td style={{ padding: '5px 8px', color: 'var(--text-base)' }}>{s.label}</td>
                         <td style={{ padding: '5px 8px', color: 'var(--accent-energy)', fontFamily: 'var(--font-data)', fontSize: 11 }}>
                           {s.avl_id != null ? `avl_${s.avl_id}` : '—'}
                         </td>
@@ -299,7 +299,7 @@ export default function VehicleTypeSensorsSection() {
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); setModalError(null) }}
-                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
+                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-base)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>

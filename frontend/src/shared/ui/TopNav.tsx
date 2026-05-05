@@ -361,8 +361,8 @@ export default function TopNav() {
         }}
       >
         {logoUrl
-          ? <img src={logoUrl} alt="logo" style={{ height: isMobile ? 32 : 30, maxWidth: isMobile ? 120 : 160, objectFit: 'contain', display: 'block' }}/>
-          : <CmgMark size={28}/>
+          ? <img src={logoUrl} alt="logo" style={{ width: isMobile ? 130 : 160, height: isMobile ? 46 : 52, objectFit: 'contain', objectPosition: 'left center', display: 'block' }}/>
+          : <CmgMark size={40}/>
         }
       </button>
 
@@ -411,8 +411,31 @@ export default function TopNav() {
             flex: 1,
           }}>
             {onReports ? (
-              REPORTS_TABS.map(({ key, label }) => (
-                <button
+              <>
+                <NavLink
+                  to="/fleet"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '0 12px 0 4px',
+                    height: 'var(--topbar-h, 52px)',
+                    color: 'var(--text-muted)',
+                    textDecoration: 'none',
+                    fontSize: 13,
+                    borderRight: '1px solid var(--bg-border)',
+                    marginRight: 4,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'color 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-energy)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                >
+                  ← Flota
+                </NavLink>
+                {REPORTS_TABS.map(({ key, label }) => (
+                  <button
                   key={key}
                   onClick={() => setReportsTab(key)}
                   style={{
@@ -437,7 +460,8 @@ export default function TopNav() {
                 >
                   {label}
                 </button>
-              ))
+              ))}
+              </>
             ) : (
               visibleModules.map(({ key, label, Icon, to }) => (
                 <NavLink
