@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 
 interface Props { children: ReactNode; label?: string }
@@ -12,6 +13,7 @@ export class SectionErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(e: Error, info: ErrorInfo) {
     console.error(`[SectionErrorBoundary:${this.props.label}]`, e, info)
+    Sentry.captureException(e, { extra: { componentStack: info.componentStack, section: this.props.label } })
   }
 
   render() {
