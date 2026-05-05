@@ -10,8 +10,10 @@ from src.codec8 import AVLRecord
 logger = logging.getLogger(__name__)
 
 AVL_IGNITION = 239
+AVL_DIN1 = 1   # Ignición via entrada digital (fallback si no hay CAN)
 AVL_EXT_VOLTAGE = 66
 AVL_PTO = 179
+AVL_DIN2 = 2   # PTO via entrada digital
 
 
 async def write_record(
@@ -24,8 +26,8 @@ async def write_record(
     """Inserta un AVLRecord en telemetry_record."""
     ts = avl.datetime_utc
 
-    ignition = bool(avl.io_elements.get(AVL_IGNITION, 0))
-    pto_active = bool(avl.io_elements.get(AVL_PTO, 0))
+    ignition = bool(avl.io_elements.get(AVL_IGNITION, 0)) or bool(avl.io_elements.get(AVL_DIN1, 0))
+    pto_active = bool(avl.io_elements.get(AVL_PTO, 0)) or bool(avl.io_elements.get(AVL_DIN2, 0))
     ext_voltage_mv = avl.io_elements.get(AVL_EXT_VOLTAGE)
 
     known_avl_ids = {AVL_IGNITION, AVL_PTO, AVL_EXT_VOLTAGE}

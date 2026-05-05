@@ -94,7 +94,62 @@ async def update_vehicle_type_maintenance_templates(
     flag_modified(vtype, "maintenance_templates")
     await db.commit()
     await db.refresh(vtype)
+
+    # Auto-aplicar plantillas a vehículos existentes del tipo
+    await _apply_templates_to_vehicles(db, type_id, [t.model_dump() for t in body.templates])
+
     return vtype
+
+
+async def _apply_templates_to_vehicles(db: AsyncSession, type_id: uuid.UUID, templates: list) -> int:
+    """Crea MaintenancePlan para cada template en todos los vehículos activos del tipo."""
+    if not templates:
+        return 0
+    vehicles_result = await db.execute(
+        select(Vehicle).where(Vehicle.vehicle_type_id == type_id, Vehicle.active == True)
+    )
+    vehicles = vehicles_result.scalars().all()
+    created = 0
+    for vehicle in vehicles:
+        for tmpl in templates:
+            exists_result = await db.execute(
+                select(MaintenancePlan).where(
+                    MaintenancePlan.vehicle_id == vehicle.id,
+                    MaintenancePlan.name == tmpl["name"],
+                )
+            )
+            if exists_result.scalar_one_or_none():
+                continue
+            plan = MaintenancePlan(
+                vehicle_id=vehicle.id,
+                tenant_id=vehicle.tenant_id,
+                name=tmpl["name"],
+                trigger_condition={"thresholds": tmpl.get("thresholds", []), "op": "OR"},
+                warn_before_pct=tmpl.get("warn_before_pct", 10),
+                active=True,
+            )
+            db.add(plan)
+            created += 1
+    if created:
+        await db.commit()
+    return created
+
+
+@router.post("/vehicle-types/{type_id}/apply-maintenance-templates")
+async def apply_maintenance_templates(
+    type_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aplica las plantillas de mantenimiento del tipo a todos sus vehículos activos."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin")
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo no encontrado")
+    templates = vtype.maintenance_templates or []
+    created = await _apply_templates_to_vehicles(db, type_id, templates)
+    return {"created": created, "message": f"{created} plan(es) creado(s)"}
 
 
 class DoutConfigUpdate(BaseModel):
@@ -229,8 +284,15 @@ async def list_vehicles(
         query = query.where(Vehicle.tenant_id == user.tenant_id)
     elif tenant_id is not None:
         query = query.where(Vehicle.tenant_id == tenant_id)
-    result = await db.execute(query.order_by(Vehicle.name))
-    return result.scalars().all()
+    from sqlalchemy.orm import joinedload
+    result = await db.execute(query.options(joinedload(Vehicle.vehicle_type)).order_by(Vehicle.name))
+    vehicles = result.unique().scalars().all()
+    out = []
+    for v in vehicles:
+        d = VehicleOut.model_validate(v).model_dump()
+        d['type_slug'] = v.vehicle_type.slug if v.vehicle_type else None
+        out.append(d)
+    return out
 
 
 @router.post("/vehicles", response_model=VehicleOut, status_code=201)
@@ -317,6 +379,146 @@ async def get_vehicle(
     return vehicle
 
 
+@router.get("/vehicles/statuses", response_model=list[VehicleStatus])
+async def get_vehicles_statuses_bulk(
+    ids: str = Query(..., description="UUIDs separados por coma, máx 200"),
+    request: Request = None,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve el status en Redis de múltiples vehículos en una sola llamada."""
+    try:
+        vehicle_ids = [uuid.UUID(x.strip()) for x in ids.split(",")][:200]
+    except ValueError:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=400, detail="IDs inválidos — deben ser UUIDs válidos")
+
+    redis = request.app.state.redis
+
+    # Verificar acceso tenant para cada vehicle_id; omitir los no accesibles
+    accessible_ids: list[uuid.UUID] = []
+    for vid in vehicle_ids:
+        vehicle = await db.get(Vehicle, vid)
+        if not vehicle or not vehicle.active:
+            continue
+        try:
+            _check_vehicle_access(vehicle, user)
+            accessible_ids.append(vid)
+        except Exception:
+            continue
+
+    if not accessible_ids:
+        return []
+
+    # Leer Redis en pipeline: un hgetall por vehicle en una sola operación
+    try:
+        pipe = redis.pipeline()
+        for vid in accessible_ids:
+            pipe.hgetall(f"vehicle:{vid}:status")
+        pipeline_results = await pipe.execute()
+    except Exception:
+        logger.warning("Redis unavailable for bulk vehicle statuses")
+        return [VehicleStatus(vehicle_id=vid, online=False) for vid in accessible_ids]
+
+    def _parse_bool(val: str | None) -> bool | None:
+        if val is None:
+            return None
+        return val.lower() in ("true", "1", "yes")
+
+    def _parse_float(val: str | None) -> float | None:
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return None
+
+    def _parse_datetime(val: str | None) -> datetime | None:
+        if val is None:
+            return None
+        try:
+            return datetime.fromisoformat(val)
+        except (ValueError, TypeError):
+            return None
+
+    def _parse_json(val: str | None) -> dict | None:
+        if val is None:
+            return None
+        try:
+            return json.loads(val)
+        except (ValueError, TypeError):
+            return None
+
+    def _get(hash_data: dict, key: str) -> str | None:
+        raw = hash_data.get(key.encode()) if hash_data and isinstance(next(iter(hash_data), None), bytes) else hash_data.get(key)
+        if raw is None:
+            return None
+        return raw.decode() if isinstance(raw, bytes) else raw
+
+    # Obtener estados DOUT en pipeline también
+    try:
+        pipe2 = redis.pipeline()
+        for vid in accessible_ids:
+            pipe2.get(f"vehicle:{vid}:dout")
+        dout_results = await pipe2.execute()
+    except Exception:
+        dout_results = [None] * len(accessible_ids)
+
+    statuses: list[VehicleStatus] = []
+    for vid, hash_data, dout_raw in zip(accessible_ids, pipeline_results, dout_results):
+        if not hash_data:
+            # Sin datos en Redis → omitir del resultado
+            continue
+
+        ext_voltage_str = _get(hash_data, "ext_voltage_mv")
+        ext_voltage_mv = None
+        if ext_voltage_str:
+            try:
+                ext_voltage_mv = int(float(ext_voltage_str))
+            except (ValueError, TypeError):
+                pass
+
+        dout_state: dict[int, bool] = {}
+        if dout_raw:
+            try:
+                dout_state = {int(k): bool(v) for k, v in json.loads(dout_raw).items()}
+            except (ValueError, TypeError):
+                pass
+
+        can_str = _get(hash_data, "can_data")
+        can_data = _parse_json(can_str)
+        pto_str = _get(hash_data, "pto_active")
+        pto_active = _parse_bool(pto_str)
+
+        if not pto_active and can_data:
+            if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
+                pto_active = True
+
+        last_seen_str = _get(hash_data, "last_seen")
+        last_seen_dt = _parse_datetime(last_seen_str)
+        if last_seen_dt:
+            age_minutes = (datetime.now(timezone.utc) - last_seen_dt).total_seconds() / 60
+            effective_online = age_minutes < 5
+        else:
+            effective_online = False
+
+        statuses.append(VehicleStatus(
+            vehicle_id=vid,
+            online=effective_online,
+            last_seen=last_seen_dt,
+            lat=_parse_float(_get(hash_data, "lat")),
+            lon=_parse_float(_get(hash_data, "lon")),
+            speed_kmh=_parse_float(_get(hash_data, "speed_kmh")),
+            ignition=_parse_bool(_get(hash_data, "ignition")),
+            pto_active=pto_active,
+            ext_voltage_mv=ext_voltage_mv,
+            can_data=can_data,
+            dout_state=dout_state,
+        ))
+
+    return statuses
+
+
 @router.get("/vehicles/{vehicle_id}/status", response_model=VehicleStatus)
 async def get_vehicle_status(
     vehicle_id: uuid.UUID,
@@ -401,17 +603,36 @@ async def get_vehicle_status(
         except (ValueError, TypeError):
             pass
 
+    can_data = _parse_json(can_str)
+    pto_active = _parse_bool(pto_str)
+
+    # Fallback: si Redis tiene pto_active=false pero los AVL IDs de DIN2 (avl_2)
+    # o el canal CAN de PTO (avl_179) indican activo, corregimos el valor.
+    # Esto cubre el caso en que el hash de Redis fue escrito por una versión
+    # anterior del publisher que no calculaba pto_active correctamente.
+    if not pto_active and can_data:
+        if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
+            pto_active = True
+
+    # Recalcular online basado en last_seen (< 5 min = online real)
+    last_seen_dt = _parse_datetime(last_seen_str)
+    if last_seen_dt:
+        age_minutes = (datetime.now(timezone.utc) - last_seen_dt).total_seconds() / 60
+        effective_online = age_minutes < 5
+    else:
+        effective_online = False
+
     return VehicleStatus(
         vehicle_id=vehicle_id,
-        online=bool(_parse_bool(online_str)),
-        last_seen=_parse_datetime(last_seen_str),
+        online=effective_online,
+        last_seen=last_seen_dt,
         lat=_parse_float(lat_str),
         lon=_parse_float(lon_str),
         speed_kmh=_parse_float(speed_str),
         ignition=_parse_bool(ignition_str),
-        pto_active=_parse_bool(pto_str),
+        pto_active=pto_active,
         ext_voltage_mv=ext_voltage_mv,
-        can_data=_parse_json(can_str),
+        can_data=can_data,
         dout_state=dout_state,
     )
 
@@ -555,31 +776,40 @@ async def get_vehicle_track(
 async def get_vehicle_avl_series(
     vehicle_id: uuid.UUID,
     avl_id: int = Query(..., description="AVL ID a consultar (ej: 145)"),
-    hours: int = Query(24, ge=1, le=720),
+    hours: int = Query(168, ge=1, le=720),
+    start: datetime | None = None,
+    end: datetime | None = None,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Devuelve serie temporal de cualquier AVL ID desde telemetry_record.io_data."""
+    """Devuelve serie temporal de cualquier AVL ID desde telemetry_record.can_data."""
     vehicle = await db.get(Vehicle, vehicle_id)
     if not vehicle or not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     _check_vehicle_access(vehicle, user)
 
-    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    if start is not None and end is not None:
+        since = start
+        until = end
+    else:
+        until = datetime.now(timezone.utc)
+        since = until - timedelta(hours=hours)
+
     key = f"avl_{avl_id}"
 
     rows = await db.execute(
         text("""
             SELECT time AS bucket,
-                   (io_data->>:key)::numeric AS value
+                   (can_data->>:key)::numeric AS value
             FROM telemetry_record
             WHERE vehicle_id = :vid
               AND time >= :since
-              AND io_data ? :key
-              AND (io_data->>:key) IS NOT NULL
+              AND time <= :until
+              AND can_data ? :key
+              AND (can_data->>:key) IS NOT NULL
             ORDER BY time ASC
         """),
-        {"vid": str(vehicle_id), "key": key, "since": since},
+        {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
     )
     data = rows.fetchall()
     return [

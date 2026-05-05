@@ -2,6 +2,7 @@ import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
 import RequireAuth from './features/auth/RequireAuth'
+import { SectionErrorBoundary } from './shared/ui/SectionErrorBoundary'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -61,26 +62,26 @@ export default function App() {
             <ErrorBoundary>
             <Suspense fallback={<Loading />}>
               <Routes>
-                <Route path="fleet"        element={<FleetPage />} />
-                <Route path="vehicles/:id" element={<VehicleDetailPage />} />
-                <Route path="alerts"       element={<AlertsPage />} />
-                <Route path="settings"     element={<SettingsPage />} />
-                <Route path="rules"              element={<RulesPage />} />
-                <Route path="rules/new"          element={<RuleFormPage />} />
-                <Route path="rules/:id"          element={<RuleFormPage />} />
-                <Route path="maintenance"          element={<MaintenancePage />} />
-                <Route path="maintenance/new"      element={<MaintenancePlanFormPage />} />
-                <Route path="maintenance/:id"      element={<MaintenancePlanDetailPage />} />
-                <Route path="maintenance/:id/edit" element={<MaintenancePlanFormPage />} />
-                <Route path="clientes"          element={<TenantsPage />} />
-                <Route path="clientes/new"      element={<TenantFormPage />} />
-                <Route path="clientes/:id"      element={<TenantDetailPage />} />
-                <Route path="clientes/:id/edit" element={<TenantFormPage />} />
-                <Route path="reports"           element={<ReportsPage />} />
-                <Route path="vehiculos"         element={<VehiclesPage />} />
-                <Route path="tipos-vehiculo"   element={<VehicleTypesPage />} />
-                <Route path="devices"          element={<DevicesPage />} />
-                <Route path="can-scanner"      element={<CanScannerPage />} />
+                <Route path="fleet"        element={<SectionErrorBoundary label="Fleet"><FleetPage /></SectionErrorBoundary>} />
+                <Route path="vehicles/:id" element={<SectionErrorBoundary label="VehicleDetail"><VehicleDetailPage /></SectionErrorBoundary>} />
+                <Route path="alerts"       element={<SectionErrorBoundary label="Alerts"><AlertsPage /></SectionErrorBoundary>} />
+                <Route path="settings"     element={<SectionErrorBoundary label="Settings"><SettingsPage /></SectionErrorBoundary>} />
+                <Route path="rules"              element={<SectionErrorBoundary label="Rules"><RulesPage /></SectionErrorBoundary>} />
+                <Route path="rules/new"          element={<SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary>} />
+                <Route path="rules/:id"          element={<SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary>} />
+                <Route path="maintenance"          element={<SectionErrorBoundary label="Maintenance"><MaintenancePage /></SectionErrorBoundary>} />
+                <Route path="maintenance/new"      element={<SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary>} />
+                <Route path="maintenance/:id"      element={<SectionErrorBoundary label="MaintenanceDetail"><MaintenancePlanDetailPage /></SectionErrorBoundary>} />
+                <Route path="maintenance/:id/edit" element={<SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary>} />
+                <Route path="clientes"          element={<SectionErrorBoundary label="Clientes"><TenantsPage /></SectionErrorBoundary>} />
+                <Route path="clientes/new"      element={<SectionErrorBoundary label="ClienteForm"><TenantFormPage /></SectionErrorBoundary>} />
+                <Route path="clientes/:id"      element={<SectionErrorBoundary label="ClienteDetail"><TenantDetailPage /></SectionErrorBoundary>} />
+                <Route path="clientes/:id/edit" element={<SectionErrorBoundary label="ClienteForm"><TenantFormPage /></SectionErrorBoundary>} />
+                <Route path="reports"           element={<SectionErrorBoundary label="Reports"><ReportsPage /></SectionErrorBoundary>} />
+                <Route path="vehiculos"         element={<SectionErrorBoundary label="Vehiculos"><VehiclesPage /></SectionErrorBoundary>} />
+                <Route path="tipos-vehiculo"   element={<SectionErrorBoundary label="TiposVehiculo"><VehicleTypesPage /></SectionErrorBoundary>} />
+                <Route path="devices"          element={<SectionErrorBoundary label="Devices"><DevicesPage /></SectionErrorBoundary>} />
+                <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>
