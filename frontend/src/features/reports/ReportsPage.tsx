@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useIsMobile } from '../../lib/useIsMobile'
 import {
@@ -11,19 +11,15 @@ import L from 'leaflet'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import { useAuthStore } from '../auth/useAuthStore'
-import { useReportsTabStore } from './useReportsTabStore'
 import { exportToCsv } from '../../lib/csvExport'
+import { useReportData, periodToHours, PERIOD_LABELS } from './useReportData'
+import { SelectorBar, PdfDownloadBtn } from './ReportFilters'
+import type { Period } from './useReportData'
 import type {
-  TenantOut, VehicleOut, VehicleTypeOut, KpiHour,
+  VehicleTypeOut, KpiHour,
   AlertInstanceOut, MaintenancePlanOut, MaintenanceLogOut,
   TrackPoint, RuleOut,
 } from '../../lib/types'
-
-type Period = 'dia' | 'semana' | 'mes'
-
-const PERIOD_HOURS: Record<Period, number> = { dia: 24, semana: 168, mes: 720 }
-const PERIOD_LABELS: Record<Period, string> = { dia: 'Último día', semana: 'Última semana', mes: 'Último mes' }
 
 // ── Style constants ───────────────────────────────────────────────────────────
 
@@ -41,18 +37,21 @@ const thStyle: React.CSSProperties = {
 
 const tdStyle: React.CSSProperties = {
   padding: '6px 8px', fontSize: 12,
-  color: 'var(--text-default)', borderBottom: '1px solid var(--bg-border)',
+  color: 'var(--text-primary)', borderBottom: '1px solid var(--bg-border)',
 }
 
 const btnSecondary: React.CSSProperties = {
   padding: '5px 12px', fontSize: 12, fontWeight: 600,
   fontFamily: 'var(--font-ui)', border: '1px solid var(--bg-border)',
   borderRadius: 6, cursor: 'pointer',
-  background: 'var(--bg-elevated)', color: 'var(--text-default)',
+  background: 'var(--bg-elevated)', color: 'var(--text-primary)',
   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
 }
 
 const CHART_COLORS = ['#F97316', '#22C55E', '#38BDF8', '#EAB308', '#A78BFA']
+
+// Paleta para gráficos multi-serie agrupados
+const GROUP_COLORS = ['#F97316', '#38BDF8', '#22C55E', '#EAB308', '#EF4444', '#A78BFA']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +136,25 @@ function buildMultiSeriesData(
     .map(([label, vals]) => ({ label, ...vals } as Record<string, string | number>))
 }
 
+/**
+ * Merge múltiples series de {label, value} en un array combinado por label (outer join).
+ * Devuelve [{label, key1: val, key2: val, ...}]
+ */
+function mergeSeriesByLabel(
+  series: { key: string; data: { label: string; value: number }[] }[],
+): Record<string, string | number>[] {
+  const labelMap = new Map<string, Record<string, number>>()
+  for (const s of series) {
+    for (const pt of s.data) {
+      if (!labelMap.has(pt.label)) labelMap.set(pt.label, {})
+      labelMap.get(pt.label)![s.key] = pt.value
+    }
+  }
+  return Array.from(labelMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, vals]) => ({ label, ...vals } as Record<string, string | number>))
+}
+
 function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000
   const toRad = (d: number) => d * Math.PI / 180
@@ -146,212 +164,13 @@ function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): num
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function SelectorBar({
-  isCmg, tenants, tenantId, setTenantId,
-  vehicles, vehicleId, setVehicleId,
-  period, setPeriod, pdfSlot, onBack,
-}: {
-  isCmg: boolean
-  tenants: TenantOut[]
-  tenantId: string
-  setTenantId: (v: string) => void
-  vehicles: VehicleOut[]
-  vehicleId: string
-  setVehicleId: (v: string) => void
-  period: Period
-  setPeriod: (p: Period) => void
-  pdfSlot?: React.ReactNode
-  onBack?: () => void
-}) {
-  const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px',
-    color: 'var(--text-default)',
-  }
-  const periodBtn = (p: Period): React.CSSProperties => ({
-    padding: '5px 14px', fontSize: 12, fontWeight: 600,
-    fontFamily: 'var(--font-ui)', border: '1px solid var(--bg-border)',
-    borderRadius: 20, cursor: 'pointer',
-    background: period === p ? 'var(--accent-energy)' : 'transparent',
-    color: period === p ? '#fff' : 'var(--text-muted)',
-    transition: 'background 0.15s',
-  })
-
-  return (
-    <div style={{
-      padding: '12px 20px',
-      borderBottom: '1px solid var(--bg-border)',
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      flexWrap: 'wrap',
-    }}>
-      {onBack && (
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none',
-            border: '1px solid var(--bg-border)',
-            borderRadius: 6,
-            padding: '4px 10px',
-            fontSize: 12,
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            flexShrink: 0,
-          }}
-        >
-          ‹ Volver
-        </button>
-      )}
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-default)', marginRight: 4, letterSpacing: '-0.01em' }}>
-        Reportes
-      </div>
-
-      {isCmg && (
-        <select
-          value={tenantId}
-          onChange={e => { setTenantId(e.target.value); setVehicleId('') }}
-          style={{ ...selStyle, color: tenantId ? 'var(--text-default)' : 'var(--text-muted)' }}
-        >
-          <option value="">— Cliente —</option>
-          {tenants.filter(t => t.tier !== 'cmg').map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-      )}
-
-      <select
-        value={vehicleId}
-        onChange={e => setVehicleId(e.target.value)}
-        style={{ ...selStyle, color: vehicleId ? 'var(--text-default)' : 'var(--text-muted)', minWidth: 180 }}
-      >
-        <option value="">— Selecciona un vehículo —</option>
-        {vehicles.map(v => (
-          <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
-        ))}
-      </select>
-
-      <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
-        {(['dia', 'semana', 'mes'] as Period[]).map(p => (
-          <button key={p} style={periodBtn(p)} onClick={() => setPeriod(p)}>
-            {p === 'dia' ? 'Día' : p === 'semana' ? 'Semana' : 'Mes'}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ marginLeft: 'auto' }}>{pdfSlot}</div>
-    </div>
-  )
-}
-
-// ── PDF Download button ───────────────────────────────────────────────────────
-
-function PdfDownloadBtn({
-  vehicleId, vehicles, isCmg, tenantId,
-}: {
-  vehicleId: string
-  vehicles: VehicleOut[]
-  isCmg: boolean
-  tenantId: string
-}) {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
-
-  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
-  const months = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-  ]
-
-  async function download() {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ year: String(year), month: String(month) })
-      if (vehicleId) params.append('vehicle_ids', vehicleId)
-      if (isCmg && tenantId) params.append('tenant_id', tenantId)
-      const blob = await apiClient.getBlob(`/api/v1/reports/monthly?${params}`)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `informe-${year}-${String(month).padStart(2, '0')}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-      setOpen(false)
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Error al generar el informe')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--text-default)',
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <button style={{ ...btnSecondary, color: 'var(--accent-energy)', borderColor: 'var(--accent-energy)' }} onClick={() => setOpen(o => !o)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Informe PDF
-      </button>
-      {open && (
-        <div style={{
-          position: 'absolute', right: 0, top: '110%', zIndex: 100,
-          background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-          borderRadius: 8, padding: 14, minWidth: 240, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-default)' }}>Selecciona período</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selStyle, flex: 1 }}>
-              {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-            </select>
-            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selStyle}>
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            {vehicleId
-              ? `Vehículo: ${vehicles.find(v => v.id === vehicleId)?.name ?? vehicleId}`
-              : 'Todos los vehículos del tenant'}
-          </div>
-          <button
-            style={{
-              ...btnSecondary, justifyContent: 'center',
-              background: 'var(--accent-energy)', color: '#fff',
-              border: 'none', opacity: loading ? 0.6 : 1,
-            }}
-            onClick={download}
-            disabled={loading}
-          >
-            {loading ? 'Generando…' : '⬇ Descargar PDF'}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div style={{ ...card, flex: 1, minWidth: 130, position: 'relative', overflow: 'hidden' }}>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, color: accent ?? 'var(--text-default)', fontFamily: 'var(--font-data)', letterSpacing: '-0.02em' }}>
+      <div style={{ fontSize: 26, fontWeight: 700, color: accent ?? 'var(--text-primary)', fontFamily: 'var(--font-data)', letterSpacing: '-0.02em' }}>
         {value}
       </div>
       {accent && (
@@ -364,19 +183,34 @@ function KpiCard({ label, value, accent }: { label: string; value: string; accen
 // ── HISTÓRICO tab ─────────────────────────────────────────────────────────────
 
 function HistoricoTab({
-  vehicleId, vehicleTypeId, vehicleTypes, period,
+  vehicleId, vehicleTypeId, vehicleTypes, period, customFrom, customTo,
 }: {
   vehicleId: string
   vehicleTypeId: string
   vehicleTypes: VehicleTypeOut[]
   period: Period
+  customFrom?: string
+  customTo?: string
 }) {
   const isMobile = useIsMobile()
-  const hours = PERIOD_HOURS[period]
+  const hours = periodToHours(period, customFrom ?? '', customTo ?? '')
+
+  const customQuerySuffix = period === 'custom' ? `${customFrom}_${customTo}` : hours
 
   const { data: kpis = [] } = useQuery<KpiHour[]>({
-    queryKey: [...keys.vehicleKpis(vehicleId), hours],
-    queryFn: () => apiClient.get<KpiHour[]>(`/api/v1/vehicles/${vehicleId}/kpis?hours=${hours}`),
+    queryKey: [...keys.vehicleKpis(vehicleId), customQuerySuffix],
+    queryFn: () => {
+      if (period === 'custom' && customFrom && customTo) {
+        const start = encodeURIComponent(new Date(customFrom + 'T00:00:00').toISOString())
+        const end = encodeURIComponent(new Date(customTo + 'T23:59:59').toISOString())
+        return apiClient.get<KpiHour[]>(`/api/v1/vehicles/${vehicleId}/kpis?start=${start}&end=${end}`)
+      }
+      const endDate = new Date()
+      const startDate = new Date(endDate.getTime() - hours * 60 * 60 * 1000)
+      const startISO = encodeURIComponent(startDate.toISOString())
+      const endISO = encodeURIComponent(endDate.toISOString())
+      return apiClient.get<KpiHour[]>(`/api/v1/vehicles/${vehicleId}/kpis?start=${startISO}&end=${endISO}`)
+    },
     enabled: Boolean(vehicleId),
     staleTime: 60_000,
   })
@@ -384,18 +218,29 @@ function HistoricoTab({
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicleTypeId)
   const metrics = vehicleType?.historic_metrics ?? []
 
-  // Cargar series AVL — una sola query con todos los AVL IDs (evita hooks en bucle)
-  const avlMetrics = metrics.filter(m => m.avl_id !== undefined && m.avl_id !== null)
+  // KpiHour column names — estas métricas vienen de telemetry_1h, nunca de avl-series
+  const KPI_HOUR_KEYS = new Set(['engine_on_minutes', 'pto_active_minutes', 'avg_pressure_1', 'max_pressure_1', 'avg_oil_temp', 'max_oil_temp', 'record_count'])
+
+  // Cargar series AVL — excluir columnas KPI conocidas aunque tengan avl_id configurado
+  const avlMetrics = metrics.filter(m => m.avl_id !== undefined && m.avl_id !== null && !KPI_HOUR_KEYS.has(m.key))
   const avlIds = avlMetrics.map(m => m.avl_id!)
 
   const { data: avlSeriesRaw } = useQuery<Record<string, {bucket: string; value: number | null}[]>>({
-    queryKey: ['avl-series-multi', vehicleId, avlIds.join(','), hours],
+    queryKey: ['avl-series-multi', vehicleId, avlIds.join(','), customQuerySuffix],
     queryFn: async () => {
       if (!avlIds.length) return {}
       const results: Record<string, {bucket: string; value: number | null}[]> = {}
       await Promise.all(avlIds.map(async avlId => {
         try {
-          results[avlId] = await apiClient.get(`/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${avlId}&hours=${hours}`)
+          if (period === 'custom' && customFrom && customTo) {
+            const start = encodeURIComponent(new Date(customFrom + 'T00:00:00').toISOString())
+            const end = encodeURIComponent(new Date(customTo + 'T23:59:59').toISOString())
+            results[avlId] = await apiClient.get(`/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${avlId}&start=${start}&end=${end}`)
+          } else {
+            const endD = new Date()
+            const startD = new Date(endD.getTime() - hours * 60 * 60 * 1000)
+            results[avlId] = await apiClient.get(`/api/v1/vehicles/${vehicleId}/avl-series?avl_id=${avlId}&start=${encodeURIComponent(startD.toISOString())}&end=${encodeURIComponent(endD.toISOString())}`)
+          }
         } catch { results[avlId] = [] }
       }))
       return results
@@ -480,11 +325,11 @@ function HistoricoTab({
       ? [{ key: 'pto_active_minutes', label: 'H. PTO', color: '#F97316', unit: 'min', transform: 1 }]
       : []),
   ]
-  // Para métricas con avl_id, usar datos AVL directos; para el resto, usar KPIs
-  const kpiLineMetrics = allLineMetrics.filter(m => !(m as any).avl_id)
-  const avlLineMetrics = allLineMetrics.filter(m => (m as any).avl_id !== undefined)
+  // KpiHour columns always use kpis[], even if avl_id is set in the metric config
+  const kpiLineMetrics = allLineMetrics.filter(m => KPI_HOUR_KEYS.has(m.key) || !(m as any).avl_id)
+  const avlLineMetrics = allLineMetrics.filter(m => !KPI_HOUR_KEYS.has(m.key) && (m as any).avl_id !== undefined)
   const lineData = buildMultiSeriesData(kpis, period, kpiLineMetrics)
-  // Datos individuales por cada métrica AVL personalizada
+  // Datos individuales por cada métrica AVL — se usan para agrupación o gráfico solitario
   const avlLineData = avlLineMetrics.map(m => ({
     metric: m,
     data: buildAvlSeriesData(
@@ -494,6 +339,26 @@ function HistoricoTab({
       m.transform ?? 1,
     ),
   }))
+
+  // Agrupar métricas AVL por campo group
+  // Métricas con group definido y no vacío → gráfico combinado
+  // Métricas sin group → gráfico individual (comportamiento anterior)
+  type AvlLineDataItem = typeof avlLineData[number]
+  const avlGrouped = (() => {
+    const groups = new Map<string, AvlLineDataItem[]>()
+    const singles: AvlLineDataItem[] = []
+    for (const item of avlLineData) {
+      const grp = (item.metric as any).group
+      if (grp && typeof grp === 'string' && grp.trim()) {
+        const key = grp.trim()
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key)!.push(item)
+      } else {
+        singles.push(item)
+      }
+    }
+    return { groups, singles }
+  })()
 
   const tooltipStyle = {
     contentStyle: {
@@ -519,7 +384,7 @@ function HistoricoTab({
       {/* Export + multi-series line chart */}
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-default)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
             Desempeño histórico — {PERIOD_LABELS[period]}
           </div>
           <button style={btnSecondary} onClick={handleCsvExport} disabled={kpis.length === 0}>
@@ -545,8 +410,8 @@ function HistoricoTab({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData} margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716C' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#78716C' }} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
                 {kpiLineMetrics.map((m, i) => (
@@ -572,7 +437,7 @@ function HistoricoTab({
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
 
           <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-default)', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
               Motor vs PTO
             </div>
             <div style={{ height: isMobile ? 150 : 200 }}>
@@ -600,7 +465,7 @@ function HistoricoTab({
           </div>
 
           <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-default)', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
               Distribución del tiempo
             </div>
             <div style={{ height: isMobile ? 150 : 200 }}>
@@ -630,10 +495,68 @@ function HistoricoTab({
         </div>
       )}
 
-      {/* Gráficos de línea para métricas AVL personalizadas */}
-      {avlLineData.map(({ metric, data }) => (
+      {/* Gráficos de línea para métricas AVL agrupadas (multi-serie) */}
+      {Array.from(avlGrouped.groups.entries()).map(([groupName, items]) => {
+        const mergedData = mergeSeriesByLabel(
+          items.map(it => ({ key: it.metric.key, data: it.data }))
+        )
+        const hasData = mergedData.length > 0
+        const title = items.map(it => it.metric.label).join(' / ')
+        const firstUnit = items[0]?.metric.unit ?? ''
+        const allSameUnit = items.every(it => it.metric.unit === firstUnit)
+        return (
+          <div key={groupName} style={card}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
+              {title}{allSameUnit && firstUnit ? ` (${firstUnit})` : ''} — {PERIOD_LABELS[period]}
+            </div>
+            {!hasData ? (
+              <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                Sin datos para este período
+              </div>
+            ) : (
+              <div style={{ height: isMobile ? 160 : 240 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={mergedData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: 'var(--accent-off)' }}
+                      unit={allSameUnit && firstUnit ? ` ${firstUnit}` : undefined}
+                    />
+                    <Tooltip
+                      {...tooltipStyle}
+                      formatter={(v: number, name: string) => {
+                        const item = items.find(it => it.metric.key === name)
+                        const unit = item?.metric.unit ?? ''
+                        const label = item?.metric.label ?? name
+                        return [`${v}${unit ? ' ' + unit : ''}`, label]
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                    {items.map((it, i) => (
+                      <Line
+                        key={it.metric.key}
+                        type="monotone"
+                        dataKey={it.metric.key}
+                        name={it.metric.label}
+                        stroke={(it.metric as any).color || GROUP_COLORS[i % GROUP_COLORS.length]}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Gráficos de línea para métricas AVL individuales (sin group) */}
+      {avlGrouped.singles.map(({ metric, data }) => (
         <div key={metric.key} style={card}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-default)', marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
             {metric.label}{metric.unit ? ` (${metric.unit})` : ''} — {PERIOD_LABELS[period]}
           </div>
           {data.length === 0 ? (
@@ -645,8 +568,8 @@ function HistoricoTab({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#78716C' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#78716C' }} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
                   <Tooltip
                     {...tooltipStyle}
                     formatter={(v: number) => [`${v}${metric.unit ? ' ' + metric.unit : ''}`, metric.label]}
@@ -669,7 +592,7 @@ function HistoricoTab({
       {/* Configurable donut charts — metrics with chart_type='donut' */}
       {donutMetrics.length > 0 && customDonutData.length > 0 && (
         <div style={card}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-default)', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
             Distribución de actividades
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(donutMetrics.length, 3)}, 1fr)`, gap: 12 }}>
@@ -697,7 +620,7 @@ function HistoricoTab({
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-default)', textAlign: 'center' }}>{d.name}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', textAlign: 'center' }}>{d.name}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-data)', color: d.color }}>
                   {d.value} <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{d.unit}</span>
                 </div>
@@ -767,8 +690,14 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, height: isMobile ? undefined : '100%' }}>
 
       <div style={{ ...card, width: isMobile ? '100%' : 210, flexShrink: 0, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-border)', fontSize: 12, fontWeight: 600, color: 'var(--text-default)' }}>
-          Planes de mantenimiento
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-border)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Planes de mantenimiento</span>
+          <Link
+            to="/maintenance"
+            style={{ fontSize: 11, color: 'var(--accent-energy)', textDecoration: 'none', whiteSpace: 'nowrap', marginLeft: 8 }}
+          >
+            Ver todo →
+          </Link>
         </div>
         {plans.length === 0 ? (
           <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)' }}>Sin planes</div>
@@ -784,7 +713,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                   display: 'flex', flexDirection: 'column', gap: 4,
                 }}
               >
-                <span style={{ fontSize: 12, color: 'var(--text-default)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
                   {p.name}
                 </span>
                 <StatusBadge status={p.progress.status} />
@@ -801,7 +730,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-default)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
               {selectedPlan.name} — Historial de intervenciones
             </div>
             {allLogs.length === 0 ? (
@@ -863,7 +792,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
                     {typeLabel[t.type] ?? t.type}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-default)', fontFamily: 'var(--font-data)', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-data)', marginBottom: 6 }}>
                     {Math.round(t.current)} / {t.limit}
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
@@ -926,7 +855,7 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
     L.polyline(latlngs, { color: '#10b981', weight: 4, opacity: 0.9 }).addTo(map)
 
     L.circleMarker(latlngs[0], {
-      radius: 7, fillColor: '#22C55E', color: '#fff', weight: 2, fillOpacity: 1,
+      radius: 7, fillColor: '#22C55E', color: '#fff', weight: 2, fillOpacity: 1,  // T_OK
     }).bindTooltip('Inicio').addTo(map)
 
     L.circleMarker(latlngs[latlngs.length - 1], {
@@ -973,7 +902,7 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
           style={{
             fontSize: 12, background: 'var(--bg-elevated)',
             border: '1px solid var(--bg-border)', borderRadius: 5,
-            padding: '5px 8px', color: 'var(--text-default)',
+            padding: '5px 8px', color: 'var(--text-primary)',
           }}
         />
         {isFetching && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Cargando…</span>}
@@ -1009,8 +938,8 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
             borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)',
             display: 'flex', flexDirection: 'column', gap: 4, backdropFilter: 'blur(4px)',
           }}>
-            <span style={{ color: '#22C55E' }}>● Inicio</span>
-            <span style={{ color: '#38BDF8' }}>● Fin</span>
+            <span style={{ color: 'var(--accent-ok)' }}>● Inicio</span>
+            <span style={{ color: 'var(--accent-info)' }}>● Fin</span>
             <span style={{ color: 'var(--text-muted)', marginTop: 2 }}>{validPoints.length} puntos GPS</span>
           </div>
         </div>
@@ -1029,7 +958,7 @@ function StatChip({ icon, label, value }: { icon: string; label: string; value: 
       <span style={{ fontSize: 13 }}>{icon}</span>
       <div>
         <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-data)', color: 'var(--text-default)' }}>{value}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-data)', color: 'var(--text-primary)' }}>{value}</div>
       </div>
     </div>
   )
@@ -1199,60 +1128,17 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const user = useAuthStore(s => s.user)
-  const isCmg = user?.tenant_tier === 'cmg'
-  const location = useLocation()
-  const navigate = useNavigate()
-
-  const { tab, setTab } = useReportsTabStore()
-  const [period, setPeriod] = useState<Period>('semana')
-  const [vehicleId, setVehicleId] = useState('')
-  const [tenantId, setTenantId] = useState('')
-
-  const fromVehicleId = useRef(
-    (location.state as { vehicleId?: string } | null)?.vehicleId ?? null
-  ).current
-
-  // Initialize from navigation state (e.g. from VehicleDetailPage quick-access cards)
-  useEffect(() => {
-    const state = location.state as { vehicleId?: string; tab?: string; tenantId?: string } | null
-    if (state?.tenantId) setTenantId(state.tenantId)
-    if (state?.vehicleId) setVehicleId(state.vehicleId)
-    if (state?.tab && ['historico', 'mantenimiento', 'rutas', 'alertas'].includes(state.tab)) {
-      setTab(state.tab as Parameters<typeof setTab>[0])
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ── Queries ───────────────────────────────────────────────────────────────
-
-  const { data: tenants = [] } = useQuery<TenantOut[]>({
-    queryKey: keys.tenants(),
-    queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants'),
-    enabled: isCmg,
-    staleTime: 60_000,
-  })
-
-  const effectiveTenantId = isCmg ? tenantId : (user?.tenant_id ?? '')
-
-  const { data: vehicles = [] } = useQuery<VehicleOut[]>({
-    queryKey: isCmg ? keys.vehiclesByTenant(effectiveTenantId) : keys.vehicles(),
-    queryFn: () => isCmg
-      ? apiClient.get<VehicleOut[]>(`/api/v1/vehicles?tenant_id=${effectiveTenantId}`)
-      : apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
-    enabled: !isCmg || Boolean(effectiveTenantId),
-    staleTime: 60_000,
-  })
-
-  const { data: vehicleTypes = [] } = useQuery<VehicleTypeOut[]>({
-    queryKey: keys.vehicleTypes(),
-    queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
-    staleTime: 300_000,
-  })
-
-  const selectedVehicle = vehicles.find(v => v.id === vehicleId)
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  const {
+    isCmg, navigate, fromVehicleId,
+    period, setPeriod,
+    vehicleId, setVehicleId,
+    tenantId, setTenantId,
+    customFrom, setCustomFrom,
+    customTo, setCustomTo,
+    tab,
+    tenants, vehicles, vehicleTypes,
+    selectedVehicle,
+  } = useReportData()
 
   return (
     <Shell title="Reportes">
@@ -1268,6 +1154,10 @@ export default function ReportsPage() {
           setVehicleId={setVehicleId}
           period={period}
           setPeriod={setPeriod}
+          customFrom={customFrom}
+          customTo={customTo}
+          setCustomFrom={setCustomFrom}
+          setCustomTo={setCustomTo}
           onBack={fromVehicleId ? () => navigate(-1) : undefined}
           pdfSlot={
             <PdfDownloadBtn
@@ -1286,6 +1176,8 @@ export default function ReportsPage() {
               vehicleTypeId={selectedVehicle?.vehicle_type_id ?? ''}
               vehicleTypes={vehicleTypes}
               period={period}
+              customFrom={customFrom}
+              customTo={customTo}
             />
           )}
           {tab === 'mantenimiento' && (
