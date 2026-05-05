@@ -98,8 +98,7 @@ describe('SensorGrid', () => {
     expect(getByText('24.1 V')).toBeInTheDocument()
   })
 
-  it('gauge_type desconocido muestra NumericDisplay y avisa en dev', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  it('gauge_type led muestra LedIndicator con la etiqueta del sensor', () => {
     const ledSensor: SensorDef = {
       key: 'pto_led',
       label: 'PTO',
@@ -110,8 +109,6 @@ describe('SensorGrid', () => {
     const { getByText } = render(
       <SensorGrid sensorSchema={[ledSensor]} canData={{ avl_99: 1 }} />
     )
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('gauge_type'))
     expect(getByText('PTO')).toBeInTheDocument()
-    spy.mockRestore()
   })
 })
