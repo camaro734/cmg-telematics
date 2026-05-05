@@ -141,12 +141,6 @@ export default function VehicleDetailPage() {
     p => p.progress.status === 'vencido' || p.progress.status === 'próximo'
   ).length
 
-  const { data: kpis30 = [] } = useQuery<KpiHour[]>({
-    queryKey: [...keys.vehicleKpis(id ?? ''), 720],
-    queryFn: () => { const e=new Date(); const s=new Date(e.getTime()-720*3600000); return apiClient.get<KpiHour[]>(`/api/v1/vehicles/${id}/kpis?start=${encodeURIComponent(s.toISOString())}&end=${encodeURIComponent(e.toISOString())}`) },
-    enabled: !!vehicle,
-    staleTime: 300_000,
-  })
 
   const { data: firingAlerts = [] } = useQuery<AlertInstanceOut[]>({
     queryKey: [...keys.alerts(), 'firing', id],
@@ -185,10 +179,6 @@ export default function VehicleDetailPage() {
       : null,
   }), [kpis, status?.ext_voltage_mv])
 
-  const operativeDays = useMemo(() => {
-    const days = new Set(kpis30.filter(h => (h.engine_on_minutes ?? 0) > 0).map(h => h.bucket.slice(0, 10)))
-    return days.size
-  }, [kpis30])
 
   const activeAlertsCount = firingAlerts.filter(a => a.vehicle_id === id).length
 
@@ -226,7 +216,7 @@ export default function VehicleDetailPage() {
         </div>
       )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <VehicleHeader vehicle={vehicle} status={status} />
+        <VehicleHeader vehicle={vehicle} status={status} iconUrl={vehicleType?.icon_url ?? undefined} />
         <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
             <Tabs tabs={PAGE_TABS} activeTab={tab} onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles' | 'maintenance')} />
@@ -242,35 +232,67 @@ export default function VehicleDetailPage() {
               {/* Main area */}
               <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '35% 65%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-                {/* Left/top: map + vehicle info */}
-                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <TrackMap track={track} status={status} />
-                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent-info)', fontFamily: 'var(--font-data)', marginBottom: 10 }}>
-                      {vehicle.name}
-                    </div>
-                    <VDRow label="Cliente" value={vehicleTenant?.name ?? '—'} />
-                    <VDRow label="Modelo" value={vehicleType?.name ?? '—'} />
-                    <VDRow label="Conductor" value={vehicle.driver_name ?? '—'} />
-                    <VDRow label="Matrícula" value={vehicle.license_plate ?? '—'} />
-                    <VDRow label="VIN" value={vehicle.vin ?? '—'} />
+                {/* Left/top: mapa (pantalla completa de la columna) + tira info mínima */}
+                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <div style={{ flex: 1, minHeight: isMobile ? 220 : 0, position: 'relative' }}>
+                    <TrackMap track={track} status={status} />
+                  </div>
+                  {/* Tira inferior: solo datos operacionales no repetidos */}
+                  <div style={{ flexShrink: 0, padding: '8px 14px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--bg-border)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 11 }}>
+                    {vehicle.driver_name && (
+                      <span><span style={{ color: 'var(--text-muted)' }}>Conductor </span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{vehicle.driver_name}</span></span>
+                    )}
+                    {vehicleTenant && (
+                      <span><span style={{ color: 'var(--text-muted)' }}>Cliente </span><span style={{ color: 'var(--text-primary)' }}>{vehicleTenant.name}</span></span>
+                    )}
+                    {status?.lat != null && status?.lon != null && (
+                      <a
+                        href={`https://maps.google.com/?q=${status.lat},${status.lon}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--accent-info)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        Ver en mapa
+                      </a>
+                    )}
                   </div>
                 </div>
 
                 {/* Right/bottom: KPIs + telemetry + controls */}
                 <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
-                    <VDKpiCard title="Días operativos" value={operativeDays} color="var(--accent-ok)" />
-                    <VDKpiCard title="Fuera de servicio" value={Math.max(0, 30 - operativeDays)} color="var(--text-muted)" />
-                    <VDKpiCard title="En mantenimiento" value={maintenancePlans.filter(p => p.progress.status !== 'ok').length} color="var(--accent-warn)" />
-                    <VDKpiCard title="Alertas activas" value={activeAlertsCount} color={activeAlertsCount > 0 ? 'var(--accent-crit)' : 'var(--accent-ok)'} />
+                    {/* Velocidad actual */}
+                    <VDKpiCard
+                      title="Velocidad"
+                      value={status?.online && status?.speed_kmh != null ? `${Math.round(status.speed_kmh)}` : '—'}
+                      unit={status?.online && status?.speed_kmh != null ? 'km/h' : undefined}
+                      color={status?.online && (status?.speed_kmh ?? 0) > 0 ? 'var(--accent-info)' : 'var(--text-muted)'}
+                    />
+                    {/* PTO hoy */}
+                    <VDKpiCard
+                      title="PTO hoy"
+                      value={derivedValues.pto_hours_today != null ? `${derivedValues.pto_hours_today}` : '—'}
+                      unit={derivedValues.pto_hours_today != null ? 'h' : undefined}
+                      color={derivedValues.pto_hours_today != null && derivedValues.pto_hours_today > 0 ? 'var(--accent-energy)' : 'var(--text-muted)'}
+                    />
+                    {/* Planes pendientes */}
+                    <VDKpiCard
+                      title="Mantenimiento"
+                      value={String(maintenancePlans.filter(p => p.progress.status !== 'ok').length)}
+                      color={maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--accent-crit)' : maintenancePlans.some(p => p.progress.status === 'próximo') ? 'var(--accent-warn)' : 'var(--accent-ok)'}
+                    />
+                    {/* Alertas activas */}
+                    <VDKpiCard
+                      title="Alertas"
+                      value={String(activeAlertsCount)}
+                      color={activeAlertsCount > 0 ? 'var(--accent-crit)' : 'var(--accent-ok)'}
+                    />
                   </div>
 
+                  {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
                   <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '12px 14px' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 10 }}>CONTROLES DE MANDO</div>
-                    {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin salidas configuradas</div>
-                    ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                         {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
                           const active = !!doutState[d.slot]
@@ -301,8 +323,8 @@ export default function VehicleDetailPage() {
                           )
                         })}
                       </div>
-                    )}
                   </div>
+                  )}
 
                   <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '12px 14px' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -356,11 +378,11 @@ export default function VehicleDetailPage() {
                             <StatusCard label="Voltaje" value={`${(status.ext_voltage_mv / 1000).toFixed(2)} V`} color={status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)'} />
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11 }}>
-                          <span><span style={{ color: 'var(--text-muted)' }}>Lat </span><span style={{ fontFamily: 'var(--font-data)' }}>{status.lat != null ? status.lat.toFixed(6) : '—'}</span></span>
-                          <span><span style={{ color: 'var(--text-muted)' }}>Lon </span><span style={{ fontFamily: 'var(--font-data)' }}>{status.lon != null ? status.lon.toFixed(6) : '—'}</span></span>
-                          <span><span style={{ color: 'var(--text-muted)' }}>Señal </span><span>{status.last_seen ? new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</span></span>
-                        </div>
+                        {status.last_seen && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
                         {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                             {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).map(s => {
@@ -668,22 +690,15 @@ function StatusCard({ label, value, color }: { label: string; value: string; col
   )
 }
 
-function VDRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: mono ? 'var(--font-data)' : undefined, textAlign: 'right', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {value}
-      </span>
-    </div>
-  )
-}
 
-function VDKpiCard({ title, value, color }: { title: string; value: number; color: string }) {
+function VDKpiCard({ title, value, unit, color }: { title: string; value: string; unit?: string; color: string }) {
   return (
     <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '10px 12px' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, lineHeight: 1.3 }}>{title}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-data)', color }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, lineHeight: 1.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <span style={{ fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-data)', color, lineHeight: 1 }}>{value}</span>
+        {unit && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>{unit}</span>}
+      </div>
     </div>
   )
 }
