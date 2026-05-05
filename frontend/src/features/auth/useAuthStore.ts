@@ -100,13 +100,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         body: JSON.stringify({ refresh_token: refreshToken }),
       })
       if (!res.ok) { localStorage.removeItem(REFRESH_KEY); return false }
-      const data = await res.json() as { access_token: string; refresh_token: string }
+      const data = await res.json() as { access_token: string; refresh_token: string; logo_url?: string; brand_name?: string }
       localStorage.setItem(REFRESH_KEY, data.refresh_token)
       const user = parseJwt(data.access_token)
       if (!user) { localStorage.removeItem(REFRESH_KEY); return false }
       set({ accessToken: data.access_token, user })
       const enabledModules = await fetchEnabledModules(data.access_token)
       set({ enabledModules })
+      get().applyBrandTokens({ logo_url: data.logo_url, brand_name: data.brand_name })
       return true
     } catch {
       return false

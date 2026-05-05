@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import StatusBadge from '../../shared/ui/StatusBadge'
+import { getVehicleIconForSlug } from '../../shared/ui/icons'
 import type { VehicleOut, VehicleStatus } from '../../lib/types'
 
 function batteryColor(mv: number): string {
@@ -21,12 +22,14 @@ interface VehicleHeaderProps {
   vehicle: VehicleOut
   status: VehicleStatus | undefined
   iconUrl?: string
+  vehicleTypeSlug?: string
 }
 
-export default function VehicleHeader({ vehicle, status, iconUrl }: VehicleHeaderProps) {
+export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlug }: VehicleHeaderProps) {
   const navigate = useNavigate()
   const online = status?.online ?? false
   const ignition = status?.ignition ?? false
+  const VehicleTypeIcon = getVehicleIconForSlug(vehicleTypeSlug ?? '')
 
   return (
     <div style={{
@@ -53,18 +56,18 @@ export default function VehicleHeader({ vehicle, status, iconUrl }: VehicleHeade
         ← Flota
       </button>
 
-      {/* Icono del tipo de vehículo */}
+      {/* Icono del tipo de vehículo — contenedor landscape para no deformar */}
       <div style={{
-        width: 44, height: 44, borderRadius: 8, flexShrink: 0,
+        width: 72, height: 40, borderRadius: 8, flexShrink: 0,
         background: 'var(--bg-elevated)',
         border: `2px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden',
+        overflow: 'hidden', padding: 4,
         transition: 'border-color 0.3s',
       }}>
         {iconUrl
-          ? <img src={iconUrl} alt="" style={{ width: 36, height: 36, objectFit: 'contain' }} />
-          : <span style={{ fontSize: 22 }}>🚛</span>
+          ? <img src={iconUrl} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          : <VehicleTypeIcon width={60} height={30} style={{ color: online ? 'var(--accent-ok)' : 'var(--accent-off)', opacity: online ? 1 : 0.5 }} />
         }
       </div>
 

@@ -14,6 +14,7 @@ import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut, CommandLogEntry } from '../../lib/types'
 import WorkCyclesTab from './WorkCyclesTab'
 import { useAuthStore } from '../auth/useAuthStore'
+import { useFleetStore } from '../fleet/useFleetStore'
 
 const BASE_TABS = [
   { id: 'live', label: 'EN VIVO' },
@@ -30,6 +31,7 @@ export default function VehicleDetailPage() {
   const isCmg = user?.tenant_tier === 'cmg'
   const isMobile = useIsMobile()
   const isCmgAdmin = isCmg && user?.role === 'admin'
+  const setFleetSelected = useFleetStore(s => s.setSelected)
   const PAGE_TABS = isCmgAdmin
     ? [...BASE_TABS, { id: 'maintenance', label: 'MANTENIMIENTO' }]
     : BASE_TABS
@@ -216,7 +218,7 @@ export default function VehicleDetailPage() {
         </div>
       )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <VehicleHeader vehicle={vehicle} status={status} iconUrl={vehicleType?.icon_url ?? undefined} />
+        <VehicleHeader vehicle={vehicle} status={status} iconUrl={vehicleType?.icon_url ?? undefined} vehicleTypeSlug={vehicleType?.slug} />
         <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
             <Tabs tabs={PAGE_TABS} activeTab={tab} onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles' | 'maintenance')} />
@@ -245,17 +247,13 @@ export default function VehicleDetailPage() {
                     {vehicleTenant && (
                       <span><span style={{ color: 'var(--text-muted)' }}>Cliente </span><span style={{ color: 'var(--text-primary)' }}>{vehicleTenant.name}</span></span>
                     )}
-                    {status?.lat != null && status?.lon != null && (
-                      <a
-                        href={`https://maps.google.com/?q=${status.lat},${status.lon}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: 'var(--accent-info)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        Ver en mapa
-                      </a>
-                    )}
+                    <button
+                      onClick={() => { setFleetSelected(id); navigate('/fleet') }}
+                      style={{ color: 'var(--accent-info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11 }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      Ver en mapa de flota
+                    </button>
                   </div>
                 </div>
 
@@ -370,7 +368,7 @@ export default function VehicleDetailPage() {
                     )}
                     {status ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 6 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--accent-ok)' : 'var(--text-muted)'} />
                           <StatusCard label="PTO" value={status.online ? ((status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'var(--accent-energy)' : 'var(--text-muted)'} />
                           <StatusCard label="Velocidad" value={status.online ? (status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—') : '—'} />
@@ -681,13 +679,24 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
   )
 }
 
-function StatusCard({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatusChip({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '8px 12px' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-primary, #E7E5E4)' }}>{value}</div>
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 1,
+      padding: '5px 10px',
+      background: 'var(--bg-elevated)',
+      border: `1px solid ${color ? `color-mix(in srgb, ${color} 30%, var(--bg-border))` : 'var(--bg-border)'}`,
+      borderRadius: 6,
+      minWidth: 64,
+    }}>
+      <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
     </div>
   )
+}
+
+function StatusCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  return <StatusChip label={label} value={value} color={color} />
 }
 
 
