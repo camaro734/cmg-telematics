@@ -287,7 +287,7 @@ pero con estética contemporánea. Único, no derivado de competidores.
 - Fase 2: App React Native + Expo
 
 ═══════════════════════════════════════════════════════════════
-## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-04)
+## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-05)
 ═══════════════════════════════════════════════════════════════
 
 La plataforma está en producción con datos reales. Los servicios están desplegados como contenedores Docker en el VPS.
@@ -297,7 +297,7 @@ La plataforma está en producción con datos reales. Los servicios están desple
 | Contenedor | Imagen | Estado |
 |-----------|--------|--------|
 | `ingest-svc` | cmg-ingest | ✅ Activo, recibiendo datos FMC650 |
-| `core-api` | cmg-core-api | ✅ Activo |
+| `core-api` | cmg-core-api | ✅ Activo (Sentry activo, logging JSON estructurado) |
 | `frontend` | cmg-frontend | ✅ Activo (nginx, rebuild manual con docker build + docker run) |
 | `caddy` | caddy | ✅ HTTPS reverse proxy |
 | `timescaledb` | timescaledb | ✅ PostgreSQL + TimescaleDB |
@@ -306,7 +306,8 @@ La plataforma está en producción con datos reales. Los servicios están desple
 **Nota docker-compose:** hay un bug en docker-compose v1.29.2 con imágenes nginx:alpine que impide usar `up -d`. Para reconstruir el frontend usar:
 ```bash
 docker-compose build frontend
-docker stop <id_frontend> && docker rm <id_frontend>
+OLD=$(docker ps -q --filter "name=cmg-telematic1_frontend_1")
+docker stop $OLD && docker rm $OLD
 docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default --network-alias frontend --restart unless-stopped cmg-telematic1_frontend
 ```
 
@@ -314,13 +315,13 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 001 → 014 (última: `014_device_sim_phone`)
 
 ### Frontend — páginas implementadas
-- `/fleet` — FleetPage con mapa Leaflet + grid de vehículos + panel lateral
+- `/fleet` — FleetDashboard: mapa Leaflet full-page, sidebar collapsible con lista de vehículos, tarjeta flotante al seleccionar vehículo con botón "Ver detalle →"
 - `/vehicles` — VehiclesPage (lista de vehículos con CRUD)
-- `/tipos-vehiculo` — VehicleTypesPage (sensor_schema con scale+offset, mantenimiento templates, DOUT config, métricas históricas, ciclos de trabajo, reglas de alerta, icono)
+- `/tipos-vehiculo` — VehicleTypesPage (sensor_schema con scale+offset, mantenimiento templates, DOUT config, métricas históricas, ciclos de trabajo, reglas de alerta, icono). Dividida en sub-componentes: AlertRulesSection, DoutConfigSection, HistoricMetricsSection, MaintenanceTemplatesSection
 - `/diagnostics/can-scanner` — CAN Scanner con histórico, etiquetado, exportación CSV
-- `/vehicles/:id` — VehicleDetailPage (live, histórico, ciclos, mantenimiento; paneles CHASIS/COMANDOS/INCIDENCIAS colapsables)
+- `/vehicles/:id` — VehicleDetailPage (live con mapa ampliado, KPIs en tiempo real, histórico, ciclos, mantenimiento; paneles CHASIS/COMANDOS/INCIDENCIAS colapsables)
 - `/alerts` — AlertsPage (tabs Activas / Reglas)
-- `/reports` — ReportsPage (filtro por vehículo, PDF mensual)
+- `/reports` — ReportsPage (filtro por vehículo, PDF mensual). Hook useReportData extraído
 - `/devices` — DevicesPage
 - `/maintenance` — MaintenancePage + formulario de planes
 - `/rules` — RulesPage + RuleFormPage (constructor visual)
@@ -336,13 +337,22 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 - **Mantenimiento predictivo**: planes por vehículo, templates por tipo, intervenciones con reset
 - **Alertas**: rules engine con condiciones JSONB (threshold, sustained, accumulation, trend, composite, schedule), instancias, escalación
 - **Exportación CSV**: CAN Scanner, ciclos de trabajo, intervenciones de mantenimiento
-- **Iconos por tipo de vehículo**: upload PNG, StaticFiles en /uploads
-- **White-label**: brand_tokens JSONB por tenant; login devuelve logo_url + brand_name; tokens inyectados como CSS variables en runtime
+- **Iconos por tipo de vehículo**: upload PNG, StaticFiles en /uploads; logo PNG del tipo mostrado en header de detalle y tarjeta flotante de flota
+- **White-label**: brand_tokens JSONB por tenant; login devuelve logo_url + brand_name; tokens inyectados como CSS variables en runtime; `refresh()` también aplica brand tokens (fix: logo visible al recargar página)
 - **AVL series endpoint**: datos CAN del PLC en serie temporal para gráficos con nombre personalizado
 - **KpiChart**: gráficos configurables por tipo de vehículo (line, donut, bar), agrupación multi-serie, transform/offset, filtro por vehículo
 - **Métricas históricas por tipo**: hasta 5 métricas configurables en VehicleTypesPage, visibles en reportes PDF
 - **Módulos por tenant**: `enabled_modules TEXT[]` en tenant; TopNav filtra secciones según módulos activos
 - **Paneles colapsables en VehicleDetailPage**: ESTADO CHASIS, HISTORIAL DE COMANDOS e INCIDENCIAS ocultos por defecto, expandibles con toggle; badge rojo si hay incidencias activas
+- **Sentry**: backend (sentry-sdk[fastapi]) + frontend (@sentry/react) con DSN en .env; logging JSON estructurado en backend
+- **Bulk status endpoint**: `GET /api/v1/vehicles/statuses?ids=...` — pipeline Redis, hasta 200 IDs, reduce N peticiones a 1
+- **SensorGrid live indicators**: tarjetas TimeCard/CounterCard/NumericDisplay con punto verde pulsante y borde de acento cuando hay dato activo
+- **FleetDashboard mapa protagonista**: mapa full-viewport, sidebar semi-transparente collapsible (z-index 1000), tarjeta flotante de vehículo seleccionado
+
+### Logo CMG Track
+- Archivo: `backend/static/logos/cmgtrack.png` (668×187 px, recortado de 1280×853 con márgenes transparentes)
+- Original guardado en: `backend/static/logos/cmgtrack_original.png`
+- Topbar height: 62px (tokens.css `--topbar-h`)
 
 ### GitHub
 Repositorio: https://github.com/camaro734/cmg-telematics (rama master)
