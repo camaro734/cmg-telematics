@@ -230,26 +230,51 @@ export default function VehicleDetailPage() {
         <div style={{ flex: 1, minHeight: 0, overflow: (tab === 'live' && !isMobile) ? 'hidden' : 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 
           {tab === 'live' && (
-            <div style={{ display: 'flex', flexDirection: 'column', height: isMobile ? undefined : '100%' }}>
-              {/* Main area */}
-              <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '35% 65%', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* MAIN GRID: 55% mapa + 45% panel */}
+              <div style={isMobile
+                ? { display: 'flex', flexDirection: 'column' }
+                : { display: 'grid', gridTemplateColumns: '55% 45%' }
+              }>
+                {/* ── MAPA ── */}
+                <div style={{
+                  borderRight: isMobile ? 'none' : '1px solid var(--bg-border)',
+                  borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none',
+                  position: 'relative',
+                  minHeight: isMobile ? 220 : 440,
+                }}>
+                  <TrackMap track={track} status={status} />
 
-                {/* Left/top: mapa (pantalla completa de la columna) + tira info mínima */}
-                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                  <div style={{ flex: 1, minHeight: isMobile ? 220 : 340, position: 'relative' }}>
-                    <TrackMap track={track} status={status} />
+                  {/* Badge de conexión superpuesto en el mapa */}
+                  <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 500, pointerEvents: 'none' }}>
+                    {status?.online
+                      ? <div style={{ background: 'rgba(34,197,94,0.92)', color: '#fff', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
+                          En directo
+                        </div>
+                      : status
+                        ? <div style={{ background: 'rgba(239,68,68,0.92)', color: '#fff', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
+                            ⚠ Sin señal
+                          </div>
+                        : null
+                    }
                   </div>
-                  {/* Tira inferior: solo datos operacionales no repetidos */}
-                  <div style={{ flexShrink: 0, padding: '8px 14px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--bg-border)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 11 }}>
+
+                  {/* Tira inferior semitransparente sobre el mapa */}
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 400,
+                    background: 'rgba(28,25,23,0.82)', backdropFilter: 'blur(6px)',
+                    padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 11,
+                  }}>
                     {vehicle.driver_name && (
-                      <span><span style={{ color: 'var(--text-muted)' }}>Conductor </span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{vehicle.driver_name}</span></span>
+                      <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Conductor </span><span style={{ color: '#fff', fontWeight: 600 }}>{vehicle.driver_name}</span></span>
                     )}
                     {vehicleTenant && (
-                      <span><span style={{ color: 'var(--text-muted)' }}>Cliente </span><span style={{ color: 'var(--text-primary)' }}>{vehicleTenant.name}</span></span>
+                      <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Cliente </span><span style={{ color: 'rgba(255,255,255,0.8)' }}>{vehicleTenant.name}</span></span>
                     )}
                     <button
                       onClick={() => { setFleetSelected(id); navigate('/fleet') }}
-                      style={{ color: 'var(--accent-info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11 }}
+                      style={{ color: 'var(--accent-info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11, pointerEvents: 'auto' }}
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                       Ver en mapa de flota
@@ -257,132 +282,96 @@ export default function VehicleDetailPage() {
                   </div>
                 </div>
 
-                {/* Right/bottom: KPIs + telemetry + controls */}
-                <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
-                    {/* Velocidad actual */}
+                {/* ── PANEL DERECHO ── */}
+                <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                  {/* ALERTAS ACTIVAS — siempre visible si las hay */}
+                  {activeAlertsCount > 0 && (
+                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--accent-crit)', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--accent-crit)', marginBottom: firingAlerts.filter(a => a.vehicle_id === id).length > 0 ? 6 : 0 }}>
+                        🚨 {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''}
+                      </div>
+                      {firingAlerts.filter(a => a.vehicle_id === id).slice(0, 3).map(a => (
+                        <div key={a.id} style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 6, borderLeft: '2px solid rgba(239,68,68,0.25)', marginTop: 3, fontFamily: 'var(--font-ui)' }}>
+                          {a.rule_id.slice(0, 28)}… · {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* MANTENIMIENTO URGENTE */}
+                  {maintenancePlans.some(p => p.progress.status !== 'ok') && (
+                    <div style={{
+                      background: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.07)' : 'rgba(234,179,8,0.07)',
+                      border: `1px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)'}`,
+                      borderLeft: `3px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--accent-crit)' : 'var(--accent-warn)'}`,
+                      borderRadius: 8, padding: '10px 12px',
+                    }}>
+                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--accent-crit)' : 'var(--accent-warn)' }}>
+                        🔧 {maintenancePlans.filter(p => p.progress.status !== 'ok').length} plan{maintenancePlans.filter(p => p.progress.status !== 'ok').length > 1 ? 'es' : ''} de mantenimiento {maintenancePlans.some(p => p.progress.status === 'vencido') ? 'vencido' : 'próximo'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* KPIs PRINCIPALES — 3 grandes */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
                     <VDKpiCard
                       title="Velocidad"
                       value={status?.online && status?.speed_kmh != null ? `${Math.round(status.speed_kmh)}` : '—'}
                       unit={status?.online && status?.speed_kmh != null ? 'km/h' : undefined}
                       color={status?.online && (status?.speed_kmh ?? 0) > 0 ? 'var(--accent-info)' : 'var(--text-muted)'}
                     />
-                    {/* PTO hoy */}
                     <VDKpiCard
                       title="PTO hoy"
                       value={derivedValues.pto_hours_today != null ? `${derivedValues.pto_hours_today}` : '—'}
                       unit={derivedValues.pto_hours_today != null ? 'h' : undefined}
                       color={derivedValues.pto_hours_today != null && derivedValues.pto_hours_today > 0 ? 'var(--accent-energy)' : 'var(--text-muted)'}
                     />
-                    {/* Planes pendientes */}
                     <VDKpiCard
-                      title="Mantenimiento"
-                      value={String(maintenancePlans.filter(p => p.progress.status !== 'ok').length)}
-                      color={maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--accent-crit)' : maintenancePlans.some(p => p.progress.status === 'próximo') ? 'var(--accent-warn)' : 'var(--accent-ok)'}
-                    />
-                    {/* Alertas activas */}
-                    <VDKpiCard
-                      title="Alertas"
-                      value={String(activeAlertsCount)}
-                      color={activeAlertsCount > 0 ? 'var(--accent-crit)' : 'var(--accent-ok)'}
+                      title="Voltaje"
+                      value={status?.ext_voltage_mv != null ? `${(status.ext_voltage_mv / 1000).toFixed(1)}` : '—'}
+                      unit={status?.ext_voltage_mv != null ? 'V' : undefined}
+                      color={status?.ext_voltage_mv != null ? (status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)') : 'var(--text-muted)'}
                     />
                   </div>
 
-                  {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 10 }}>CONTROLES DE MANDO</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-                        {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
-                          const active = !!doutState[d.slot]
-                          const loading = !!doutLoading[d.slot]
-                          return (
-                          <button
-                            key={d.slot}
-                            title={`DOUT${d.slot}`}
-                            onClick={() => sendDout(d.slot)}
-                            disabled={loading}
-                            style={{
-                              background: active ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)',
-                              border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
-                              borderRadius: 6,
-                              padding: '8px 12px',
-                              cursor: loading ? 'wait' : 'pointer',
-                              textAlign: 'left',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 2,
-                              opacity: loading ? 0.7 : 1,
-                              transition: 'background 0.2s, border-color 0.2s',
-                            }}
-                          >
-                            <span style={{ fontSize: 10, color: active ? 'var(--accent-ok)' : 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>DOUT{d.slot}{active ? ' ●' : ' ○'}</span>
-                            <span style={{ fontSize: 12, color: active ? 'var(--accent-ok)' : 'var(--text-primary, #E7E5E4)', fontWeight: 600 }}>{d.label}</span>
-                          </button>
-                          )
-                        })}
-                      </div>
-                  </div>
-                  )}
-
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      TELEMETRÍA EN TIEMPO REAL
+                  {/* TELEMETRÍA */}
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderTop: '2px solid var(--accent-energy)', borderRadius: 8, padding: '11px 13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Telemetría</span>
                       {status?.online
-                        ? <span style={{ color: 'var(--accent-ok)', fontSize: 10 }}>● En directo</span>
+                        ? <span style={{ color: 'var(--accent-ok)', fontSize: 10, fontWeight: 600 }}>● En directo</span>
                         : status?.last_seen
-                          ? <span style={{ color: 'var(--accent-crit)', fontSize: 10, fontWeight: 700 }}>⚠ Sin señal desde hace {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h`; })()}</span>
+                          ? <span style={{ color: 'var(--accent-crit)', fontSize: 10, fontWeight: 700 }}>⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h`; })()}</span>
                           : <span style={{ color: 'var(--accent-crit)', fontSize: 10 }}>⚠ Sin señal</span>
                       }
                       {status?.can_data && Object.keys(status.can_data).length > 0 && (
-                        <button
-                          onClick={() => setShowFullTelemetry(true)}
-                          style={{
-                            marginLeft: 'auto',
-                            background: 'transparent',
-                            border: '1px solid var(--bg-border)',
-                            borderRadius: 5,
-                            padding: '2px 8px',
-                            fontSize: 10,
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            fontWeight: 600,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          📡 Telemetría completa
+                        <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>
+                          📡 Completa
                         </button>
                       )}
                     </div>
-                    {/* Banner offline prominente */}
+
                     {status && !status.online && (
-                      <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 6, padding: '8px 10px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 18 }}>📡</span>
-                        <div>
-                          <div style={{ color: '#ef4444', fontWeight: 700, fontSize: 12 }}>Dispositivo sin conexión</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Los datos mostrados son del último envío. El vehículo puede estar apagado o sin cobertura.</div>
-                        </div>
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '7px 10px', marginBottom: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                        Vehículo apagado o sin cobertura. Último dato conocido.
                       </div>
                     )}
+
                     {status ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      <>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
                           <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--accent-ok)' : 'var(--text-muted)'} />
                           <StatusCard label="PTO" value={status.online ? ((status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'var(--accent-energy)' : 'var(--text-muted)'} />
                           <StatusCard label="Velocidad" value={status.online ? (status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—') : '—'} />
-                          {status.ext_voltage_mv != null && (
-                            <StatusCard label="Voltaje" value={`${(status.ext_voltage_mv / 1000).toFixed(2)} V`} color={status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)'} />
-                          )}
                         </div>
                         {status.last_seen && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>
                             Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
                         {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
                             {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).map(s => {
                               const raw = status.can_data?.[`avl_${s.avl_id}`]
                               const num = raw != null ? Number(raw) : 0
@@ -398,103 +387,104 @@ export default function VehicleDetailPage() {
                             derivedValues={derivedValues}
                           />
                         )}
-                      </div>
+                      </>
                     ) : (
                       <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Sin datos en vivo</div>
                     )}
                   </div>
 
-                  {/* Enlace a reportes de este vehículo */}
+                  {/* CONTROLES DOUT */}
+                  {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
+                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '11px 13px' }}>
+                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 9 }}>Controles de mando</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(130px, 1fr))', gap: 7 }}>
+                        {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
+                          const active = !!doutState[d.slot]
+                          const loading = !!doutLoading[d.slot]
+                          return (
+                            <button
+                              key={d.slot}
+                              title={`DOUT${d.slot}`}
+                              onClick={() => sendDout(d.slot)}
+                              disabled={loading}
+                              style={{
+                                background: active ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)',
+                                border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+                                borderRadius: 6, padding: '8px 12px', cursor: loading ? 'wait' : 'pointer',
+                                textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2,
+                                opacity: loading ? 0.7 : 1, transition: 'background 0.2s, border-color 0.2s',
+                              }}
+                            >
+                              <span style={{ fontSize: 10, color: active ? 'var(--accent-ok)' : 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>DOUT{d.slot}{active ? ' ●' : ' ○'}</span>
+                              <span style={{ fontSize: 12, color: active ? 'var(--accent-ok)' : 'var(--text-primary, #E7E5E4)', fontWeight: 600 }}>{d.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VER REPORTES */}
                   <button
                     onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico' } })}
-                    style={{
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--bg-border)',
-                      borderRadius: 8,
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      fontSize: 12,
-                      color: 'var(--text-muted)',
-                      fontWeight: 600,
-                      textAlign: 'left',
-                      width: '100%',
-                      transition: 'border-color 0.15s, color 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLButtonElement
-                      el.style.borderColor = 'var(--accent-info)'
-                      el.style.color = 'var(--accent-info)'
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLButtonElement
-                      el.style.borderColor = 'var(--bg-border)'
-                      el.style.color = 'var(--text-muted)'
-                    }}
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--accent-info)'; el.style.color = 'var(--accent-info)' }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--bg-border)'; el.style.color = 'var(--text-muted)' }}
                   >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                    </svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     Ver reportes de este vehículo
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}>
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
-
                 </div>
               </div>
 
-              {/* Bottom section — colapsable */}
+              {/* PANEL TÉCNICO COLAPSABLE */}
               <div style={{ borderTop: '1px solid var(--bg-border)', flexShrink: 0 }}>
                 <button onClick={() => setShowBottomPanel(v => !v)}
                   style={{ width: '100%', background: 'var(--bg-surface)', border: 'none', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11 }}>
                   <span style={{ transform: showBottomPanel ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
-                  {showBottomPanel ? 'Ocultar datos técnicos' : 'Mostrar datos técnicos (comandos, incidencias)'}
+                  {showBottomPanel ? 'Ocultar historial técnico' : 'Historial de comandos e incidencias'}
                 </button>
               </div>
-              {showBottomPanel && <div style={isMobile ? { display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--bg-border)' } : { display: 'grid', gridTemplateColumns: '2fr 1fr', borderTop: '1px solid var(--bg-border)', height: 180, overflow: 'hidden', flexShrink: 0 }}>
-                <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
-                  {commandHistory.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {commandHistory.map(entry => (
-                        <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'start', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4 }}>
-                          <div>
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
-                              {new Date(entry.sent_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </div>
-                            <div style={{ fontSize: 11, color: 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
-                              {entry.command}
-                            </div>
-                            {(entry.response || entry.error_message) && (
-                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                {entry.response ?? entry.error_message}
+              {showBottomPanel && (
+                <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '2fr 1fr', borderTop: '1px solid var(--bg-border)', height: 180, overflow: 'hidden' }}>
+                  <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
+                    {commandHistory.length === 0 ? (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {commandHistory.map(entry => (
+                          <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'start', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4 }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                                {new Date(entry.sent_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                               </div>
-                            )}
+                              <div style={{ fontSize: 11, color: 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>{entry.command}</div>
+                              {(entry.response || entry.error_message) && (
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{entry.response ?? entry.error_message}</div>
+                              )}
+                            </div>
+                            <CommandStatusBadge status={entry.status} />
                           </div>
-                          <CommandStatusBadge status={entry.status} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: '10px 14px', overflowY: 'auto' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>INCIDENCIAS</div>
-                  {firingAlerts.filter(a => a.vehicle_id === id).length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--accent-ok)' }}>✓ Sin incidencias</div>
-                  ) : (
-                    firingAlerts.filter(a => a.vehicle_id === id).slice(0, 5).map(a => (
-                      <div key={a.id} style={{ fontSize: 11, color: 'var(--accent-warn)', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4, marginBottom: 4 }}>
-                        {a.rule_id.slice(0, 8)}… {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                        ))}
                       </div>
-                    ))
-                  )}
+                    )}
+                  </div>
+                  <div style={{ padding: '10px 14px', overflowY: 'auto' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>INCIDENCIAS</div>
+                    {firingAlerts.filter(a => a.vehicle_id === id).length === 0 ? (
+                      <div style={{ fontSize: 12, color: 'var(--accent-ok)' }}>✓ Sin incidencias</div>
+                    ) : (
+                      firingAlerts.filter(a => a.vehicle_id === id).slice(0, 5).map(a => (
+                        <div key={a.id} style={{ fontSize: 11, color: 'var(--accent-warn)', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4, marginBottom: 4 }}>
+                          {a.rule_id.slice(0, 8)}… {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>}
+              )}
             </div>
           )}
 
