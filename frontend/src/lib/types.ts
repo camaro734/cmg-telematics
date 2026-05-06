@@ -180,7 +180,7 @@ export interface ScheduleTimeWindow {
 }
 
 export interface ConditionDef {
-  type: 'threshold' | 'threshold_sustained' | 'accumulation' | 'trend_rising' | 'schedule' | 'composite'
+  type: 'threshold' | 'threshold_sustained' | 'accumulation' | 'trend_rising' | 'schedule' | 'composite' | 'geofence'
   field?: string
   op?: ConditionOp
   value?: number
@@ -192,6 +192,47 @@ export interface ConditionDef {
   schedule?: ScheduleWindow | ScheduleTimeWindow
   op_composite?: 'AND' | 'OR'
   conditions?: ConditionDef[]
+  // geofence
+  polygon?: [number, number][]
+  action?: 'enter' | 'exit'
+}
+
+export type WorkOrderStatus   = 'pending' | 'in_progress' | 'done' | 'cancelled'
+export type WorkOrderPriority = 'low' | 'normal' | 'high' | 'urgent'
+
+export interface WorkOrderOut {
+  id: string
+  tenant_id: string
+  title: string
+  description: string | null
+  vehicle_id: string | null
+  driver_id: string | null
+  status: WorkOrderStatus
+  priority: WorkOrderPriority
+  scheduled_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  location_address: string | null
+  location_lat: number | null
+  location_lon: number | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  vehicle_name: string | null
+  driver_name: string | null
+}
+
+export interface DriverOut {
+  id: string
+  tenant_id: string
+  full_name: string
+  phone: string | null
+  license_number: string | null
+  license_expiry: string | null  // ISO date
+  notes: string | null
+  active: boolean
+  created_at: string
+  current_vehicle_name: string | null
 }
 
 export interface ActionDef {
@@ -349,6 +390,7 @@ export interface UserUpdate {
   full_name?: string
   role?: 'admin' | 'operator' | 'viewer' | 'driver'
   active?: boolean
+  password?: string
 }
 
 export interface GrantOut {
@@ -449,4 +491,24 @@ export interface WorkCycle {
   cycle_data: Record<string, unknown>
   lat: number | null
   lon: number | null
+}
+
+export interface MaterialItem {
+  name: string
+  quantity: number
+  unit: string
+}
+
+export interface WorkReportOut {
+  id: string
+  work_order_id: string
+  tenant_id: string
+  vehicle_id: string | null
+  driver_id: string | null
+  description: string | null
+  work_duration_minutes: number | null
+  photo_urls: string[]
+  signature_url: string | null
+  materials_used: MaterialItem[]
+  created_at: string
 }

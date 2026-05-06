@@ -24,6 +24,7 @@ class Tenant(Base):
     brand_tokens: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     notification_email: Mapped[str | None] = mapped_column(Text(), nullable=True)
     enabled_modules: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
+    portal_access_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     parent = relationship("Tenant", remote_side=[id], backref="children")

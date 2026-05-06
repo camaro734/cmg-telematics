@@ -6,6 +6,7 @@ from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.user import UserOut, UserUpdate
 from app.models.user import User
+from app.core.security import hash_password
 
 router = APIRouter(tags=["users"])
 
@@ -34,6 +35,8 @@ async def update_user(
         user.role = body.role
     if body.active is not None:
         user.active = body.active
+    if body.password is not None:
+        user.hashed_password = hash_password(body.password)
     await db.commit()
     await db.refresh(user)
     return user

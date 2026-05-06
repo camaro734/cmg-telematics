@@ -29,4 +29,10 @@ export const keys = {
   workCycles: (vehicleId: string, from: string, to: string) =>
     ['work-cycles', vehicleId, from, to] as const,
   vehicleCommands: (id: string) => ['vehicles', id, 'commands'] as const,
+  workOrders: (filters?: string) => filters ? ['work-orders', filters] as const : ['work-orders'] as const,
+  workOrder: (id: string) => ['work-orders', id] as const,
+  drivers: () => ['drivers'] as const,
+  driver: (id: string) => ['drivers', id] as const,
+  driverHistory: (id: string) => ['drivers', id, 'history'] as const,
+  workReport: (orderId: string) => ['work-orders', orderId, 'report'] as const,
 }

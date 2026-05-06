@@ -33,7 +33,9 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (isEdit) {
-      mutation.mutate({ full_name: fullName, role } satisfies UserUpdate)
+      const payload: UserUpdate = { full_name: fullName, role }
+      if (password) payload.password = password
+      mutation.mutate(payload)
     } else {
       mutation.mutate({ email, full_name: fullName, role, password } satisfies UserCreate)
     }
@@ -81,19 +83,20 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
             </select>
           </label>
 
-          {!isEdit && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Contraseña</span>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                minLength={8}
-                style={inputStyle}
-              />
-            </label>
-          )}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+              Contraseña{isEdit && <span style={{ color: 'var(--accent-off)', fontWeight: 400 }}> — dejar en blanco para no cambiar</span>}
+            </span>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required={!isEdit}
+              minLength={8}
+              placeholder={isEdit ? '••••••••' : ''}
+              style={inputStyle}
+            />
+          </label>
 
           {mutation.isError && (
             <p style={{ color: 'var(--accent-crit)', fontSize: 12, margin: 0 }}>Error al guardar.</p>

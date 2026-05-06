@@ -8,6 +8,7 @@ import ActiveAlertsList from './ActiveAlertsList'
 import AlertHistory from './AlertHistory'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
+import { useTenantContext } from '../../lib/useTenantContext'
 
 const SECTION_LABEL: CSSProperties = {
   fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-ui)',
@@ -19,9 +20,11 @@ export default function AlertsPage() {
   const [tab, setTab] = useState<'activas' | 'reglas'>('activas')
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
+  const { activeTenantId } = useTenantContext()
+  const tenantQ = activeTenantId ? `&tenant_id=${activeTenantId}` : ''
 
   async function handleExportCsv() {
-    const blob = await apiClient.getBlob('/api/v1/alerts/export.csv')
+    const blob = await apiClient.getBlob(`/api/v1/alerts/export.csv${activeTenantId ? `?tenant_id=${activeTenantId}` : ''}`)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -33,8 +36,8 @@ export default function AlertsPage() {
   }
 
   const { data: vehicles = [] } = useQuery({
-    queryKey: keys.vehicles(),
-    queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
+    queryKey: [...keys.vehicles(), activeTenantId],
+    queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${activeTenantId ? `?tenant_id=${activeTenantId}` : ''}`),
     staleTime: Infinity,
   })
 
@@ -45,14 +48,14 @@ export default function AlertsPage() {
   })
 
   const { data: firing = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'firing'],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>('/api/v1/alerts?status=firing'),
+    queryKey: [...keys.alerts(), 'firing', activeTenantId],
+    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=firing${tenantQ}`),
     refetchInterval: 30_000,
   })
 
   const { data: escalated = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'escalated'],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>('/api/v1/alerts?status=escalated'),
+    queryKey: [...keys.alerts(), 'escalated', activeTenantId],
+    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=escalated${tenantQ}`),
     refetchInterval: 30_000,
   })
 

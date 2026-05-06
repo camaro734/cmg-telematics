@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { ConditionDef, SensorDef } from '../../lib/types'
+import GeofenceMapEditor from '../../shared/ui/GeofenceMapEditor'
 
 const SELECT: CSSProperties = {
   background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
@@ -21,6 +22,7 @@ const CONDITION_TYPES = [
   { value: 'trend_rising',        label: 'Tendencia' },
   { value: 'schedule',            label: 'Horario' },
   { value: 'composite',           label: 'Combinada (AND/OR)' },
+  { value: 'geofence',            label: 'Zona geográfica' },
 ] as const
 
 const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -46,6 +48,7 @@ function defaultCondition(type: ConditionDef['type'], sensors: SensorDef[]): Con
     case 'accumulation':        return { type, field: firstNumericKey, limit: 100 }
     case 'trend_rising':        return { type, field: firstNumericKey, threshold: 1, window_minutes: 60 }
     case 'schedule':            return { type, field: firstKey, expected_outside: false, schedule: { type: 'always' } }
+    case 'geofence':            return { type, polygon: [], action: 'enter' }
     case 'composite':
       return {
         type, op_composite: 'AND',
@@ -222,8 +225,32 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
         </select>
       </div>
 
-      {/* Vista composite: dos sub-condiciones con operador AND/OR entre ellas */}
-      {condition.type === 'composite' ? (
+      {/* Vista geofence: selector de acción + mapa con editor de polígono */}
+      {condition.type === 'geofence' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={LABEL}>Disparar al</span>
+            <select
+              value={condition.action ?? 'enter'}
+              onChange={e => onChange({ ...condition, action: e.target.value as 'enter' | 'exit' })}
+              style={SELECT}
+            >
+              <option value="enter">entrar en la zona</option>
+              <option value="exit">salir de la zona</option>
+            </select>
+          </div>
+          <GeofenceMapEditor
+            polygon={condition.polygon ?? []}
+            onChange={poly => onChange({ ...condition, polygon: poly })}
+          />
+          {(condition.polygon?.length ?? 0) < 3 && (
+            <span style={{ ...LABEL, color: 'var(--accent-warn)', fontSize: 11 }}>
+              El polígono necesita al menos 3 vértices para ser válido.
+            </span>
+          )}
+        </div>
+      ) : condition.type === 'composite' ? (
+        /* Vista composite: dos sub-condiciones con operador AND/OR entre ellas */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 12, borderLeft: '2px solid var(--bg-border)' }}>
           <SimpleCondition
             condition={condition.conditions?.[0] ?? defaultCondition('threshold', sensors)}

@@ -23,3 +23,4 @@ class Vehicle(Base):
     tenant = relationship("Tenant", back_populates="vehicles")
     vehicle_type = relationship("VehicleType", back_populates="vehicles")
     device = relationship("Device", back_populates="vehicle", uselist=False)
+    driver_assignments = relationship("VehicleDriverAssignment", back_populates="vehicle", order_by="VehicleDriverAssignment.assigned_at.desc()")

@@ -4,6 +4,7 @@ import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, VehicleTypeOut, TenantOut, DeviceOut } from '../../lib/types'
+import { useTenantContext } from '../../lib/useTenantContext'
 
 // ─── Estilos compartidos ────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ const EMPTY_FORM: FormState = {
 
 export default function VehiclesPage() {
   const queryClient = useQueryClient()
+  const { activeTenantId } = useTenantContext()
 
   const [modal, setModal] = useState<'closed' | 'create' | 'edit'>('closed')
   const [editingVehicle, setEditingVehicle] = useState<VehicleOut | null>(null)
@@ -86,8 +88,8 @@ export default function VehiclesPage() {
   // ── Datos ────────────────────────────────────────────────────────────────
 
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<VehicleOut[]>({
-    queryKey: keys.vehicles(),
-    queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
+    queryKey: [...keys.vehicles(), activeTenantId],
+    queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${activeTenantId ? `?tenant_id=${activeTenantId}` : ''}`),
     staleTime: 30_000,
   })
 

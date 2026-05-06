@@ -26,3 +26,4 @@ class UserUpdate(BaseModel):
     full_name: str | None = None
     role: Literal['admin', 'operator', 'viewer', 'driver'] | None = None
     active: bool | None = None
+    password: str | None = Field(None, min_length=8)

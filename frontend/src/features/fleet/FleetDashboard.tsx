@@ -7,6 +7,7 @@ import { useVehicleStatuses } from './useVehicleStatuses'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
+import { useTenantContext } from '../../lib/useTenantContext'
 import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, TenantOut, VehicleStatus } from '../../lib/types'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
@@ -170,10 +171,13 @@ export default function FleetDashboard() {
   const setSelected = useFleetStore(s => s.setSelected)
   const isMobile = useIsMobile()
   const navigate = useNavigate()
+  const { activeTenantId } = useTenantContext()
+
+  const tenantQ = activeTenantId ? `?tenant_id=${activeTenantId}` : ''
 
   const { data: vehicles = [], isLoading: loadingVehicles } = useQuery({
-    queryKey: keys.vehicles(),
-    queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
+    queryKey: [...keys.vehicles(), activeTenantId],
+    queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${tenantQ}`),
     staleTime: 5 * 60_000,
   })
 
@@ -190,8 +194,8 @@ export default function FleetDashboard() {
   })
 
   const { data: firingAlerts = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'firing'],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>('/api/v1/alerts?status=firing'),
+    queryKey: [...keys.alerts(), 'firing', activeTenantId],
+    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=firing${activeTenantId ? `&tenant_id=${activeTenantId}` : ''}`),
     refetchInterval: 30_000,
   })
 

@@ -13,10 +13,18 @@ from app.api.v1.devices import router as devices_router
 from app.api.v1.work_cycles import router as work_cycles_router
 from app.api.v1.diagnostics import router as diagnostics_router
 from app.api.v1.commands import router as commands_router
+from app.api.v1.drivers import router as drivers_router
+from app.api.v1.work_orders import router as work_orders_router
+from app.api.v1.work_reports import router as work_reports_router
+from app.api.v1.portal import router as portal_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
 api_router.include_router(vehicles_router)
+api_router.include_router(drivers_router)
+api_router.include_router(work_orders_router)
+api_router.include_router(work_reports_router)
+api_router.include_router(portal_router)
 api_router.include_router(alerts_router)
 api_router.include_router(rules_router)
 api_router.include_router(tenants_router)

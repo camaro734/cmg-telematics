@@ -18,6 +18,100 @@ function SectionCard({ title, children }: { title: string; children: React.React
   )
 }
 
+function PortalTokenSection({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient()
+  const [copied, setCopied] = useState(false)
+
+  const { data } = useQuery({
+    queryKey: ['portal-token', tenantId],
+    queryFn: () => apiClient.get<{ portal_access_token: string | null }>(`/api/v1/tenants/${tenantId}/portal-token`),
+  })
+
+  const { mutate: generate, isPending } = useMutation({
+    mutationFn: () => apiClient.post<{ portal_access_token: string }>(`/api/v1/tenants/${tenantId}/portal-token`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portal-token', tenantId] }),
+  })
+
+  const token = data?.portal_access_token
+  const portalUrl = token ? `${window.location.origin}/portal/${token}` : null
+
+  function copyUrl() {
+    if (!portalUrl) return
+    navigator.clipboard.writeText(portalUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <SectionCard title="Portal del cliente">
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+        URL pública para que el cliente vea el estado de sus vehículos y órdenes sin necesidad de login.
+      </p>
+      {token ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              readOnly
+              value={portalUrl!}
+              style={{
+                flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+                borderRadius: 6, color: 'var(--text-muted)', fontFamily: 'var(--font-data)',
+                fontSize: 12, padding: '7px 10px',
+              }}
+            />
+            <button
+              onClick={copyUrl}
+              style={{
+                padding: '7px 14px', borderRadius: 6, border: '1px solid var(--bg-border)',
+                background: copied ? 'var(--accent-ok)' : 'var(--bg-elevated)',
+                color: copied ? '#fff' : 'var(--text-muted)',
+                fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              {copied ? 'Copiado' : 'Copiar'}
+            </button>
+            <a
+              href={portalUrl!}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                padding: '7px 14px', borderRadius: 6, border: '1px solid var(--bg-border)',
+                background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+                fontFamily: 'var(--font-ui)', fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap',
+              }}
+            >
+              Abrir →
+            </a>
+          </div>
+          <button
+            onClick={() => { if (confirm('¿Regenerar el token? El enlace anterior dejará de funcionar.')) generate() }}
+            style={{
+              alignSelf: 'flex-start', padding: '5px 12px', borderRadius: 6,
+              border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)',
+              color: 'var(--accent-warn)', fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            Regenerar token
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => generate()}
+          disabled={isPending}
+          style={{
+            padding: '8px 18px', borderRadius: 8, border: 'none',
+            background: 'var(--accent-energy)', color: '#fff',
+            fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            opacity: isPending ? 0.7 : 1,
+          }}
+        >
+          {isPending ? 'Generando…' : 'Generar enlace de portal'}
+        </button>
+      )}
+    </SectionCard>
+  )
+}
+
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
@@ -180,6 +274,9 @@ export default function TenantDetailPage() {
         <SectionCard title="White-label">
           <BrandTokensEditor tenantId={id!} />
         </SectionCard>
+
+        {/* 6. Portal cliente */}
+        <PortalTokenSection tenantId={id!} />
 
       </div>
 

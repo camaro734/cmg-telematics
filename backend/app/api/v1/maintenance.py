@@ -184,12 +184,15 @@ async def _to_out(
 async def list_plans(
     vehicle_id: uuid.UUID | None = Query(None),
     active: bool | None = Query(None),
+    tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(MaintenancePlan)
     if user.tenant_tier != "cmg":
         query = query.where(MaintenancePlan.tenant_id == user.tenant_id)
+    elif tenant_id is not None:
+        query = query.where(MaintenancePlan.tenant_id == tenant_id)
     if vehicle_id:
         query = query.where(MaintenancePlan.vehicle_id == vehicle_id)
     if active is not None:

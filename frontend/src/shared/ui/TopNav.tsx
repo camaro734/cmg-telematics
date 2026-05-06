@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { useReportsTabStore, REPORTS_TABS } from '../../features/reports/useReportsTabStore'
 import type { ReportsTab } from '../../features/reports/useReportsTabStore'
 import { CmgMark } from './CmgLogo'
 import { useIsMobile } from '../../lib/useIsMobile'
+import { useTenantContext } from '../../lib/useTenantContext'
+import { apiClient } from '../../lib/apiClient'
+import type { TenantOut } from '../../lib/types'
 import {
   IconFlota,
   IconAlertas,
@@ -15,6 +19,8 @@ import {
   IconDispositivos,
   IconCanScanner,
   IconAjustes,
+  IconOrdenes,
+  IconConductores,
 } from './icons'
 
 // ── Module nav items ─────────────────────────────────────────────────────────
@@ -24,6 +30,12 @@ const MODULES = [
   { key: 'alerts',      label: 'Alertas',       Icon: IconAlertas,      to: '/alerts' },
   { key: 'maintenance', label: 'Mantenimiento', Icon: IconMantenimiento, to: '/maintenance' },
   { key: 'reports',     label: 'Reportes',      Icon: IconReportes,     to: '/reports' },
+] as const
+
+// Accesible para admin y operator de cualquier tenant
+const OPERATOR_ITEMS = [
+  { label: 'Órdenes de trabajo', to: '/work-orders', Icon: IconOrdenes },
+  { label: 'Conductores',        to: '/drivers',      Icon: IconConductores },
 ] as const
 
 const CMG_ADMIN_ITEMS = [
@@ -142,7 +154,9 @@ function DropdownMenu({ items, onClose }: DropdownMenuProps) {
 interface MobileDrawerProps {
   visibleModules: typeof MODULES[number][]
   adminItems: typeof CMG_ADMIN_ITEMS
+  operatorItems: typeof OPERATOR_ITEMS
   showAdmin: boolean
+  showOperator: boolean
   userEmail: string | undefined
   onClose: () => void
   onLogout: () => void
@@ -152,7 +166,7 @@ interface MobileDrawerProps {
 }
 
 function MobileDrawer({
-  visibleModules, adminItems, showAdmin,
+  visibleModules, adminItems, operatorItems, showAdmin, showOperator,
   userEmail, onClose, onLogout,
   reportsTab, setReportsTab, isOnReports,
 }: MobileDrawerProps) {
@@ -236,6 +250,35 @@ function MobileDrawer({
           ))}
         </div>
 
+        {/* Operator section */}
+        {showOperator && (
+          <div style={{ borderTop: '1px solid var(--bg-border)', padding: '8px 0' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operaciones</div>
+            {operatorItems.map(({ label, to, Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={onClose}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '11px 16px',
+                  color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                  fontWeight: isActive ? 600 : 400,
+                  background: isActive ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
+                  borderLeft: `3px solid ${isActive ? 'var(--accent-energy)' : 'transparent'}`,
+                })}
+              >
+                <Icon width={16} height={16}/>
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        )}
+
         {/* Admin section */}
         {showAdmin && (
           <div style={{ borderTop: '1px solid var(--bg-border)', padding: '8px 0' }}>
@@ -281,6 +324,92 @@ function MobileDrawer({
         </div>
       </div>
     </>
+  )
+}
+
+// ── Tenant selector (CMG admin only) ────────────────────────────────────────
+
+function TenantSelector() {
+  const { activeTenantId, activeTenantName, setActiveTenant } = useTenantContext()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useClickOutside(ref, () => setOpen(false))
+
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['tenants', 'selector'],
+    queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants?limit=200'),
+  })
+
+  const btnStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 12px',
+    borderRadius: 6,
+    border: activeTenantId ? '1px solid var(--accent-energy)' : '1px solid var(--bg-border)',
+    background: activeTenantId ? 'color-mix(in srgb, var(--accent-energy) 12%, transparent)' : 'transparent',
+    color: activeTenantId ? 'var(--accent-energy)' : 'var(--text-muted)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: 13,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+  }
+
+  const itemStyle = (active: boolean): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    padding: '8px 14px',
+    background: active ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
+    border: 'none',
+    color: active ? 'var(--accent-energy)' : 'var(--text-primary)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: 13,
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'background 0.1s',
+  })
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={btnStyle}>
+        <svg width={13} height={13} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="12" height="10" rx="2"/>
+          <path d="M5 3v10M2 7h13"/>
+        </svg>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>
+          {activeTenantName ?? 'Todos los clientes'}
+        </span>
+        <Chevron open={open}/>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 6px)',
+          right: 0,
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--bg-border)',
+          borderRadius: 8,
+          minWidth: 230,
+          maxHeight: 340,
+          overflowY: 'auto',
+          padding: '4px 0',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          zIndex: 200,
+        }}>
+          <button style={itemStyle(!activeTenantId)} onClick={() => { setActiveTenant(null, null); setOpen(false) }}>
+            Todos los clientes
+          </button>
+          <div style={{ height: 1, background: 'var(--bg-border)', margin: '4px 0' }}/>
+          {tenants.map(t => (
+            <button key={t.id} style={itemStyle(activeTenantId === t.id)} onClick={() => { setActiveTenant(t.id, t.name); setOpen(false) }}>
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -391,7 +520,9 @@ export default function TopNav() {
             <MobileDrawer
               visibleModules={visibleModules as unknown as typeof MODULES[number][]}
               adminItems={CMG_ADMIN_ITEMS}
+              operatorItems={OPERATOR_ITEMS}
               showAdmin={isCmg && isAdmin}
+              showOperator={isAdmin || user?.role === 'operator'}
               userEmail={user?.email}
               onClose={() => setDrawerOpen(false)}
               onLogout={logout}
@@ -463,36 +594,65 @@ export default function TopNav() {
               ))}
               </>
             ) : (
-              visibleModules.map(({ key, label, Icon, to }) => (
-                <NavLink
-                  key={key}
-                  to={to}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    padding: '0 12px',
-                    height: 'var(--topbar-h, 52px)',
-                    color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-                    borderBottom: isActive
-                      ? '2px solid var(--accent-energy)'
-                      : '2px solid transparent',
-                    textDecoration: 'none',
-                    fontSize: 13,
-                    fontWeight: isActive ? 500 : 400,
-                    transition: 'color 0.15s, border-color 0.15s',
-                    whiteSpace: 'nowrap',
-                  })}
-                >
-                  <Icon width={16} height={16}/>
-                  {label}
-                </NavLink>
-              ))
+              <>
+                {visibleModules.map(({ key, label, Icon, to }) => (
+                  <NavLink
+                    key={key}
+                    to={to}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      padding: '0 12px',
+                      height: 'var(--topbar-h, 52px)',
+                      color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                      borderBottom: isActive
+                        ? '2px solid var(--accent-energy)'
+                        : '2px solid transparent',
+                      textDecoration: 'none',
+                      fontSize: 13,
+                      fontWeight: isActive ? 500 : 400,
+                      transition: 'color 0.15s, border-color 0.15s',
+                      whiteSpace: 'nowrap',
+                    })}
+                  >
+                    <Icon width={16} height={16}/>
+                    {label}
+                  </NavLink>
+                ))}
+                {(isAdmin || user?.role === 'operator') && OPERATOR_ITEMS.map(({ label, to, Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      padding: '0 12px',
+                      height: 'var(--topbar-h, 52px)',
+                      color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                      borderBottom: isActive
+                        ? '2px solid var(--accent-energy)'
+                        : '2px solid transparent',
+                      textDecoration: 'none',
+                      fontSize: 13,
+                      fontWeight: isActive ? 500 : 400,
+                      transition: 'color 0.15s, border-color 0.15s',
+                      whiteSpace: 'nowrap',
+                    })}
+                  >
+                    <Icon width={16} height={16}/>
+                    {label}
+                  </NavLink>
+                ))}
+              </>
             )}
           </div>
 
           {/* ── Desktop: Right-side controls ──────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+
+            {isCmg && isAdmin && <TenantSelector />}
 
             {isCmg && isAdmin && (
               <div ref={adminRef} style={{ position: 'relative' }}>

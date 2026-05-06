@@ -6,6 +6,7 @@ import ProgressBar from './ProgressBar'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
+import { useTenantContext } from '../../lib/useTenantContext'
 import type { MaintenancePlanOut, VehicleOut } from '../../lib/types'
 
 const STATUS_LABEL: Record<string, string> = { ok: 'OK', 'próximo': 'PRÓXIMO', vencido: 'VENCIDO' }
@@ -28,6 +29,7 @@ export default function MaintenancePage() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
+  const { activeTenantId } = useTenantContext()
 
   const [completingPlan, setCompletingPlan] = useState<MaintenancePlanOut | null>(null)
   const [completeFile, setCompleteFile] = useState<File | null>(null)
@@ -93,14 +95,16 @@ export default function MaintenancePage() {
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  const tenantQ = activeTenantId ? `?tenant_id=${activeTenantId}` : ''
+
   const { data: plans = [], isLoading } = useQuery({
-    queryKey: keys.maintenancePlans(),
-    queryFn: () => apiClient.get<MaintenancePlanOut[]>('/api/v1/maintenance/plans'),
+    queryKey: [...keys.maintenancePlans(), activeTenantId],
+    queryFn: () => apiClient.get<MaintenancePlanOut[]>(`/api/v1/maintenance/plans${tenantQ}`),
   })
 
   const { data: vehicles = [] } = useQuery({
-    queryKey: keys.vehicles(),
-    queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
+    queryKey: [...keys.vehicles(), activeTenantId],
+    queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${tenantQ}`),
     staleTime: Infinity,
   })
 

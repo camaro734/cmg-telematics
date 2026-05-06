@@ -13,9 +13,28 @@ from src.state import (
     clear_sustained_start,
     get_accumulator,
     increment_accumulator,
+    get_geofence_state,
+    set_geofence_state,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _point_in_polygon(lat: float, lon: float, polygon: list) -> bool:
+    """Ray-casting algorithm — O(n) where n = number of vertices."""
+    inside = False
+    n = len(polygon)
+    if n < 3:
+        return False
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i][0], polygon[i][1]
+        xj, yj = polygon[j][0], polygon[j][1]
+        if ((yi > lon) != (yj > lon)) and (lat < (xj - xi) * (lon - yi) / (yj - yi + 1e-12) + xi):
+            inside = not inside
+        j = i
+    return inside
+
 
 # Map operator strings to callable comparators
 _OPS: dict[str, Any] = {
@@ -188,6 +207,33 @@ async def _eval_condition(cond: dict, rule: Rule, msg: TelemetryMsg, redis: Any)
         in_schedule = _check_schedule(schedule, msg.time)
         if not in_schedule and value != expected_outside:
             return RuleMatch(rule=rule, vehicle_id=msg.vehicle_id, trigger_value={"field": field_name, "value": value})
+        return None
+
+    if cond_type == "geofence":
+        # Fires on spatial transition: enter (outside→inside) or exit (inside→outside)
+        if msg.lat is None or msg.lon is None:
+            return None
+        polygon = cond.get("polygon", [])
+        action = cond.get("action")  # "enter" | "exit"
+        if len(polygon) < 3 or action not in ("enter", "exit"):
+            return None
+
+        inside_now = _point_in_polygon(msg.lat, msg.lon, polygon)
+        prev_inside = await get_geofence_state(redis, rule.id, msg.vehicle_id)
+        await set_geofence_state(redis, rule.id, msg.vehicle_id, inside_now)
+
+        # First telemetry — only record state, do not fire
+        if prev_inside is None:
+            return None
+
+        transition = (action == "enter" and not prev_inside and inside_now) or \
+                     (action == "exit" and prev_inside and not inside_now)
+        if transition:
+            return RuleMatch(
+                rule=rule,
+                vehicle_id=msg.vehicle_id,
+                trigger_value={"lat": msg.lat, "lon": msg.lon, "action": action},
+            )
         return None
 
     # Unknown condition type — do not fire

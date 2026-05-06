@@ -159,6 +159,28 @@ export function IconCanScanner(props: IconProps) {
   )
 }
 
+// Work orders: clipboard with checkmark
+export function IconOrdenes(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+      <rect x="9" y="3" width="6" height="4" rx="1"/>
+      <path d="m9 12 2 2 4-4"/>
+    </Icon>
+  )
+}
+
+// Driver: single person silhouette (user with hard hat feel)
+export function IconConductores(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M6 20v-2a6 6 0 0 1 12 0v2"/>
+      <path d="M8 8h8"/>
+    </Icon>
+  )
+}
+
 // ── Vehicle type icons — 64×32 side-view, stroke-based ───────────────────────
 
 type TruckIconProps = React.SVGProps<SVGSVGElement>

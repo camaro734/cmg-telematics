@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
-import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos, IconCanScanner, IconVehiculos } from './icons'
+import { IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes, IconClientes, IconReportes, IconDispositivos, IconCanScanner, IconVehiculos, IconConductores, IconOrdenes } from './icons'
 import { apiClient } from '../../lib/apiClient'
 
 function useActiveAlertCount() {
@@ -134,6 +134,18 @@ export default function Sidebar() {
       {isAdmin && (
         <NavLink to="/reports" title="Reportes" style={navLinkStyle}>
           <IconReportes width={20} height={20}/>
+        </NavLink>
+      )}
+
+      {(isAdmin || user?.role === 'operator') && (
+        <NavLink to="/work-orders" title="Órdenes de trabajo" style={navLinkStyle}>
+          <IconOrdenes width={20} height={20}/>
+        </NavLink>
+      )}
+
+      {(isAdmin || user?.role === 'operator') && (
+        <NavLink to="/drivers" title="Conductores" style={navLinkStyle}>
+          <IconConductores width={20} height={20}/>
         </NavLink>
       )}
 

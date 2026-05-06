@@ -325,3 +325,38 @@ async def create_tenant_user(
         raise HTTPException(status_code=409, detail="Email ya registrado")
     await db.refresh(new_user)
     return new_user
+
+
+# ── Portal token ──────────────────────────────────────────────────────────────
+
+import secrets as _secrets
+
+@router.post("/tenants/{tenant_id}/portal-token", status_code=200)
+async def generate_portal_token(
+    tenant_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" and str(user.tenant_id) != str(tenant_id):
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant or not tenant.active:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    tenant.portal_access_token = _secrets.token_urlsafe(32)
+    await db.commit()
+    await db.refresh(tenant)
+    return {"portal_access_token": tenant.portal_access_token}
+
+
+@router.get("/tenants/{tenant_id}/portal-token", status_code=200)
+async def get_portal_token(
+    tenant_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.tenant_tier != "cmg" and str(user.tenant_id) != str(tenant_id):
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant or not tenant.active:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    return {"portal_access_token": tenant.portal_access_token}

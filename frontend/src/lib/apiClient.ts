@@ -45,6 +45,28 @@ export const apiClient = {
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
+  postForm: async <T>(path: string, formData: FormData, retry = true): Promise<T> => {
+    const token = useAuthStore.getState().accessToken
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    let res: Response
+    try {
+      res = await fetch(path, { method: 'POST', headers, body: formData })
+    } catch {
+      throw new Error('Error de red')
+    }
+    if (res.status === 401 && retry) {
+      const ok = await useAuthStore.getState().refresh()
+      if (ok) return apiClient.postForm<T>(path, formData, false)
+      useAuthStore.getState().logout()
+      throw new Error('Sesión expirada')
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText)
+      throw new Error(`${res.status}: ${text}`)
+    }
+    return res.json() as Promise<T>
+  },
   getBlob: async (path: string, retry = true): Promise<Blob> => {
     const token = useAuthStore.getState().accessToken
     const headers: Record<string, string> = {}

@@ -37,6 +37,21 @@ def _eval_threshold(condition: dict, field_values: dict) -> tuple[bool, float | 
         return False, None
 
 
+def _point_in_polygon(lat: float, lon: float, polygon: list) -> bool:
+    inside = False
+    n = len(polygon)
+    if n < 3:
+        return False
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i][0], polygon[i][1]
+        xj, yj = polygon[j][0], polygon[j][1]
+        if ((yi > lon) != (yj > lon)) and (lat < (xj - xi) * (lon - yi) / (yj - yi + 1e-12) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
 @router.get("/rules", response_model=list[RuleOut])
 async def list_rules(
     user: CurrentUser = Depends(get_current_user),
@@ -144,6 +159,17 @@ async def test_rule(
     if ctype == "threshold":
         fired, val = _eval_threshold(rule.condition, body.field_values)
         return RuleTestResult(would_fire=fired, trigger_value=val)
+
+    if ctype == "geofence":
+        lat = body.field_values.get("lat")
+        lon = body.field_values.get("lon")
+        if lat is None or lon is None:
+            return RuleTestResult(would_fire=False, reason="Proporciona 'lat' y 'lon' en field_values para probar geofence")
+        polygon = rule.condition.get("polygon", [])
+        action = rule.condition.get("action", "enter")
+        inside = _point_in_polygon(float(lat), float(lon), polygon)
+        would_fire = (action == "enter" and inside) or (action == "exit" and not inside)
+        return RuleTestResult(would_fire=would_fire, reason=f"Punto {'dentro' if inside else 'fuera'} del polígono")
 
     return RuleTestResult(
         would_fire=False,

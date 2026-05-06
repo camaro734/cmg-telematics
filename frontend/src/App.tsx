@@ -35,6 +35,9 @@ const DevicesPage      = lazy(() => import('./features/devices/DevicesPage'))
 const CanScannerPage   = lazy(() => import('./features/diagnostics/CanScannerPage'))
 const VehiclesPage     = lazy(() => import('./features/vehicles/VehiclesPage'))
 const VehicleTypesPage = lazy(() => import('./features/vehicles/VehicleTypesPage'))
+const DriversPage      = lazy(() => import('./features/drivers/DriversPage'))
+const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPage'))
+const ClientPortalPage = lazy(() => import('./features/portal/ClientPortalPage'))
 
 function Loading() {
   return (
@@ -55,6 +58,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/portal/:token" element={<Suspense fallback={<Loading />}><ClientPortalPage /></Suspense>} />
       <Route
         path="/*"
         element={
@@ -82,6 +86,8 @@ export default function App() {
                 <Route path="tipos-vehiculo"   element={<SectionErrorBoundary label="TiposVehiculo"><VehicleTypesPage /></SectionErrorBoundary>} />
                 <Route path="devices"          element={<SectionErrorBoundary label="Devices"><DevicesPage /></SectionErrorBoundary>} />
                 <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
+                <Route path="drivers"          element={<SectionErrorBoundary label="Drivers"><DriversPage /></SectionErrorBoundary>} />
+                <Route path="work-orders"     element={<SectionErrorBoundary label="WorkOrders"><WorkOrdersPage /></SectionErrorBoundary>} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>
             </Suspense>

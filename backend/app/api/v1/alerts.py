@@ -23,6 +23,7 @@ async def list_alerts(
     vehicle_id: uuid.UUID | None = Query(None),
     triggered_at_from: datetime | None = Query(None),
     triggered_at_to: datetime | None = Query(None),
+    tenant_id: uuid.UUID | None = Query(None),
     limit: int = 50,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -32,6 +33,8 @@ async def list_alerts(
     query = select(AlertInstance)
     if user.tenant_tier != "cmg":
         query = query.where(AlertInstance.tenant_id == user.tenant_id)
+    elif tenant_id is not None:
+        query = query.where(AlertInstance.tenant_id == tenant_id)
     if alert_status:
         query = query.where(AlertInstance.status == alert_status)
     if vehicle_id:
@@ -78,6 +81,7 @@ async def export_alerts_csv(
     vehicle_id: uuid.UUID | None = Query(None),
     triggered_at_from: datetime | None = Query(None),
     triggered_at_to: datetime | None = Query(None),
+    tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -87,6 +91,8 @@ async def export_alerts_csv(
     )
     if user.tenant_tier != "cmg":
         query = query.where(AlertInstance.tenant_id == user.tenant_id)
+    elif tenant_id is not None:
+        query = query.where(AlertInstance.tenant_id == tenant_id)
     if alert_status:
         query = query.where(AlertInstance.status == alert_status)
     if vehicle_id:

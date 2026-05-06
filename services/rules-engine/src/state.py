@@ -29,3 +29,15 @@ async def get_accumulator(redis: Redis, rule_id: str, vehicle_id: str) -> float:
 
 async def increment_accumulator(redis: Redis, rule_id: str, vehicle_id: str, delta: float) -> float:
     return float(await redis.incrbyfloat(f"rule:accum:{rule_id}:{vehicle_id}", delta))
+
+
+async def get_geofence_state(redis: Redis, rule_id: str, vehicle_id: str) -> bool | None:
+    """Retorna True/False si hay estado conocido, None si es la primera vez."""
+    val = await redis.hget(f"rule:geofence:{rule_id}:{vehicle_id}", "inside")
+    if val is None:
+        return None
+    return val == b"1" or val == "1"
+
+
+async def set_geofence_state(redis: Redis, rule_id: str, vehicle_id: str, inside: bool) -> None:
+    await redis.hset(f"rule:geofence:{rule_id}:{vehicle_id}", "inside", "1" if inside else "0")
