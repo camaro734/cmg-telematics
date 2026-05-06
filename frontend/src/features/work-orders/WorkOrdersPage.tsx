@@ -120,6 +120,23 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
 // ── Stop location picker (Leaflet map, click to set lat/lon) ──────────────────
 type NominatimPlace = { lat: string; lon: string; display_name: string }
 
+// Chincheta naranja SVG — evita el icono PNG por defecto de Leaflet que Vite no resuelve
+function makeStopIcon(label?: string) {
+  return L.divIcon({
+    html: `<div style="position:relative;width:28px;height:36px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.45))">
+        <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z" fill="#F97316"/>
+        <circle cx="14" cy="14" r="6" fill="white"/>
+        ${label ? `<text x="14" y="18" text-anchor="middle" font-size="8" font-weight="700" fill="#F97316" font-family="monospace">${label}</text>` : ''}
+      </svg>
+    </div>`,
+    className: '',
+    iconSize: [28, 36],
+    iconAnchor: [14, 36],
+    popupAnchor: [0, -38],
+  })
+}
+
 function StopLocationPicker({
   lat, lon, searchQuery, onPick,
 }: { lat: number | null; lon: number | null; searchQuery?: string; onPick: (lat: number, lon: number) => void }) {
@@ -141,12 +158,12 @@ function StopLocationPicker({
     }).addTo(map)
     mapRef.current = map
     if (lat && lon) {
-      markerRef.current = L.marker([lat, lon]).addTo(map)
+      markerRef.current = L.marker([lat, lon], { icon: makeStopIcon() }).addTo(map)
     }
     map.on('click', (e: L.LeafletMouseEvent) => {
       onPick(e.latlng.lat, e.latlng.lng)
       if (markerRef.current) markerRef.current.setLatLng(e.latlng)
-      else markerRef.current = L.marker(e.latlng).addTo(map)
+      else markerRef.current = L.marker(e.latlng, { icon: makeStopIcon() }).addTo(map)
       setShowDrop(false)
     })
     return () => { map.remove(); mapRef.current = null }
@@ -181,7 +198,7 @@ function StopLocationPicker({
     if (mapRef.current) {
       mapRef.current.setView([la, lo], 16)
       if (markerRef.current) markerRef.current.setLatLng([la, lo])
-      else markerRef.current = L.marker([la, lo]).addTo(mapRef.current)
+      else markerRef.current = L.marker([la, lo], { icon: makeStopIcon() }).addTo(mapRef.current)
     }
   }
 
