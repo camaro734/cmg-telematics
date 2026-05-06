@@ -541,7 +541,19 @@ interface ModalProps {
   onSaved: () => void
 }
 
+type DraftStop = {
+  _id: string
+  title: string
+  client_name: string
+  address: string
+  lat: number | null
+  lon: number | null
+  notes: string
+  mapOpen: boolean
+}
+
 function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalProps) {
+  const qc = useQueryClient()
   const [form, setForm] = useState({
     title: initial?.title ?? '',
     description: initial?.description ?? '',
@@ -549,46 +561,90 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
     driver_id: initial?.driver_id ?? '',
     priority: (initial?.priority ?? 'normal') as WorkOrderPriority,
     scheduled_at: initial?.scheduled_at?.slice(0, 16) ?? '',
-    location_address: initial?.location_address ?? '',
     notes: initial?.notes ?? '',
   })
+  const [draftStops, setDraftStops] = useState<DraftStop[]>([])
   const [error, setError] = useState('')
 
+  function addStop() {
+    setDraftStops(ds => [...ds, {
+      _id: Math.random().toString(36).slice(2),
+      title: '', client_name: '', address: '',
+      lat: null, lon: null, notes: '', mapOpen: true,
+    }])
+  }
+
+  function updateStop(_id: string, field: keyof DraftStop, value: unknown) {
+    setDraftStops(ds => ds.map(d => d._id === _id ? { ...d, [field]: value } : d))
+  }
+
+  function removeStop(_id: string) {
+    setDraftStops(ds => ds.filter(d => d._id !== _id))
+  }
+
+  const validStops = draftStops.filter(s => s.title.trim())
+
   const { mutate, isPending } = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload = {
         ...form,
         vehicle_id: form.vehicle_id || null,
         driver_id: form.driver_id || null,
         scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
         description: form.description || null,
-        location_address: form.location_address || null,
         notes: form.notes || null,
       }
-      return initial
-        ? apiClient.put<WorkOrderOut>(`/api/v1/work-orders/${initial.id}`, payload)
-        : apiClient.post<WorkOrderOut>('/api/v1/work-orders', payload)
+      const order = initial
+        ? await apiClient.put<WorkOrderOut>(`/api/v1/work-orders/${initial.id}`, payload)
+        : await apiClient.post<WorkOrderOut>('/api/v1/work-orders', payload)
+      for (let i = 0; i < draftStops.length; i++) {
+        const s = draftStops[i]
+        if (!s.title.trim()) continue
+        await apiClient.post(`/api/v1/work-orders/${order.id}/stops`, {
+          order_index: i,
+          title: s.title,
+          client_name: s.client_name || null,
+          address: s.address || null,
+          lat: s.lat,
+          lon: s.lon,
+          notes: s.notes || null,
+        })
+      }
+      return order
     },
-    onSuccess: () => { onSaved(); onClose() },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.workOrders() })
+      onSaved()
+      onClose()
+    },
     onError: (e) => setError((e as Error).message),
   })
 
   const u = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
+  const saveLabel = isPending
+    ? 'Guardando…'
+    : initial
+      ? 'Guardar cambios'
+      : validStops.length > 0
+        ? `Crear orden + ${validStops.length} parada${validStops.length > 1 ? 's' : ''}`
+        : 'Crear orden'
+
   return (
     <div style={S.overlay} onClick={onClose}>
-      <div style={S.modal} onClick={e => e.stopPropagation()}>
+      <div style={{ ...S.modal, width: 'min(700px, 95vw)' }} onClick={e => e.stopPropagation()}>
         <h2 style={{ ...S.title, fontSize: 16, margin: 0 }}>
           {initial ? 'Editar orden' : 'Nueva orden de trabajo'}
         </h2>
 
+        {/* ── Datos generales ── */}
         <div style={S.field}>
           <span style={S.label}>Título *</span>
           <input style={S.input} value={form.title} onChange={e => u('title', e.target.value)} placeholder="Ej: Limpieza alcantarilla Calle Mayor 5"/>
         </div>
         <div style={S.field}>
           <span style={S.label}>Descripción</span>
-          <textarea style={{ ...S.input, resize: 'vertical', minHeight: 56 }} value={form.description} onChange={e => u('description', e.target.value)}/>
+          <textarea style={{ ...S.input, resize: 'vertical', minHeight: 48 }} value={form.description} onChange={e => u('description', e.target.value)}/>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div style={S.field}>
@@ -621,20 +677,139 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           </div>
         </div>
         <div style={S.field}>
-          <span style={S.label}>Dirección / Ubicación</span>
-          <input style={S.input} value={form.location_address} onChange={e => u('location_address', e.target.value)} placeholder="Calle, número, localidad"/>
-        </div>
-        <div style={S.field}>
           <span style={S.label}>Notas internas</span>
-          <textarea style={{ ...S.input, resize: 'vertical', minHeight: 48 }} value={form.notes} onChange={e => u('notes', e.target.value)}/>
+          <textarea style={{ ...S.input, resize: 'vertical', minHeight: 40 }} value={form.notes} onChange={e => u('notes', e.target.value)}/>
+        </div>
+
+        {/* ── Paradas programadas ── */}
+        <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Paradas programadas
+              </span>
+              {draftStops.length > 0 && (
+                <span style={{ fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--accent-energy)', marginLeft: 6 }}>
+                  {draftStops.length}
+                </span>
+              )}
+            </div>
+            <button
+              style={{ ...S.btnSm, background: 'color-mix(in srgb, var(--accent-energy) 15%, transparent)', color: 'var(--accent-energy)', border: '1px solid var(--accent-energy)', fontSize: 12 }}
+              onClick={addStop}
+              type="button"
+            >
+              + Añadir parada
+            </button>
+          </div>
+
+          {draftStops.length === 0 && (
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', margin: '0 0 4px' }}>
+              Sin paradas — el conductor recibirá las instrucciones generales. Añade paradas para definir los puntos de trabajo con ubicación en el mapa.
+            </p>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {draftStops.map((stop, idx) => (
+              <div key={stop._id} style={{
+                background: 'var(--bg-base)', borderRadius: 8, padding: 12,
+                border: '1px solid var(--bg-border)', borderLeft: '3px solid var(--accent-energy)',
+              }}>
+                {/* Row 1: número + título + eliminar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{
+                    fontFamily: 'var(--font-data)', fontSize: 11, fontWeight: 700,
+                    color: 'var(--accent-energy)', background: 'rgba(249,115,22,0.15)',
+                    borderRadius: '50%', width: 22, height: 22,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {idx + 1}
+                  </span>
+                  <input
+                    style={{ ...S.input, flex: 1, padding: '5px 8px', fontSize: 13, fontWeight: 600 }}
+                    placeholder="Título de la parada *"
+                    value={stop.title}
+                    onChange={e => updateStop(stop._id, 'title', e.target.value)}
+                  />
+                  <button
+                    style={{ background: 'transparent', border: 'none', color: 'var(--accent-crit)', fontSize: 18, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
+                    onClick={() => removeStop(stop._id)}
+                    title="Eliminar parada"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Row 2: cliente + dirección */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <input
+                    style={{ ...S.input, padding: '5px 8px', fontSize: 12 }}
+                    placeholder="Cliente / empresa"
+                    value={stop.client_name}
+                    onChange={e => updateStop(stop._id, 'client_name', e.target.value)}
+                  />
+                  <input
+                    style={{ ...S.input, padding: '5px 8px', fontSize: 12 }}
+                    placeholder="Dirección"
+                    value={stop.address}
+                    onChange={e => updateStop(stop._id, 'address', e.target.value)}
+                  />
+                </div>
+
+                {/* Row 3: notas */}
+                <input
+                  style={{ ...S.input, width: '100%', boxSizing: 'border-box', padding: '5px 8px', fontSize: 12, marginBottom: 8 }}
+                  placeholder="Instrucciones para el conductor"
+                  value={stop.notes}
+                  onChange={e => updateStop(stop._id, 'notes', e.target.value)}
+                />
+
+                {/* Toggle mapa */}
+                <button
+                  style={{
+                    ...S.btnSm, fontSize: 11,
+                    color: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : 'var(--text-muted)'),
+                    borderColor: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : undefined),
+                  }}
+                  onClick={() => updateStop(stop._id, 'mapOpen', !stop.mapOpen)}
+                  type="button"
+                >
+                  {stop.mapOpen
+                    ? '▲ Cerrar mapa'
+                    : stop.lat
+                      ? `✓ Ubicación fijada · ${stop.lat.toFixed(4)}, ${stop.lon?.toFixed(4)}`
+                      : '📍 Fijar ubicación en mapa'}
+                </button>
+
+                {stop.mapOpen && (
+                  <div style={{ marginTop: 8 }}>
+                    <StopLocationPicker
+                      lat={stop.lat}
+                      lon={stop.lon}
+                      onPick={(la, lo) => {
+                        updateStop(stop._id, 'lat', la)
+                        updateStop(stop._id, 'lon', lo)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {error && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--accent-crit)' }}>{error}</span>}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button style={S.btnSm} onClick={onClose}>Cancelar</button>
-          <button style={{ ...S.btn, opacity: isPending || !form.title.trim() ? 0.6 : 1 }} disabled={isPending || !form.title.trim()} onClick={() => mutate()}>
-            {isPending ? 'Guardando…' : 'Guardar'}
+          <button style={S.btnSm} onClick={onClose} type="button">Cancelar</button>
+          <button
+            style={{ ...S.btn, opacity: isPending || !form.title.trim() ? 0.6 : 1 }}
+            disabled={isPending || !form.title.trim()}
+            onClick={() => mutate()}
+            type="button"
+          >
+            {saveLabel}
           </button>
         </div>
       </div>
