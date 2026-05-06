@@ -430,16 +430,19 @@ export default function TopNav() {
   const isAdmin  = user?.role === 'admin'
   const onReports = location.pathname === '/reports'
 
-  const [adminOpen, setAdminOpen] = useState(false)
-  const [userOpen,  setUserOpen]  = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [adminOpen,    setAdminOpen]    = useState(false)
+  const [operatorOpen, setOperatorOpen] = useState(false)
+  const [userOpen,     setUserOpen]     = useState(false)
+  const [drawerOpen,   setDrawerOpen]   = useState(false)
   const [logoImgError, setLogoImgError] = useState(false)
 
-  const adminRef = useRef<HTMLDivElement>(null)
-  const userRef  = useRef<HTMLDivElement>(null)
+  const adminRef    = useRef<HTMLDivElement>(null)
+  const operatorRef = useRef<HTMLDivElement>(null)
+  const userRef     = useRef<HTMLDivElement>(null)
 
-  useClickOutside(adminRef, () => setAdminOpen(false))
-  useClickOutside(userRef,  () => setUserOpen(false))
+  useClickOutside(adminRef,    () => setAdminOpen(false))
+  useClickOutside(operatorRef, () => setOperatorOpen(false))
+  useClickOutside(userRef,     () => setUserOpen(false))
 
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false) }, [location.pathname])
@@ -635,31 +638,6 @@ export default function TopNav() {
                     {label}
                   </NavLink>
                 ))}
-                {(isAdmin || user?.role === 'operator') && OPERATOR_ITEMS.map(({ label, to, Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      padding: '0 12px',
-                      height: 'var(--topbar-h, 52px)',
-                      color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-                      borderBottom: isActive
-                        ? '2px solid var(--accent-energy)'
-                        : '2px solid transparent',
-                      textDecoration: 'none',
-                      fontSize: 13,
-                      fontWeight: isActive ? 500 : 400,
-                      transition: 'color 0.15s, border-color 0.15s',
-                      whiteSpace: 'nowrap',
-                    })}
-                  >
-                    <Icon width={16} height={16}/>
-                    {label}
-                  </NavLink>
-                ))}
               </>
             )}
           </div>
@@ -669,10 +647,26 @@ export default function TopNav() {
 
             {isCmg && isAdmin && <TenantSelector />}
 
+            {(isAdmin || user?.role === 'operator') && (
+              <div ref={operatorRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => { setOperatorOpen(o => !o); setAdminOpen(false); setUserOpen(false) }}
+                  style={btnBase}
+                >
+                  <IconOrdenes width={15} height={15}/>
+                  Operaciones
+                  <Chevron open={operatorOpen}/>
+                </button>
+                {operatorOpen && (
+                  <DropdownMenu items={OPERATOR_ITEMS as unknown as typeof CMG_ADMIN_ITEMS} onClose={() => setOperatorOpen(false)}/>
+                )}
+              </div>
+            )}
+
             {isCmg && isAdmin && (
               <div ref={adminRef} style={{ position: 'relative' }}>
                 <button
-                  onClick={() => { setAdminOpen(o => !o); setUserOpen(false) }}
+                  onClick={() => { setAdminOpen(o => !o); setOperatorOpen(false); setUserOpen(false) }}
                   style={btnBase}
                 >
                   <IconAjustes width={15} height={15}/>
