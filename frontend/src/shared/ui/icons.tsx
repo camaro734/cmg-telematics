@@ -18,6 +18,18 @@ function Icon({ children, ...props }: IconProps & { children: React.ReactNode })
   )
 }
 
+// Dashboard: 2×2 grid of widgets
+export function IconDashboard(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+    </Icon>
+  )
+}
+
 // Fleet: truck side-profile — cab + cargo box, dual rear axle
 export function IconFlota(props: IconProps) {
   return (

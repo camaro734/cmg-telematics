@@ -5,7 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { useNavigate } from 'react-router-dom'
 import { useFleetStore } from './useFleetStore'
-import type { VehicleOut, VehicleStatus, AlertInstanceOut } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut } from '../../lib/types'
 
 
 // ── Design token mirrors (CSS vars can't be used in SVG strings) ────────────
@@ -175,9 +175,11 @@ interface FleetMapProps {
   statuses: Map<string, VehicleStatus>
   vehicleTypes?: unknown[]
   firingAlerts?: AlertInstanceOut[]
+  rules?: RuleOut[]
+  workOrders?: WorkOrderOut[]
 }
 
-export default function FleetMap({ vehicles, statuses, firingAlerts = [] }: FleetMapProps) {
+export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules = [], workOrders = [] }: FleetMapProps) {
   const navigate = useNavigate()
   const { selectedId } = useFleetStore()
   const mapRef = useRef<L.Map | null>(null)
@@ -185,6 +187,8 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [] }: Flee
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
   // Círculos de precisión GPS por vehículo
   const circlesRef = useRef<Map<string, L.Circle>>(new Map())
+  const geofenceLayerRef = useRef<L.LayerGroup | null>(null)
+  const orderLayerRef    = useRef<L.LayerGroup | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const initialFitDoneRef = useRef(false)
 
@@ -237,6 +241,10 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [] }: Flee
       if (raf !== null) cancelAnimationFrame(raf)
       clusterGroupRef.current?.clearLayers()
       clusterGroupRef.current = null
+      geofenceLayerRef.current?.clearLayers()
+      geofenceLayerRef.current = null
+      orderLayerRef.current?.clearLayers()
+      orderLayerRef.current = null
       mapRef.current?.remove()
       mapRef.current = null
     }
@@ -336,6 +344,56 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [] }: Flee
       map.flyTo([status.lat, status.lon], 14, { duration: 0.8 })
     }
   }, [selectedId, statuses])
+
+  // Geofence polygons from alert rules
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (!geofenceLayerRef.current) {
+      geofenceLayerRef.current = L.layerGroup().addTo(map)
+    }
+    geofenceLayerRef.current.clearLayers()
+    for (const rule of rules) {
+      const cond = rule.condition
+      if (cond.type !== 'geofence' || !cond.polygon || cond.polygon.length < 3) continue
+      const poly = L.polygon(cond.polygon as [number, number][], {
+        color: T_ORANGE, fillColor: T_ORANGE, fillOpacity: 0.10,
+        weight: 2, dashArray: '6 4',
+      })
+      poly.bindTooltip(rule.name, { direction: 'center', className: '' })
+      geofenceLayerRef.current.addLayer(poly)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rules])
+
+  // Work order pins (pending + in_progress with coordinates)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (!orderLayerRef.current) {
+      orderLayerRef.current = L.layerGroup().addTo(map)
+    }
+    orderLayerRef.current.clearLayers()
+    for (const order of workOrders) {
+      if (order.location_lat == null || order.location_lon == null) continue
+      if (order.status !== 'pending' && order.status !== 'in_progress') continue
+      const color = order.status === 'in_progress' ? T_ORANGE : T_INFO
+      const label = order.status === 'in_progress' ? 'En curso' : 'Pendiente'
+      const marker = L.circleMarker([order.location_lat, order.location_lon], {
+        radius: 9, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.92,
+      })
+      marker.bindPopup(`
+        <div style="font-family:var(--font-ui,sans-serif);min-width:170px;padding:2px 0">
+          <div style="font-weight:600;font-size:13px;margin-bottom:4px">${order.title}</div>
+          ${order.vehicle_name ? `<div style="font-size:11px;color:#999;margin-bottom:2px">${order.vehicle_name}</div>` : ''}
+          ${order.driver_name  ? `<div style="font-size:11px;color:#999;margin-bottom:6px">${order.driver_name}</div>` : ''}
+          <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${color}22;color:${color}">${label}</span>
+        </div>
+      `)
+      orderLayerRef.current.addLayer(marker)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workOrders])
 
   // Handle popup link clicks (SPA navigation)
   useEffect(() => {

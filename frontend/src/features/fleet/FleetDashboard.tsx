@@ -8,7 +8,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
-import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, TenantOut, VehicleStatus } from '../../lib/types'
+import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, TenantOut, VehicleStatus, RuleOut, WorkOrderOut } from '../../lib/types'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
 
@@ -199,6 +199,17 @@ export default function FleetDashboard() {
     refetchInterval: 30_000,
   })
 
+  const { data: rules = [] } = useQuery({
+    queryKey: keys.rules(),
+    queryFn: () => apiClient.get<RuleOut[]>('/api/v1/rules'),
+    staleTime: 5 * 60_000,
+  })
+
+  const { data: activeOrders = [] } = useQuery({
+    queryKey: ['fleet-orders', activeTenantId],
+    queryFn: () => apiClient.get<WorkOrderOut[]>(`/api/v1/work-orders?limit=200${activeTenantId ? `&tenant_id=${activeTenantId}` : ''}`),
+    staleTime: 60_000,
+  })
 
   const statuses = useVehicleStatuses(vehicles)
   const typeById = new Map(vehicleTypes.map(t => [t.id, t]))
@@ -240,7 +251,7 @@ export default function FleetDashboard() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ width: '100%', height: '55vh', minHeight: 260, flexShrink: 0 }}>
-          <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} firingAlerts={firingAlerts} />
+          <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} firingAlerts={firingAlerts} rules={rules} workOrders={activeOrders} />
         </div>
 
         {selectedVehicle && (
@@ -312,7 +323,7 @@ export default function FleetDashboard() {
 
       {/* MAP — fills everything */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} firingAlerts={firingAlerts} />
+        <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} firingAlerts={firingAlerts} rules={rules} workOrders={activeOrders} />
       </div>
 
       {/* SIDEBAR — collapsible left panel */}
