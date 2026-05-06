@@ -7,13 +7,42 @@ import { SectionErrorBoundary } from './shared/ui/SectionErrorBoundary'
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
   static getDerivedStateFromError(e: Error) { return { error: e } }
-  componentDidCatch(e: Error, info: ErrorInfo) { console.error('[EB]', e, info) }
+  componentDidCatch(e: Error, info: ErrorInfo) {
+    console.error('[EB]', e, info)
+    // Chunk load failure after a new deploy — do one hard reload to fetch fresh assets
+    const isChunkError = e.message?.includes('Failed to fetch dynamically imported module')
+      || e.message?.includes('Importing a module script failed')
+      || e.message?.includes('error loading dynamically imported module')
+    if (isChunkError) {
+      const reloaded = sessionStorage.getItem('chunk_reload')
+      if (!reloaded) {
+        sessionStorage.setItem('chunk_reload', '1')
+        window.location.reload()
+      }
+    }
+  }
   render() {
-    if (this.state.error) return (
-      <div style={{ padding: 24, background: '#1C1917', color: '#ef4444', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
-        <b>ERROR (ErrorBoundary):</b>{'\n'}{String(this.state.error)}{'\n'}{(this.state.error as Error).stack}
-      </div>
-    )
+    if (this.state.error) {
+      const msg = String(this.state.error)
+      const isChunk = msg.includes('Failed to fetch dynamically imported module')
+        || msg.includes('Importing a module script failed')
+      if (isChunk) return (
+        <div style={{ padding: 24, background: '#1C1917', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          <div style={{ fontSize: 15 }}>Actualizando la aplicación…</div>
+          <button
+            onClick={() => { sessionStorage.removeItem('chunk_reload'); window.location.reload() }}
+            style={{ padding: '8px 20px', borderRadius: 8, background: '#F97316', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+          >
+            Recargar
+          </button>
+        </div>
+      )
+      return (
+        <div style={{ padding: 24, background: '#1C1917', color: '#ef4444', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
+          <b>ERROR (ErrorBoundary):</b>{'\n'}{msg}{'\n'}{(this.state.error as Error).stack}
+        </div>
+      )
+    }
     return this.props.children
   }
 }

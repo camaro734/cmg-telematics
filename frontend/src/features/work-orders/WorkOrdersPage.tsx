@@ -5,7 +5,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type {
   WorkOrderOut, WorkOrderStatus, WorkOrderPriority, DriverOut, VehicleOut,
-  WorkOrderStopOut, WorkOrderStopCreate, WorkOrderStopStatus,
+  WorkOrderStopOut, WorkOrderStopCreate, WorkOrderStopStatus, VehicleStatus,
 } from '../../lib/types'
 import Shell from '../../shared/ui/Shell'
 import WorkReportModal from './WorkReportModal'
@@ -20,6 +20,20 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef       = useRef<L.Map | null>(null)
   const layerRef     = useRef<L.LayerGroup | null>(null)
+
+  // Fetch live vehicle positions for in_progress orders
+  const vehicleIds = [...new Set(
+    orders.filter(o => o.status === 'in_progress' && o.vehicle_id).map(o => o.vehicle_id!)
+  )]
+  const { data: statuses = [] } = useQuery<VehicleStatus[]>({
+    queryKey: ['vehicle-statuses-map', vehicleIds.join(',')],
+    queryFn: () => vehicleIds.length
+      ? apiClient.get<VehicleStatus[]>(`/api/v1/vehicles/statuses?ids=${vehicleIds.join(',')}`)
+      : Promise.resolve([]),
+    refetchInterval: 15_000,
+    enabled: vehicleIds.length > 0,
+  })
+  const statusMap = Object.fromEntries(statuses.map(s => [s.vehicle_id, s]))
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -39,6 +53,8 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
     const map = mapRef.current
     if (!map || !layerRef.current) return
     layerRef.current.clearLayers()
+
+    // Order destination markers
     const valid = orders.filter(o =>
       o.location_lat != null && o.location_lon != null &&
       (o.status === 'pending' || o.status === 'in_progress')
@@ -62,13 +78,36 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
         `)
         .addTo(layerRef.current!)
     }
-    if (valid.length > 0) {
+
+    // Live vehicle position markers
+    for (const o of orders.filter(o => o.status === 'in_progress' && o.vehicle_id)) {
+      const st = statusMap[o.vehicle_id!]
+      if (!st?.lat || !st?.lon) continue
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:#F97316;border:2px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 6px #F9731688"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      })
+      L.marker([st.lat, st.lon], { icon })
+        .bindPopup(`
+          <div style="font-family:sans-serif;min-width:150px;padding:2px 0">
+            <div style="font-weight:600;font-size:12px;margin-bottom:4px">🚚 ${o.vehicle_name ?? 'Vehículo'}</div>
+            ${o.driver_name ? `<div style="font-size:11px;color:#999">${o.driver_name}</div>` : ''}
+            <div style="font-size:11px;color:#999;margin-top:4px">${st.speed_kmh != null ? `${st.speed_kmh.toFixed(0)} km/h` : 'Parado'}</div>
+            <div style="margin-top:6px;font-size:10px;color:#F97316;font-weight:700">📋 ${o.title}</div>
+          </div>
+        `)
+        .addTo(layerRef.current!)
+    }
+
+    if (valid.length > 0 || statuses.some(s => s.lat && s.lon)) {
       try {
         const group = L.featureGroup(layerRef.current.getLayers())
-        map.fitBounds(group.getBounds().pad(0.25))
+        if (group.getLayers().length > 0) map.fitBounds(group.getBounds().pad(0.25))
       } catch { /* ignore */ }
     }
-  }, [orders])
+  }, [orders, statuses])
 
   return (
     <div

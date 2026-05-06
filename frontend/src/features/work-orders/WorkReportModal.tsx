@@ -186,6 +186,14 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
     },
   })
 
+  const { mutate: deleteReport, isPending: deleting } = useMutation({
+    mutationFn: () => apiClient.delete(`/api/v1/work-orders/${order.id}/report`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.workReport(order.id) })
+      onClose()
+    },
+  })
+
   const { mutate: uploadPhoto, isPending: uploading } = useMutation({
     mutationFn: (file: File) => {
       const fd = new FormData()
@@ -375,23 +383,36 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
         </div>
 
         {/* Acciones */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--bg-border)' }}>
-          {saveMsg && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--accent-ok)' }}>{saveMsg}</span>}
-          <button
-            style={{ ...S.btnSm }}
-            disabled={pdfLoading || !report}
-            onClick={downloadPdf}
-            title={!report ? 'Guarda el informe primero' : ''}
-          >
-            {pdfLoading ? 'Generando…' : 'Descargar PDF'}
-          </button>
-          <button
-            style={{ ...S.btn, opacity: saving ? 0.7 : 1 }}
-            disabled={saving}
-            onClick={() => saveReport()}
-          >
-            {saving ? 'Guardando…' : 'Guardar informe'}
-          </button>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--bg-border)' }}>
+          <div>
+            {report && (
+              <button
+                style={{ ...S.btnSm, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)', opacity: deleting ? 0.6 : 1 }}
+                disabled={deleting}
+                onClick={() => { if (confirm('¿Eliminar el informe? Esta acción no se puede deshacer.')) deleteReport() }}
+              >
+                {deleting ? 'Eliminando…' : 'Eliminar informe'}
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {saveMsg && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--accent-ok)' }}>{saveMsg}</span>}
+            <button
+              style={{ ...S.btnSm }}
+              disabled={pdfLoading || !report}
+              onClick={downloadPdf}
+              title={!report ? 'Guarda el informe primero' : ''}
+            >
+              {pdfLoading ? 'Generando…' : 'Descargar PDF'}
+            </button>
+            <button
+              style={{ ...S.btn, opacity: saving ? 0.7 : 1 }}
+              disabled={saving}
+              onClick={() => saveReport()}
+            >
+              {saving ? 'Guardando…' : 'Guardar informe'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

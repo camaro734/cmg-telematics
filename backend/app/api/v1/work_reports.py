@@ -238,6 +238,23 @@ async def upload_photo(
     return report
 
 
+@router.delete("/{order_id}/report", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_report(
+    order_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await _get_order_authorized(order_id, user, db)
+    result = await db.execute(select(WorkReport).where(WorkReport.work_order_id == order_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Informe no encontrado")
+    await db.delete(report)
+    await db.commit()
+
+
 @router.get("/{order_id}/report/pdf")
 async def download_pdf(
     order_id: uuid.UUID,
