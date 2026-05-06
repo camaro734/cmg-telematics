@@ -5,6 +5,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useReportsTabStore } from './useReportsTabStore'
+import { useTenantContext } from '../../lib/useTenantContext'
 import type { ReportsTab } from './useReportsTabStore'
 import type { TenantOut, VehicleOut, VehicleTypeOut } from '../../lib/types'
 
@@ -68,6 +69,7 @@ export function useReportData(): UseReportDataReturn {
   const user = useAuthStore(s => s.user)
   const isCmg = user?.tenant_tier === 'cmg'
   const location = useLocation()
+  const { activeTenantId } = useTenantContext()
   const navigate = useNavigate()
 
   const { tab, setTab } = useReportsTabStore()
@@ -129,7 +131,12 @@ export function useReportData(): UseReportDataReturn {
     staleTime: 60_000,
   })
 
-  const effectiveTenantId = isCmg ? tenantId : (user?.tenant_id ?? '')
+  // TopNav tenant selector overrides the local SelectorBar choice
+  useEffect(() => {
+    if (isCmg && activeTenantId) setTenantId(activeTenantId)
+  }, [activeTenantId, isCmg])
+
+  const effectiveTenantId = isCmg ? (activeTenantId ?? tenantId) : (user?.tenant_id ?? '')
 
   const { data: vehicles = [] } = useQuery<VehicleOut[]>({
     queryKey: isCmg

@@ -1,11 +1,79 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import L from 'leaflet'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkOrderOut, WorkOrderStatus, WorkOrderPriority, DriverOut, VehicleOut } from '../../lib/types'
 import Shell from '../../shared/ui/Shell'
 import WorkReportModal from './WorkReportModal'
 import { useTenantContext } from '../../lib/useTenantContext'
+
+// ── Map view ──────────────────────────────────────────────────────────────────
+
+const C_PENDING     = '#38BDF8'  // info blue
+const C_IN_PROGRESS = '#F97316'  // energy orange
+
+function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef       = useRef<L.Map | null>(null)
+  const layerRef     = useRef<L.LayerGroup | null>(null)
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return
+    mapRef.current = L.map(containerRef.current, {
+      center: [40.416775, -3.70379], zoom: 6, zoomControl: false,
+    })
+    L.control.zoom({ position: 'topright' }).addTo(mapRef.current)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd', maxZoom: 19,
+      attribution: '© OpenStreetMap © CARTO',
+    }).addTo(mapRef.current)
+    layerRef.current = L.layerGroup().addTo(mapRef.current)
+    return () => { mapRef.current?.remove(); mapRef.current = null }
+  }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !layerRef.current) return
+    layerRef.current.clearLayers()
+    const valid = orders.filter(o =>
+      o.location_lat != null && o.location_lon != null &&
+      (o.status === 'pending' || o.status === 'in_progress')
+    )
+    for (const o of valid) {
+      const color = o.status === 'in_progress' ? C_IN_PROGRESS : C_PENDING
+      const label = o.status === 'in_progress' ? 'En curso' : 'Pendiente'
+      L.circleMarker([o.location_lat!, o.location_lon!], {
+        radius: 10, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.9,
+      })
+        .bindPopup(`
+          <div style="font-family:sans-serif;min-width:180px;padding:2px 0">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px">${o.title}</div>
+            ${o.location_address ? `<div style="font-size:11px;color:#777;margin-bottom:4px">📍 ${o.location_address}</div>` : ''}
+            ${o.vehicle_name    ? `<div style="font-size:12px;color:#999">Vehículo: ${o.vehicle_name}</div>` : ''}
+            ${o.driver_name     ? `<div style="font-size:12px;color:#999">Conductor: ${o.driver_name}</div>` : ''}
+            <div style="margin-top:8px">
+              <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${color}22;color:${color}">${label}</span>
+            </div>
+          </div>
+        `)
+        .addTo(layerRef.current!)
+    }
+    if (valid.length > 0) {
+      try {
+        const group = L.featureGroup(layerRef.current.getLayers())
+        map.fitBounds(group.getBounds().pad(0.25))
+      } catch { /* ignore */ }
+    }
+  }, [orders])
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: 'calc(100vh - 200px)', minHeight: 400, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bg-border)' }}
+    />
+  )
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_LABELS: Record<WorkOrderStatus, string> = {
@@ -175,6 +243,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
 export default function WorkOrdersPage() {
   const qc = useQueryClient()
   const [filter, setFilter] = useState<WorkOrderStatus | 'all'>('all')
+  const [view, setView] = useState<'list' | 'map'>('list')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<WorkOrderOut | null>(null)
   const [reportOrder, setReportOrder] = useState<WorkOrderOut | null>(null)
@@ -224,14 +293,30 @@ export default function WorkOrdersPage() {
         </button>
       </div>
 
-      {/* Filtros de estado */}
-      <div style={S.filters}>
-        <button style={S.chip(filter === 'all')} onClick={() => setFilter('all')}>Todas</button>
-        {ALL_STATUSES.map(s => (
-          <button key={s} style={S.chip(filter === s)} onClick={() => setFilter(s)}>
-            {STATUS_LABELS[s]}
+      {/* Filtros de estado + toggle vista */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={S.chip(filter === 'all')} onClick={() => setFilter('all')}>Todas</button>
+          {ALL_STATUSES.map(s => (
+            <button key={s} style={S.chip(filter === s)} onClick={() => setFilter(s)}>
+              {STATUS_LABELS[s]}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            style={{ ...S.chip(view === 'list'), borderRadius: '6px 0 0 6px' }}
+            onClick={() => setView('list')}
+          >
+            ☰ Lista
           </button>
-        ))}
+          <button
+            style={{ ...S.chip(view === 'map'), borderRadius: '0 6px 6px 0' }}
+            onClick={() => setView('map')}
+          >
+            ◉ Mapa
+          </button>
+        </div>
       </div>
 
       {isLoading && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>}
@@ -242,7 +327,9 @@ export default function WorkOrdersPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {view === 'map' && <WorkOrdersMap orders={orders}/>}
+
+      <div style={{ display: view === 'list' ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
         {orders.map(o => (
           <div key={o.id} style={S.card}>
             <div style={S.row}>
@@ -307,7 +394,7 @@ export default function WorkOrdersPage() {
             )}
           </div>
         ))}
-      </div>
+      </div>{/* end list view */}
 
       {showModal && (
         <WorkOrderModal

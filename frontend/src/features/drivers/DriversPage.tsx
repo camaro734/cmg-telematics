@@ -136,6 +136,7 @@ export default function DriversPage() {
   const qc = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<DriverOut | null>(null)
+  const [search, setSearch] = useState('')
   const { activeTenantId } = useTenantContext()
 
   const { data: drivers = [], isLoading } = useQuery({
@@ -160,6 +161,19 @@ export default function DriversPage() {
         </button>
       </div>
 
+      <input
+        type="search"
+        placeholder="Buscar conductor…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        style={{
+          width: '100%', maxWidth: 320, padding: '7px 12px',
+          background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+          borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+          fontSize: 13, marginBottom: 16, boxSizing: 'border-box',
+        }}
+      />
+
       {isLoading && (
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
       )}
@@ -171,7 +185,7 @@ export default function DriversPage() {
       )}
 
       <div style={S.grid}>
-        {drivers.map(d => {
+        {drivers.filter(d => d.full_name.toLowerCase().includes(search.toLowerCase())).map(d => {
           const expirySoon = licenseExpirySoon(d.license_expiry)
           const expired = licenseExpired(d.license_expiry)
           return (
