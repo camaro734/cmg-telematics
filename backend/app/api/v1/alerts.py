@@ -10,14 +10,15 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
-from app.schemas.alert import AlertInstanceOut, AckRequest
+from app.schemas.alert import AlertInstanceOut, AlertInstanceEnrichedOut, AckRequest
 from app.models.alert_instance import AlertInstance
 from app.models.alert_rule import AlertRule
+from app.models.vehicle import Vehicle
 
 router = APIRouter(tags=["alerts"])
 
 
-@router.get("/alerts", response_model=list[AlertInstanceOut])
+@router.get("/alerts", response_model=list[AlertInstanceEnrichedOut])
 async def list_alerts(
     alert_status: str | None = Query(None, alias="status"),
     vehicle_id: uuid.UUID | None = Query(None),
@@ -30,7 +31,16 @@ async def list_alerts(
 ):
     if limit > 200:
         limit = 200
-    query = select(AlertInstance)
+    query = (
+        select(
+            AlertInstance,
+            AlertRule.name.label("rule_name"),
+            AlertRule.severity.label("severity"),
+            Vehicle.name.label("vehicle_name"),
+        )
+        .join(AlertRule, AlertRule.id == AlertInstance.rule_id)
+        .join(Vehicle, Vehicle.id == AlertInstance.vehicle_id)
+    )
     if user.tenant_tier != "cmg":
         query = query.where(AlertInstance.tenant_id == user.tenant_id)
     elif tenant_id is not None:
@@ -45,7 +55,16 @@ async def list_alerts(
         query = query.where(AlertInstance.triggered_at <= triggered_at_to)
     query = query.order_by(AlertInstance.triggered_at.desc()).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    rows = result.all()
+    enriched = []
+    for alert, rule_name, severity, vehicle_name in rows:
+        enriched.append(AlertInstanceEnrichedOut(
+            **{c.key: getattr(alert, c.key) for c in AlertInstance.__table__.columns},
+            rule_name=rule_name,
+            severity=severity,
+            vehicle_name=vehicle_name,
+        ))
+    return enriched
 
 
 @router.post("/alerts/{alert_id}/acknowledge", response_model=AlertInstanceOut)
