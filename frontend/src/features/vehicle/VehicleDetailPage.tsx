@@ -201,7 +201,7 @@ export default function VehicleDetailPage() {
   return (
     <Shell title={vehicle.name}>
       {urgentCount > 0 && (
-        <div style={{ padding: '6px 24px 0' }}>
+        <div style={{ padding: '6px 24px 0', flexShrink: 0 }}>
           <Link
             to={`/maintenance?vehicle=${id}`}
             style={{
@@ -217,7 +217,7 @@ export default function VehicleDetailPage() {
           </Link>
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <VehicleHeader vehicle={vehicle} status={status} iconUrl={vehicleType?.icon_url ?? undefined} vehicleTypeSlug={vehicleType?.slug} />
         <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
@@ -227,14 +227,14 @@ export default function VehicleDetailPage() {
             <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
           </div>
         </div>
-        <div style={{ overflow: 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: (tab === 'live' && !isMobile) ? 'hidden' : 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 
           {tab === 'live' && (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               {/* MAIN GRID: 55% mapa + 45% panel */}
               <div style={isMobile
                 ? { display: 'flex', flexDirection: 'column' }
-                : { display: 'grid', gridTemplateColumns: '55% 45%', height: 480 }
+                : { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '55% 45%' }
               }>
                 {/* ── MAPA ── */}
                 <div style={{
@@ -283,7 +283,7 @@ export default function VehicleDetailPage() {
                 </div>
 
                 {/* ── PANEL DERECHO ── */}
-                <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 10 : 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ height: isMobile ? 'auto' : '100%', overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
 
                   {/* ALERTAS ACTIVAS — siempre visible si las hay */}
                   {activeAlertsCount > 0 && (
@@ -382,6 +382,7 @@ export default function VehicleDetailPage() {
                         )}
                         {sensorSchema.some(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led' && s.visible_in_detail !== false) && (
                           <SensorGrid
+                            compact
                             sensorSchema={sensorSchema.filter(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led' && s.visible_in_detail !== false)}
                             canData={{ ...(status.can_data ?? {}), ...(status.ext_voltage_mv != null ? { avl_66: status.ext_voltage_mv } : {}) }}
                             derivedValues={derivedValues}

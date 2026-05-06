@@ -8,6 +8,7 @@ interface SensorGridProps {
   sensorSchema: SensorDef[]
   canData: Record<string, unknown>
   derivedValues?: Partial<Record<string, number | null>>
+  compact?: boolean
 }
 
 // Sensor cuya unidad de medida son minutos → formatear como min/h
@@ -231,7 +232,67 @@ const dividerStyle: React.CSSProperties = {
   margin: '2px 0',
 }
 
-export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }: SensorGridProps) {
+// Modo compacto: filas label→valor sin gauges, para paneles laterales estrechos
+function CompactSensorList({ sensorSchema, canData, derivedValues }: {
+  sensorSchema: SensorDef[]
+  canData: Record<string, unknown>
+  derivedValues: Partial<Record<string, number | null>>
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {sensorSchema.map((sensor, i) => {
+        const isLed = sensor.gauge_type === 'led'
+        let displayValue = '—'
+        let valueColor = 'var(--accent-off)'
+
+        if (isLed) {
+          const raw = sensor.avl_id != null ? canData[`avl_${sensor.avl_id}`] : undefined
+          const num = raw != null ? Number(raw) : 0
+          const active = raw != null && (sensor.bit_index != null ? ((num >> sensor.bit_index) & 1) === 1 : num === 1)
+          displayValue = active ? 'ON' : raw != null ? 'OFF' : '—'
+          valueColor = active ? 'var(--accent-ok)' : raw != null ? 'var(--text-muted)' : 'var(--accent-off)'
+        } else {
+          const value = getSensorValue(sensor, canData, derivedValues)
+          if (value !== null) {
+            if (isMinuteSensor(sensor.label)) {
+              const fmt = formatMinutes(value)
+              displayValue = `${fmt.main} ${fmt.unit}`
+            } else {
+              const decimals = Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2
+              displayValue = `${value.toFixed(decimals)}${sensor.unit ? ' ' + sensor.unit : ''}`
+            }
+            // Color por umbrales
+            if (sensor.alert_above != null && value >= sensor.alert_above) valueColor = 'var(--accent-crit)'
+            else if (sensor.warn_above != null && value >= sensor.warn_above) valueColor = 'var(--accent-warn)'
+            else if (sensor.alert_below != null && value <= sensor.alert_below) valueColor = 'var(--accent-crit)'
+            else if (sensor.warn_below != null && value <= sensor.warn_below) valueColor = 'var(--accent-warn)'
+            else valueColor = 'var(--accent-info)'
+          }
+        }
+
+        return (
+          <div key={sensor.key} style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '3px 4px',
+            borderBottom: i < sensorSchema.length - 1 ? '1px solid var(--bg-elevated)' : 'none',
+          }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', lineHeight: 1.3 }}>
+              {sensor.label}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-data)', color: valueColor, flexShrink: 0, marginLeft: 8 }}>
+              {displayValue}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function SensorGrid({ sensorSchema, canData, derivedValues = {}, compact = false }: SensorGridProps) {
+  if (compact) {
+    return <CompactSensorList sensorSchema={sensorSchema} canData={canData} derivedValues={derivedValues} />
+  }
   // Grupo 1: gauges visuales (circular / linear / battery)
   const visualSensors = sensorSchema.filter(
     s => s.gauge_type === 'circular' || s.gauge_type === 'linear' || s.gauge_type === 'battery',
