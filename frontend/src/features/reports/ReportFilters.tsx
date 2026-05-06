@@ -111,7 +111,7 @@ export function PdfDownloadBtn({
 // ── SelectorBar ───────────────────────────────────────────────────────────────
 
 export function SelectorBar({
-  isCmg, tenants, tenantId, setTenantId,
+  isCmg: _isCmg, tenants: _tenants, tenantId: _tenantId, setTenantId: _setTenantId,
   vehicles, vehicleId, setVehicleId,
   period, setPeriod,
   customFrom, customTo, setCustomFrom, setCustomTo,
@@ -182,22 +182,6 @@ export function SelectorBar({
         >
           ‹ Volver
         </button>
-      )}
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginRight: 4, letterSpacing: '-0.01em' }}>
-        Reportes
-      </div>
-
-      {isCmg && (
-        <select
-          value={tenantId}
-          onChange={e => { setTenantId(e.target.value); setVehicleId('') }}
-          style={{ ...selStyle, color: tenantId ? 'var(--text-primary)' : 'var(--text-muted)' }}
-        >
-          <option value="">— Cliente —</option>
-          {tenants.filter(t => t.tier !== 'cmg').map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
       )}
 
       <select

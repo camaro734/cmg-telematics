@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { useReportsTabStore, REPORTS_TABS } from '../../features/reports/useReportsTabStore'
 import type { ReportsTab } from '../../features/reports/useReportsTabStore'
-import { CmgMark } from './CmgLogo'
+// CmgMark removed — fallback now uses the CMG Track PNG directly
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { apiClient } from '../../lib/apiClient'
@@ -431,6 +431,7 @@ export default function TopNav() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [userOpen,  setUserOpen]  = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [logoImgError, setLogoImgError] = useState(false)
 
   const adminRef = useRef<HTMLDivElement>(null)
   const userRef  = useRef<HTMLDivElement>(null)
@@ -491,9 +492,19 @@ export default function TopNav() {
           marginRight: isMobile ? 0 : 8,
         }}
       >
-        {logoUrl
-          ? <img src={logoUrl} alt="logo" style={{ width: isMobile ? 130 : 160, height: isMobile ? 46 : 52, objectFit: 'contain', objectPosition: 'left center', display: 'block' }}/>
-          : <CmgMark size={40}/>
+        {logoUrl && !logoImgError
+          ? <img
+              src={logoUrl}
+              alt="logo"
+              onError={() => setLogoImgError(true)}
+              style={{ width: isMobile ? 130 : 160, height: isMobile ? 46 : 52, objectFit: 'contain', objectPosition: 'left center', display: 'block' }}
+            />
+          : <img
+              src="/static/logos/cmgtrack.png"
+              alt="CMG Track"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              style={{ width: isMobile ? 130 : 160, height: isMobile ? 46 : 52, objectFit: 'contain', objectPosition: 'left center', display: 'block' }}
+            />
         }
       </button>
 
