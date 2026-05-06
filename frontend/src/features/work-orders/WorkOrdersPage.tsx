@@ -3,7 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import L from 'leaflet'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { WorkOrderOut, WorkOrderStatus, WorkOrderPriority, DriverOut, VehicleOut } from '../../lib/types'
+import type {
+  WorkOrderOut, WorkOrderStatus, WorkOrderPriority, DriverOut, VehicleOut,
+  WorkOrderStopOut, WorkOrderStopCreate, WorkOrderStopStatus,
+} from '../../lib/types'
 import Shell from '../../shared/ui/Shell'
 import WorkReportModal from './WorkReportModal'
 import { useTenantContext } from '../../lib/useTenantContext'
@@ -72,6 +75,355 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
       ref={containerRef}
       style={{ width: '100%', height: 'calc(100vh - 200px)', minHeight: 400, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bg-border)' }}
     />
+  )
+}
+
+// ── Stop location picker (Leaflet map, click to set lat/lon) ──────────────────
+function StopLocationPicker({
+  lat, lon, onPick,
+}: { lat: number | null; lon: number | null; onPick: (lat: number, lon: number) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef    = useRef<L.Map | null>(null)
+  const markerRef = useRef<L.Marker | null>(null)
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return
+    const center: [number, number] = lat && lon ? [lat, lon] : [39.47, -0.376]
+    const map = L.map(containerRef.current, { center, zoom: lat ? 14 : 6, zoomControl: true })
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap © CARTO',
+    }).addTo(map)
+    mapRef.current = map
+    if (lat && lon) {
+      markerRef.current = L.marker([lat, lon]).addTo(map)
+    }
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      onPick(e.latlng.lat, e.latlng.lng)
+      if (markerRef.current) markerRef.current.setLatLng(e.latlng)
+      else markerRef.current = L.marker(e.latlng).addTo(map)
+    })
+    return () => { map.remove(); mapRef.current = null }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div>
+      <div ref={containerRef} style={{ width: '100%', height: 220, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--bg-border)' }} />
+      <p style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+        Haz clic en el mapa para fijar la ubicación de la parada
+        {lat && lon ? ` · ${lat.toFixed(5)}, ${lon.toFixed(5)}` : ''}
+      </p>
+    </div>
+  )
+}
+
+// ── Stop status badge ──────────────────────────────────────────────────────────
+const STOP_STATUS_LABELS: Record<WorkOrderStopStatus, string> = {
+  pending: 'Pendiente', arrived: 'Llegado', in_progress: 'En trabajo', done: 'Completado', skipped: 'Omitido',
+}
+const STOP_STATUS_COLORS: Record<WorkOrderStopStatus, string> = {
+  pending: 'var(--text-muted)', arrived: 'var(--accent-info)',
+  in_progress: 'var(--accent-energy)', done: 'var(--accent-ok)', skipped: 'var(--accent-warn)',
+}
+
+// ── Panel de paradas de una orden ─────────────────────────────────────────────
+function StopsPanel({ order, onClose }: { order: WorkOrderOut; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [addingStop, setAddingStop] = useState(false)
+  const [newStop, setNewStop] = useState<WorkOrderStopCreate>({ title: '', order_index: 0 })
+  const [pickedLat, setPickedLat] = useState<number | null>(null)
+  const [pickedLon, setPickedLon] = useState<number | null>(null)
+  const [stopError, setStopError] = useState('')
+
+  const { data: stops = [], isLoading } = useQuery({
+    queryKey: ['work-order-stops', order.id],
+    queryFn: () => apiClient.get<WorkOrderStopOut[]>(`/api/v1/work-orders/${order.id}/stops`),
+    refetchInterval: 15_000,
+  })
+
+  const { mutate: createStop, isPending: creating } = useMutation({
+    mutationFn: () => apiClient.post<WorkOrderStopOut>(`/api/v1/work-orders/${order.id}/stops`, {
+      ...newStop, lat: pickedLat, lon: pickedLon, order_index: stops.length,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['work-order-stops', order.id] })
+      setAddingStop(false)
+      setNewStop({ title: '', order_index: 0 })
+      setPickedLat(null); setPickedLon(null)
+      setStopError('')
+    },
+    onError: (e) => setStopError((e as Error).message),
+  })
+
+  const { mutate: patchStopStatus } = useMutation({
+    mutationFn: ({ stopId, status }: { stopId: string; status: WorkOrderStopStatus }) =>
+      apiClient.patch<WorkOrderStopOut>(`/api/v1/work-orders/${order.id}/stops/${stopId}/status`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['work-order-stops', order.id] }),
+  })
+
+  const { mutate: deleteStop } = useMutation({
+    mutationFn: (stopId: string) => apiClient.delete(`/api/v1/work-orders/${order.id}/stops/${stopId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['work-order-stops', order.id] }),
+  })
+
+  const up = (k: keyof WorkOrderStopCreate, v: string) =>
+    setNewStop(f => ({ ...f, [k]: v || null }))
+
+  const panelStyle: React.CSSProperties = {
+    position: 'fixed', top: 0, right: 0, width: 420, height: '100vh',
+    background: 'var(--bg-surface)', borderLeft: '1px solid var(--bg-border)',
+    display: 'flex', flexDirection: 'column', zIndex: 2000, overflowY: 'auto',
+  }
+
+  return (
+    <div style={panelStyle}>
+      {/* Header */}
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bg-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+            Paradas de la ruta
+          </div>
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {order.title}
+          </div>
+          {order.vehicle_name && (
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              🚚 {order.vehicle_name}{order.driver_name ? ` · ${order.driver_name}` : ''}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', lineHeight: 1, padding: 4 }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Lista de paradas */}
+      <div style={{ padding: '12px 20px', flex: 1 }}>
+        {isLoading && <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>Cargando paradas…</div>}
+
+        {stops.map((stop, idx) => {
+          const color = STOP_STATUS_COLORS[stop.status]
+          const nextTransitions: WorkOrderStopStatus[] = stop.status === 'pending'
+            ? ['arrived'] : stop.status === 'arrived'
+            ? ['in_progress'] : stop.status === 'in_progress'
+            ? ['done', 'skipped'] : []
+
+          return (
+            <div key={stop.id} style={{
+              background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+              borderRadius: 8, padding: '12px 14px', marginBottom: 10,
+              borderLeft: `3px solid ${color}`,
+            }}>
+              {/* Número + título */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', background: color,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-data)', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+                }}>
+                  {idx + 1}
+                </div>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
+                  {stop.title}
+                </span>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {STOP_STATUS_LABELS[stop.status]}
+                </span>
+              </div>
+
+              {/* Dirección */}
+              {stop.address && (
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  📍 {stop.address}
+                  {stop.lat && stop.lon && (
+                    <a
+                      href={`https://maps.google.com/maps?q=${stop.lat},${stop.lon}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ marginLeft: 8, color: 'var(--accent-info)', fontSize: 11 }}
+                    >
+                      Ver mapa ↗
+                    </a>
+                  )}
+                </div>
+              )}
+              {stop.client_name && (
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  👤 Cliente: {stop.client_name}
+                </div>
+              )}
+
+              {/* Telemetría del trabajo si está completado */}
+              {stop.status === 'done' && (stop.pto_minutes || stop.rpm_avg || stop.fuel_l) && (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--bg-border)' }}>
+                  {stop.pto_minutes != null && (
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-energy)' }}>
+                      ⏱ {stop.pto_minutes.toFixed(0)} min PTO
+                    </span>
+                  )}
+                  {stop.pump_minutes != null && (
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-info)' }}>
+                      💧 {stop.pump_minutes.toFixed(0)} min bomba
+                    </span>
+                  )}
+                  {stop.rpm_avg != null && (
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--text-muted)' }}>
+                      ⚙ {stop.rpm_avg.toFixed(0)} RPM
+                    </span>
+                  )}
+                  {stop.fuel_l != null && (
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-warn)' }}>
+                      ⛽ {stop.fuel_l.toFixed(1)} L
+                    </span>
+                  )}
+                  {stop.pressure_min != null && (
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-crit)' }}>
+                      🔽 {stop.pressure_min.toFixed(0)} mbar
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Tiempos */}
+              {stop.started_at && (
+                <div style={{ fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {stop.started_at ? `Inicio: ${new Date(stop.started_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                  {stop.completed_at ? ` · Fin: ${new Date(stop.completed_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {nextTransitions.map(ns => (
+                  <button
+                    key={ns}
+                    onClick={() => patchStopStatus({ stopId: stop.id, status: ns })}
+                    style={{
+                      fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
+                      padding: '3px 10px', borderRadius: 6,
+                      border: `1px solid ${STOP_STATUS_COLORS[ns]}`,
+                      background: 'transparent', color: STOP_STATUS_COLORS[ns], cursor: 'pointer',
+                    }}
+                  >
+                    → {STOP_STATUS_LABELS[ns]}
+                  </button>
+                ))}
+                {order.status !== 'done' && order.status !== 'cancelled' && stop.status === 'pending' && (
+                  <button
+                    onClick={() => { if (confirm('¿Eliminar esta parada?')) deleteStop(stop.id) }}
+                    style={{
+                      fontFamily: 'var(--font-ui)', fontSize: 11, padding: '3px 10px', borderRadius: 6,
+                      border: '1px solid var(--bg-border)', background: 'transparent',
+                      color: 'var(--accent-crit)', cursor: 'pointer',
+                    }}
+                  >
+                    Eliminar
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {!isLoading && stops.length === 0 && !addingStop && (
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>
+            Sin paradas. Añade la primera parada de la ruta.
+          </div>
+        )}
+
+        {/* Formulario nueva parada */}
+        {addingStop && (
+          <div style={{
+            background: 'var(--bg-base)', border: '1px solid var(--accent-energy)',
+            borderRadius: 8, padding: 14, marginTop: 8,
+          }}>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--accent-energy)', marginBottom: 10 }}>
+              Nueva parada
+            </div>
+            {[
+              { k: 'title', label: 'Título *', placeholder: 'Ej: Descarga en almacén' },
+              { k: 'client_name', label: 'Cliente', placeholder: 'Nombre del cliente o empresa' },
+              { k: 'address', label: 'Dirección', placeholder: 'Calle, número, localidad' },
+            ].map(({ k, label, placeholder }) => (
+              <div key={k} style={{ marginBottom: 8 }}>
+                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{label}</div>
+                <input
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+                    borderRadius: 5, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                    fontSize: 13, padding: '6px 9px',
+                  }}
+                  value={(newStop as unknown as Record<string, string>)[k] ?? ''}
+                  onChange={e => up(k as keyof WorkOrderStopCreate, e.target.value)}
+                  placeholder={placeholder}
+                />
+              </div>
+            ))}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Notas</div>
+              <textarea
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+                  borderRadius: 5, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                  fontSize: 13, padding: '6px 9px', resize: 'vertical', minHeight: 52,
+                }}
+                value={newStop.notes ?? ''}
+                onChange={e => up('notes', e.target.value)}
+                placeholder="Instrucciones adicionales para el conductor…"
+              />
+            </div>
+            <StopLocationPicker
+              lat={pickedLat}
+              lon={pickedLon}
+              onPick={(la, lo) => { setPickedLat(la); setPickedLon(lo) }}
+            />
+            {stopError && (
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--accent-crit)', marginTop: 6 }}>{stopError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setAddingStop(false); setStopError('') }}
+                style={{ fontFamily: 'var(--font-ui)', fontSize: 12, padding: '5px 14px', borderRadius: 6, border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={creating || !newStop.title?.trim()}
+                onClick={() => createStop()}
+                style={{
+                  fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700,
+                  padding: '5px 14px', borderRadius: 6, border: 'none',
+                  background: 'var(--accent-energy)', color: '#fff', cursor: 'pointer',
+                  opacity: creating || !newStop.title?.trim() ? 0.6 : 1,
+                }}
+              >
+                {creating ? 'Guardando…' : 'Añadir parada'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Botón añadir parada */}
+        {!addingStop && order.status !== 'done' && order.status !== 'cancelled' && (
+          <button
+            onClick={() => setAddingStop(true)}
+            style={{
+              width: '100%', marginTop: 8,
+              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+              padding: '9px 0', borderRadius: 8,
+              border: '1px dashed var(--accent-energy)', background: 'transparent',
+              color: 'var(--accent-energy)', cursor: 'pointer',
+            }}
+          >
+            + Añadir parada
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -247,6 +599,7 @@ export default function WorkOrdersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<WorkOrderOut | null>(null)
   const [reportOrder, setReportOrder] = useState<WorkOrderOut | null>(null)
+  const [stopsOrder, setStopsOrder] = useState<WorkOrderOut | null>(null)
 
   const { activeTenantId } = useTenantContext()
 
@@ -284,6 +637,7 @@ export default function WorkOrdersPage() {
   const handleSaved = () => qc.invalidateQueries({ queryKey: ['work-orders'] })
 
   return (
+    <>
     <Shell title="Órdenes de trabajo">
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
       <div style={S.header}>
@@ -372,6 +726,12 @@ export default function WorkOrdersPage() {
                     Informe
                   </button>
                 )}
+                <button
+                  style={{ ...S.btnSm, borderColor: 'var(--accent-energy)', color: 'var(--accent-energy)' }}
+                  onClick={() => setStopsOrder(o)}
+                >
+                  Ruta
+                </button>
                 <button style={S.btnSm} onClick={() => { setEditing(o); setShowModal(true) }}>Editar</button>
                 {(o.status === 'pending' || o.status === 'cancelled') && (
                   <button style={{ ...S.btnSm, color: 'var(--accent-crit)' }}
@@ -414,5 +774,10 @@ export default function WorkOrdersPage() {
       )}
       </div>
     </Shell>
+
+    {stopsOrder && (
+      <StopsPanel order={stopsOrder} onClose={() => setStopsOrder(null)} />
+    )}
+    </>
   )
 }

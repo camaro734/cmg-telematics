@@ -222,6 +222,43 @@ export interface WorkOrderOut {
   driver_name: string | null
 }
 
+export type WorkOrderStopStatus = 'pending' | 'arrived' | 'in_progress' | 'done' | 'skipped'
+
+export interface WorkOrderStopOut {
+  id: string
+  work_order_id: string
+  order_index: number
+  title: string
+  address: string | null
+  lat: number | null
+  lon: number | null
+  arrival_radius_m: number
+  notes: string | null
+  client_name: string | null
+  status: WorkOrderStopStatus
+  arrived_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  pto_minutes: number | null
+  fuel_l: number | null
+  rpm_avg: number | null
+  pump_minutes: number | null
+  pressure_min: number | null
+  pressure_max: number | null
+  created_at: string
+}
+
+export interface WorkOrderStopCreate {
+  order_index?: number
+  title: string
+  address?: string | null
+  lat?: number | null
+  lon?: number | null
+  arrival_radius_m?: number
+  notes?: string | null
+  client_name?: string | null
+}
+
 export interface DriverOut {
   id: string
   tenant_id: string

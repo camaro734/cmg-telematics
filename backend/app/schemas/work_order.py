@@ -61,3 +61,60 @@ class WorkOrderUpdate(BaseModel):
 
 class WorkOrderStatusPatch(BaseModel):
     status: WorkOrderStatus
+
+
+# ── Work Order Stop ────────────────────────────────────────────────────────────
+
+WorkOrderStopStatus = Literal['pending', 'arrived', 'in_progress', 'done', 'skipped']
+
+
+class WorkOrderStopOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    work_order_id: uuid.UUID
+    order_index: int
+    title: str
+    address: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    arrival_radius_m: int = 150
+    notes: str | None = None
+    client_name: str | None = None
+    status: WorkOrderStopStatus
+    arrived_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    pto_minutes: float | None = None
+    fuel_l: float | None = None
+    rpm_avg: float | None = None
+    pump_minutes: float | None = None
+    pressure_min: float | None = None
+    pressure_max: float | None = None
+    created_at: datetime
+
+
+class WorkOrderStopCreate(BaseModel):
+    order_index: int = 0
+    title: str
+    address: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    arrival_radius_m: int = 150
+    notes: str | None = None
+    client_name: str | None = None
+
+
+class WorkOrderStopUpdate(BaseModel):
+    order_index: int | None = None
+    title: str | None = None
+    address: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    arrival_radius_m: int | None = None
+    notes: str | None = None
+    client_name: str | None = None
+    status: WorkOrderStopStatus | None = None
+
+
+class WorkOrderStopStatusPatch(BaseModel):
+    status: WorkOrderStopStatus

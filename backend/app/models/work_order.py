@@ -34,3 +34,7 @@ class WorkOrder(Base):
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
     driver = relationship("Driver", foreign_keys=[driver_id])
     creator = relationship("User", foreign_keys=[created_by])
+    stops = relationship(
+        "WorkOrderStop", back_populates="work_order",
+        order_by="WorkOrderStop.order_index", cascade="all, delete-orphan",
+    )

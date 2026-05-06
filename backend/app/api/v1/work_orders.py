@@ -7,8 +7,12 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
-from app.schemas.work_order import WorkOrderOut, WorkOrderCreate, WorkOrderUpdate, WorkOrderStatusPatch
+from app.schemas.work_order import (
+    WorkOrderOut, WorkOrderCreate, WorkOrderUpdate, WorkOrderStatusPatch,
+    WorkOrderStopOut, WorkOrderStopCreate, WorkOrderStopUpdate, WorkOrderStopStatusPatch,
+)
 from app.models.work_order import WorkOrder
+from app.models.work_order_stop import WorkOrderStop
 from app.models.vehicle import Vehicle
 from app.models.driver import Driver
 
@@ -159,4 +163,113 @@ async def delete_work_order(
     if order.status not in ("pending", "cancelled"):
         raise HTTPException(status_code=400, detail="Solo se pueden eliminar órdenes pendientes o canceladas")
     await db.delete(order)
+    await db.commit()
+
+
+# ── Work Order Stops ──────────────────────────────────────────────────────────
+
+async def _get_order_for_tenant(db: AsyncSession, order_id: uuid.UUID, user: CurrentUser) -> WorkOrder:
+    order = await db.get(WorkOrder, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    _check_tenant(user, order.tenant_id)
+    return order
+
+
+@router.get("/work-orders/{order_id}/stops", response_model=list[WorkOrderStopOut])
+async def list_stops(
+    order_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_order_for_tenant(db, order_id, user)
+    result = await db.execute(
+        select(WorkOrderStop)
+        .where(WorkOrderStop.work_order_id == order_id)
+        .order_by(WorkOrderStop.order_index)
+    )
+    return result.scalars().all()
+
+
+@router.post("/work-orders/{order_id}/stops", response_model=WorkOrderStopOut, status_code=201)
+async def create_stop(
+    order_id: uuid.UUID,
+    body: WorkOrderStopCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await _get_order_for_tenant(db, order_id, user)
+    stop = WorkOrderStop(work_order_id=order_id, **body.model_dump())
+    db.add(stop)
+    await db.commit()
+    await db.refresh(stop)
+    return stop
+
+
+@router.put("/work-orders/{order_id}/stops/{stop_id}", response_model=WorkOrderStopOut)
+async def update_stop(
+    order_id: uuid.UUID,
+    stop_id: uuid.UUID,
+    body: WorkOrderStopUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await _get_order_for_tenant(db, order_id, user)
+    stop = await db.get(WorkOrderStop, stop_id)
+    if not stop or stop.work_order_id != order_id:
+        raise HTTPException(status_code=404, detail="Parada no encontrada")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(stop, k, v)
+    await db.commit()
+    await db.refresh(stop)
+    return stop
+
+
+@router.patch("/work-orders/{order_id}/stops/{stop_id}/status", response_model=WorkOrderStopOut)
+async def patch_stop_status(
+    order_id: uuid.UUID,
+    stop_id: uuid.UUID,
+    body: WorkOrderStopStatusPatch,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_order_for_tenant(db, order_id, user)
+    stop = await db.get(WorkOrderStop, stop_id)
+    if not stop or stop.work_order_id != order_id:
+        raise HTTPException(status_code=404, detail="Parada no encontrada")
+    now = datetime.now(timezone.utc)
+    stop.status = body.status
+    if body.status == "arrived" and not stop.arrived_at:
+        stop.arrived_at = now
+    elif body.status == "in_progress" and not stop.started_at:
+        stop.started_at = now
+    elif body.status == "done" and not stop.completed_at:
+        stop.completed_at = now
+        # auto-calculate pto_minutes from started_at
+        if stop.started_at:
+            delta = (now - stop.started_at).total_seconds()
+            stop.pto_minutes = round(delta / 60, 1)
+    await db.commit()
+    await db.refresh(stop)
+    return stop
+
+
+@router.delete("/work-orders/{order_id}/stops/{stop_id}", status_code=204)
+async def delete_stop(
+    order_id: uuid.UUID,
+    stop_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await _get_order_for_tenant(db, order_id, user)
+    stop = await db.get(WorkOrderStop, stop_id)
+    if not stop or stop.work_order_id != order_id:
+        raise HTTPException(status_code=404, detail="Parada no encontrada")
+    await db.delete(stop)
     await db.commit()
