@@ -548,6 +548,7 @@ type DraftStop = {
   address: string
   lat: number | null
   lon: number | null
+  arrival_radius_m: number
   notes: string
   mapOpen: boolean
 }
@@ -570,7 +571,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
     setDraftStops(ds => [...ds, {
       _id: Math.random().toString(36).slice(2),
       title: '', client_name: '', address: '',
-      lat: null, lon: null, notes: '', mapOpen: true,
+      lat: null, lon: null, arrival_radius_m: 50, notes: '', mapOpen: true,
     }])
   }
 
@@ -607,6 +608,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           address: s.address || null,
           lat: s.lat,
           lon: s.lon,
+          arrival_radius_m: s.arrival_radius_m,
           notes: s.notes || null,
         })
       }
@@ -765,22 +767,35 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
                   onChange={e => updateStop(stop._id, 'notes', e.target.value)}
                 />
 
-                {/* Toggle mapa */}
-                <button
-                  style={{
-                    ...S.btnSm, fontSize: 11,
-                    color: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : 'var(--text-muted)'),
-                    borderColor: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : undefined),
-                  }}
-                  onClick={() => updateStop(stop._id, 'mapOpen', !stop.mapOpen)}
-                  type="button"
-                >
-                  {stop.mapOpen
-                    ? '▲ Cerrar mapa'
-                    : stop.lat
-                      ? `✓ Ubicación fijada · ${stop.lat.toFixed(4)}, ${stop.lon?.toFixed(4)}`
-                      : '📍 Fijar ubicación en mapa'}
-                </button>
+                {/* Toggle mapa + radio de llegada */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    style={{
+                      ...S.btnSm, fontSize: 11,
+                      color: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : 'var(--text-muted)'),
+                      borderColor: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : undefined),
+                    }}
+                    onClick={() => updateStop(stop._id, 'mapOpen', !stop.mapOpen)}
+                    type="button"
+                  >
+                    {stop.mapOpen
+                      ? '▲ Cerrar mapa'
+                      : stop.lat
+                        ? `✓ Ubicación fijada · ${stop.lat.toFixed(4)}, ${stop.lon?.toFixed(4)}`
+                        : '📍 Fijar ubicación en mapa'}
+                  </button>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    Radio llegada:
+                    <input
+                      type="number"
+                      min={10} max={2000} step={10}
+                      value={stop.arrival_radius_m}
+                      onChange={e => updateStop(stop._id, 'arrival_radius_m', Math.max(10, parseInt(e.target.value) || 50))}
+                      style={{ ...S.input, width: 64, padding: '3px 6px', fontSize: 12, textAlign: 'center' }}
+                    />
+                    <span>m</span>
+                  </label>
+                </div>
 
                 {stop.mapOpen && (
                   <div style={{ marginTop: 8 }}>
