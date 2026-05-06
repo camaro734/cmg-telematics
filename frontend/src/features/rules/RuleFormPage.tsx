@@ -64,14 +64,19 @@ export default function RuleFormPage() {
   const qc = useQueryClient()
   const [searchParams] = useSearchParams()
   const prefilledTypeId = searchParams.get('type_id')
+  const prefilledVehicleId = searchParams.get('vehicle_id')
+  const prefilledConditionType = searchParams.get('condition_type')
 
   const [form, setForm] = useState<RuleCreate>({
     ...DEFAULT_FORM,
     vehicle_filter: {
-      scope: prefilledTypeId ? 'type' : 'all',
-      vehicle_id: '',
+      scope: prefilledTypeId ? 'type' : prefilledVehicleId ? 'vehicle' : 'all',
+      vehicle_id: prefilledVehicleId ?? '',
       vehicle_type_id: prefilledTypeId ?? '',
     },
+    condition: prefilledConditionType === 'geofence'
+      ? { type: 'geofence', polygon: [], action: 'enter' } as unknown as typeof DEFAULT_CONDITION
+      : DEFAULT_CONDITION,
   })
   const [nameError, setNameError] = useState('')
   const [apiError, setApiError] = useState('')

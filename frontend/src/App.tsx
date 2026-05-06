@@ -66,6 +66,7 @@ const VehiclesPage     = lazy(() => import('./features/vehicles/VehiclesPage'))
 const VehicleTypesPage = lazy(() => import('./features/vehicles/VehicleTypesPage'))
 const DriversPage      = lazy(() => import('./features/drivers/DriversPage'))
 const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPage'))
+const GeofencesPage    = lazy(() => import('./features/geofences/GeofencesPage'))
 const ClientPortalPage = lazy(() => import('./features/portal/ClientPortalPage'))
 const DashboardPage    = lazy(() => import('./features/dashboard/DashboardPage'))
 
@@ -118,6 +119,7 @@ export default function App() {
                 <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
                 <Route path="drivers"          element={<SectionErrorBoundary label="Drivers"><DriversPage /></SectionErrorBoundary>} />
                 <Route path="work-orders"     element={<SectionErrorBoundary label="WorkOrders"><WorkOrdersPage /></SectionErrorBoundary>} />
+                <Route path="geofences"       element={<SectionErrorBoundary label="Geofences"><GeofencesPage /></SectionErrorBoundary>} />
                 <Route path="dashboard"       element={<SectionErrorBoundary label="Dashboard"><DashboardPage /></SectionErrorBoundary>} />
                 <Route path="*"                  element={<Navigate to="/dashboard" replace />} />
               </Routes>

@@ -182,6 +182,16 @@ export function IconOrdenes(props: IconProps) {
   )
 }
 
+// Geofence: hexagon zone with center dot
+export function IconGeocercas(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <polygon points="12,3 20,8 20,16 12,21 4,16 4,8" strokeDasharray="2 1.5" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" />
+    </Icon>
+  )
+}
+
 // Driver: single person silhouette (user with hard hat feel)
 export function IconConductores(props: IconProps) {
   return (

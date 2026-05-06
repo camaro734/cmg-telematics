@@ -22,6 +22,7 @@ import {
   IconAjustes,
   IconOrdenes,
   IconConductores,
+  IconGeocercas,
 } from './icons'
 
 // ── Module nav items ─────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ const MODULES = [
 const OPERATOR_ITEMS = [
   { label: 'Órdenes de trabajo', to: '/work-orders', Icon: IconOrdenes },
   { label: 'Conductores',        to: '/drivers',      Icon: IconConductores },
+  { label: 'Geocercas',          to: '/geofences',    Icon: IconGeocercas },
 ] as const
 
 const CMG_ADMIN_ITEMS = [
