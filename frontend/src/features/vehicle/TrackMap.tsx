@@ -98,7 +98,10 @@ export default function TrackMap({ track, status }: TrackMapProps) {
       subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(mapRef.current)
-    return () => { mapRef.current?.remove(); mapRef.current = null }
+    // Force recalc after flex/grid layout settles
+    const raf = requestAnimationFrame(() => mapRef.current?.invalidateSize())
+    const t = setTimeout(() => mapRef.current?.invalidateSize(), 300)
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); mapRef.current?.remove(); mapRef.current = null }
   }, [])
 
   useEffect(() => {

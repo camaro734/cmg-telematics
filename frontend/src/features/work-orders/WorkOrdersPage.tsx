@@ -785,9 +785,9 @@ export default function WorkOrdersPage() {
                   Ruta
                 </button>
                 <button style={S.btnSm} onClick={() => { setEditing(o); setShowModal(true) }}>Editar</button>
-                {(o.status === 'pending' || o.status === 'cancelled') && (
+                {o.status !== 'in_progress' && (
                   <button style={{ ...S.btnSm, color: 'var(--accent-crit)' }}
-                    onClick={() => { if (confirm('¿Eliminar esta orden?')) deleteOrder(o.id) }}>
+                    onClick={() => { if (confirm('¿Eliminar esta orden? Esta acción no se puede deshacer.')) deleteOrder(o.id) }}>
                     Eliminar
                   </button>
                 )}

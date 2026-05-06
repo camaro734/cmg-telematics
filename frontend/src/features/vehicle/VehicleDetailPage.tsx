@@ -236,7 +236,7 @@ export default function VehicleDetailPage() {
 
                 {/* Left/top: mapa (pantalla completa de la columna) + tira info mínima */}
                 <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                  <div style={{ flex: 1, minHeight: isMobile ? 220 : 0, position: 'relative' }}>
+                  <div style={{ flex: 1, minHeight: isMobile ? 220 : 340, position: 'relative' }}>
                     <TrackMap track={track} status={status} />
                   </div>
                   {/* Tira inferior: solo datos operacionales no repetidos */}

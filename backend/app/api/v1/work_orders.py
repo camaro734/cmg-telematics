@@ -160,8 +160,8 @@ async def delete_work_order(
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     _check_tenant(user, order.tenant_id)
-    if order.status not in ("pending", "cancelled"):
-        raise HTTPException(status_code=400, detail="Solo se pueden eliminar órdenes pendientes o canceladas")
+    if order.status == "in_progress":
+        raise HTTPException(status_code=400, detail="No se puede eliminar una orden en curso. Cancélala primero.")
     await db.delete(order)
     await db.commit()
 
