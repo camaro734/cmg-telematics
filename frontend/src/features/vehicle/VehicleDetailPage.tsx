@@ -117,14 +117,15 @@ export default function VehicleDetailPage() {
   const { data: status } = useQuery({
     queryKey: keys.vehicleStatus(id ?? ''),
     queryFn: () => apiClient.get<VehicleStatus>(`/api/v1/vehicles/${id}/status`),
-    refetchInterval: 30_000,
+    refetchInterval: 5_000,
     enabled: !!vehicle,
   })
 
   const { data: track = [] } = useQuery({
     queryKey: keys.vehicleTrack(id ?? ''),
     queryFn: () => apiClient.get<TrackPoint[]>(`/api/v1/vehicles/${id}/track/today`),
-    staleTime: 60_000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
     enabled: !!vehicle,
   })
 

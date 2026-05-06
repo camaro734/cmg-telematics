@@ -476,7 +476,11 @@ async def get_vehicles_statuses_bulk(
         can_data = _parse_json(can_str)
         pto_str = _get(hash_data, "pto_active")
         pto_active = _parse_bool(pto_str)
+        ignition_val = _parse_bool(_get(hash_data, "ignition"))
 
+        if not ignition_val and can_data:
+            if can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1:
+                ignition_val = True
         if not pto_active and can_data:
             if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
                 pto_active = True
@@ -496,7 +500,7 @@ async def get_vehicles_statuses_bulk(
             lat=_parse_float(_get(hash_data, "lat")),
             lon=_parse_float(_get(hash_data, "lon")),
             speed_kmh=_parse_float(_get(hash_data, "speed_kmh")),
-            ignition=_parse_bool(_get(hash_data, "ignition")),
+            ignition=ignition_val,
             pto_active=pto_active,
             ext_voltage_mv=ext_voltage_mv,
             can_data=can_data,
@@ -605,11 +609,14 @@ async def get_vehicle_status(
 
     can_data = _parse_json(can_str)
     pto_active = _parse_bool(pto_str)
+    ignition_val = _parse_bool(ignition_str)
 
-    # Fallback: si Redis tiene pto_active=false pero los AVL IDs de DIN2 (avl_2)
-    # o el canal CAN de PTO (avl_179) indican activo, corregimos el valor.
-    # Esto cubre el caso en que el hash de Redis fue escrito por una versión
-    # anterior del publisher que no calculaba pto_active correctamente.
+    # Fallback ignición: si Redis tiene ignition=false pero DIN1 (avl_1) = 1, corregimos.
+    if not ignition_val and can_data:
+        if can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1:
+            ignition_val = True
+
+    # Fallback PTO: si Redis tiene pto_active=false pero DIN2 (avl_2) o canal CAN (avl_179) = 1.
     if not pto_active and can_data:
         if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
             pto_active = True
@@ -629,7 +636,7 @@ async def get_vehicle_status(
         lat=_parse_float(lat_str),
         lon=_parse_float(lon_str),
         speed_kmh=_parse_float(speed_str),
-        ignition=_parse_bool(ignition_str),
+        ignition=ignition_val,
         pto_active=pto_active,
         ext_voltage_mv=ext_voltage_mv,
         can_data=can_data,

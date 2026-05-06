@@ -62,10 +62,11 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             except Exception:
                                 pass
                         tenant_id = payload.get("tenant_id")
+                        msg = {"type": "telemetry", "data": payload}
                         if tenant_id:
-                            await manager.broadcast_to_tenant(
-                                tenant_id, {"type": "telemetry", "data": payload}
-                            )
+                            await manager.broadcast_to_tenant(tenant_id, msg)
+                        # CMG admins ven todos los tenants — conexiones registradas bajo "__cmg__"
+                        await manager.broadcast_to_tenant("__cmg__", msg)
                     except Exception as exc:
                         logger.debug("WS broadcast parse error: %s", exc)
         except asyncio.CancelledError:
@@ -101,7 +102,8 @@ async def ws_fleet(websocket: WebSocket, token: str | None = None) -> None:
         return
 
     manager: ConnectionManager = websocket.app.state.ws_manager
-    await manager.connect(websocket, str(user.tenant_id))
+    ws_tenant_key = "__cmg__" if user.tenant_tier == "cmg" else str(user.tenant_id)
+    await manager.connect(websocket, ws_tenant_key)
     try:
         await websocket.send_json({"type": "connected", "tenant_id": str(user.tenant_id)})
         while True:
@@ -109,4 +111,4 @@ async def ws_fleet(websocket: WebSocket, token: str | None = None) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        manager.disconnect(websocket, str(user.tenant_id))
+        manager.disconnect(websocket, ws_tenant_key)
