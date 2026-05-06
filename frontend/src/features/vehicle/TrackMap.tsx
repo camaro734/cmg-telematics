@@ -193,7 +193,7 @@ export default function TrackMap({ track, status }: TrackMapProps) {
   if (track.length === 0 && (status?.lat == null)) {
     return (
       <div style={{
-        height: 340,
+        width: '100%', height: '100%', minHeight: 260,
         background: 'var(--bg-elevated)',
         display: 'flex',
         alignItems: 'center',
@@ -207,5 +207,5 @@ export default function TrackMap({ track, status }: TrackMapProps) {
     )
   }
 
-  return <div ref={containerRef} style={{ width: '100%', height: 340, borderRadius: 8, overflow: 'hidden' }} />
+  return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 260, borderRadius: 8, overflow: 'hidden' }} />
 }

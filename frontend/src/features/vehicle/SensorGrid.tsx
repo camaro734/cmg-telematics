@@ -79,31 +79,31 @@ function TimeCard({ label, value }: { label: string; value: number | null }) {
     <div style={{
       background: 'var(--bg-elevated)',
       border: `1px solid ${fmt ? 'color-mix(in srgb, var(--accent-info) 25%, var(--bg-border))' : 'var(--bg-border)'}`,
-      borderRadius: 8,
-      padding: '10px 14px',
+      borderRadius: 7,
+      padding: '5px 9px',
       display: 'flex',
       flexDirection: 'column',
-      gap: 4,
+      gap: 2,
       position: 'relative' as const,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{
           fontFamily: 'var(--font-ui)',
-          fontSize: 9,
+          fontSize: 8,
           color: 'var(--text-muted)',
           letterSpacing: '0.8px',
           textTransform: 'uppercase' as const,
-          lineHeight: 1.35,
+          lineHeight: 1.3,
           wordBreak: 'break-word' as const,
         }}>
           {label}
         </div>
         {fmt && <span className="live-dot" />}
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
         <span style={{
           fontFamily: 'var(--font-data)',
-          fontSize: 22,
+          fontSize: 15,
           fontWeight: 700,
           color: fmt ? 'var(--accent-info)' : 'var(--accent-off)',
           lineHeight: 1,
@@ -111,7 +111,7 @@ function TimeCard({ label, value }: { label: string; value: number | null }) {
           {fmt ? fmt.main : '—'}
         </span>
         {fmt && (
-          <span style={{ fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--font-data)', fontSize: 10, color: 'var(--text-muted)' }}>
             {fmt.unit}
           </span>
         )}
@@ -129,21 +129,21 @@ function CounterCard({ label, value, unit }: { label: string; value: number | nu
     <div style={{
       background: 'var(--bg-elevated)',
       border: `1px solid ${value !== null ? 'color-mix(in srgb, var(--accent-energy) 25%, var(--bg-border))' : 'var(--bg-border)'}`,
-      borderRadius: 8,
-      padding: '10px 14px',
+      borderRadius: 7,
+      padding: '5px 9px',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      gap: 4,
+      gap: 2,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{
           fontFamily: 'var(--font-ui)',
-          fontSize: 9,
+          fontSize: 8,
           color: 'var(--text-muted)',
           letterSpacing: '0.8px',
           textTransform: 'uppercase' as const,
-          lineHeight: 1.35,
+          lineHeight: 1.3,
           wordBreak: 'break-word' as const,
           textAlign: 'center' as const,
           flex: 1,
@@ -155,7 +155,7 @@ function CounterCard({ label, value, unit }: { label: string; value: number | nu
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
         <span style={{
           fontFamily: 'var(--font-data)',
-          fontSize: 22,
+          fontSize: 15,
           fontWeight: 700,
           color: value !== null ? 'var(--accent-energy)' : 'var(--accent-off)',
           lineHeight: 1,
@@ -163,7 +163,7 @@ function CounterCard({ label, value, unit }: { label: string; value: number | nu
           {display}
         </span>
         {unit && value !== null && (
-          <span style={{ fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--font-data)', fontSize: 10, color: 'var(--text-muted)' }}>
             {unit}
           </span>
         )}
@@ -260,6 +260,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
       return (
         <CircularGauge
           key={sensor.key}
+          size={100}
           value={value}
           min={sensor.min ?? 0}
           max={sensor.max ?? 100}
@@ -301,7 +302,7 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
       {/* Grupo 1: Presiones y niveles — gauges uniformes en grid */}
       {visualSensors.length > 0 && (
@@ -309,8 +310,8 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
           {showTitles && <div style={groupTitleStyle}>Presiones y Niveles</div>}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: 12,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+            gap: 7,
           }}>
             {visualSensors.map(renderVisual)}
           </div>
@@ -338,8 +339,8 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
             {showTitles && <div style={groupTitleStyle}>Contadores de Tiempo</div>}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: 10,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+              gap: 6,
             }}>
               {timeSensors.map(s => (
                 <TimeCard
@@ -361,8 +362,8 @@ export default function SensorGrid({ sensorSchema, canData, derivedValues = {} }
             {showTitles && <div style={groupTitleStyle}>Contadores</div>}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-              gap: 10,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+              gap: 6,
             }}>
               {counterSensors.map(s => (
                 <CounterCard

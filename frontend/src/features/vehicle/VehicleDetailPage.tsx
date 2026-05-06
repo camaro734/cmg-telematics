@@ -217,7 +217,7 @@ export default function VehicleDetailPage() {
           </Link>
         </div>
       )}
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         <VehicleHeader vehicle={vehicle} status={status} iconUrl={vehicleType?.icon_url ?? undefined} vehicleTypeSlug={vehicleType?.slug} />
         <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
@@ -227,21 +227,21 @@ export default function VehicleDetailPage() {
             <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
           </div>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflow: (tab === 'live' && !isMobile) ? 'hidden' : 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
+        <div style={{ overflow: 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 
           {tab === 'live' && (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* MAIN GRID: 55% mapa + 45% panel */}
               <div style={isMobile
                 ? { display: 'flex', flexDirection: 'column' }
-                : { display: 'grid', gridTemplateColumns: '55% 45%' }
+                : { display: 'grid', gridTemplateColumns: '55% 45%', height: 480 }
               }>
                 {/* ── MAPA ── */}
                 <div style={{
                   borderRight: isMobile ? 'none' : '1px solid var(--bg-border)',
                   borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none',
                   position: 'relative',
-                  minHeight: isMobile ? 220 : 440,
+                  height: isMobile ? 260 : '100%',
                 }}>
                   <TrackMap track={track} status={status} />
 
@@ -283,7 +283,7 @@ export default function VehicleDetailPage() {
                 </div>
 
                 {/* ── PANEL DERECHO ── */}
-                <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 12 : 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ overflowY: isMobile ? undefined : 'auto', padding: isMobile ? 10 : 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
 
                   {/* ALERTAS ACTIVAS — siempre visible si las hay */}
                   {activeAlertsCount > 0 && (
@@ -336,8 +336,8 @@ export default function VehicleDetailPage() {
                   </div>
 
                   {/* TELEMETRÍA */}
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderTop: '2px solid var(--accent-energy)', borderRadius: 8, padding: '11px 13px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderTop: '2px solid var(--accent-energy)', borderRadius: 8, padding: '7px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
                       <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Telemetría</span>
                       {status?.online
                         ? <span style={{ color: 'var(--accent-ok)', fontSize: 10, fontWeight: 600 }}>● En directo</span>
@@ -353,25 +353,25 @@ export default function VehicleDetailPage() {
                     </div>
 
                     {status && !status.online && (
-                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '7px 10px', marginBottom: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '5px 8px', marginBottom: 5, fontSize: 10, color: 'var(--text-muted)' }}>
                         Vehículo apagado o sin cobertura. Último dato conocido.
                       </div>
                     )}
 
                     {status ? (
                       <>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
                           <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--accent-ok)' : 'var(--text-muted)'} />
                           <StatusCard label="PTO" value={status.online ? ((status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'var(--accent-energy)' : 'var(--text-muted)'} />
                           <StatusCard label="Velocidad" value={status.online ? (status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—') : '—'} />
                         </div>
                         {status.last_seen && (
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 4 }}>
                             Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
                         {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
                             {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).map(s => {
                               const raw = status.can_data?.[`avl_${s.avl_id}`]
                               const num = raw != null ? Number(raw) : 0
@@ -395,9 +395,9 @@ export default function VehicleDetailPage() {
 
                   {/* CONTROLES DOUT */}
                   {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
-                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '11px 13px' }}>
-                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 9 }}>Controles de mando</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(130px, 1fr))', gap: 7 }}>
+                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '7px 10px' }}>
+                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 5 }}>
                         {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
                           const active = !!doutState[d.slot]
                           const loading = !!doutLoading[d.slot]
@@ -410,13 +410,13 @@ export default function VehicleDetailPage() {
                               style={{
                                 background: active ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)',
                                 border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
-                                borderRadius: 6, padding: '8px 12px', cursor: loading ? 'wait' : 'pointer',
-                                textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2,
+                                borderRadius: 6, padding: '5px 8px', cursor: loading ? 'wait' : 'pointer',
+                                textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
                                 opacity: loading ? 0.7 : 1, transition: 'background 0.2s, border-color 0.2s',
                               }}
                             >
-                              <span style={{ fontSize: 10, color: active ? 'var(--accent-ok)' : 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>DOUT{d.slot}{active ? ' ●' : ' ○'}</span>
-                              <span style={{ fontSize: 12, color: active ? 'var(--accent-ok)' : 'var(--text-primary, #E7E5E4)', fontWeight: 600 }}>{d.label}</span>
+                              <span style={{ fontSize: 11, color: active ? 'var(--accent-ok)' : 'var(--text-primary, #E7E5E4)', fontWeight: 600 }}>{d.label}</span>
+                              <span style={{ fontSize: 9, color: active ? 'var(--accent-ok)' : 'var(--text-muted)', fontFamily: 'var(--font-data)', flexShrink: 0 }}>{active ? '●' : '○'}</span>
                             </button>
                           )
                         })}
@@ -673,14 +673,14 @@ function StatusChip({ label, value, color }: { label: string; value: string; col
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 1,
-      padding: '5px 10px',
+      padding: '3px 7px',
       background: 'var(--bg-elevated)',
       border: `1px solid ${color ? `color-mix(in srgb, ${color} 30%, var(--bg-border))` : 'var(--bg-border)'}`,
-      borderRadius: 6,
-      minWidth: 64,
+      borderRadius: 5,
+      minWidth: 52,
     }}>
-      <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
+      <span style={{ fontSize: 8, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
     </div>
   )
 }
@@ -692,11 +692,11 @@ function StatusCard({ label, value, color }: { label: string; value: string; col
 
 function VDKpiCard({ title, value, unit, color }: { title: string; value: string; unit?: string; color: string }) {
   return (
-    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '10px 12px' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, lineHeight: 1.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-data)', color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>{unit}</span>}
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 7, padding: '6px 9px' }}>
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2, lineHeight: 1.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+        <span style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-data)', color, lineHeight: 1 }}>{value}</span>
+        {unit && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>{unit}</span>}
       </div>
     </div>
   )
