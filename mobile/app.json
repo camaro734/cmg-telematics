@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "CMG Track",
+    "slug": "cmg-track",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f1117"
+    },
+    "scheme": "cmgtrack",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "es.cmghidraulica.cmgtrack"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f1117"
+      },
+      "package": "es.cmghidraulica.cmgtrack"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#00C8C8"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "CMG Track necesita acceso a la ubicación para mostrar tu posición en el mapa."
+        }
+      ]
+    ]
+  }
+}

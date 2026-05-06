@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from src.config import settings
 from src.loader import load_rules, load_vehicle_type_map, Rule
 from src.evaluator import process_message, TelemetryMsg, RuleMatch
+from src.field_ops import handle_field_operations
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,11 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
                                 for match in matches:
                                     alert_id = await _write_alert(conn, match)
                                     await _publish_alert(redis, alert_id, match)
+                        await handle_field_operations(
+                            db_pool, redis,
+                            msg.vehicle_id, msg.pto_active,
+                            msg.lat, msg.lon,
+                        )
                         await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
                     except Exception as exc:
                         logger.error("Error processing %s: %s", msg_id, exc, exc_info=True)

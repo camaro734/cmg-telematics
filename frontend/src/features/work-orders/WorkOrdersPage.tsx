@@ -127,7 +127,7 @@ const STOP_STATUS_COLORS: Record<WorkOrderStopStatus, string> = {
 }
 
 // ── Panel de paradas de una orden ─────────────────────────────────────────────
-function StopsPanel({ order, onClose }: { order: WorkOrderOut; onClose: () => void }) {
+function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onClose: () => void; onReportStop: (stop: WorkOrderStopOut) => void }) {
   const qc = useQueryClient()
   const [addingStop, setAddingStop] = useState(false)
   const [newStop, setNewStop] = useState<WorkOrderStopCreate>({ title: '', order_index: 0 })
@@ -310,6 +310,18 @@ function StopsPanel({ order, onClose }: { order: WorkOrderOut; onClose: () => vo
                     → {STOP_STATUS_LABELS[ns]}
                   </button>
                 ))}
+                {stop.status === 'done' && (
+                  <button
+                    onClick={() => onReportStop(stop)}
+                    style={{
+                      fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                      border: '1px solid var(--accent-energy)', background: 'transparent',
+                      color: 'var(--accent-energy)', cursor: 'pointer',
+                    }}
+                  >
+                    Informe
+                  </button>
+                )}
                 {order.status !== 'done' && order.status !== 'cancelled' && stop.status === 'pending' && (
                   <button
                     onClick={() => { if (confirm('¿Eliminar esta parada?')) deleteStop(stop.id) }}
@@ -599,6 +611,7 @@ export default function WorkOrdersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<WorkOrderOut | null>(null)
   const [reportOrder, setReportOrder] = useState<WorkOrderOut | null>(null)
+  const [reportStop, setReportStop] = useState<WorkOrderStopOut | null>(null)
   const [stopsOrder, setStopsOrder] = useState<WorkOrderOut | null>(null)
 
   const { activeTenantId } = useTenantContext()
@@ -769,14 +782,22 @@ export default function WorkOrdersPage() {
       {reportOrder && (
         <WorkReportModal
           order={reportOrder}
-          onClose={() => setReportOrder(null)}
+          stop={reportStop}
+          onClose={() => { setReportOrder(null); setReportStop(null) }}
         />
       )}
       </div>
     </Shell>
 
     {stopsOrder && (
-      <StopsPanel order={stopsOrder} onClose={() => setStopsOrder(null)} />
+      <StopsPanel
+        order={stopsOrder}
+        onClose={() => setStopsOrder(null)}
+        onReportStop={(stop) => {
+          setReportStop(stop)
+          setReportOrder(stopsOrder)
+        }}
+      />
     )}
     </>
   )

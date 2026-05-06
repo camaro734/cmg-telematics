@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { WorkOrderOut, WorkReportOut, MaterialItem } from '../../lib/types'
+import type { WorkOrderOut, WorkOrderStopOut, WorkReportOut, MaterialItem } from '../../lib/types'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S = {
@@ -136,9 +136,10 @@ function SignatureCanvas({ onSigned, existingUrl }: SignatureCanvasProps) {
 interface Props {
   order: WorkOrderOut
   onClose: () => void
+  stop?: WorkOrderStopOut | null
 }
 
-export default function WorkReportModal({ order, onClose }: Props) {
+export default function WorkReportModal({ order, onClose, stop }: Props) {
   const qc = useQueryClient()
 
   const { data: report } = useQuery({
@@ -155,14 +156,18 @@ export default function WorkReportModal({ order, onClose }: Props) {
   const [saveMsg, setSaveMsg] = useState('')
   const photoInputRef = useRef<HTMLInputElement>(null)
 
-  // Sync form from loaded report
+  // Sync form: prefer existing report, fall back to stop telemetry
   useEffect(() => {
-    if (!report) return
-    setDescription(report.description ?? '')
-    setDurationH(Math.floor((report.work_duration_minutes ?? 0) / 60).toString())
-    setDurationM(((report.work_duration_minutes ?? 0) % 60).toString())
-    setMaterials(report.materials_used ?? [])
-  }, [report])
+    if (report) {
+      setDescription(report.description ?? '')
+      setDurationH(Math.floor((report.work_duration_minutes ?? 0) / 60).toString())
+      setDurationM(((report.work_duration_minutes ?? 0) % 60).toString())
+      setMaterials(report.materials_used ?? [])
+    } else if (stop?.pto_minutes != null) {
+      setDurationH(Math.floor(stop.pto_minutes / 60).toString())
+      setDurationM(Math.round(stop.pto_minutes % 60).toString())
+    }
+  }, [report, stop])
 
   const { mutate: saveReport, isPending: saving } = useMutation({
     mutationFn: () => {
@@ -238,6 +243,53 @@ export default function WorkReportModal({ order, onClose }: Props) {
           </div>
           <button onClick={onClose} style={{ ...S.btnSm, border: 'none', fontSize: 16, padding: '2px 8px' }}>×</button>
         </div>
+
+        {/* Parada y telemetría automática */}
+        {stop && (
+          <div style={S.section}>
+            <div style={S.sectionTitle}>Parada: {stop.title}{stop.client_name ? ` — ${stop.client_name}` : ''}</div>
+            {(stop.pto_minutes != null || stop.pump_minutes != null || stop.rpm_avg != null || stop.pressure_min != null || stop.pressure_max != null) && (
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--bg-border)' }}>
+                {stop.pto_minutes != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={S.label}>PTO</span>
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-energy)' }}>{stop.pto_minutes.toFixed(0)} min</span>
+                  </div>
+                )}
+                {stop.pump_minutes != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={S.label}>Bomba</span>
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-info)' }}>{stop.pump_minutes.toFixed(0)} min</span>
+                  </div>
+                )}
+                {stop.rpm_avg != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={S.label}>RPM media</span>
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{stop.rpm_avg.toFixed(0)}</span>
+                  </div>
+                )}
+                {stop.pressure_min != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={S.label}>Presión mín</span>
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-info)' }}>{stop.pressure_min.toFixed(0)} mbar</span>
+                  </div>
+                )}
+                {stop.pressure_max != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={S.label}>Presión máx</span>
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-warn)' }}>{stop.pressure_max.toFixed(0)} mbar</span>
+                  </div>
+                )}
+                {stop.fuel_l != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={S.label}>Combustible</span>
+                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-warn)' }}>{stop.fuel_l.toFixed(1)} L</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Descripción */}
         <div style={S.section}>
