@@ -312,47 +312,72 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 ```
 
 ### Migraciones Alembic aplicadas
-001 → 014 (última: `014_device_sim_phone`)
+001 → 019 (última: `019_work_order_stops`)
+
+| Migración | Contenido |
+|-----------|-----------|
+| 001–014 | Schema inicial, dispositivos, ciclos, mantenimiento, SIM phone |
+| 015 | Tabla `driver` + `vehicle_driver_assignment` |
+| 016 | Tabla `work_order` (órdenes de trabajo) |
+| 017 | Tabla `work_report` (informes con fotos, firma, PDF) |
+| 018 | Campo `portal_access_token` en `tenant` |
+| 019 | Tabla `work_order_stop` (paradas con lat/lon, arrival_radius_m, telemetría) |
 
 ### Frontend — páginas implementadas
-- `/fleet` — FleetDashboard: mapa Leaflet full-page, sidebar collapsible con lista de vehículos, tarjeta flotante al seleccionar vehículo con botón "Ver detalle →"
-- `/vehicles` — VehiclesPage (lista de vehículos con CRUD)
-- `/tipos-vehiculo` — VehicleTypesPage (sensor_schema con scale+offset, mantenimiento templates, DOUT config, métricas históricas, ciclos de trabajo, reglas de alerta, icono). Dividida en sub-componentes: AlertRulesSection, DoutConfigSection, HistoricMetricsSection, MaintenanceTemplatesSection
+- `/fleet` — FleetDashboard: mapa Leaflet full-page, sidebar collapsible, tarjeta flotante, TenantSelector para admins CMG
+- `/vehicles` — VehiclesPage (lista con CRUD)
+- `/tipos-vehiculo` — VehicleTypesPage (sensor_schema, mantenimiento, DOUT, métricas, reglas). Subcomponentes: AlertRulesSection (con editar/eliminar), DoutConfigSection, HistoricMetricsSection, MaintenanceTemplatesSection
 - `/diagnostics/can-scanner` — CAN Scanner con histórico, etiquetado, exportación CSV
-- `/vehicles/:id` — VehicleDetailPage (live con mapa ampliado, KPIs en tiempo real, histórico, ciclos, mantenimiento; paneles CHASIS/COMANDOS/INCIDENCIAS colapsables)
-- `/alerts` — AlertsPage (tabs Activas / Reglas)
-- `/reports` — ReportsPage (filtro por vehículo, PDF mensual). Hook useReportData extraído
+- `/vehicles/:id` — VehicleDetailPage (mapa dinámico full-height, SensorGrid compact, KPIs live WebSocket, auto-refresh 5 s, ignición con fallback DIN1)
+- `/alerts` — AlertsPage (tabs Activas / Reglas, filtro por tenant para CMG admins)
+- `/reports` — ReportsPage (filtro vehículo, PDF mensual)
 - `/devices` — DevicesPage
 - `/maintenance` — MaintenancePage + formulario de planes
-- `/rules` — RulesPage + RuleFormPage (constructor visual)
+- `/rules` — RulesPage + RuleFormPage (constructor visual; soporta ?condition_type=geofence y ?vehicle_id=)
+- `/geofences` — GeofencesPage (lista de geocercas con preview SVG del polígono, editar/eliminar, crear)
 - `/settings` — SettingsPage (usuarios, notificaciones, ciclos)
-- `/clientes` — TenantsPage + TenantDetailPage + TenantFormPage (módulos habilitados, brand tokens, grants)
+- `/clientes` — TenantsPage + TenantDetailPage (Portal cliente con token) + TenantFormPage
+- `/drivers` — DriversPage (CRUD conductores, asignación a vehículo)
+- `/work-orders` — WorkOrdersPage (órdenes con paradas, mapa, estados, informes PDF, StopsPanel)
+- `/portal/:token` — ClientPortalPage (portal público sin autenticación, URL tokenizada por tenant)
+- `/dashboard` — DashboardPage
+
+### Navegación TopNav (desktop)
+- **Barra principal**: Dashboard, Flota, Alertas, Mantenimiento, Reportes
+- **Dropdown "Operaciones"** (admin/operator): Órdenes de trabajo, Conductores, Geocercas
+- **Dropdown "Admin"** (solo CMG admin): Clientes, Flota todos, Plantillas, Dispositivos, CAN Scanner, Ajustes
+- **TenantSelector**: visible solo para CMG admins — filtra datos de FleetDashboard, AlertsPage y WorkOrdersPage
 
 ### Funcionalidades clave implementadas
-- **Codec 8 + Codec 8 Extended**: decodificación correcta incluyendo el grupo X-byte del Extended
+- **Codec 8 + Codec 8 Extended**: decodificación correcta incluyendo grupo X-byte del Extended
 - **CAN Manual slots 0–19**: AVL IDs 145–154 (Codec 8) y 380–389 (Codec 8 Extended)
-- **DOUT**: control de salidas digitales vía Codec 12, persistencia en Redis, restore automático al reconectar; historial de comandos con ACK FMC650
-- **sensor_schema**: definición por tipo de vehículo con canal CAN, modo Byte/Bit, scale y **offset** (fórmula: `valor = raw × scale + offset`, ej: offset=-40 para temperatura)
-- **CAN Scanner**: indicador de antigüedad de datos (badge + banner cuando PLC apagado)
-- **Mantenimiento predictivo**: planes por vehículo, templates por tipo, intervenciones con reset
-- **Alertas**: rules engine con condiciones JSONB (threshold, sustained, accumulation, trend, composite, schedule), instancias, escalación
-- **Exportación CSV**: CAN Scanner, ciclos de trabajo, intervenciones de mantenimiento
-- **Iconos por tipo de vehículo**: upload PNG, StaticFiles en /uploads; logo PNG del tipo mostrado en header de detalle y tarjeta flotante de flota
-- **White-label**: brand_tokens JSONB por tenant; login devuelve logo_url + brand_name; tokens inyectados como CSS variables en runtime; `refresh()` también aplica brand tokens (fix: logo visible al recargar página)
-- **AVL series endpoint**: datos CAN del PLC en serie temporal para gráficos con nombre personalizado
-- **KpiChart**: gráficos configurables por tipo de vehículo (line, donut, bar), agrupación multi-serie, transform/offset, filtro por vehículo
-- **Métricas históricas por tipo**: hasta 5 métricas configurables en VehicleTypesPage, visibles en reportes PDF
-- **Módulos por tenant**: `enabled_modules TEXT[]` en tenant; TopNav filtra secciones según módulos activos
-- **Paneles colapsables en VehicleDetailPage**: ESTADO CHASIS, HISTORIAL DE COMANDOS e INCIDENCIAS ocultos por defecto, expandibles con toggle; badge rojo si hay incidencias activas
-- **Sentry**: backend (sentry-sdk[fastapi]) + frontend (@sentry/react) con DSN en .env; logging JSON estructurado en backend
-- **Bulk status endpoint**: `GET /api/v1/vehicles/statuses?ids=...` — pipeline Redis, hasta 200 IDs, reduce N peticiones a 1
-- **SensorGrid live indicators**: tarjetas TimeCard/CounterCard/NumericDisplay con punto verde pulsante y borde de acento cuando hay dato activo
-- **FleetDashboard mapa protagonista**: mapa full-viewport, sidebar semi-transparente collapsible (z-index 1000), tarjeta flotante de vehículo seleccionado
+- **Buffer offline FMC650**: el dispositivo guarda hasta ~130.000 registros en flash interna (10 MB) o microSD (hasta 32 GB). Al reconectar envía todo en Codec 8 idéntico. El ingest-svc lo maneja transparentemente — `ON CONFLICT DO NOTHING` + timestamp original del AVL. No se pierde ningún dato CAN/PTO.
+- **DOUT**: control salidas digitales vía Codec 12, persistencia Redis, restore automático
+- **Ignición con fallback DIN1**: `avl_1`/`avl_239` como fallback si no hay CAN ignition (corregido en status endpoint y bulk endpoint)
+- **sensor_schema**: por tipo de vehículo con canal CAN, modo Byte/Bit, scale y offset
+- **Mantenimiento predictivo**: planes, templates, intervenciones con reset de acumuladores
+- **Alertas / Rules engine**: threshold, sustained, accumulation, trend, composite, schedule, **geofence** (ray-casting, estado inside/outside en Redis por regla+vehículo)
+- **Geocercas**: polígono JSONB en condition, editor Leaflet con clic para vértices, evaluación por transición enter/exit, visualización en FleetMap
+- **Conductores**: entidad Driver con historial de asignaciones a vehículos
+- **Órdenes de trabajo**: creación con paradas inline (título, cliente, dirección, lat/lon, radio de llegada ajustable); geocoding Nominatim integrado en StopLocationPicker (buscar por dirección + clic en mapa); marcadores DivIcon SVG; telemetría capturada por parada (PTO min, RPM, combustible, presión)
+- **Informes de trabajo**: firma digital canvas, upload fotos, generación PDF WeasyPrint con logo tenant
+- **Portal cliente**: URL `/portal/:token` pública sin login; mapa de flota, lista de vehículos, órdenes completadas; token generado y copiado desde TenantDetailPage
+- **TenantSelector CMG**: Zustand store `useTenantContext`; filtra queries en FleetDashboard, AlertsPage, WorkOrdersPage
+- **WebSocket telemetría**: CMG admins registrados bajo sentinel `"__cmg__"`, broadcast siempre incluye `"__cmg__"` además del tenant del vehículo — admins ven todos los tenants en tiempo real
+- **Bulk status endpoint**: `GET /api/v1/vehicles/statuses?ids=...` — pipeline Redis, hasta 200 IDs
+- **SensorGrid compact**: modo lista plana (label→valor) para panel lateral de VehicleDetailPage
+- **White-label**: brand_tokens JSONB; CSS variables inyectadas en runtime; portal también respeta branding del tenant
+- **Sentry**: backend + frontend con DSN en .env; logging JSON estructurado
 
 ### Logo CMG Track
-- Archivo: `backend/static/logos/cmgtrack.png` (668×187 px, recortado de 1280×853 con márgenes transparentes)
-- Original guardado en: `backend/static/logos/cmgtrack_original.png`
-- Topbar height: 62px (tokens.css `--topbar-h`)
+- Archivo: `backend/static/logos/cmgtrack.png` (668×187 px)
+- Topbar height: 62px (`--topbar-h` en tokens.css)
+
+### Hardware FMC650 — notas clave
+- **Buffer offline**: flash interna 10 MB (~80k–130k registros AVL completos con todos los IO elements/CAN)
+- **MicroSD**: slot físico push-lock, hasta 32 GB FAT32. Configurar en Teltonika Configurator: `Save records to → SD card`
+- **Reenvío**: mismo Codec 8/8E, FIFO, espera ACK. Sistema actual lo maneja sin cambios de código.
+- **Campo `priority`** (0=low, 1=high, 2=panic): se parsea en codec8.py pero NO se persiste en `telemetry_record` — pendiente si se necesita en el futuro
 
 ### GitHub
 Repositorio: https://github.com/camaro734/cmg-telematics (rama master)
