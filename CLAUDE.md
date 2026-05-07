@@ -287,7 +287,7 @@ pero con estética contemporánea. Único, no derivado de competidores.
 - Fase 2: App React Native + Expo
 
 ═══════════════════════════════════════════════════════════════
-## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-05)
+## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-07)
 ═══════════════════════════════════════════════════════════════
 
 La plataforma está en producción con datos reales. Los servicios están desplegados como contenedores Docker en el VPS.
@@ -363,8 +363,8 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 - **Informes de trabajo**: firma digital canvas, upload fotos, generación PDF WeasyPrint con logo tenant
 - **Portal cliente**: URL `/portal/:token` pública sin login; mapa de flota, lista de vehículos, órdenes completadas; token generado y copiado desde TenantDetailPage
 - **TenantSelector CMG**: Zustand store `useTenantContext`; filtra queries en FleetDashboard, AlertsPage, WorkOrdersPage
-- **WebSocket telemetría**: CMG admins registrados bajo sentinel `"__cmg__"`, broadcast siempre incluye `"__cmg__"` además del tenant del vehículo — admins ven todos los tenants en tiempo real
-- **Bulk status endpoint**: `GET /api/v1/vehicles/statuses?ids=...` — pipeline Redis, hasta 200 IDs
+- **WebSocket telemetría**: CMG admins registrados bajo sentinel `"__cmg__"`, broadcast siempre incluye `"__cmg__"` además del tenant del vehículo — admins ven todos los tenants en tiempo real. El handler `wsClient.onmessage` parchea **dos** caches en cada mensaje: el individual `['vehicles', id, 'status']` (VehicleDetailPage) y el bulk `['vehicles', 'statuses', ...]` vía `setQueriesData` con match por prefijo (FleetMap, FleetDashboard, DashboardPage). Sin esto el bulk queda congelado por `staleTime: Infinity` y el mapa muestra "sin señal" mientras el detalle se ve online.
+- **Bulk status endpoint**: `GET /api/v1/vehicles/statuses?ids=...` — pipeline Redis, hasta 200 IDs. `effective_online` se calcula desde `last_seen < 5 min` en Redis, no desde `device.online` de Postgres (que puede quedar desactualizado).
 - **SensorGrid compact**: modo lista plana (label→valor) para panel lateral de VehicleDetailPage
 - **White-label**: brand_tokens JSONB; CSS variables inyectadas en runtime; portal también respeta branding del tenant
 - **Sentry**: backend + frontend con DSN en .env; logging JSON estructurado
