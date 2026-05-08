@@ -287,7 +287,7 @@ pero con estética contemporánea. Único, no derivado de competidores.
 - Fase 2: App React Native + Expo
 
 ═══════════════════════════════════════════════════════════════
-## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-07)
+## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-08)
 ═══════════════════════════════════════════════════════════════
 
 La plataforma está en producción con datos reales. Los servicios están desplegados como contenedores Docker en el VPS.
@@ -312,7 +312,7 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 ```
 
 ### Migraciones Alembic aplicadas
-001 → 019 (última: `019_work_order_stops`)
+001 → 021 (última: `021_pdf_parte_multitenant`)
 
 | Migración | Contenido |
 |-----------|-----------|
@@ -322,6 +322,8 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 | 017 | Tabla `work_report` (informes con fotos, firma, PDF) |
 | 018 | Campo `portal_access_token` en `tenant` |
 | 019 | Tabla `work_order_stop` (paradas con lat/lon, arrival_radius_m, telemetría) |
+| 020 | Refresh policy de `telemetry_1h` cada 15 min con end_offset 5 min |
+| 021 | PDF parte multitenant: `tenant.business_cif/business_address`, `vehicle_type.pdf_metrics`, `work_order.final_client_name/address/doc_number`, `work_report.client_signee_name/dni/unsigned_reason`, tabla `tenant_doc_counter` |
 
 ### Frontend — páginas implementadas
 - `/fleet` — FleetDashboard: mapa Leaflet full-page, sidebar collapsible, tarjeta flotante, TenantSelector para admins CMG
@@ -344,8 +346,9 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 
 ### Navegación TopNav (desktop)
 - **Barra principal**: Dashboard, Flota, Alertas, Mantenimiento, Reportes
-- **Dropdown "Operaciones"** (admin/operator): Órdenes de trabajo, Conductores, Geocercas
-- **Dropdown "Admin"** (solo CMG admin): Clientes, Flota todos, Plantillas, Dispositivos, CAN Scanner, Ajustes
+- **Dropdown "Operaciones"** (admin/operator): Órdenes de trabajo, Conductores, Geocercas. **Para admin tier=client se añade "Mis clientes"** (gestión de subclients propios — el CMG admin lo tiene en su dropdown "Admin").
+- **Dropdown "Admin"** (CMG admin): Clientes, Flota todos, Plantillas, Dispositivos, CAN Scanner, Ajustes
+- **Dropdown "Cuenta"** (admin tier=client): solo Ajustes (la gestión de subclients vive en Operaciones → Mis clientes)
 - **TenantSelector**: visible solo para CMG admins — filtra datos de FleetDashboard, AlertsPage y WorkOrdersPage
 
 ### Funcionalidades clave implementadas
@@ -359,9 +362,15 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 - **Alertas / Rules engine**: threshold, sustained, accumulation, trend, composite, schedule, **geofence** (ray-casting, estado inside/outside en Redis por regla+vehículo)
 - **Geocercas**: polígono JSONB en condition, editor Leaflet con clic para vértices, evaluación por transición enter/exit, visualización en FleetMap
 - **Conductores**: entidad Driver con historial de asignaciones a vehículos
-- **Órdenes de trabajo**: creación con paradas inline (título, cliente, dirección, lat/lon, radio de llegada ajustable); geocoding Nominatim integrado en StopLocationPicker (buscar por dirección + clic en mapa); marcadores DivIcon SVG; telemetría capturada por parada (PTO min, RPM, combustible, presión)
-- **Informes de trabajo**: firma digital canvas, upload fotos, generación PDF WeasyPrint con logo tenant
-- **Portal cliente**: URL `/portal/:token` pública sin login; mapa de flota, lista de vehículos, órdenes completadas; token generado y copiado desde TenantDetailPage
+- **Órdenes de trabajo**: creación con paradas inline (título, cliente, dirección, lat/lon, radio de llegada ajustable); geocoding Nominatim integrado en StopLocationPicker (buscar por dirección + clic en mapa); marcadores DivIcon SVG; telemetría capturada por parada (PTO min, RPM, combustible, presión). Datos opcionales del **cliente final** (`final_client_name`, `final_client_address`) para imprimir en el PDF como destinatario del servicio.
+- **Informes de trabajo (parte de servicio multi-tenant)**: PDF generado con WeasyPrint y branding del tenant emisor (logo + `brand_color` desde `brand_tokens` o columna; CIF y dirección fiscal opcionales). Tabla de paradas con métricas configurables por `vehicle_type.pdf_metrics` (catálogo: pto_minutes, pressure_min/max, rpm_avg, pump_minutes, fuel_l con label/unit/format editables desde `PdfMetricsSection` en `/tipos-vehiculo`). **Firma + DNI del cliente final** capturada en mobile (canvas + DNI/NIE con validación de letra de control); flujo alternativo "no se puede firmar" con motivo (`Cliente ausente`, `Rechaza firmar`, `Menor de edad`, `Otro`) que se imprime como nota gris en el PDF en lugar de la firma. **Numeración secuencial `PT-{año}-{NNNNN}` independiente por tenant emisor** (asignada atómicamente vía `INSERT ... ON CONFLICT ... RETURNING` sobre `tenant_doc_counter` al transicionar la orden a `done`). El backend bloquea `status=done` con 422 si el report no tiene firma+nombre+DNI o `unsigned_reason`. Endpoint `GET /work-orders/{id}/telemetry-detail` devuelve toda la telemetría capturada con flag de qué keys salen en el PDF (tab "Telemetría capturada" en `WorkReportModal`). El operario, tras cerrar el parte, llega a `WorkReportSuccessScreen` con botón "Compartir parte" que descarga el PDF (`expo-file-system`) y abre la Share API nativa (`expo-sharing`) para enviarlo al cliente final por WhatsApp/Mail/AirDrop.
+- **Portal cliente**: URL `/portal/:token` pública sin login; mapa de flota, lista de vehículos, órdenes completadas; token generado y copiado desde TenantDetailPage. (Por decisión de producto **no se entrega al cliente final**: el PDF se descarga desde el web autenticado del tenant emisor o se comparte directamente desde el móvil del operario.)
+- **Permisos jerárquicos sobre tenants/usuarios**: helper `assert_can_manage_tenant` en `backend/app/api/v1/deps.py` centraliza la regla:
+  - tier=cmg admin: cualquier tenant
+  - tier=client admin: su propio tenant + cualquier subclient suyo (parent_id == user.tenant_id)
+  - tier=subclient admin: solo su propio tenant
+  - operator/viewer/driver: nunca
+  Aplicado en `list_tenant_users`, `create_tenant_user`, `PUT/DELETE /users/{id}`. Permite a Vacuum admin crear y gestionar usuarios para sus subclients (Aguas de Valencia, etc.).
 - **TenantSelector CMG**: Zustand store `useTenantContext`; filtra queries en FleetDashboard, AlertsPage, WorkOrdersPage
 - **WebSocket telemetría**: CMG admins registrados bajo sentinel `"__cmg__"`, broadcast siempre incluye `"__cmg__"` además del tenant del vehículo — admins ven todos los tenants en tiempo real. El handler `wsClient.onmessage` parchea **dos** caches en cada mensaje: el individual `['vehicles', id, 'status']` (VehicleDetailPage) y el bulk `['vehicles', 'statuses', ...]` vía `setQueriesData` con match por prefijo (FleetMap, FleetDashboard, DashboardPage). Sin esto el bulk queda congelado por `staleTime: Infinity` y el mapa muestra "sin señal" mientras el detalle se ve online.
 - **Bulk status endpoint**: `GET /api/v1/vehicles/statuses?ids=...` — pipeline Redis, hasta 200 IDs. `effective_online` se calcula desde `last_seen < 5 min` en Redis, no desde `device.online` de Postgres (que puede quedar desactualizado).
