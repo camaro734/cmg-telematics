@@ -26,6 +26,14 @@ async def list_tenants(
 ):
     if user.tenant_tier == "cmg":
         result = await db.execute(select(Tenant).order_by(Tenant.name))
+    elif user.tenant_tier == "client":
+        # client ve su propio tenant + sus subclientes
+        result = await db.execute(
+            select(Tenant).where(
+                (Tenant.id == user.tenant_id) |
+                (Tenant.parent_id == user.tenant_id)
+            ).order_by(Tenant.name)
+        )
     else:
         result = await db.execute(
             select(Tenant).where(Tenant.id == user.tenant_id)
@@ -36,11 +44,16 @@ async def list_tenants(
 @router.post("/tenants", response_model=TenantOut, status_code=status.HTTP_201_CREATED)
 async def create_tenant(
     body: TenantCreate,
-    user: CurrentUser = Depends(require_tier("cmg")),
+    user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    # Los clientes solo pueden crear subclientes bajo ellos mismos
+    if user.tenant_tier == "client":
+        body = body.model_copy(update={"tier": "subclient", "parent_id": user.tenant_id})
+    elif user.tenant_tier not in ("cmg",):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos para crear tenants")
     existing = await db.execute(select(Tenant).where(Tenant.slug == body.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -114,6 +127,10 @@ async def update_tenant(
         tenant.slug = body.slug
     if body.active is not None:
         tenant.active = body.active
+    if body.business_cif is not None:
+        tenant.business_cif = body.business_cif.strip() or None
+    if body.business_address is not None:
+        tenant.business_address = body.business_address.strip() or None
     try:
         await db.commit()
         await db.refresh(tenant)
@@ -127,7 +144,7 @@ async def update_tenant(
 async def patch_tenant(
     tenant_id: uuid.UUID,
     body: TenantUpdate,
-    user: CurrentUser = Depends(require_tier("cmg")),
+    user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if user.role != "admin":
@@ -135,6 +152,11 @@ async def patch_tenant(
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    # client solo puede editar sus propios subclientes
+    if user.tenant_tier == "client" and str(tenant.parent_id) != str(user.tenant_id):
+        raise HTTPException(status_code=403, detail="Solo puedes editar tus propios subclientes")
+    elif user.tenant_tier not in ("cmg", "client"):
+        raise HTTPException(status_code=403, detail="Sin permisos")
 
     if body.enabled_modules is not None:
         invalid = set(body.enabled_modules) - ALLOWED_MODULES

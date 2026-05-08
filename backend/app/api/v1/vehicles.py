@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
@@ -235,6 +236,14 @@ async def update_vehicle_type(
         if dup.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Ya existe un tipo con ese slug")
         vtype.slug = body.slug
+    if body.pdf_metrics is not None:
+        keys = [m.key for m in body.pdf_metrics]
+        if len(keys) != len(set(keys)):
+            raise HTTPException(
+                status_code=422,
+                detail="No se puede duplicar una métrica en pdf_metrics",
+            )
+        vtype.pdf_metrics = [m.model_dump() for m in body.pdf_metrics]
     await db.commit()
     await db.refresh(vtype)
     return vtype
@@ -275,6 +284,7 @@ async def upload_vehicle_type_icon(
 
 @router.get("/vehicles", response_model=list[VehicleOut])
 async def list_vehicles(
+    request: Request,
     tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -287,10 +297,50 @@ async def list_vehicles(
     from sqlalchemy.orm import joinedload
     result = await db.execute(query.options(joinedload(Vehicle.vehicle_type)).order_by(Vehicle.name))
     vehicles = result.unique().scalars().all()
+    # Obtener status de Redis para cada vehículo
+    redis = getattr(request.app.state, 'redis', None)
     out = []
     for v in vehicles:
         d = VehicleOut.model_validate(v).model_dump()
         d['type_slug'] = v.vehicle_type.slug if v.vehicle_type else None
+        # Calcular status desde Redis
+        if redis:
+            try:
+                redis_key = f'vehicle:{v.id}:status'
+                raw = await redis.hgetall(redis_key)
+                if raw:
+                    def _get(key):
+                        val = raw.get(key.encode()) if isinstance(next(iter(raw), None), bytes) else raw.get(key)
+                        return val.decode() if isinstance(val, bytes) else val
+                    last_seen_str = _get('last_seen')
+                    if last_seen_str:
+                        try:
+                            ls = datetime.fromisoformat(last_seen_str.replace('Z', '+00:00'))
+                            age_min = (datetime.now(timezone.utc) - ls).total_seconds() / 60
+                            online = age_min < 5
+                        except Exception:
+                            online = False
+                    else:
+                        online = False
+                    spd = _get('speed_kmh')
+                    speed = float(spd) if spd else 0
+                    ign_raw = _get('ignition')
+                    _ign = ign_raw and ign_raw.lower() in ('true','1')
+                    if not online:
+                        d['status'] = 'offline'
+                    elif speed > 2:
+                        d['status'] = 'moving'
+                    elif _ign:
+                        d['status'] = 'idle'
+                    else:
+                        d['status'] = 'parked'
+                    d['last_seen'] = last_seen_str
+                    lat = _get('lat'); lon = _get('lon')
+                    if lat: d['lat'] = float(lat)
+                    if lon: d['lng'] = float(lon)
+                    d['speed'] = speed
+            except Exception:
+                pass
         out.append(d)
     return out
 
@@ -320,8 +370,19 @@ async def create_vehicle(
         year=body.year,
     )
     db.add(vehicle)
-    await db.commit()
-    await db.refresh(vehicle)
+    try:
+        await db.commit()
+        await db.refresh(vehicle)
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig) if hasattr(e, "orig") else str(e)
+        if "vehicle_vin_key" in msg:
+            detail = "Ese VIN ya está registrado en otro vehículo"
+        elif "license_plate" in msg:
+            detail = "Esa matrícula ya está registrada en otro vehículo"
+        else:
+            detail = "Ya existe un vehículo con esos datos"
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
     # Auto-create maintenance plans from vehicle type templates
     templates = vtype.maintenance_templates or []
     for tmpl in templates:
@@ -361,8 +422,19 @@ async def update_vehicle(
             raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(vehicle, field, value)
-    await db.commit()
-    await db.refresh(vehicle)
+    try:
+        await db.commit()
+        await db.refresh(vehicle)
+    except IntegrityError as e:
+        await db.rollback()
+        msg = str(e.orig) if hasattr(e, "orig") else str(e)
+        if "vehicle_vin_key" in msg:
+            detail = "Ese VIN ya está registrado en otro vehículo"
+        elif "license_plate" in msg:
+            detail = "Esa matrícula ya está registrada en otro vehículo"
+        else:
+            detail = "Ya existe un vehículo con esos datos"
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
     return vehicle
 
 
@@ -629,18 +701,32 @@ async def get_vehicle_status(
     else:
         effective_online = False
 
+    # Calcular status
+    _speed = _parse_float(speed_str) or 0
+    _ign_det = ignition_val or False
+    if not effective_online:
+        _vstatus = 'offline'
+    elif _speed > 2:
+        _vstatus = 'moving'
+    elif _ign_det:
+        _vstatus = 'idle'
+    else:
+        _vstatus = 'parked'
+    _lon = _parse_float(lon_str)
     return VehicleStatus(
         vehicle_id=vehicle_id,
         online=effective_online,
         last_seen=last_seen_dt,
         lat=_parse_float(lat_str),
-        lon=_parse_float(lon_str),
-        speed_kmh=_parse_float(speed_str),
+        lon=_lon,
+        lng=_lon,
+        speed_kmh=_speed,
         ignition=ignition_val,
         pto_active=pto_active,
         ext_voltage_mv=ext_voltage_mv,
         can_data=can_data,
         dout_state=dout_state,
+        status=_vstatus,
     )
 
 
