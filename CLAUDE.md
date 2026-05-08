@@ -287,7 +287,7 @@ pero con estética contemporánea. Único, no derivado de competidores.
 - Fase 2: App React Native + Expo
 
 ═══════════════════════════════════════════════════════════════
-## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-08)
+## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-08, 14:10 GMT+2)
 ═══════════════════════════════════════════════════════════════
 
 La plataforma está en producción con datos reales. Los servicios están desplegados como contenedores Docker en el VPS.
@@ -356,7 +356,7 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 - **CAN Manual slots 0–19**: AVL IDs 145–154 (Codec 8) y 380–389 (Codec 8 Extended)
 - **Buffer offline FMC650**: el dispositivo guarda hasta ~130.000 registros en flash interna (10 MB) o microSD (hasta 32 GB). Al reconectar envía todo en Codec 8 idéntico. El ingest-svc lo maneja transparentemente — `ON CONFLICT DO NOTHING` + timestamp original del AVL. No se pierde ningún dato CAN/PTO.
 - **DOUT**: control salidas digitales vía Codec 12, persistencia Redis, restore automático
-- **Ignición con fallback DIN1**: `avl_1`/`avl_239` como fallback si no hay CAN ignition (corregido en status endpoint y bulk endpoint)
+- **Ignición con fallback DIN1 + RPM**: `avl_1`/`avl_239` como fallback si no hay CAN ignition. **Si tampoco llegan**, se busca cualquier AVL de RPM conocido (`avl_30`, `avl_36`, `avl_85`, `avl_269`, `avl_10309`) > 200 raw (umbral conservador que filtra ruido sin perder motor real al ralentí). Helper `_ignition_from_can()` en `backend/app/api/v1/vehicles.py` aplicado en endpoint individual y bulk. Necesario porque algunos FMC650 (vacuum-pressure CMG) no tienen activados los I/O elements 239/1 en Teltonika Configurator pero sí mandan RPM del motor por CAN custom (avl_10309 con escala J1939 ×0.125).
 - **sensor_schema**: por tipo de vehículo con canal CAN, modo Byte/Bit, scale y offset
 - **Mantenimiento predictivo**: planes, templates, intervenciones con reset de acumuladores
 - **Alertas / Rules engine**: threshold, sustained, accumulation, trend, composite, schedule, **geofence** (ray-casting, estado inside/outside en Redis por regla+vehículo)
