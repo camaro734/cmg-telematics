@@ -3,8 +3,20 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import Any, Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.maintenance import MaintenanceTemplateItem
+
+
+PdfMetricKey = Literal['pto_minutes', 'pressure_min', 'pressure_max', 'rpm_avg', 'pump_minutes', 'fuel_l']
+PdfMetricFormat = Literal['integer', 'decimal1', 'decimal2']
+
+
+class PdfMetric(BaseModel):
+    """Métrica configurable que aparece en la tabla de paradas del PDF de parte de servicio."""
+    key: PdfMetricKey
+    label: str = Field(min_length=1, max_length=60)
+    unit: str = Field(min_length=1, max_length=10)
+    format: PdfMetricFormat
 
 
 class DoutSlot(BaseModel):
@@ -42,6 +54,7 @@ class VehicleTypeOut(BaseModel):
     maintenance_templates: list[MaintenanceTemplateItem] = []
     historic_metrics: list[HistoricMetricItem] = []
     dout_config: list[DoutSlot] = []
+    pdf_metrics: list[PdfMetric] = []
 
 
 class VehicleOut(BaseModel):
@@ -55,6 +68,11 @@ class VehicleOut(BaseModel):
     driver_name: str | None = None
     year: int | None = None
     active: bool
+    status: str | None = None
+    last_seen: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    speed: float | None = None
     type_slug: str | None = None
     created_at: datetime
 
@@ -89,6 +107,8 @@ class VehicleStatus(BaseModel):
     ext_voltage_mv: int | None = None
     can_data: dict[str, Any] | None = None
     dout_state: dict[int, bool] = {}
+    status: str | None = None
+    lng: float | None = None
 
 
 class TelemetryPoint(BaseModel):
@@ -133,3 +153,4 @@ class VehicleTypeCreate(BaseModel):
 class VehicleTypeUpdate(BaseModel):
     name: str | None = None
     slug: str | None = None
+    pdf_metrics: list[PdfMetric] | None = None

@@ -20,6 +20,8 @@ class TenantOut(BaseModel):
     custom_domain: str | None = None
     brand_tokens: dict[str, Any] | None = None
     enabled_modules: list[str] = []
+    business_cif: str | None = None
+    business_address: str | None = None
     created_at: datetime
 
 
@@ -38,6 +40,8 @@ class TenantUpdate(BaseModel):
     slug: str | None = None
     active: bool | None = None
     enabled_modules: list[str] | None = None
+    business_cif: str | None = None
+    business_address: str | None = None
 
 
 class BrandTokensUpdate(BaseModel):

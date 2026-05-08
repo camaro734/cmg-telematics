@@ -25,6 +25,9 @@ class WorkOrderOut(BaseModel):
     location_lat: float | None = None
     location_lon: float | None = None
     notes: str | None = None
+    final_client_name: str | None = None
+    final_client_address: str | None = None
+    doc_number: str | None = None
     created_by: uuid.UUID | None = None
     created_at: datetime
     # Populated at query time
@@ -43,6 +46,8 @@ class WorkOrderCreate(BaseModel):
     location_lat: float | None = None
     location_lon: float | None = None
     notes: str | None = None
+    final_client_name: str | None = None
+    final_client_address: str | None = None
 
 
 class WorkOrderUpdate(BaseModel):
@@ -57,6 +62,8 @@ class WorkOrderUpdate(BaseModel):
     location_lat: float | None = None
     location_lon: float | None = None
     notes: str | None = None
+    final_client_name: str | None = None
+    final_client_address: str | None = None
 
 
 class WorkOrderStatusPatch(BaseModel):
