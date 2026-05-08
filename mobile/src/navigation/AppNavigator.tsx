@@ -3,6 +3,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 import { LoginScreen } from '../screens/LoginScreen';
 import { VehicleDetailScreen } from '../screens/VehicleDetailScreen';
+import { WorkOrderDetailScreen } from '../screens/WorkOrderDetailScreen';
+import { WorkReportScreen } from '../screens/WorkReportScreen';
+import { WorkReportSuccessScreen } from '../screens/WorkReportSuccessScreen';
 import { MainNavigator } from './MainNavigator';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../theme';
@@ -11,6 +14,9 @@ export type RootStackParamList = {
   Login: undefined;
   Main: undefined;
   VehicleDetail: { vehicleId: string };
+  WorkOrderDetail: { workOrderId: string };
+  WorkReport: { workOrderId: string };
+  WorkReportSuccess: { workOrderId: string; docNumber: string | null };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -48,6 +54,21 @@ export default function AppNavigator() {
             name="VehicleDetail"
             component={VehicleDetailScreen}
             options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="WorkOrderDetail"
+            component={WorkOrderDetailScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="WorkReport"
+            component={WorkReportScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="WorkReportSuccess"
+            component={WorkReportSuccessScreen}
+            options={{ animation: 'slide_from_right', gestureEnabled: false }}
           />
         </>
       ) : (

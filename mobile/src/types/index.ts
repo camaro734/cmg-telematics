@@ -61,6 +61,29 @@ export interface Alert {
 
 export type WorkOrderStatus = 'pending' | 'in_progress' | 'done' | 'cancelled';
 export type WorkOrderPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type WorkOrderStopStatus = 'pending' | 'arrived' | 'in_progress' | 'done' | 'skipped';
+
+export interface WorkOrderStop {
+  id: string;
+  work_order_id: string;
+  order_index: number;
+  title: string;
+  address: string | null;
+  lat: number | null;
+  lon: number | null;
+  arrival_radius_m: number;
+  notes: string | null;
+  client_name: string | null;
+  status: WorkOrderStopStatus;
+  arrived_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  pto_minutes: number | null;
+  fuel_l: number | null;
+  rpm_avg: number | null;
+  pressure_min: number | null;
+  pressure_max: number | null;
+}
 
 export interface WorkOrder {
   id: string;
@@ -80,6 +103,29 @@ export interface WorkOrder {
   location_lat: number | null;
   location_lon: number | null;
   notes: string | null;
+  final_client_name: string | null;
+  final_client_address: string | null;
+  doc_number: string | null;
+  created_at: string;
+  stops: WorkOrderStop[];
+}
+
+export interface WorkReportMaterial {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface WorkReportOut {
+  id: string;
+  work_order_id: string;
+  description: string | null;
+  photo_urls: string[];
+  signature_url: string | null;
+  client_signee_name: string | null;
+  client_signee_dni: string | null;
+  unsigned_reason: string | null;
+  materials_used: WorkReportMaterial[];
   created_at: string;
 }
 
