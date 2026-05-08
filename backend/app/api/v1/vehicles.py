@@ -31,6 +31,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vehicles"])
 
 
+# AVL IDs conocidos que reportan régimen del motor (RPM). Si CUALQUIERA está
+# por encima del umbral, la ignición está ON aunque ni avl_239 (ignición CAN)
+# ni avl_1 (DIN1) lleguen. Lista cubre Teltonika OBD-II/J1939 estándar y los
+# canales custom de los PLCs que se ven en la flota CMG.
+_RPM_AVL_IDS = (
+    "avl_30",     # OBD-II Engine RPM
+    "avl_36",     # J1939 Engine Speed
+    "avl_85",     # Algunos vehículos lo usan como RPM (ojo: en otros es Fuel Level)
+    "avl_269",    # CAN Engine RPM
+    "avl_10309",  # Custom: cisterna vacuum-pressure (CMG)
+)
+# Umbral conservador: 200 unidades raw filtra ruido (los valores espurios
+# observados en la flota están <100). Por encima de 200 indica motor encendido
+# en cualquiera de las escalas habituales (×0.125 J1939 → 25 rpm, ×0.25 OBD →
+# 50 rpm). Un motor real al ralentí está siempre muy por encima.
+_RPM_IGNITION_THRESHOLD = 200
+
+
+def _ignition_from_can(can_data: dict) -> bool:
+    """Detecta ignición a partir de CAN data. True si:
+    - DIN1 (avl_1) = 1, o
+    - Ignición CAN (avl_239) = 1, o
+    - Cualquier AVL conocido de RPM por encima del umbral.
+    """
+    if can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1:
+        return True
+    for key in _RPM_AVL_IDS:
+        v = can_data.get(key)
+        if isinstance(v, (int, float)) and v > _RPM_IGNITION_THRESHOLD:
+            return True
+    return False
+
+
 class MaintenanceTemplatesUpdate(BaseModel):
     templates: list[MaintenanceTemplateItem]
 
@@ -551,7 +584,7 @@ async def get_vehicles_statuses_bulk(
         ignition_val = _parse_bool(_get(hash_data, "ignition"))
 
         if not ignition_val and can_data:
-            if can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1:
+            if _ignition_from_can(can_data):
                 ignition_val = True
         if not pto_active and can_data:
             if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
@@ -683,9 +716,9 @@ async def get_vehicle_status(
     pto_active = _parse_bool(pto_str)
     ignition_val = _parse_bool(ignition_str)
 
-    # Fallback ignición: si Redis tiene ignition=false pero DIN1 (avl_1) = 1, corregimos.
+    # Fallback ignición: DIN1 (avl_1), CAN ignition (avl_239) o RPM > umbral
     if not ignition_val and can_data:
-        if can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1:
+        if _ignition_from_can(can_data):
             ignition_val = True
 
     # Fallback PTO: si Redis tiene pto_active=false pero DIN2 (avl_2) o canal CAN (avl_179) = 1.
