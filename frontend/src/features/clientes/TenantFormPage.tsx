@@ -114,6 +114,8 @@ export default function TenantFormPage() {
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [createUser, setCreateUser] = useState(true)
+  const [businessCif, setBusinessCif] = useState('')
+  const [businessAddress, setBusinessAddress] = useState('')
 
   const { data: tenant } = useQuery({
     queryKey: keys.cliente(id!),
@@ -127,6 +129,8 @@ export default function TenantFormPage() {
       setSlug(tenant.slug)
       setActive(tenant.active)
       setFormModules(tenant.enabled_modules ?? [])
+      setBusinessCif(tenant.business_cif ?? '')
+      setBusinessAddress(tenant.business_address ?? '')
     }
   }, [tenant])
 
@@ -159,7 +163,14 @@ export default function TenantFormPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (isEdit) {
-      mutation.mutate({ name: name.trim(), slug: slug.trim(), active, enabled_modules: formModules } satisfies TenantUpdate)
+      mutation.mutate({
+        name: name.trim(),
+        slug: slug.trim(),
+        active,
+        enabled_modules: formModules,
+        business_cif: businessCif.trim() || null,
+        business_address: businessAddress.trim() || null,
+      } satisfies TenantUpdate)
     } else {
       mutation.mutate({ parent_id: user!.tenant_id, tier: 'client', name: name.trim(), slug: slug.trim() } satisfies TenantCreate)
     }
@@ -207,6 +218,34 @@ export default function TenantFormPage() {
                 <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
                 <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>Activo</span>
               </label>
+            )}
+
+            {isEdit && (
+              <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 16, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Datos legales (aparecerán en el PDF de partes)
+                </div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>CIF / NIF</span>
+                  <input
+                    value={businessCif}
+                    onChange={e => setBusinessCif(e.target.value)}
+                    placeholder="A-46123456"
+                    maxLength={20}
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Dirección fiscal</span>
+                  <input
+                    value={businessAddress}
+                    onChange={e => setBusinessAddress(e.target.value)}
+                    placeholder="Av. del Puerto 102, 46023 Valencia"
+                    maxLength={300}
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
             )}
 
             {isEdit && tenant && (tenant.tier === 'client' || tenant.tier === 'subclient') && (

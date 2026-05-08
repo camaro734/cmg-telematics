@@ -366,9 +366,18 @@ async def download_pdf(
     brand_name = (tenant.brand_name or tenant.name) if tenant else "CMG Track"
     business_cif = tenant.business_cif if tenant else None
     business_address = tenant.business_address if tenant else None
-    primary_color = (
-        (tenant.brand_tokens or {}).get("primary_color") if tenant else None
-    ) or "#F97316"
+    # primary_color: prioriza brand_tokens.primary_color, luego brand_tokens.brand_color
+    # (formato de BrandTokensEditor), luego tenant.brand_color (columna), fallback naranja CMG.
+    if tenant:
+        bt = tenant.brand_tokens or {}
+        primary_color = (
+            bt.get("primary_color")
+            or bt.get("brand_color")
+            or tenant.brand_color
+            or "#F97316"
+        )
+    else:
+        primary_color = "#F97316"
     logo_url = tenant.logo_url if tenant else None
 
     # Vehicle + tipo (para pdf_metrics) + label

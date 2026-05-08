@@ -90,6 +90,8 @@ export interface TenantOut {
   logo_url: string | null
   custom_domain: string | null
   brand_tokens: BrandTokens | null
+  business_cif: string | null
+  business_address: string | null
   created_at: string
   enabled_modules: string[]
 }
@@ -404,6 +406,8 @@ export interface TenantUpdate {
   slug?: string
   active?: boolean
   enabled_modules?: string[]
+  business_cif?: string | null
+  business_address?: string | null
 }
 
 export interface UserOut {
