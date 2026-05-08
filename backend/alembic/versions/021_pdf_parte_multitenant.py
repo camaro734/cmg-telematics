@@ -27,7 +27,7 @@ def upgrade():
     # vehicle_type: métricas configurables que aparecen en la tabla de paradas del PDF
     op.add_column(
         'vehicle_type',
-        sa.Column('pdf_metrics', JSONB, nullable=False, server_default="'[]'::jsonb"),
+        sa.Column('pdf_metrics', JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
     )
 
     # work_order: datos del cliente final + número de documento (asignado al cerrar)

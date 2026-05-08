@@ -15,6 +15,8 @@ from app.models.work_order import WorkOrder
 from app.models.work_order_stop import WorkOrderStop
 from app.models.vehicle import Vehicle
 from app.models.driver import Driver
+from app.models.work_report import WorkReport
+from app.services.doc_numbers import assign_doc_number
 
 router = APIRouter(tags=["work_orders"])
 
@@ -137,12 +139,37 @@ async def transition_status(
             status_code=400,
             detail=f"No se puede pasar de '{order.status}' a '{body.status}'",
         )
-    order.status = body.status
+
     now = datetime.now(timezone.utc)
+
+    if body.status == "done":
+        # Cerrar la orden requiere parte firmado por cliente o motivo de no firma
+        rep = (await db.execute(
+            select(WorkReport).where(WorkReport.work_order_id == order.id)
+        )).scalar_one_or_none()
+        is_signed = bool(
+            rep and rep.signature_url and rep.client_signee_name and rep.client_signee_dni
+        )
+        is_unsigned = bool(rep and rep.unsigned_reason)
+        if not (is_signed or is_unsigned):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "No se puede cerrar la orden: el parte debe estar firmado por "
+                    "el cliente (nombre + DNI + firma) o tener un motivo de no firma."
+                ),
+            )
+
+    order.status = body.status
     if body.status == "in_progress" and not order.started_at:
         order.started_at = now
-    elif body.status == "done" and not order.completed_at:
-        order.completed_at = now
+    elif body.status == "done":
+        if not order.completed_at:
+            order.completed_at = now
+        # Asignación atómica del nº de documento (idempotente)
+        if not order.doc_number:
+            order.doc_number = await assign_doc_number(db, order.tenant_id, order.completed_at)
+
     await db.commit()
     await db.refresh(order)
     return await _enrich(db, order)
