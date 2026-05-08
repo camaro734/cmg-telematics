@@ -230,10 +230,33 @@ export interface WorkOrderOut {
   location_lat: number | null
   location_lon: number | null
   notes: string | null
+  final_client_name: string | null
+  final_client_address: string | null
+  doc_number: string | null
   created_by: string | null
   created_at: string
   vehicle_name: string | null
   driver_name: string | null
+}
+
+export interface WorkOrderTelemetryDetail {
+  stops: Array<{
+    id: string
+    order_index: number
+    address: string | null
+    client_name: string | null
+    arrived_at: string | null
+    completed_at: string | null
+    telemetry: {
+      pto_minutes: number | null
+      pressure_min: number | null
+      pressure_max: number | null
+      rpm_avg: number | null
+      pump_minutes: number | null
+      fuel_l: number | null
+    }
+  }>
+  pdf_metric_keys: string[]
 }
 
 export type WorkOrderStopStatus = 'pending' | 'arrived' | 'in_progress' | 'done' | 'skipped'

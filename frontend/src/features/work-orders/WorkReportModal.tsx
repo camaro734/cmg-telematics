@@ -2,7 +2,17 @@ import { useRef, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { WorkOrderOut, WorkOrderStopOut, WorkReportOut, MaterialItem } from '../../lib/types'
+import type { WorkOrderOut, WorkOrderStopOut, WorkReportOut, MaterialItem, WorkOrderTelemetryDetail } from '../../lib/types'
+import { useAuthStore } from '../auth/useAuthStore'
+
+const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
+  pto_minutes:   { label: 'Tiempo PTO',   unit: 'min' },
+  pressure_min:  { label: 'Presión mín.', unit: 'bar' },
+  pressure_max:  { label: 'Presión máx.', unit: 'bar' },
+  rpm_avg:       { label: 'RPM medio',    unit: 'rpm' },
+  pump_minutes:  { label: 'Tiempo bomba', unit: 'min' },
+  fuel_l:        { label: 'Combustible',  unit: 'L' },
+}
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S = {
@@ -216,22 +226,29 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
   async function downloadPdf() {
     setPdfLoading(true)
     try {
-      const token = localStorage.getItem('access_token') ?? ''
+      const token = useAuthStore.getState().accessToken
       const res = await fetch(`/api/v1/work-orders/${order.id}/report/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!res.ok) throw new Error('Error generando PDF')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `informe_${order.title.slice(0, 30).replace(/\s/g, '_')}.pdf`
+      a.download = `${order.doc_number ?? `informe_${order.title.slice(0, 30).replace(/\s/g, '_')}`}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } finally {
       setPdfLoading(false)
     }
   }
+
+  // Telemetría capturada por todas las paradas (visible solo cuando no estamos en una parada concreta)
+  const { data: telemetry } = useQuery({
+    queryKey: ['work-order-telemetry-detail', order.id],
+    queryFn: () => apiClient.get<WorkOrderTelemetryDetail>(`/api/v1/work-orders/${order.id}/telemetry-detail`),
+    enabled: !stop,
+  })
 
   const photos: string[] = report?.photo_urls ?? []
 
@@ -296,6 +313,53 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Telemetría capturada por parada (vista completa de la orden, sin stop concreto) */}
+        {!stop && telemetry && telemetry.stops.length > 0 && (
+          <div style={S.section}>
+            <div style={S.sectionTitle}>Telemetría capturada por parada</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {telemetry.stops.map((s, idx) => (
+                <details
+                  key={s.id}
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '8px 10px' }}
+                >
+                  <summary style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, color: 'var(--text-primary)', fontSize: 13 }}>
+                    <span>
+                      <b style={{ color: 'var(--accent-energy)' }}>#{idx + 1}</b>
+                      {' '}{s.address ?? '—'}
+                      {s.client_name && <span style={{ color: 'var(--text-muted)' }}> · {s.client_name}</span>}
+                    </span>
+                    {s.completed_at && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-data)' }}>
+                        {new Date(s.completed_at).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </summary>
+                  <ul style={{ listStyle: 'none', padding: '8px 0 0', margin: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 6 }}>
+                    {Object.entries(s.telemetry).map(([k, v]) => {
+                      const inPdf = telemetry.pdf_metric_keys.includes(k)
+                      const meta = METRIC_LABELS[k] ?? { label: k, unit: '' }
+                      return (
+                        <li key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid var(--bg-border)' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{meta.label}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-data)', fontSize: 12 }}>
+                              {v == null ? '—' : `${v} ${meta.unit}`}
+                            </span>
+                            {inPdf
+                              ? <span title="Aparece en PDF" style={{ color: 'var(--accent-ok)', fontSize: 10 }}>✓ PDF</span>
+                              : <span title="Capturado, no en PDF" style={{ color: 'var(--text-muted)', fontSize: 10 }}>—</span>}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </details>
+              ))}
+            </div>
           </div>
         )}
 

@@ -10,6 +10,31 @@ import type {
 import Shell from '../../shared/ui/Shell'
 import WorkReportModal from './WorkReportModal'
 import { useTenantContext } from '../../lib/useTenantContext'
+import { useAuthStore } from '../auth/useAuthStore'
+
+async function downloadOrderPdf(order: WorkOrderOut) {
+  const token = useAuthStore.getState().accessToken
+  try {
+    const res = await fetch(`/api/v1/work-orders/${order.id}/report/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) {
+      alert(`No se pudo descargar el PDF (${res.status})`)
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${order.doc_number ?? `parte_${order.title.slice(0, 30)}`}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    alert((e as Error).message ?? 'Error de red')
+  }
+}
 
 // ── Map view ──────────────────────────────────────────────────────────────────
 
@@ -671,6 +696,8 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
     priority: (initial?.priority ?? 'normal') as WorkOrderPriority,
     scheduled_at: initial?.scheduled_at?.slice(0, 16) ?? '',
     notes: initial?.notes ?? '',
+    final_client_name: initial?.final_client_name ?? '',
+    final_client_address: initial?.final_client_address ?? '',
   })
   const [draftStops, setDraftStops] = useState<DraftStop[]>([])
   const [error, setError] = useState('')
@@ -702,6 +729,8 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
         scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
         description: form.description || null,
         notes: form.notes || null,
+        final_client_name: form.final_client_name.trim() || null,
+        final_client_address: form.final_client_address.trim() || null,
       }
       const order = initial
         ? await apiClient.put<WorkOrderOut>(`/api/v1/work-orders/${initial.id}`, payload)
@@ -789,6 +818,38 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
         <div style={S.field}>
           <span style={S.label}>Notas internas</span>
           <textarea style={{ ...S.input, resize: 'vertical', minHeight: 40 }} value={form.notes} onChange={e => u('notes', e.target.value)}/>
+        </div>
+
+        {/* ── Datos del cliente final (aparecerán en el PDF del parte) ── */}
+        <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 14 }}>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Cliente final del servicio (opcional)
+          </span>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 8px' }}>
+            Aparecerá en el bloque "Cliente" del PDF del parte de servicio.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={S.field}>
+              <span style={S.label}>Nombre / Razón social</span>
+              <input
+                style={S.input}
+                value={form.final_client_name}
+                maxLength={200}
+                placeholder="Comunidad El Pinar"
+                onChange={e => u('final_client_name', e.target.value)}
+              />
+            </div>
+            <div style={S.field}>
+              <span style={S.label}>Dirección</span>
+              <input
+                style={S.input}
+                value={form.final_client_address}
+                maxLength={300}
+                placeholder="C/ Mayor 12, Valencia"
+                onChange={e => u('final_client_address', e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
         {/* ── Paradas programadas ── */}
@@ -1049,6 +1110,14 @@ export default function WorkOrdersPage() {
                 <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {o.title}
                 </span>
+                {o.status === 'done' && o.doc_number && (
+                  <span style={{
+                    fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--accent-info)',
+                    background: 'rgba(56,189,248,0.1)', padding: '2px 6px', borderRadius: 4,
+                  }}>
+                    {o.doc_number}
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {/* Botones de transición de estado */}
@@ -1075,6 +1144,15 @@ export default function WorkOrdersPage() {
                     onClick={() => setReportOrder(o)}
                   >
                     Informe
+                  </button>
+                )}
+                {o.status === 'done' && (
+                  <button
+                    style={{ ...S.btnSm, color: 'var(--accent-energy)', borderColor: 'var(--accent-energy)' }}
+                    onClick={() => downloadOrderPdf(o)}
+                    title="Descargar parte de servicio en PDF"
+                  >
+                    ⤓ PDF
                   </button>
                 )}
                 <button
