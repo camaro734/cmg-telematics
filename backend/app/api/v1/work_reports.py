@@ -19,7 +19,7 @@ from app.models.work_report import WorkReport
 from app.schemas.auth import CurrentUser
 from app.schemas.work_report import WorkReportCreate, WorkReportOut
 
-router = APIRouter(prefix="/api/v1/work-orders", tags=["work-reports"])
+router = APIRouter(prefix="/work-orders", tags=["work-reports"])
 
 UPLOADS_DIR = Path("/app/uploads/work_reports")
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -201,8 +201,20 @@ async def upsert_report(
     report.work_duration_minutes = body.work_duration_minutes
     report.materials_used = [m.model_dump() for m in body.materials_used]
 
-    if body.signature_data:
-        report.signature_url = _save_signature(body.signature_data, report.id)
+    # Datos del firmante o motivo de no firma (XOR ya validado en el schema)
+    unsigned = (body.unsigned_reason or '').strip() or None
+    if unsigned:
+        # Modo "no se puede firmar": limpiar campos de firma
+        report.unsigned_reason = unsigned
+        report.signature_url = None
+        report.client_signee_name = None
+        report.client_signee_dni = None
+    else:
+        report.client_signee_name = (body.client_signee_name or '').strip() or None
+        report.client_signee_dni = (body.client_signee_dni or '').strip() or None
+        report.unsigned_reason = None
+        if body.signature_data:
+            report.signature_url = _save_signature(body.signature_data, report.id)
 
     await db.commit()
     await db.refresh(report)
