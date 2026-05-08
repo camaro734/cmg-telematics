@@ -69,9 +69,12 @@ Estructura del JSONB — array ordenado de objetos:
 ```sql
 ALTER TABLE tenant
   ADD COLUMN business_cif      VARCHAR(20),
-  ADD COLUMN business_address  VARCHAR(300);
+  ADD COLUMN business_address  VARCHAR(300),
+  ADD COLUMN portal_pin_hash   VARCHAR(255);   -- bcrypt hash del PIN/contraseña del portal
 ```
 `brand_tokens` ya existe como JSONB; se establece convención de clave `primary_color` (string hex) — sin migración, basta documentar.
+
+`portal_pin_hash` es nullable: si está `NULL` el portal queda **bloqueado** (ningún cliente puede acceder) hasta que el admin del tenant configure un PIN. Esta política de "fail closed" evita que portales recién creados queden expuestos por accidente.
 
 ### 3.3 — `work_order`
 ```sql
@@ -185,21 +188,76 @@ Subida de firma e imágenes mantiene endpoints actuales (`POST /report/signature
 4. Renderizar el template nuevo (Sección 5).
 5. Exigir que la orden esté en estado `completed` (404 si no).
 
-### 4.6 — Descarga desde portal público
-**Endpoint nuevo:** `GET /api/v1/portal/{token}/work-orders/{order_id}/pdf` en `backend/app/api/v1/portal.py`.
+### 4.6 — Autenticación del portal con PIN
+**Cambio importante:** el portal pasa de protección por token-único a un esquema **token + PIN** ("doble factor débil"). El token sigue identificando el tenant; el PIN autentica al cliente final.
 
+**Endpoint nuevo:** `POST /api/v1/portal/{token}/auth` (público, sin auth previa).
+```python
+class PortalAuthRequest(BaseModel):
+    pin: str = Field(min_length=4, max_length=64)
+
+@router.post("/{token}/auth")
+async def portal_auth(token: str, body: PortalAuthRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    tenant = await db.scalar(select(Tenant).where(Tenant.portal_access_token == token))
+    if not tenant or not tenant.portal_pin_hash:
+        await asyncio.sleep(0.5)  # constant-time-ish; evita probing
+        raise HTTPException(401, detail="PIN incorrecto")
+    if not bcrypt.checkpw(body.pin.encode(), tenant.portal_pin_hash.encode()):
+        await asyncio.sleep(0.5)
+        raise HTTPException(401, detail="PIN incorrecto")
+
+    session_jwt = create_jwt(
+        payload={"portal_token": token, "tenant_id": str(tenant.id), "scope": "portal"},
+        expires=timedelta(hours=8),
+    )
+    response.set_cookie(
+        key=f"portal_session_{token[:8]}",  # cookie por portal, no compartir entre tenants
+        value=session_jwt,
+        httponly=True, secure=True, samesite="strict",
+        max_age=8 * 3600,
+    )
+    return {"ok": True, "expires_in": 8 * 3600}
+```
+
+**Dependencia `require_portal_session(token)`** para todos los endpoints `/portal/{token}/*` que devuelvan datos de órdenes/vehículos/PDFs:
+```python
+async def require_portal_session(token: str, request: Request) -> Tenant:
+    cookie_name = f"portal_session_{token[:8]}"
+    session = request.cookies.get(cookie_name)
+    if not session: raise HTTPException(401, detail="Portal no autenticado")
+    payload = decode_jwt(session)
+    if payload.get("portal_token") != token or payload.get("scope") != "portal":
+        raise HTTPException(401, detail="Sesión inválida")
+    tenant = await db.scalar(select(Tenant).where(Tenant.portal_access_token == token))
+    if not tenant: raise HTTPException(401)
+    return tenant
+```
+
+**Endpoints existentes del portal** (`/portal/{token}`, `/portal/{token}/orders`, `/portal/{token}/vehicles`, etc.) pasan a depender de `require_portal_session` excepto:
+- `GET /portal/{token}/branding` — público, devuelve solo `brand_name`, `logo_url`, `brand_tokens` para que la página de PIN tenga branding antes de autenticar.
+
+**Endpoint nuevo:** `GET /api/v1/portal/{token}/work-orders/{order_id}/pdf` con `require_portal_session`.
 ```python
 @router.get("/{token}/work-orders/{order_id}/pdf")
-async def portal_download_pdf(token: str, order_id: UUID, db: AsyncSession = Depends(get_db)):
-    tenant = await db.scalar(select(Tenant).where(Tenant.portal_access_token == token))
-    if not tenant:
-        raise HTTPException(404)
+async def portal_download_pdf(
+    token: str, order_id: UUID,
+    tenant: Tenant = Depends(require_portal_session),
+    db: AsyncSession = Depends(get_db),
+):
     order = await db.scalar(select(WorkOrder).where(WorkOrder.id == order_id))
     if not order or order.tenant_id != tenant.id or order.status != 'completed':
         raise HTTPException(404)
-    return await render_pdf(db, order)  # mismo helper que 4.5
+    return await render_pdf(db, order)
 ```
-Sin auth JWT. Validación estricta de tenant_id y estado `completed`.
+
+**Endpoint admin para configurar PIN:** `PATCH /api/v1/tenants/{id}/portal-pin` (auth JWT normal, solo el propio tenant admin o CMG admin):
+```python
+class SetPortalPinRequest(BaseModel):
+    pin: str = Field(min_length=4, max_length=64)
+```
+Hashea con bcrypt y guarda en `portal_pin_hash`. Para "borrar" el PIN (desactivar el portal) se hace `PATCH` con `pin=null` → `portal_pin_hash` queda NULL → el portal vuelve a fail-closed.
+
+**Migración de tenants existentes:** los tenants ya creados en producción tendrán `portal_pin_hash = NULL` tras la migración → portal queda inaccesible hasta que el admin configure el PIN. Esto es intencional (fail closed) pero requiere comunicación: notificar a los clientes activos que deben establecer un PIN para reactivar el portal.
 
 ### 4.7 — Vista telemetría completa para admin
 **Endpoint nuevo:** `GET /api/v1/work-orders/{order_id}/telemetry-detail`.
@@ -241,7 +299,7 @@ Estructura del cuerpo:
 6. **Fotografías** — grid 3 columnas, alto fijo 110px.
 7. **Conformidad del cliente:**
    - Si firmado: imagen de firma + nombre + DNI.
-   - Si no firmado: sello rojo "Sin firma del cliente" inclinado 2°, motivo debajo.
+   - Si no firmado: nota discreta en gris cursiva — `"Parte cerrado sin firma del cliente. Motivo: {unsigned_reason}"`. Sin sello ni colores llamativos: el documento sigue siendo válido como justificante interno y el motivo queda registrado para trazabilidad.
 
 Helper Jinja registrado:
 ```python
@@ -306,11 +364,8 @@ Template completo (reemplaza el actual `_PDF_TEMPLATE` en `backend/app/api/v1/wo
   .signature-img { max-height: 90px; max-width: 280px; display: block; margin-bottom: 4px; }
   .signature-meta { font-size: 10px; color: #444; line-height: 1.4; padding-top: 4px; border-top: 1px solid #eee; }
   .signature-meta b { font-size: 11px; color: #222; }
-  .unsigned-stamp { display: inline-block; border: 2px solid #C2410C; color: #C2410C;
-                    padding: 12px 18px; border-radius: 4px; font-size: 14px; font-weight: 700;
-                    text-transform: uppercase; letter-spacing: 0.08em; transform: rotate(-2deg);
-                    background: rgba(252,165,143,0.08); }
-  .unsigned-reason { font-size: 10px; color: #555; margin-top: 6px; max-width: 320px; }
+  .unsigned-note { font-size: 11px; color: #777; font-style: italic; padding: 8px 0; }
+  .unsigned-note b { color: #555; font-style: normal; }
 </style>
 </head>
 <body>
@@ -406,8 +461,9 @@ Template completo (reemplaza el actual `_PDF_TEMPLATE` en `backend/app/api/v1/wo
         </div>
       </div>
     {% else %}
-      <div class="unsigned-stamp">Sin firma del cliente</div>
-      <div class="unsigned-reason"><b>Motivo:</b> {{ unsigned_reason }}</div>
+      <div class="unsigned-note">
+        Parte cerrado sin firma del cliente. <b>Motivo:</b> {{ unsigned_reason }}
+      </div>
     {% endif %}
   </div>
 </body>
@@ -470,11 +526,28 @@ Sección "Datos del cliente final (opcional)" con `final_client_name` y `final_c
 ### 7.3 — Tab "Telemetría capturada" en `/work-orders/:id`
 Nueva tab en `WorkOrderDetailPage.tsx`. Acordeón por parada mostrando todos los campos de `work_order_stop`. Las métricas que están en `pdf_metrics` se marcan con ✓; las que no, con texto "capturado, no en PDF".
 
-### 7.4 — Datos legales en `TenantFormPage`
-Sección "Datos legales (aparecerán en el PDF de partes)" con `business_cif` y `business_address`. Sección "Branding" añade selector de `primary_color` (input type=color + hex text).
+### 7.4 — Datos legales y PIN del portal en `TenantFormPage` / `TenantDetailPage`
+**TenantFormPage:** sección "Datos legales (aparecerán en el PDF de partes)" con `business_cif` y `business_address`. Sección "Branding" añade selector de `primary_color` (input type=color + hex text).
 
-### 7.5 — Descarga PDF en `ClientPortalPage`
-Botón "⤓ Descargar parte (PDF)" junto a cada orden en estado `completed`. Abre `/api/v1/portal/{token}/work-orders/{id}/pdf` en pestaña nueva.
+**TenantDetailPage** (donde ya se gestiona el `portal_access_token`): nueva subsección "Acceso al portal":
+- Estado actual: "PIN configurado" (verde) o "PIN no configurado — el portal está bloqueado" (gris).
+- Botón "Establecer PIN" / "Cambiar PIN" → modal con input numérico/texto (4–64 chars, mínimo 4) y confirmación. Llama `PATCH /tenants/{id}/portal-pin`.
+- Botón "Desactivar PIN" → confirmación → `PATCH /tenants/{id}/portal-pin` con `pin=null`. Avisa que esto bloquea el acceso al portal hasta configurar uno nuevo.
+- Texto explicativo: "Comparte la URL del portal y el PIN por canales separados (URL por email, PIN por SMS o teléfono)".
+
+### 7.5 — Portal con PIN y descarga PDF
+**Cambio en `ClientPortalPage`:**
+- Al entrar a `/portal/:token`:
+  1. Llama `GET /portal/{token}/branding` para mostrar logo/colores del tenant antes de autenticar.
+  2. Comprueba si hay cookie `portal_session_{token_prefix}` válida (intenta `GET /portal/{token}` — si responde 401, no autenticado).
+  3. Si no autenticado: muestra **PinEntryPage** centrada con logo del tenant, input de PIN (numeric o text), botón "Acceder". POST `/portal/{token}/auth` con el PIN. En éxito, recarga el portal autenticado.
+  4. Si autenticado: muestra el portal completo (mapa, vehículos, órdenes) como hoy.
+
+**Componente nuevo:** `frontend/src/features/portal/PinEntryPage.tsx` — página de entrada de PIN. Muestra logo + brand_name + form simple. Mensajes: "PIN incorrecto" (401), "Portal no disponible" (404 si tenant no existe o `portal_pin_hash` es null).
+
+**Botón descarga PDF en lista de órdenes:** "⤓ Descargar parte (PDF)" junto a cada orden `completed`. Abre `/api/v1/portal/{token}/work-orders/{id}/pdf` en pestaña nueva — la cookie de sesión va automáticamente.
+
+**Logout / cambio de sesión:** un botón discreto "Cerrar sesión" en la esquina superior. Borra la cookie y vuelve a PinEntryPage.
 
 ### 7.6 — Mostrar `doc_number`
 - `WorkOrdersPage`: nueva columna "Nº Doc" (solo visible si `completed`).
@@ -503,22 +576,31 @@ Botón "⤓ Descargar parte (PDF)" junto a cada orden en estado `completed`. Abr
 | Cliente final extranjero con DNI que no pasa validación española | `isValidDni` permisivo: solo rechaza si parece formato español pero letra incorrecta |
 | Tenant cambia `pdf_metrics` después de cerrar órdenes | Las métricas se renderizan en el momento de descarga, no se snapshot — los PDFs futuros reflejarán la nueva config. Aceptable: el `work_order_stop` ya tiene los datos; solo cambia qué se muestra |
 | Logo del tenant es muy grande y rompe el header | CSS limita `max-height: 44px; max-width: 160px`; WeasyPrint redimensiona |
-| Portal público expone PDFs a quien tenga el token | Asumimos que el token se trata como secreto (igual que ya hace el portal hoy). Documentar en TenantDetailPage que regenerar el token invalida el anterior |
+| Portal público expone datos a quien tenga el token | Mitigado con PIN obligatorio (sección 4.6/7.5). Token + PIN deben compartirse por canales separados. Tenants sin PIN configurado tienen el portal bloqueado |
+| Brute force del PIN del portal | `bcrypt` para hash, sleep de 500ms ante PIN incorrecto, JWT de sesión con TTL 8h. Si en uso real aparece abuso real, añadir rate limiting por IP en un sprint posterior |
+| Tenants existentes pierden acceso al portal tras el deploy de la migración | `portal_pin_hash` NULL → portal bloqueado. Aceptado: hay que avisar a los clientes activos antes del deploy y darles tiempo a establecer PIN. La alternativa (PIN por defecto) es peor para seguridad |
 
 ## 10. Plan de implementación (alto nivel)
 
 Sugerido para el plan detallado posterior:
 
-1. **Migración 020** — añadir todas las columnas y tabla `tenant_doc_counter`.
+1. **Migración 020** — añadir todas las columnas (incluido `tenant.portal_pin_hash`) y tabla `tenant_doc_counter`.
 2. **Backend — modelos y schemas** — actualizar SQLAlchemy models y Pydantic schemas.
 3. **Backend — helper `assign_doc_number`** + integración en `PATCH /work-orders/{id}`.
 4. **Backend — endpoint `/report` ampliado** con validación XOR y nuevos campos.
 5. **Backend — template PDF reescrito** + helper `format_metric` + endpoint usa nueva firma.
-6. **Backend — endpoint portal `/portal/{token}/work-orders/{id}/pdf`**.
-7. **Backend — endpoint `/work-orders/{id}/telemetry-detail`**.
-8. **Frontend — `PdfMetricsSection`** en `/tipos-vehiculo`.
-9. **Frontend — datos cliente final + datos legales tenant** en formularios existentes.
-10. **Frontend — Tab "Telemetría capturada" + columnas `doc_number`** en listados.
-11. **Frontend — botón descarga PDF en portal**.
-12. **Mobile — `WorkReportScreen` rediseñado** con captura firma+DNI o motivo.
-13. **Verificación end-to-end** — crear tenant subclient, configurar `pdf_metrics`, crear orden, cerrar desde mobile firmando, descargar PDF web y portal, verificar branding.
+6. **Backend — autenticación de portal con PIN**:
+   - Endpoint `POST /portal/{token}/auth`
+   - Dependencia `require_portal_session`
+   - Endpoint `GET /portal/{token}/branding` (público)
+   - Migrar endpoints existentes del portal a la nueva dependencia
+   - Endpoint admin `PATCH /tenants/{id}/portal-pin`
+7. **Backend — endpoint portal PDF** `/portal/{token}/work-orders/{id}/pdf` con `require_portal_session`.
+8. **Backend — endpoint `/work-orders/{id}/telemetry-detail`**.
+9. **Frontend — `PdfMetricsSection`** en `/tipos-vehiculo`.
+10. **Frontend — datos cliente final + datos legales tenant + UI de PIN del portal** en formularios existentes y `TenantDetailPage`.
+11. **Frontend — Tab "Telemetría capturada" + columnas `doc_number`** en listados.
+12. **Frontend — `PinEntryPage` + flujo de auth en `ClientPortalPage` + botón descarga PDF**.
+13. **Mobile — `WorkReportScreen` rediseñado** con captura firma+DNI o motivo.
+14. **Comunicación pre-deploy** — avisar a tenants en producción de que deben configurar PIN tras el deploy.
+15. **Verificación end-to-end** — crear tenant subclient, configurar `pdf_metrics` y PIN, crear orden, cerrar desde mobile firmando, descargar PDF web autenticado y desde portal con PIN, verificar branding y bloqueo del portal sin PIN.
