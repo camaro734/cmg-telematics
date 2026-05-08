@@ -14,6 +14,7 @@ from app.schemas.work_order import (
 from app.models.work_order import WorkOrder
 from app.models.work_order_stop import WorkOrderStop
 from app.models.vehicle import Vehicle
+from app.models.vehicle_type import VehicleType
 from app.models.driver import Driver
 from app.models.work_report import WorkReport
 from app.services.doc_numbers import assign_doc_number
@@ -82,6 +83,58 @@ async def get_work_order(
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     _check_tenant(user, order.tenant_id)
     return await _enrich(db, order)
+
+
+@router.get("/work-orders/{order_id}/telemetry-detail")
+async def get_telemetry_detail(
+    order_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve TODA la telemetría capturada por parada + qué métricas salen en el PDF.
+
+    El admin del tenant emisor lo usa para ver qué se midió en cada trabajo,
+    incluso campos que no aparecen en el PDF de cliente.
+    """
+    order = await db.get(WorkOrder, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    _check_tenant(user, order.tenant_id)
+
+    pdf_keys: list[str] = []
+    if order.vehicle_id:
+        v = await db.get(Vehicle, order.vehicle_id)
+        if v and v.vehicle_type_id:
+            vt = await db.get(VehicleType, v.vehicle_type_id)
+            if vt and vt.pdf_metrics:
+                pdf_keys = [m.get("key") for m in vt.pdf_metrics if m.get("key")]
+
+    stops_q = await db.execute(
+        select(WorkOrderStop).where(WorkOrderStop.work_order_id == order_id)
+        .order_by(WorkOrderStop.order_index)
+    )
+    return {
+        "stops": [
+            {
+                "id": str(s.id),
+                "order_index": s.order_index,
+                "address": s.address,
+                "client_name": s.client_name,
+                "arrived_at": s.arrived_at.isoformat() if s.arrived_at else None,
+                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+                "telemetry": {
+                    "pto_minutes": s.pto_minutes,
+                    "pressure_min": s.pressure_min,
+                    "pressure_max": s.pressure_max,
+                    "rpm_avg": s.rpm_avg,
+                    "pump_minutes": s.pump_minutes,
+                    "fuel_l": s.fuel_l,
+                },
+            }
+            for s in stops_q.scalars().all()
+        ],
+        "pdf_metric_keys": pdf_keys,
+    }
 
 
 @router.post("/work-orders", response_model=WorkOrderOut, status_code=status.HTTP_201_CREATED)
