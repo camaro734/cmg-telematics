@@ -138,6 +138,17 @@ export interface HistoricMetricItem {
   group?: string | null
 }
 
+export type PdfMetricKey =
+  | 'pto_minutes' | 'pressure_min' | 'pressure_max' | 'rpm_avg' | 'pump_minutes' | 'fuel_l'
+export type PdfMetricFormat = 'integer' | 'decimal1' | 'decimal2'
+
+export interface PdfMetricItem {
+  key: PdfMetricKey
+  label: string
+  unit: string
+  format: PdfMetricFormat
+}
+
 export interface VehicleTypeOut {
   id: string
   slug: string
@@ -147,6 +158,7 @@ export interface VehicleTypeOut {
   maintenance_templates: MaintenanceTemplateItem[]
   historic_metrics: HistoricMetricItem[]
   dout_config: DoutSlot[]
+  pdf_metrics: PdfMetricItem[]
 }
 
 export interface AlertInstanceOut {

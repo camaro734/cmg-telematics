@@ -9,6 +9,7 @@ import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
 import WorkCycleDefsSection from './WorkCycleDefsSection'
 import MaintenanceTemplatesSection from './MaintenanceTemplatesSection'
 import HistoricMetricsSection from './HistoricMetricsSection'
+import PdfMetricsSection from './PdfMetricsSection'
 import DoutConfigSection from './DoutConfigSection'
 import AlertRulesSection from './AlertRulesSection'
 
@@ -471,6 +472,11 @@ export default function VehicleTypesPage() {
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <HistoricMetricsSection typeId={selectedType.id} selectedType={selectedType} />
+                )}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <div style={{ borderTop: '1px solid var(--bg-border)', marginTop: 24, paddingTop: 24 }}>
+                    <PdfMetricsSection typeId={selectedType.id} selectedType={selectedType} />
+                  </div>
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <DoutConfigSection typeId={selectedType.id} selectedType={selectedType} />
