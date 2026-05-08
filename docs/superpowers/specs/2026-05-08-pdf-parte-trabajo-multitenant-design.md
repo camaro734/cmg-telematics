@@ -190,8 +190,9 @@ Subida de firma e imágenes mantiene endpoints actuales (`POST /report/signature
 
 Acceso:
 - **CMG admin** ve PDFs de todos los tenants.
-- **Admin/operator del tenant emisor** (ej. Aguas de Valencia) ve PDFs de sus propias órdenes — incluyendo las de sus subclients si los tuviera, vía la jerarquía de permisos existente.
-- **Cliente final** (ej. Comunidad El Pinar) **no tiene acceso directo al PDF**: el subclient admin lo descarga y se lo envía por su propio canal (email, papel, etc.). Esto es intencional para evitar la complejidad de un portal público.
+- **Admin / operator del tenant emisor** (ej. Aguas de Valencia) ve PDFs de sus propias órdenes desde el web — incluyendo las de sus subclients si los tuviera, vía la jerarquía de permisos existente.
+- **Operario / conductor desde la mobile** descarga el PDF de las órdenes que ha cerrado él (mismo JWT, mismo endpoint). Justo tras cerrar el parte, la app le ofrece compartir el PDF con el cliente final (WhatsApp, email, AirDrop, etc.) usando la Share API nativa.
+- **Cliente final** (ej. Comunidad El Pinar) **no tiene acceso directo al PDF en la plataforma**: lo recibe del operario en el momento (compartido desde su móvil) o del subclient admin después (descargado del web y reenviado). Esto es intencional para evitar la complejidad de un portal público.
 
 > **No se desarrolla ningún portal público en este sprint.** El portal `/portal/:token` actual sigue funcionando como está; ni se extiende ni se elimina. Si en el futuro se decide darle acceso directo al cliente final al PDF, se evaluará entonces (URL firmada con TTL, envío automático por email, etc.).
 
@@ -436,12 +437,35 @@ Submit:
 2. Si `mode === 'sign'`: subir firma.
 3. POST `/work-orders/{id}/report` con todos los campos.
 4. PATCH `/work-orders/{id}` con `status: 'completed'` (asigna `doc_number`).
+5. Navegar a una pantalla de éxito (`WorkReportSuccessScreen`) con dos acciones:
+   - **"Compartir parte con el cliente"** (primary) — descarga el PDF con `expo-file-system` y lo abre con la Share API nativa (`expo-sharing`). El operario elige el canal (WhatsApp, Mail, AirDrop, etc.) directamente desde el sheet del SO.
+   - **"Volver"** (secondary) — vuelve al listado de órdenes sin compartir.
 
-Archivos modificados:
+Implementación de la descarga + compartir:
+```ts
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
+
+async function shareReportPdf(orderId: string, docNumber: string) {
+  const url = `${API_BASE}/api/v1/work-orders/${orderId}/report/pdf`
+  const targetPath = `${FileSystem.cacheDirectory}${docNumber}.pdf`
+  const { uri } = await FileSystem.downloadAsync(url, targetPath, {
+    headers: { Authorization: `Bearer ${await getAuthToken()}` },
+  })
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Parte ${docNumber}` })
+  }
+}
+```
+
+Archivos modificados / nuevos:
 - `mobile/src/screens/WorkReportScreen.tsx` (reescritura del bloque firma)
+- `mobile/src/screens/WorkReportSuccessScreen.tsx` **(nuevo — pantalla post-cierre con botón compartir PDF)**
 - `mobile/src/utils/dni.ts` (nuevo)
-- `mobile/src/api/workOrders.ts` (extensión del payload de submitReport)
+- `mobile/src/api/workOrders.ts` (extensión del payload + helper `downloadReportPdf`)
 - `mobile/src/types/index.ts` (actualizar `WorkReport` type)
+- `mobile/src/navigation/MainNavigator.tsx` (registrar la nueva pantalla en el stack)
+- `mobile/package.json` — añadir `expo-sharing` si no está ya (probablemente sí, junto a `expo-file-system`).
 
 ## 7. Frontend web — UI
 
@@ -514,5 +538,5 @@ Sugerido para el plan detallado posterior:
 8. **Frontend — datos cliente final** en `WorkOrderForm` + **datos legales y branding del tenant** en `TenantFormPage`.
 9. **Frontend — Tab "Telemetría capturada" + columnas `doc_number`** en listados.
 10. **Frontend — botones "Descargar PDF"** en `WorkOrderDetailPage` y `WorkOrdersPage`.
-11. **Mobile — `WorkReportScreen` rediseñado** con captura firma+DNI o motivo.
+11. **Mobile — `WorkReportScreen` rediseñado** con captura firma+DNI o motivo, **y nueva `WorkReportSuccessScreen` con botón "Compartir parte"** que descarga el PDF y abre la Share API nativa.
 12. **Verificación end-to-end** — crear tenant subclient, configurar `pdf_metrics` y datos legales, crear orden con cliente final, cerrar desde mobile firmando (y en otra prueba sin firmar con motivo), descargar PDF desde el web del subclient admin y verificar branding+telemetría+firma.
