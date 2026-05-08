@@ -15,5 +15,6 @@ class VehicleType(Base):
     maintenance_templates: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     historic_metrics: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     dout_config: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
+    pdf_metrics: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
 
     vehicles = relationship("Vehicle", back_populates="vehicle_type")

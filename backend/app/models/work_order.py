@@ -28,6 +28,9 @@ class WorkOrder(Base):
     location_lat: Mapped[float | None] = mapped_column(nullable=True)
     location_lon: Mapped[float | None] = mapped_column(nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_client_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    final_client_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    doc_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

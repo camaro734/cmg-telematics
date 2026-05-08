@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Text, ForeignKey, DateTime, Integer
+from sqlalchemy import Text, ForeignKey, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
@@ -21,6 +21,9 @@ class WorkReport(Base):
     work_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     photo_urls: Mapped[list] = mapped_column(JSONB, default=list, server_default="'[]'")
     signature_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_signee_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    client_signee_dni: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    unsigned_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     materials_used: Mapped[list] = mapped_column(JSONB, default=list, server_default="'[]'")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

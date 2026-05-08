@@ -14,10 +14,11 @@ from app.models.driver import Driver
 from app.models.work_order import WorkOrder
 from app.models.work_order_stop import WorkOrderStop
 from app.models.work_report import WorkReport
+from app.models.tenant_doc_counter import TenantDocCounter
 
 __all__ = [
     "Base", "Tenant", "User", "PermissionGrant", "VehicleType",
     "Vehicle", "Device", "TelemetryRecord", "AlertRule", "AlertInstance",
     "MaintenancePlan", "MaintenanceLog", "CommandLog",
-    "Driver", "WorkOrder", "WorkOrderStop", "WorkReport",
+    "Driver", "WorkOrder", "WorkOrderStop", "WorkReport", "TenantDocCounter",
 ]
