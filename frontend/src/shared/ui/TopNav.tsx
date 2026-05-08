@@ -42,12 +42,19 @@ const OPERATOR_ITEMS = [
   { label: 'Geocercas',          to: '/geofences',    Icon: IconGeocercas },
 ] as const
 
+// Items completos del dropdown "Admin" para tier=cmg
 const CMG_ADMIN_ITEMS = [
   { label: 'Clientes',            to: '/clientes',       Icon: IconClientes },
   { label: 'Flota (todos)',        to: '/vehiculos',      Icon: IconVehiculos },
   { label: 'Plantillas',          to: '/tipos-vehiculo', Icon: IconVehiculos },
   { label: 'Dispositivos',        to: '/devices',        Icon: IconDispositivos },
   { label: 'CAN Scanner',         to: '/can-scanner',    Icon: IconCanScanner },
+  { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
+] as const
+
+// Subset para tier=client: solo gestión de subclientes propios + ajustes
+const CLIENT_ADMIN_ITEMS = [
+  { label: 'Mis clientes',        to: '/clientes',       Icon: IconClientes },
   { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
 ] as const
 
@@ -158,6 +165,7 @@ function DropdownMenu({ items, onClose }: DropdownMenuProps) {
 interface MobileDrawerProps {
   visibleModules: typeof MODULES[number][]
   adminItems: typeof CMG_ADMIN_ITEMS
+  adminLabel: string
   operatorItems: typeof OPERATOR_ITEMS
   showAdmin: boolean
   showOperator: boolean
@@ -170,7 +178,7 @@ interface MobileDrawerProps {
 }
 
 function MobileDrawer({
-  visibleModules, adminItems, operatorItems, showAdmin, showOperator,
+  visibleModules, adminItems, adminLabel, operatorItems, showAdmin, showOperator,
   userEmail, onClose, onLogout,
   reportsTab, setReportsTab, isOnReports,
 }: MobileDrawerProps) {
@@ -286,7 +294,7 @@ function MobileDrawer({
         {/* Admin section */}
         {showAdmin && (
           <div style={{ borderTop: '1px solid var(--bg-border)', padding: '8px 0' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Administración</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{adminLabel}</div>
             {adminItems.map(({ label, to, Icon }) => (
               <NavLink
                 key={to}
@@ -427,7 +435,9 @@ export default function TopNav() {
   const isMobile = useIsMobile()
 
   const isCmg   = user?.tenant_tier === 'cmg'
+  const isClient = user?.tenant_tier === 'client'
   const isAdmin  = user?.role === 'admin'
+  const canManageClients = (isCmg || isClient) && isAdmin
   const onReports = location.pathname === '/reports'
 
   const [adminOpen,    setAdminOpen]    = useState(false)
@@ -537,9 +547,10 @@ export default function TopNav() {
           {drawerOpen && (
             <MobileDrawer
               visibleModules={visibleModules as unknown as typeof MODULES[number][]}
-              adminItems={CMG_ADMIN_ITEMS}
+              adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
+              adminLabel={isCmg ? 'Administración' : 'Mis clientes'}
               operatorItems={OPERATOR_ITEMS}
-              showAdmin={isCmg && isAdmin}
+              showAdmin={canManageClients}
               showOperator={isAdmin || user?.role === 'operator'}
               userEmail={user?.email}
               onClose={() => setDrawerOpen(false)}
@@ -645,7 +656,7 @@ export default function TopNav() {
           {/* ── Desktop: Right-side controls ──────────────────────────── */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
 
-            {isCmg && isAdmin && <TenantSelector />}
+            {canManageClients && <TenantSelector />}
 
             {(isAdmin || user?.role === 'operator') && (
               <div ref={operatorRef} style={{ position: 'relative' }}>
@@ -663,18 +674,21 @@ export default function TopNav() {
               </div>
             )}
 
-            {isCmg && isAdmin && (
+            {canManageClients && (
               <div ref={adminRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => { setAdminOpen(o => !o); setOperatorOpen(false); setUserOpen(false) }}
                   style={btnBase}
                 >
                   <IconAjustes width={15} height={15}/>
-                  Admin
+                  {isCmg ? 'Admin' : 'Mis clientes'}
                   <Chevron open={adminOpen}/>
                 </button>
                 {adminOpen && (
-                  <DropdownMenu items={CMG_ADMIN_ITEMS} onClose={() => setAdminOpen(false)}/>
+                  <DropdownMenu
+                    items={isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS}
+                    onClose={() => setAdminOpen(false)}
+                  />
                 )}
               </div>
             )}
