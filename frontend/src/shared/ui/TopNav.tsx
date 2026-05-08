@@ -35,12 +35,18 @@ const MODULES = [
   { key: 'reports',     label: 'Reportes',       Icon: IconReportes,     to: '/reports' },
 ] as const
 
-// Accesible para admin y operator de cualquier tenant
-const OPERATOR_ITEMS = [
+// Items base de Operaciones — visible para admin/operator de cualquier tenant
+const OPERATOR_ITEMS_BASE = [
   { label: 'Órdenes de trabajo', to: '/work-orders', Icon: IconOrdenes },
   { label: 'Conductores',        to: '/drivers',      Icon: IconConductores },
   { label: 'Geocercas',          to: '/geofences',    Icon: IconGeocercas },
 ] as const
+
+// Item extra para admins client (gestión de subclientes propios)
+const MIS_CLIENTES_ITEM = { label: 'Mis clientes', to: '/clientes', Icon: IconClientes } as const
+
+// Mantenemos OPERATOR_ITEMS como alias para tipos que ya lo referencian
+const OPERATOR_ITEMS = OPERATOR_ITEMS_BASE
 
 // Items completos del dropdown "Admin" para tier=cmg
 const CMG_ADMIN_ITEMS = [
@@ -52,9 +58,9 @@ const CMG_ADMIN_ITEMS = [
   { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
 ] as const
 
-// Subset para tier=client: solo gestión de subclientes propios + ajustes
+// Subset para tier=client en el dropdown "Admin": solo Ajustes
+// (la gestión de subclientes vive en Operaciones → Mis clientes)
 const CLIENT_ADMIN_ITEMS = [
-  { label: 'Mis clientes',        to: '/clientes',       Icon: IconClientes },
   { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
 ] as const
 
@@ -548,8 +554,13 @@ export default function TopNav() {
             <MobileDrawer
               visibleModules={visibleModules as unknown as typeof MODULES[number][]}
               adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
-              adminLabel={isCmg ? 'Administración' : 'Mis clientes'}
-              operatorItems={OPERATOR_ITEMS}
+              adminLabel={isCmg ? 'Administración' : 'Cuenta'}
+              operatorItems={
+                (isClient && isAdmin
+                  ? [...OPERATOR_ITEMS_BASE, MIS_CLIENTES_ITEM]
+                  : OPERATOR_ITEMS_BASE
+                ) as unknown as typeof OPERATOR_ITEMS
+              }
               showAdmin={canManageClients}
               showOperator={isAdmin || user?.role === 'operator'}
               userEmail={user?.email}
@@ -669,7 +680,15 @@ export default function TopNav() {
                   <Chevron open={operatorOpen}/>
                 </button>
                 {operatorOpen && (
-                  <DropdownMenu items={OPERATOR_ITEMS as unknown as typeof CMG_ADMIN_ITEMS} onClose={() => setOperatorOpen(false)}/>
+                  <DropdownMenu
+                    items={
+                      (isClient && isAdmin
+                        ? [...OPERATOR_ITEMS_BASE, MIS_CLIENTES_ITEM]
+                        : OPERATOR_ITEMS_BASE
+                      ) as unknown as typeof CMG_ADMIN_ITEMS
+                    }
+                    onClose={() => setOperatorOpen(false)}
+                  />
                 )}
               </div>
             )}

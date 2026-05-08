@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, require_tier
+from app.api.v1.deps import get_current_user, require_tier, assert_can_manage_tenant
 from app.schemas.auth import CurrentUser
 from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, BrandTokensUpdate, GrantOut, GrantCreate
 from app.schemas.user import UserOut, UserCreate
@@ -308,10 +308,7 @@ async def list_tenant_users(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.tenant_tier != "cmg" and (
-        user.role != "admin" or str(user.tenant_id) != str(tenant_id)
-    ):
-        raise HTTPException(status_code=403, detail="Sin permiso")
+    await assert_can_manage_tenant(user, tenant_id, db)
     result = await db.execute(
         select(User).where(User.tenant_id == tenant_id).order_by(User.email)
     )
@@ -325,10 +322,7 @@ async def create_tenant_user(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.tenant_tier != "cmg" and (
-        user.role != "admin" or str(user.tenant_id) != str(tenant_id)
-    ):
-        raise HTTPException(status_code=403, detail="Sin permiso")
+    await assert_can_manage_tenant(user, tenant_id, db)
     tenant = await db.get(Tenant, tenant_id)
     if not tenant or not tenant.active:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")

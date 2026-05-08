@@ -44,3 +44,27 @@ def require_tier(*tiers: str):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
         return user
     return checker
+
+
+async def assert_can_manage_tenant(user: CurrentUser, target_tenant_id: uuid.UUID, db) -> None:
+    """
+    Verifica que `user` (admin) pueda gestionar el tenant `target_tenant_id`:
+      - tier=cmg: cualquier tenant.
+      - tier=client (admin): su propio tenant o cualquier subclient suyo (parent_id == user.tenant_id).
+      - tier=subclient (admin): solo su propio tenant.
+      - operator/viewer/driver: nunca.
+    Lanza 403 si no.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    if user.tenant_tier == "cmg":
+        return
+    if str(target_tenant_id) == str(user.tenant_id):
+        return
+    if user.tenant_tier == "client":
+        # cargar el target para ver si es subclient nuestro
+        from app.models.tenant import Tenant
+        target = await db.get(Tenant, target_tenant_id)
+        if target and str(target.parent_id) == str(user.tenant_id):
+            return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permiso sobre este cliente")
