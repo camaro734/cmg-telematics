@@ -1,0 +1,36 @@
+name: PR Agent
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    name: Revisión automática de PRs con IA
+    steps:
+      - name: PR Agent
+        uses: the-pr-agent/pr-agent@main
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Usar GPT-4o-mini para reducir costes (buen ratio calidad/precio)
+          config.model: "gpt-4o-mini"
+          config.fallback_models: '["gpt-4o-mini"]'
+          # Desactivar tests review (los repos no tienen tests aún)
+          PR_REVIEWER.REQUIRE_TESTS_REVIEW: "false"
+          # Número de sugerencias de código
+          PR_CODE_SUGGESTIONS.NUM_CODE_SUGGESTIONS: "4"
+          # Idioma de los comentarios
+          config.response_language: "es"
+          # Auto-review al abrir PR
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "false"
