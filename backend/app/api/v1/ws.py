@@ -24,18 +24,35 @@ class ConnectionManager:
             self._connections[tenant_id].discard(ws)
 
     async def broadcast_to_tenant(self, tenant_id: str, message: dict) -> None:
-        dead: set[WebSocket] = set()
-        for ws in list(self._connections.get(tenant_id, set())):
+        # Enviar en paralelo con timeout corto: un cliente lento no bloquea al resto.
+        sockets = list(self._connections.get(tenant_id, set()))
+        if not sockets:
+            return
+
+        async def _send_one(ws: WebSocket) -> WebSocket | None:
             try:
-                await ws.send_json(message)
-            except Exception:
-                dead.add(ws)
-        for ws in dead:
+                await asyncio.wait_for(ws.send_json(message), timeout=2.0)
+                return None
+            except (asyncio.TimeoutError, Exception):
+                return ws
+
+        results = await asyncio.gather(*(_send_one(w) for w in sockets), return_exceptions=False)
+        for ws in (r for r in results if r is not None):
             self._connections[tenant_id].discard(ws)
+            try:
+                await ws.close()
+            except Exception:
+                pass
 
     async def broadcast_to_all(self, message: dict) -> None:
-        for tenant_id in list(self._connections):
-            await self.broadcast_to_tenant(tenant_id, message)
+        # Paralelizar entre tenants también — cada uno ya es no-bloqueante internamente.
+        tenants = list(self._connections)
+        if not tenants:
+            return
+        await asyncio.gather(
+            *(self.broadcast_to_tenant(t, message) for t in tenants),
+            return_exceptions=True,
+        )
 
 
 async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
@@ -68,7 +85,7 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                         # CMG admins ven todos los tenants — conexiones registradas bajo "__cmg__"
                         await manager.broadcast_to_tenant("__cmg__", msg)
                     except Exception as exc:
-                        logger.debug("WS broadcast parse error: %s", exc)
+                        logger.warning("WS broadcast parse error: %s", exc)
         except asyncio.CancelledError:
             break
         except Exception as exc:

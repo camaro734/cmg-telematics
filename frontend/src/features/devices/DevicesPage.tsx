@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { useAuthStore } from '../auth/useAuthStore'
 import type { DeviceOut, TenantOut, DeviceCreate } from '../../lib/types'
 
 // Formatea last_seen como tiempo relativo (aprox) o fecha local
@@ -20,6 +22,8 @@ function formatLastSeen(last_seen: string | null): string {
 
 export default function DevicesPage() {
   const queryClient = useQueryClient()
+  const confirmAsk = useConfirm()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
 
   // Filtro por tenant
   const [filterTenantId, setFilterTenantId] = useState('')
@@ -45,7 +49,9 @@ export default function DevicesPage() {
       filterTenantId
         ? apiClient.get<DeviceOut[]>(`/api/v1/devices?tenant_id=${filterTenantId}`)
         : apiClient.get<DeviceOut[]>('/api/v1/devices'),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   })
 
   // Mutación para eliminar dispositivo
@@ -56,9 +62,14 @@ export default function DevicesPage() {
     },
   })
 
-  function handleDelete(device: DeviceOut) {
-    const label = device.imei
-    if (!window.confirm(`¿Eliminar el dispositivo ${label}?\n\nEsta acción no se puede deshacer.`)) return
+  async function handleDelete(device: DeviceOut) {
+    const ok = await confirmAsk({
+      title: 'Eliminar dispositivo',
+      message: `¿Eliminar el dispositivo ${device.imei}? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      kind: 'danger',
+    })
+    if (!ok) return
     deleteMutation.mutate(device.id)
   }
 
@@ -156,7 +167,7 @@ export default function DevicesPage() {
               ))}
             </select>
           </div>
-          <button
+          {isAdmin && <button
             onClick={() => setShowModal(true)}
             style={{
               background: 'var(--accent-energy)',
@@ -171,7 +182,7 @@ export default function DevicesPage() {
             }}
           >
             + Nuevo dispositivo
-          </button>
+          </button>}
         </div>
 
         {/* Tabla de dispositivos */}
@@ -241,7 +252,7 @@ export default function DevicesPage() {
                         {device.firmware_ver ?? '—'}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <button
+                        {isAdmin && <button
                           onClick={() => handleDelete(device)}
                           disabled={deleteMutation.isPending}
                           style={{
@@ -256,7 +267,7 @@ export default function DevicesPage() {
                           }}
                         >
                           Eliminar
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}

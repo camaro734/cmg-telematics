@@ -25,7 +25,7 @@ export default function MaintenancePlanFormPage() {
   const { data: vehicles = [] } = useQuery({
     queryKey: keys.vehicles(),
     queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const { data: existing } = useQuery({

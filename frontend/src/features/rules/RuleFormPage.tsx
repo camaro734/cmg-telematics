@@ -85,20 +85,20 @@ export default function RuleFormPage() {
     queryKey: keys.rule(id!),
     queryFn: () => apiClient.get<RuleOut>(`/api/v1/rules/${id}`),
     enabled: isEdit,
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const { data: vehicleTypes = [] } = useQuery({
     queryKey: keys.vehicleTypes(),
     queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const { data: selectedVehicle } = useQuery({
     queryKey: keys.vehicle(form.vehicle_filter.vehicle_id ?? ''),
     queryFn: () => apiClient.get<VehicleOut>(`/api/v1/vehicles/${form.vehicle_filter.vehicle_id}`),
     enabled: form.vehicle_filter.scope === 'vehicle' && !!form.vehicle_filter.vehicle_id,
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   // Pre-cargar formulario cuando se obtiene la regla existente

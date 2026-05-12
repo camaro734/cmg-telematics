@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkOrderOut, WorkOrderStopOut, WorkReportOut, MaterialItem, WorkOrderTelemetryDetail } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 
 const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   pto_minutes:   { label: 'Tiempo PTO',   unit: 'min' },
@@ -151,6 +152,7 @@ interface Props {
 
 export default function WorkReportModal({ order, onClose, stop }: Props) {
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
 
   const { data: report } = useQuery({
     queryKey: keys.workReport(order.id),
@@ -453,7 +455,7 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
               <button
                 style={{ ...S.btnSm, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)', opacity: deleting ? 0.6 : 1 }}
                 disabled={deleting}
-                onClick={() => { if (confirm('¿Eliminar el informe? Esta acción no se puede deshacer.')) deleteReport() }}
+                onClick={async () => { if (await confirmAsk({ title: 'Eliminar informe', message: '¿Eliminar el informe? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar', kind: 'danger' })) deleteReport() }}
               >
                 {deleting ? 'Eliminando…' : 'Eliminar informe'}
               </button>

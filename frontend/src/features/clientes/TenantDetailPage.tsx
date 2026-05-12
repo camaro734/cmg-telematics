@@ -7,6 +7,7 @@ import { keys } from '../../lib/queryKeys'
 import UserFormModal from './UserFormModal'
 import GrantsSection from './GrantsSection'
 import BrandTokensEditor from './BrandTokensEditor'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { TenantOut, UserOut, VehicleOut } from '../../lib/types'
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -20,6 +21,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 function PortalTokenSection({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
   const [copied, setCopied] = useState(false)
 
   const { data } = useQuery({
@@ -84,7 +86,7 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
             </a>
           </div>
           <button
-            onClick={() => { if (confirm('¿Regenerar el token? El enlace anterior dejará de funcionar.')) generate() }}
+            onClick={async () => { if (await confirmAsk({ title: 'Regenerar token', message: '¿Regenerar el token? El enlace anterior dejará de funcionar.', confirmLabel: 'Regenerar', kind: 'warning' })) generate() }}
             style={{
               alignSelf: 'flex-start', padding: '5px 12px', borderRadius: 6,
               border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)',

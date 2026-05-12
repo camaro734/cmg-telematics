@@ -42,7 +42,7 @@ export default function WorkCycleDefinitionsSection() {
   const { data: vehicleTypes = [] } = useQuery({
     queryKey: keys.vehicleTypes(),
     queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const createMutation = useMutation({

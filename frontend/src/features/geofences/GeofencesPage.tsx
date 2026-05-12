@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { useAuthStore } from '../auth/useAuthStore'
 import type { RuleOut, VehicleOut, VehicleTypeOut } from '../../lib/types'
 
 // SVG preview of a geofence polygon (normalized lat/lon → pixel space)
@@ -38,6 +40,8 @@ function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
 export default function GeofencesPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const { data: allRules = [] } = useQuery({
@@ -55,7 +59,7 @@ export default function GeofencesPage() {
   const { data: vehicleTypes = [] } = useQuery({
     queryKey: keys.vehicleTypes(),
     queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const deleteMutation = useMutation({
@@ -82,8 +86,13 @@ export default function GeofencesPage() {
     return 'Desconocido'
   }
 
-  function handleDelete(rule: RuleOut) {
-    if (!window.confirm(`¿Eliminar la geocerca "${rule.name}"?`)) return
+  async function handleDelete(rule: RuleOut) {
+    const ok = await confirmAsk({
+      title: 'Eliminar geocerca',
+      message: `¿Eliminar la geocerca "${rule.name}"?`,
+      confirmLabel: 'Eliminar', kind: 'danger',
+    })
+    if (!ok) return
     setDeletingId(rule.id)
     deleteMutation.mutate(rule.id)
   }
@@ -105,9 +114,9 @@ export default function GeofencesPage() {
               Zonas geográficas que generan alertas cuando un vehículo entra o sale de ellas
             </p>
           </div>
-          <button style={btnNew} onClick={() => navigate('/rules/new?condition_type=geofence')}>
+          {isAdmin && <button style={btnNew} onClick={() => navigate('/rules/new?condition_type=geofence')}>
             + Nueva geocerca
-          </button>
+          </button>}
         </div>
 
         {/* Empty state */}
@@ -121,9 +130,9 @@ export default function GeofencesPage() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 18px' }}>
               Dibuja una zona en el mapa para monitorizar entradas y salidas de tus vehículos
             </p>
-            <button style={btnNew} onClick={() => navigate('/rules/new?condition_type=geofence')}>
+            {isAdmin && <button style={btnNew} onClick={() => navigate('/rules/new?condition_type=geofence')}>
               + Crear primera geocerca
-            </button>
+            </button>}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -177,7 +186,7 @@ export default function GeofencesPage() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                  {isAdmin && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                     <button
                       style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
                       onClick={() => navigate(`/rules/${rule.id}`)}
@@ -191,7 +200,7 @@ export default function GeofencesPage() {
                     >
                       {isDeleting ? '...' : 'Eliminar'}
                     </button>
-                  </div>
+                  </div>}
                 </div>
               )
             })}

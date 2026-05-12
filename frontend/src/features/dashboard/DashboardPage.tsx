@@ -1,11 +1,20 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useVehicleStatuses } from '../fleet/useVehicleStatuses'
 import type { VehicleOut, AlertInstanceOut, WorkOrderOut, MaintenancePlanOut, RuleOut } from '../../lib/types'
+
+interface FleetKpis {
+  range: string
+  engine_hours: number
+  pto_hours: number
+  active_vehicles: number
+  by_day: { date: string; engine_hours: number; pto_hours: number }[]
+}
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
@@ -188,6 +197,14 @@ export default function DashboardPage() {
     .sort((a, b) => maxPct(b) - maxPct(a))
   const overdueCount = urgentPlans.filter(p => p.progress.status === 'vencido').length
 
+  // KPIs reales de telemetría — últimos 7 días
+  const { data: fleetKpis } = useQuery<FleetKpis>({
+    queryKey: ['fleet-kpis', '7d', activeTenantId],
+    queryFn: () => apiClient.get<FleetKpis>(`/api/v1/fleet/kpis?range=7d${tAmp}`),
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  })
+
   const alertAccent: Accent  = escalatedCount > 0 ? 'crit' : activeAlerts.length > 0 ? 'warn' : 'ok'
   const maintAccent: Accent  = overdueCount > 0 ? 'crit' : urgentPlans.length > 0 ? 'warn' : 'ok'
   const fleetAccent: Accent  = vehicles.length === 0 ? 'neutral'
@@ -232,6 +249,74 @@ export default function DashboardPage() {
             onClick={() => navigate('/maintenance')}
           />
         </div>
+
+        {/* ── KPIs de telemetría (últimos 7 días) ──────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+          <KpiCard
+            label="Horas motor · 7 días"
+            value={fleetKpis ? fleetKpis.engine_hours.toLocaleString('es-ES') : '—'}
+            sub={fleetKpis ? `${fleetKpis.active_vehicles} vehículo${fleetKpis.active_vehicles !== 1 ? 's' : ''} activo${fleetKpis.active_vehicles !== 1 ? 's' : ''}` : ''}
+            accent="info"
+          />
+          <KpiCard
+            label="Horas PTO · 7 días"
+            value={fleetKpis ? fleetKpis.pto_hours.toLocaleString('es-ES') : '—'}
+            sub={fleetKpis && fleetKpis.engine_hours > 0
+              ? `${Math.round((fleetKpis.pto_hours / fleetKpis.engine_hours) * 100)}% de uso PTO`
+              : 'Toma de fuerza'}
+            accent="ok"
+          />
+          <KpiCard
+            label="Utilización media"
+            value={fleetKpis && fleetKpis.active_vehicles > 0
+              ? `${(fleetKpis.engine_hours / fleetKpis.active_vehicles / 7).toFixed(1)} h/día`
+              : '—'}
+            sub="por vehículo activo"
+            accent="neutral"
+          />
+        </div>
+
+        {/* ── Gráfica de utilización diaria ────────────────────────────────── */}
+        {fleetKpis && fleetKpis.by_day.length > 0 && (
+          <div style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--bg-border)',
+            borderRadius: 10, padding: 20, marginBottom: 24,
+          }}>
+            <div style={{
+              fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+              letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14,
+            }}>Utilización diaria (últimos 7 días)</div>
+            <div style={{ width: '100%', height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={fleetKpis.by_day} margin={{ top: 5, right: 12, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={d => {
+                      const date = new Date(d)
+                      return `${date.getDate()}/${date.getMonth() + 1}`
+                    }}
+                    stroke="var(--text-muted)"
+                    fontSize={11}
+                  />
+                  <YAxis stroke="var(--text-muted)" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--bg-border)',
+                      borderRadius: 6,
+                      fontSize: 12,
+                    }}
+                    formatter={(v: number) => `${v} h`}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="engine_hours" name="Motor" fill="#F97316" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="pto_hours" name="PTO" fill="#22C55E" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* ── Content grid ─────────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>

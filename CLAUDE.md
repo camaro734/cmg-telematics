@@ -287,7 +287,7 @@ pero con estética contemporánea. Único, no derivado de competidores.
 - Fase 2: App React Native + Expo
 
 ═══════════════════════════════════════════════════════════════
-## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-08, 14:10 GMT+2)
+## 10. ESTADO ACTUAL DEL PROYECTO (actualizado 2026-05-12, 17:30 GMT+2)
 ═══════════════════════════════════════════════════════════════
 
 La plataforma está en producción con datos reales. Los servicios están desplegados como contenedores Docker en el VPS.
@@ -312,7 +312,7 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 ```
 
 ### Migraciones Alembic aplicadas
-001 → 021 (última: `021_pdf_parte_multitenant`)
+001 → 022 (última: `022_indices_tenant_id`)
 
 | Migración | Contenido |
 |-----------|-----------|
@@ -324,6 +324,7 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 | 019 | Tabla `work_order_stop` (paradas con lat/lon, arrival_radius_m, telemetría) |
 | 020 | Refresh policy de `telemetry_1h` cada 15 min con end_offset 5 min |
 | 021 | PDF parte multitenant: `tenant.business_cif/business_address`, `vehicle_type.pdf_metrics`, `work_order.final_client_name/address/doc_number`, `work_report.client_signee_name/dni/unsigned_reason`, tabla `tenant_doc_counter` |
+| 022 | Índices `ix_<tabla>_tenant_id` en `vehicle`, `maintenance_plan`, `alert_instance`, `alert_rule` (Postgres no indexa FK por defecto → evita seq-scan al filtrar por tenant). `CREATE INDEX CONCURRENTLY` para no bloquear escrituras. |
 
 ### Frontend — páginas implementadas
 - `/fleet` — FleetDashboard: mapa Leaflet full-page, sidebar collapsible, tarjeta flotante, TenantSelector para admins CMG
@@ -377,6 +378,49 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 - **SensorGrid compact**: modo lista plana (label→valor) para panel lateral de VehicleDetailPage
 - **White-label**: brand_tokens JSONB; CSS variables inyectadas en runtime; portal también respeta branding del tenant
 - **Sentry**: backend + frontend con DSN en .env; logging JSON estructurado
+
+### Sprint vendibilidad (2026-05-12) — estabilidad y UX pre-comercial
+
+Sprint de un día tras auditoría con 4 agentes en paralelo (frontend + backend + scale + rutas). Plan completo en `/root/.claude/plans/snazzy-hatching-crown.md`. Objetivo: pasar la plataforma de "funcional para uso interno CMG" a "vendible a 100-500 vehículos con admins concurrentes".
+
+**Backend — escalabilidad y estabilidad:**
+- `backend/app/api/v1/ws.py` — `broadcast_to_tenant` ahora usa `asyncio.gather` con `wait_for(timeout=2.0)` por socket; sockets que timeoutean se descartan y cierran. `broadcast_to_all` paraleliza entre tenants. Antes: un cliente lento (3G, navegador en background) bloqueaba la telemetría EN VIVO de toda la flota; ahora no.
+- `backend/app/api/v1/vehicles.py:list_vehicles` — HGETALL Redis migrado a `redis.pipeline()` (1 round-trip en lugar de N). Antes inutilizable a partir de ~150 vehículos.
+- `backend/app/api/v1/vehicles.py:get_vehicles_statuses_bulk` — `db.get()` por cada uno de hasta 200 IDs reemplazado por `SELECT WHERE id = ANY(:ids)`. Antes saturaba el pool de 20 conexiones con 50 admins refrescando.
+- `backend/app/api/v1/vehicles.py:_apply_templates_to_vehicles` — N×M queries → un SELECT IN + diff en memoria + bulk insert. Antes PATCH `/vehicle-types/{id}/maintenance-templates` con 200 veh × 8 templates = 1.600 SELECT.
+- `backend/app/api/v1/vehicles.py:avl-series` — `LIMIT 5000` defensivo. Para rangos > 24 h agrega por hora con `time_bucket('1 hour', time)`. Antes un cliente curioso pidiendo 720 h podía derribar Timescale.
+- `services/ingest/src/main.py` — pool asyncpg subido a `min_size=10, max_size=40` (antes 5/20). Aguanta tormenta de reconexiones FMC650 sin bloquear el receive_loop.
+- `docker-compose.yml` — `ingest-svc` ahora declara `healthcheck` TCP al 5027, `mem_limit: 512m`, `cpus: 1.0` (el swap en caliente se hizo con `docker run --memory 512m --cpus 1.0` para no reiniciar todo el stack).
+- `backend/app/api/v1/fleet.py` (nuevo) — endpoint `GET /api/v1/fleet/kpis?range=1d|7d|30d&tenant_id=…` que agrega `telemetry_1h` por día. Devuelve `engine_hours`, `pto_hours`, `active_vehicles`, `by_day[]`. CMG admin sin tenant_id ve agregado global; resto siempre filtrado por su propio tenant.
+
+**Frontend — UX vendible:**
+- `frontend/src/App.tsx` — montados `<ToastContainer />` y `<ConfirmDialogHost />` a nivel raíz.
+- `frontend/src/shared/ui/Toast.tsx` — además del hook `useToast()`, exporta API imperativa `toast.error/success/warning/info(msg)` para usar fuera de componentes (p. ej. `downloadOrderPdf` a nivel módulo en WorkOrdersPage).
+- `frontend/src/shared/ui/ConfirmDialog.tsx` (nuevo) — modal con backdrop oscuro, soporte Enter/Esc, kinds `danger/warning/info`. Hook `useConfirm()` devuelve `Promise<boolean>`.
+- 4 `window.alert()` reemplazados por `toast.error()` en WorkOrdersPage (descarga PDF), ReportFilters, VehicleDetailPage (PDF).
+- 9 `window.confirm()` reemplazados por `useConfirm({title, message, confirmLabel, kind})` en DevicesPage, GeofencesPage, AlertRulesSection, DriversPage, WorkReportModal, WorkOrdersPage (StopsPanel y main), PdfMetricsSection, TenantDetailPage.
+- **Role guards `isAdmin`** (`user?.role === 'admin'`) en botones destructivos/crear de 8 páginas: DevicesPage, VehiclesPage, DriversPage, TenantsPage, RulesPage, MaintenancePage, WorkOrdersPage, GeofencesPage. Antes `operator`/`viewer` veían los botones y recibían 403 silencioso (sin toast).
+- `frontend/src/main.tsx` — `QueryCache({ onError })` y `MutationCache({ onError })` globales: errores 5xx → toast genérico; 401/403/404 los maneja la UI por su cuenta (no spam de toasts). Mensaje específico para 5xx: "El servidor no responde. Reintenta en unos segundos."
+- `staleTime: Infinity` bajado a `60_000` en 13 sitios de producción donde los datos sí mutan (MaintenancePage, GeofencesPage, AlertsPage, NotificationSettings, VehicleFilterPicker, RuleFormPage, WorkCycleDefinitionsSection, MaintenancePlanFormPage). Se mantiene `Infinity` solo en `useVehicleStatuses` (intencional, parcheado por WS).
+- `Loading...` plano reemplazado por `<SkeletonRow />` en TenantsPage, MaintenancePage, WorkOrdersPage.
+- 3 `.bak` huérfanos borrados (`TopNav.tsx.bak`, `ReportsPage.tsx.bak`, `VehicleDetailPage.tsx.bak`).
+
+**Frontend — features pedidas por el dueño:**
+- **Bug Reportes vacío resuelto**: `frontend/src/features/reports/useReportData.ts:142` — antes la query estaba `enabled: !isCmg || Boolean(effectiveTenantId)` que bloqueaba a admin CMG sin tenant seleccionado en el TopNav. Ahora, cuando `isCmg && !effectiveTenantId`, llama a `/api/v1/vehicles` sin parámetro y el backend devuelve todos (porque tier=cmg). Sin esto el selector de vehículos quedaba vacío y ninguna tab (Histórico/Mantenimiento/Rutas/Alertas) se podía usar.
+- **Selector de fecha en VehicleDetailPage**: `frontend/src/features/vehicle/VehicleDetailPage.tsx` — input `type="date"` superpuesto en la esquina superior derecha del mapa con valor por defecto = hoy. Si `trackDate === hoy` consume `/track/today` (con refetchInterval 30s); si es fecha pasada, llama `/track?from=YYYY-MM-DDT00:00:00&to=YYYY-MM-DDT23:59:59` sin polling. Botón "Hoy" para volver. Comparte `TrackMap.tsx` sin tocar — solo cambia la fuente de datos.
+- **DashboardPage con KPIs reales**: `frontend/src/features/dashboard/DashboardPage.tsx` — fila adicional con 3 cards ("Horas motor · 7 días", "Horas PTO · 7 días", "Utilización media h/día/veh") y `<BarChart>` Recharts con utilización diaria (engine_hours naranja + pto_hours verde). Lee el nuevo endpoint `/api/v1/fleet/kpis?range=7d`. Cuando `engine_hours > 0` muestra "% de uso PTO" como sub. Antes el Dashboard solo contaba tarjetas (vehículos online, alertas, órdenes, mantenimiento) — ninguna métrica del diferenciador comercial CAN.
+
+**Despliegue del sprint (12 mayo 2026 ~17:00-17:30 GMT+2):**
+- Migración 022 aplicada en caliente: copia del .py al contenedor + `alembic upgrade head` (sin reiniciar core-api). Verificado: 4 índices nuevos creados.
+- `frontend` swap: `docker build` + stop/rm/run. Corte real ~2 s. Sin pérdida de sesión (los chunks viejos se sirven hasta F5 manual; ErrorBoundary tiene auto-reload de chunks faltantes).
+- `core-api` swap: nuevo contenedor con la imagen reconstruida. Corte real ~11 s. WebSockets de los navegadores se reconectaron automáticamente. Importante: en el `docker run` manual hay que pasar `--env-file /opt/cmg-telematic1/.env` Y `-v cmg-telematic1_uploads_data:/app/uploads` Y `--network-alias core-api` para que Caddy lo encuentre.
+- `ingest-svc` swap: `docker run -p 0.0.0.0:5027:5027 --memory 512m --cpus 1.0`. Primer FMC650 (PRUEBA, IMEI 864275075510100) reconectó **60 s** después del swap y subió su lote acumulado al buffer offline. Cero datos perdidos gracias al patrón `ON CONFLICT DO NOTHING` en `writer.py`.
+
+**Limitaciones conocidas / fuera de alcance del sprint:**
+- **i18n** — toda la web sigue hardcoded en castellano (`useTranslation` no se usa). Limita TAM angloparlante. Trabajo aparte de ~2-3 días.
+- **Responsive tablas** — solo FleetDashboard/VehicleCard/ReportsPage/VehicleDetailPage usan `useIsMobile()`. El resto son tablas con `whiteSpace: nowrap` (scroll horizontal en tablet). No bloqueante mientras exista la app móvil nativa.
+- **Refactor de `ReportsPage.tsx` monolítico** (1196 líneas) — estético, no bloqueante.
+- **DOUT TTL Redis** — leak controlado, no urgente.
 
 ### Logo CMG Track
 - Archivo: `backend/static/logos/cmgtrack.png` (668×187 px)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
+import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import ProgressBar from './ProgressBar'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
@@ -29,6 +30,7 @@ export default function MaintenancePage() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
+  const isAdmin = user?.role === 'admin'
   const { activeTenantId } = useTenantContext()
 
   const [completingPlan, setCompletingPlan] = useState<MaintenancePlanOut | null>(null)
@@ -105,7 +107,7 @@ export default function MaintenancePage() {
   const { data: vehicles = [] } = useQuery({
     queryKey: [...keys.vehicles(), activeTenantId],
     queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${tenantQ}`),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const sorted = [...plans]
@@ -138,7 +140,7 @@ export default function MaintenancePage() {
             >
               Exportar CSV
             </button>
-            <Link
+            {isAdmin && <Link
               to="/maintenance/new"
               style={{
                 background: 'var(--accent-energy)',
@@ -151,12 +153,14 @@ export default function MaintenancePage() {
               }}
             >
               + Nuevo plan
-            </Link>
+            </Link>}
           </div>
         </div>
 
         {isLoading ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[0,1,2,3].map(i => <SkeletonRow key={i} height={44} />)}
+          </div>
         ) : sorted.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin planes de mantenimiento configurados</div>
         ) : (
@@ -200,9 +204,9 @@ export default function MaintenancePage() {
                         </span>
                       </td>
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                        <Link to={`/maintenance/${plan.id}/edit`} style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {isAdmin && <Link to={`/maintenance/${plan.id}/edit`} style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           Editar
-                        </Link>
+                        </Link>}
                         {(plan.progress.status === 'próximo' || plan.progress.status === 'vencido') && (
                           <button
                             onClick={() => openComplete(plan)}

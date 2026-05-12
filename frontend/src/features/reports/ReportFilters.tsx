@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { apiClient } from '../../lib/apiClient'
+import { toast } from '../../shared/ui/Toast'
 import type { TenantOut, VehicleOut } from '../../lib/types'
 import type { Period } from './useReportData'
 
@@ -50,7 +51,7 @@ export function PdfDownloadBtn({
       URL.revokeObjectURL(url)
       setOpen(false)
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Error al generar el informe')
+      toast.error(e instanceof Error ? e.message : 'Error al generar el informe')
     } finally {
       setLoading(false)
     }

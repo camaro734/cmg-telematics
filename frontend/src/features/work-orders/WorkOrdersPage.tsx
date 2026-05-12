@@ -8,9 +8,12 @@ import type {
   WorkOrderStopOut, WorkOrderStopCreate, WorkOrderStopStatus, VehicleStatus,
 } from '../../lib/types'
 import Shell from '../../shared/ui/Shell'
+import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import WorkReportModal from './WorkReportModal'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useAuthStore } from '../auth/useAuthStore'
+import { toast } from '../../shared/ui/Toast'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 
 async function downloadOrderPdf(order: WorkOrderOut) {
   const token = useAuthStore.getState().accessToken
@@ -19,7 +22,7 @@ async function downloadOrderPdf(order: WorkOrderOut) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (!res.ok) {
-      alert(`No se pudo descargar el PDF (${res.status})`)
+      toast.error(`No se pudo descargar el PDF (${res.status})`)
       return
     }
     const blob = await res.blob()
@@ -32,7 +35,7 @@ async function downloadOrderPdf(order: WorkOrderOut) {
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (e) {
-    alert((e as Error).message ?? 'Error de red')
+    toast.error((e as Error).message ?? 'Error de red')
   }
 }
 
@@ -300,6 +303,7 @@ const STOP_STATUS_COLORS: Record<WorkOrderStopStatus, string> = {
 // ── Panel de paradas de una orden ─────────────────────────────────────────────
 function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onClose: () => void; onReportStop: (stop: WorkOrderStopOut) => void }) {
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
   const [addingStop, setAddingStop] = useState(false)
   const [newStop, setNewStop] = useState<WorkOrderStopCreate>({ title: '', order_index: 0 })
   const [pickedLat, setPickedLat] = useState<number | null>(null)
@@ -495,7 +499,7 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                 )}
                 {order.status !== 'done' && order.status !== 'cancelled' && stop.status === 'pending' && (
                   <button
-                    onClick={() => { if (confirm('¿Eliminar esta parada?')) deleteStop(stop.id) }}
+                    onClick={async () => { if (await confirmAsk({ title: 'Eliminar parada', message: '¿Eliminar esta parada?', confirmLabel: 'Eliminar', kind: 'danger' })) deleteStop(stop.id) }}
                     style={{
                       fontFamily: 'var(--font-ui)', fontSize: 11, padding: '3px 10px', borderRadius: 6,
                       border: '1px solid var(--bg-border)', background: 'transparent',
@@ -1005,6 +1009,8 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function WorkOrdersPage() {
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [filter, setFilter] = useState<WorkOrderStatus | 'all'>('all')
   const [view, setView] = useState<'list' | 'map'>('list')
   const [showModal, setShowModal] = useState(false)
@@ -1054,9 +1060,9 @@ export default function WorkOrdersPage() {
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
       <div style={S.header}>
         <h1 style={S.title}>Órdenes de trabajo</h1>
-        <button style={S.btn} onClick={() => { setEditing(null); setShowModal(true) }}>
+        {isAdmin && <button style={S.btn} onClick={() => { setEditing(null); setShowModal(true) }}>
           + Nueva orden
-        </button>
+        </button>}
       </div>
 
       {/* Filtros de estado + toggle vista */}
@@ -1085,7 +1091,11 @@ export default function WorkOrdersPage() {
         </div>
       </div>
 
-      {isLoading && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>}
+      {isLoading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[0,1,2,3].map(i => <SkeletonRow key={i} height={64} />)}
+        </div>
+      )}
 
       {!isLoading && orders.length === 0 && (
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
@@ -1161,10 +1171,10 @@ export default function WorkOrdersPage() {
                 >
                   Ruta
                 </button>
-                <button style={S.btnSm} onClick={() => { setEditing(o); setShowModal(true) }}>Editar</button>
-                {o.status !== 'in_progress' && (
+                {isAdmin && <button style={S.btnSm} onClick={() => { setEditing(o); setShowModal(true) }}>Editar</button>}
+                {isAdmin && o.status !== 'in_progress' && (
                   <button style={{ ...S.btnSm, color: 'var(--accent-crit)' }}
-                    onClick={() => { if (confirm('¿Eliminar esta orden? Esta acción no se puede deshacer.')) deleteOrder(o.id) }}>
+                    onClick={async () => { if (await confirmAsk({ title: 'Eliminar orden', message: '¿Eliminar esta orden? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar', kind: 'danger' })) deleteOrder(o.id) }}>
                     Eliminar
                   </button>
                 )}

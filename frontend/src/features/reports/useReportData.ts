@@ -139,16 +139,16 @@ export function useReportData(): UseReportDataReturn {
   const effectiveTenantId = isCmg ? (activeTenantId ?? tenantId) : (user?.tenant_id ?? '')
 
   const { data: vehicles = [] } = useQuery<VehicleOut[]>({
-    queryKey: isCmg
-      ? keys.vehiclesByTenant(effectiveTenantId)
-      : keys.vehicles(),
+    queryKey:
+      isCmg && effectiveTenantId
+        ? keys.vehiclesByTenant(effectiveTenantId)
+        : keys.vehicles(),
     queryFn: () =>
-      isCmg
+      isCmg && effectiveTenantId
         ? apiClient.get<VehicleOut[]>(
             `/api/v1/vehicles?tenant_id=${effectiveTenantId}`,
           )
         : apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
-    enabled: !isCmg || Boolean(effectiveTenantId),
     staleTime: 60_000,
   })
 

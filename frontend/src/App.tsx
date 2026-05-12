@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
 import RequireAuth from './features/auth/RequireAuth'
 import { SectionErrorBoundary } from './shared/ui/SectionErrorBoundary'
+import { ToastContainer } from './shared/ui/Toast'
+import { ConfirmDialogHost } from './shared/ui/ConfirmDialog'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -87,6 +89,9 @@ function Loading() {
 
 export default function App() {
   return (
+    <>
+    <ToastContainer />
+    <ConfirmDialogHost />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/portal/:token" element={<Suspense fallback={<Loading />}><ClientPortalPage /></Suspense>} />
@@ -129,5 +134,6 @@ export default function App() {
         }
       />
     </Routes>
+    </>
   )
 }

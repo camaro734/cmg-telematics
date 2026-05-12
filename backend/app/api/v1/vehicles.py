@@ -136,33 +136,42 @@ async def update_vehicle_type_maintenance_templates(
 
 
 async def _apply_templates_to_vehicles(db: AsyncSession, type_id: uuid.UUID, templates: list) -> int:
-    """Crea MaintenancePlan para cada template en todos los vehículos activos del tipo."""
+    """Crea MaintenancePlan para cada template en todos los vehículos activos del tipo.
+    Una sola query de existencia (en lugar de N×M) y bulk insert.
+    """
     if not templates:
         return 0
     vehicles_result = await db.execute(
         select(Vehicle).where(Vehicle.vehicle_type_id == type_id, Vehicle.active == True)
     )
     vehicles = vehicles_result.scalars().all()
+    if not vehicles:
+        return 0
+
+    template_names = [t["name"] for t in templates]
+    vehicle_ids = [v.id for v in vehicles]
+
+    existing_result = await db.execute(
+        select(MaintenancePlan.vehicle_id, MaintenancePlan.name).where(
+            MaintenancePlan.vehicle_id.in_(vehicle_ids),
+            MaintenancePlan.name.in_(template_names),
+        )
+    )
+    existing_pairs = {(row[0], row[1]) for row in existing_result.all()}
+
     created = 0
     for vehicle in vehicles:
         for tmpl in templates:
-            exists_result = await db.execute(
-                select(MaintenancePlan).where(
-                    MaintenancePlan.vehicle_id == vehicle.id,
-                    MaintenancePlan.name == tmpl["name"],
-                )
-            )
-            if exists_result.scalar_one_or_none():
+            if (vehicle.id, tmpl["name"]) in existing_pairs:
                 continue
-            plan = MaintenancePlan(
+            db.add(MaintenancePlan(
                 vehicle_id=vehicle.id,
                 tenant_id=vehicle.tenant_id,
                 name=tmpl["name"],
                 trigger_condition={"thresholds": tmpl.get("thresholds", []), "op": "OR"},
                 warn_before_pct=tmpl.get("warn_before_pct", 10),
                 active=True,
-            )
-            db.add(plan)
+            ))
             created += 1
     if created:
         await db.commit()
@@ -330,48 +339,59 @@ async def list_vehicles(
     from sqlalchemy.orm import joinedload
     result = await db.execute(query.options(joinedload(Vehicle.vehicle_type)).order_by(Vehicle.name))
     vehicles = result.unique().scalars().all()
-    # Obtener status de Redis para cada vehículo
+
+    # Obtener status de Redis en pipeline (1 round-trip en lugar de N)
     redis = getattr(request.app.state, 'redis', None)
+    pipeline_results: list[dict] = []
+    if redis and vehicles:
+        try:
+            pipe = redis.pipeline()
+            for v in vehicles:
+                pipe.hgetall(f'vehicle:{v.id}:status')
+            pipeline_results = await pipe.execute()
+        except Exception:
+            pipeline_results = []
+
+    def _get(raw, key: str):
+        if not raw:
+            return None
+        val = raw.get(key.encode()) if isinstance(next(iter(raw), None), bytes) else raw.get(key)
+        return val.decode() if isinstance(val, bytes) else val
+
     out = []
-    for v in vehicles:
+    for idx, v in enumerate(vehicles):
         d = VehicleOut.model_validate(v).model_dump()
         d['type_slug'] = v.vehicle_type.slug if v.vehicle_type else None
-        # Calcular status desde Redis
-        if redis:
+        raw = pipeline_results[idx] if idx < len(pipeline_results) else None
+        if raw:
             try:
-                redis_key = f'vehicle:{v.id}:status'
-                raw = await redis.hgetall(redis_key)
-                if raw:
-                    def _get(key):
-                        val = raw.get(key.encode()) if isinstance(next(iter(raw), None), bytes) else raw.get(key)
-                        return val.decode() if isinstance(val, bytes) else val
-                    last_seen_str = _get('last_seen')
-                    if last_seen_str:
-                        try:
-                            ls = datetime.fromisoformat(last_seen_str.replace('Z', '+00:00'))
-                            age_min = (datetime.now(timezone.utc) - ls).total_seconds() / 60
-                            online = age_min < 5
-                        except Exception:
-                            online = False
-                    else:
+                last_seen_str = _get(raw, 'last_seen')
+                if last_seen_str:
+                    try:
+                        ls = datetime.fromisoformat(last_seen_str.replace('Z', '+00:00'))
+                        age_min = (datetime.now(timezone.utc) - ls).total_seconds() / 60
+                        online = age_min < 5
+                    except Exception:
                         online = False
-                    spd = _get('speed_kmh')
-                    speed = float(spd) if spd else 0
-                    ign_raw = _get('ignition')
-                    _ign = ign_raw and ign_raw.lower() in ('true','1')
-                    if not online:
-                        d['status'] = 'offline'
-                    elif speed > 2:
-                        d['status'] = 'moving'
-                    elif _ign:
-                        d['status'] = 'idle'
-                    else:
-                        d['status'] = 'parked'
-                    d['last_seen'] = last_seen_str
-                    lat = _get('lat'); lon = _get('lon')
-                    if lat: d['lat'] = float(lat)
-                    if lon: d['lng'] = float(lon)
-                    d['speed'] = speed
+                else:
+                    online = False
+                spd = _get(raw, 'speed_kmh')
+                speed = float(spd) if spd else 0
+                ign_raw = _get(raw, 'ignition')
+                _ign = ign_raw and ign_raw.lower() in ('true', '1')
+                if not online:
+                    d['status'] = 'offline'
+                elif speed > 2:
+                    d['status'] = 'moving'
+                elif _ign:
+                    d['status'] = 'idle'
+                else:
+                    d['status'] = 'parked'
+                d['last_seen'] = last_seen_str
+                lat = _get(raw, 'lat'); lon = _get(raw, 'lon')
+                if lat: d['lat'] = float(lat)
+                if lon: d['lng'] = float(lon)
+                d['speed'] = speed
             except Exception:
                 pass
         out.append(d)
@@ -487,14 +507,18 @@ async def get_vehicles_statuses_bulk(
 
     redis = request.app.state.redis
 
-    # Verificar acceso tenant para cada vehicle_id; omitir los no accesibles
+    # Una sola query para validar acceso de hasta 200 vehículos
+    res = await db.execute(
+        select(Vehicle).where(Vehicle.id.in_(vehicle_ids), Vehicle.active == True)
+    )
+    vehicles_by_id = {v.id: v for v in res.scalars().all()}
     accessible_ids: list[uuid.UUID] = []
     for vid in vehicle_ids:
-        vehicle = await db.get(Vehicle, vid)
-        if not vehicle or not vehicle.active:
+        v = vehicles_by_id.get(vid)
+        if v is None:
             continue
         try:
-            _check_vehicle_access(vehicle, user)
+            _check_vehicle_access(v, user)
             accessible_ids.append(vid)
         except Exception:
             continue
@@ -922,21 +946,43 @@ async def get_vehicle_avl_series(
         since = until - timedelta(hours=hours)
 
     key = f"avl_{avl_id}"
+    range_hours = (until - since).total_seconds() / 3600.0
 
-    rows = await db.execute(
-        text("""
-            SELECT time AS bucket,
-                   (can_data->>:key)::numeric AS value
-            FROM telemetry_record
-            WHERE vehicle_id = :vid
-              AND time >= :since
-              AND time <= :until
-              AND can_data ? :key
-              AND (can_data->>:key) IS NOT NULL
-            ORDER BY time ASC
-        """),
-        {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
-    )
+    # Para rangos > 24h agregamos por hora con time_bucket — evita devolver decenas
+    # de miles de puntos crudos y aprovecha la hypertable.
+    if range_hours > 24:
+        rows = await db.execute(
+            text("""
+                SELECT time_bucket('1 hour', time) AS bucket,
+                       AVG((can_data->>:key)::numeric) AS value
+                FROM telemetry_record
+                WHERE vehicle_id = :vid
+                  AND time >= :since
+                  AND time <= :until
+                  AND can_data ? :key
+                  AND (can_data->>:key) IS NOT NULL
+                GROUP BY bucket
+                ORDER BY bucket ASC
+                LIMIT 5000
+            """),
+            {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
+        )
+    else:
+        rows = await db.execute(
+            text("""
+                SELECT time AS bucket,
+                       (can_data->>:key)::numeric AS value
+                FROM telemetry_record
+                WHERE vehicle_id = :vid
+                  AND time >= :since
+                  AND time <= :until
+                  AND can_data ? :key
+                  AND (can_data->>:key) IS NOT NULL
+                ORDER BY time ASC
+                LIMIT 5000
+            """),
+            {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
+        )
     data = rows.fetchall()
     return [
         {"bucket": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}

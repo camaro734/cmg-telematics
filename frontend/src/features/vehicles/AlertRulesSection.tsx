@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { VehicleTypeOut, RuleOut } from '../../lib/types'
 
 const btnPrimary: React.CSSProperties = {
@@ -25,6 +26,7 @@ interface Props {
 export default function AlertRulesSection({ typeId, selectedType }: Props) {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
 
   const { data: allRules = [] } = useQuery({
     queryKey: keys.rules(),
@@ -41,8 +43,12 @@ export default function AlertRulesSection({ typeId, selectedType }: Props) {
     r => r.vehicle_filter?.scope === 'type' && (r.vehicle_filter as any)?.vehicle_type_id === selectedType.id
   )
 
-  function handleDelete(r: RuleOut) {
-    if (!window.confirm(`¿Eliminar la regla "${r.name}"?`)) return
+  async function handleDelete(r: RuleOut) {
+    const ok = await confirmAsk({
+      title: 'Eliminar regla', message: `¿Eliminar la regla "${r.name}"?`,
+      confirmLabel: 'Eliminar', kind: 'danger',
+    })
+    if (!ok) return
     deleteMutation.mutate(r.id)
   }
 

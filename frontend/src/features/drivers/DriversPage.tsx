@@ -5,6 +5,8 @@ import { keys } from '../../lib/queryKeys'
 import type { DriverOut } from '../../lib/types'
 import Shell from '../../shared/ui/Shell'
 import { useTenantContext } from '../../lib/useTenantContext'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { useAuthStore } from '../auth/useAuthStore'
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const S = {
@@ -134,6 +136,8 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function DriversPage() {
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<DriverOut | null>(null)
   const [search, setSearch] = useState('')
@@ -156,9 +160,9 @@ export default function DriversPage() {
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
       <div style={S.header}>
         <h1 style={S.title}>Conductores</h1>
-        <button style={S.btn} onClick={() => { setEditing(null); setShowModal(true) }}>
+        {isAdmin && <button style={S.btn} onClick={() => { setEditing(null); setShowModal(true) }}>
           + Nuevo conductor
-        </button>
+        </button>}
       </div>
 
       <input
@@ -239,7 +243,7 @@ export default function DriversPage() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 8 }}>
+              {isAdmin && <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   style={S.btnSecondary}
                   onClick={() => { setEditing(d); setShowModal(true) }}
@@ -248,11 +252,11 @@ export default function DriversPage() {
                 </button>
                 <button
                   style={{ ...S.btnSecondary, color: 'var(--accent-crit)' }}
-                  onClick={() => { if (confirm(`¿Desactivar a ${d.full_name}?`)) deactivate(d.id) }}
+                  onClick={async () => { if (await confirmAsk({ title: 'Desactivar conductor', message: `¿Desactivar a ${d.full_name}?`, confirmLabel: 'Desactivar', kind: 'danger' })) deactivate(d.id) }}
                 >
                   Desactivar
                 </button>
-              </div>
+              </div>}
             </div>
           )
         })}

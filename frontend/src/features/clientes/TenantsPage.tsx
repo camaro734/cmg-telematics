@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
+import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useAuthStore } from '../auth/useAuthStore'
 import type { TenantOut } from '../../lib/types'
 
 export default function TenantsPage() {
@@ -11,7 +13,11 @@ export default function TenantsPage() {
     queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants'),
   })
 
-  const clients = tenants.filter(t => t.tier !== 'cmg')
+  const { user } = useAuthStore()
+  const isClient = user?.tenant_tier === 'client'
+  const isAdmin = user?.role === 'admin'
+  // CMG ve todos excepto sí mismo; client ve solo sus subclientes (filtra su propio tenant)
+  const clients = tenants.filter(t => t.tier !== 'cmg' && (isClient ? t.tier === 'subclient' : true))
 
   return (
     <Shell title="Clientes">
@@ -20,7 +26,7 @@ export default function TenantsPage() {
           <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 20, fontWeight: 600 }}>
             Clientes
           </h2>
-          <Link
+          {isAdmin && <Link
             to="/clientes/new"
             style={{
               background: 'var(--accent-energy)', color: '#fff',
@@ -29,11 +35,13 @@ export default function TenantsPage() {
             }}
           >
             + Nuevo cliente
-          </Link>
+          </Link>}
         </div>
 
         {isLoading ? (
-          <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[0,1,2].map(i => <SkeletonRow key={i} height={44} />)}
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>

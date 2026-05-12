@@ -27,8 +27,8 @@ async def main() -> None:
 
     db_pool = await asyncpg.create_pool(
         dsn=settings.db_url.replace("+asyncpg", ""),
-        min_size=5,
-        max_size=20,
+        min_size=10,
+        max_size=40,
         init=_init_conn,
     )
     redis = Redis.from_url(settings.redis_url, decode_responses=True)

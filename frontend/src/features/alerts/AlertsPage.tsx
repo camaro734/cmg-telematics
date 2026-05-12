@@ -38,13 +38,13 @@ export default function AlertsPage() {
   const { data: vehicles = [] } = useQuery({
     queryKey: [...keys.vehicles(), activeTenantId],
     queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${activeTenantId ? `?tenant_id=${activeTenantId}` : ''}`),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const { data: rules = [] } = useQuery({
     queryKey: keys.rules(),
     queryFn: () => apiClient.get<RuleOut[]>('/api/v1/rules'),
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const { data: firing = [] } = useQuery({

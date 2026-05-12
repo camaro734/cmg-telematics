@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { PdfMetricItem, PdfMetricKey, PdfMetricFormat, VehicleTypeOut } from '../../lib/types'
 
 interface CatalogEntry {
@@ -66,6 +67,7 @@ interface Props {
 
 export default function PdfMetricsSection({ typeId, selectedType }: Props) {
   const qc = useQueryClient()
+  const confirmAsk = useConfirm()
   const value: PdfMetricItem[] = selectedType.pdf_metrics ?? []
 
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
@@ -89,8 +91,13 @@ export default function PdfMetricsSection({ typeId, selectedType }: Props) {
     ;[next[idx], next[j]] = [next[j], next[idx]]
     save(next)
   }
-  const remove = (idx: number) => {
-    if (!confirm('¿Quitar esta métrica del PDF?')) return
+  const remove = async (idx: number) => {
+    const ok = await confirmAsk({
+      title: 'Quitar métrica',
+      message: '¿Quitar esta métrica del PDF?',
+      confirmLabel: 'Quitar', kind: 'danger',
+    })
+    if (!ok) return
     save(value.filter((_, i) => i !== idx))
   }
   const update = (idx: number, patch: Partial<PdfMetricItem>) => {

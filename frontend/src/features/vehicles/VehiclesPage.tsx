@@ -5,6 +5,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, VehicleTypeOut, TenantOut, DeviceOut } from '../../lib/types'
 import { useTenantContext } from '../../lib/useTenantContext'
+import { useAuthStore } from '../auth/useAuthStore'
 
 // ─── Estilos compartidos ────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ const EMPTY_FORM: FormState = {
 export default function VehiclesPage() {
   const queryClient = useQueryClient()
   const { activeTenantId } = useTenantContext()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
 
   const [modal, setModal] = useState<'closed' | 'create' | 'edit'>('closed')
   const [editingVehicle, setEditingVehicle] = useState<VehicleOut | null>(null)
@@ -173,7 +175,18 @@ export default function VehiclesPage() {
       closeModal()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('409')) setError('Esa matrícula, VIN o IMEI ya está registrado')
+      // Intenta extraer el detail del backend si viene en formato "409: {"detail":"..."}"
+      const m = msg.match(/^\d{3}:\s*(\{.*\})$/)
+      let backendDetail: string | null = null
+      if (m) {
+        try {
+          const parsed = JSON.parse(m[1])
+          if (typeof parsed.detail === 'string') backendDetail = parsed.detail
+        } catch { /* ignora JSON malformado */ }
+      }
+      if (backendDetail) setError(backendDetail)
+      else if (msg.includes('409')) setError('Esa matrícula, VIN o IMEI ya está registrado')
+      else if (msg.startsWith('El IMEI ')) setError(msg)
       else setError('Error al guardar. Inténtalo de nuevo.')
     } finally {
       setSaving(false)
@@ -182,6 +195,23 @@ export default function VehiclesPage() {
 
   async function handleCreate() {
     const effectiveName = form.name.trim() || form.license_plate.trim()
+    const imei = form.imei.trim()
+
+    // Si hay IMEI, validar antes de crear el vehículo: ¿existe ya el dispositivo?
+    // Si existe sin vehículo asignado, lo reutilizamos. Si está asignado a otro,
+    // abortamos para evitar dejar un vehículo huérfano sin dispositivo.
+    let existingDevice: DeviceOut | null = null
+    if (imei) {
+      const tenantForDevice = form.tenant_id || activeTenantId || undefined
+      const url = tenantForDevice
+        ? `/api/v1/devices?tenant_id=${tenantForDevice}`
+        : '/api/v1/devices'
+      const all = await apiClient.get<DeviceOut[]>(url)
+      existingDevice = all.find(d => d.imei === imei) ?? null
+      if (existingDevice && existingDevice.vehicle_id) {
+        throw new Error(`El IMEI ${imei} ya está asignado a otro vehículo`)
+      }
+    }
 
     const vehicle = await apiClient.post<VehicleOut>('/api/v1/vehicles', {
       vehicle_type_id: form.vehicle_type_id,
@@ -193,9 +223,9 @@ export default function VehiclesPage() {
       tenant_id: form.tenant_id || null,
     })
 
-    if (form.imei.trim()) {
-      const device = await apiClient.post<DeviceOut>('/api/v1/devices', {
-        imei: form.imei.trim(),
+    if (imei) {
+      const device = existingDevice ?? await apiClient.post<DeviceOut>('/api/v1/devices', {
+        imei,
         model: 'FMC650',
         tenant_id: vehicle.tenant_id,
       })
@@ -214,14 +244,24 @@ export default function VehiclesPage() {
       driver_name: form.driver_name.trim() || null,
       year: form.year ? parseInt(form.year) : null,
     })
-    // Si no tenía dispositivo y se ha introducido un IMEI, crear y asignar
-    if (!editingDevice && form.imei.trim()) {
-      const device = await apiClient.post<DeviceOut>('/api/v1/devices', {
-        imei: form.imei.trim(),
+    // Si no tenía dispositivo y se ha introducido un IMEI, crear/reutilizar y asignar
+    const imei = form.imei.trim()
+    if (!editingDevice && imei) {
+      const tenantForDevice = vehicle.tenant_id
+      const url = `/api/v1/devices?tenant_id=${tenantForDevice}`
+      const all = await apiClient.get<DeviceOut[]>(url)
+      const existing = all.find(d => d.imei === imei) ?? null
+      if (existing && existing.vehicle_id && existing.vehicle_id !== vehicle.id) {
+        throw new Error(`El IMEI ${imei} ya está asignado a otro vehículo`)
+      }
+      const device = existing ?? await apiClient.post<DeviceOut>('/api/v1/devices', {
+        imei,
         model: 'FMC650',
         tenant_id: vehicle.tenant_id,
       })
-      await apiClient.patch(`/api/v1/devices/${device.id}/vehicle`, { vehicle_id: vehicle.id })
+      if (device.vehicle_id !== vehicle.id) {
+        await apiClient.patch(`/api/v1/devices/${device.id}/vehicle`, { vehicle_id: vehicle.id })
+      }
     }
   }
 
@@ -233,7 +273,7 @@ export default function VehiclesPage() {
 
         {/* Cabecera */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-          <button
+          {isAdmin && <button
             onClick={openCreate}
             style={{
               background: 'var(--accent-energy)',
@@ -247,7 +287,7 @@ export default function VehiclesPage() {
             }}
           >
             + Nuevo vehículo
-          </button>
+          </button>}
         </div>
 
         {/* Tabla */}
@@ -323,7 +363,7 @@ export default function VehiclesPage() {
                           {dev?.last_seen ? formatLastSeen(dev.last_seen) : '—'}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>
-                          <button
+                          {isAdmin && <button
                             onClick={() => openEdit(v)}
                             style={{
                               background: 'var(--bg-border)',
@@ -336,7 +376,7 @@ export default function VehiclesPage() {
                             }}
                           >
                             Editar
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     )

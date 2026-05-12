@@ -44,6 +44,15 @@ export function useToast() {
   }
 }
 
+// ── Imperative API (for use outside React components) ────────────────────────
+
+export const toast = {
+  success: (msg: string) => useToastStore.getState().add(msg, 'success'),
+  error:   (msg: string) => useToastStore.getState().add(msg, 'error'),
+  warning: (msg: string) => useToastStore.getState().add(msg, 'warning'),
+  info:    (msg: string) => useToastStore.getState().add(msg, 'info'),
+}
+
 // ── Single toast item ─────────────────────────────────────────────────────────
 
 const KIND_STYLE: Record<ToastKind, { border: string; icon: string }> = {

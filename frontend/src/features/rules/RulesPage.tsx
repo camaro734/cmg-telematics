@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useAuthStore } from '../auth/useAuthStore'
 import type { RuleOut } from '../../lib/types'
 
 const SEVERITY_LABEL: Record<string, { label: string; color: string }> = {
@@ -31,6 +32,7 @@ const TH: CSSProperties = {
 
 export default function RulesPage() {
   const qc = useQueryClient()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const { data: rules = [] } = useQuery({
@@ -63,7 +65,7 @@ export default function RulesPage() {
           <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
             REGLAS DE ALERTA
           </span>
-          <Link
+          {isAdmin && <Link
             to="/rules/new"
             style={{
               padding: '6px 16px', fontSize: 13, fontFamily: 'var(--font-ui)',
@@ -72,7 +74,7 @@ export default function RulesPage() {
             }}
           >
             + Nueva regla
-          </Link>
+          </Link>}
         </div>
 
         {rules.length === 0 ? (
@@ -118,7 +120,7 @@ export default function RulesPage() {
                         />
                       </td>
                       <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                        {isConfirming ? (
+                        {isAdmin && (isConfirming ? (
                           <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12 }}>
                             ¿Eliminar?{' '}
                             <button onClick={() => deleteMutation.mutate(rule.id)} style={{ color: 'var(--accent-crit)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 12 }}>Sí</button>
@@ -134,7 +136,7 @@ export default function RulesPage() {
                               title="Eliminar regla"
                             >✕</button>
                           </>
-                        )}
+                        ))}
                       </td>
                     </tr>
                   )

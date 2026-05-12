@@ -13,6 +13,7 @@ import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut, CommandLogEntry } from '../../lib/types'
 import WorkCyclesTab from './WorkCyclesTab'
+import { toast } from '../../shared/ui/Toast'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useFleetStore } from '../fleet/useFleetStore'
 
@@ -40,6 +41,8 @@ export default function VehicleDetailPage() {
   const [showFullTelemetry, setShowFullTelemetry] = useState(false)
   const [doutLoading, setDoutLoading] = useState<Record<number, boolean>>({})
   const [showBottomPanel, setShowBottomPanel] = useState(false)
+  const [trackDate, setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const isTrackToday = trackDate === new Date().toISOString().slice(0, 10)
 
   const [editingPlan, setEditingPlan] = useState<MaintenancePlanOut | null>(null)
   const [editPlanForm, setEditPlanForm] = useState({ name: '', value: '', warnPct: '10' })
@@ -122,10 +125,19 @@ export default function VehicleDetailPage() {
   })
 
   const { data: track = [] } = useQuery({
-    queryKey: keys.vehicleTrack(id ?? ''),
-    queryFn: () => apiClient.get<TrackPoint[]>(`/api/v1/vehicles/${id}/track/today`),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    queryKey: [...keys.vehicleTrack(id ?? ''), trackDate],
+    queryFn: () => {
+      if (isTrackToday) {
+        return apiClient.get<TrackPoint[]>(`/api/v1/vehicles/${id}/track/today`)
+      }
+      const from = `${trackDate}T00:00:00`
+      const to = `${trackDate}T23:59:59`
+      return apiClient.get<TrackPoint[]>(
+        `/api/v1/vehicles/${id}/track?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      )
+    },
+    staleTime: isTrackToday ? 30_000 : 5 * 60_000,
+    refetchInterval: isTrackToday ? 30_000 : false,
     enabled: !!vehicle,
   })
 
@@ -245,6 +257,39 @@ export default function VehicleDetailPage() {
                   height: isMobile ? 260 : '100%',
                 }}>
                   <TrackMap track={track} status={status} />
+
+                  {/* Selector de fecha del recorrido — esquina superior derecha */}
+                  <div style={{
+                    position: 'absolute', top: 10, right: 10, zIndex: 500,
+                    background: 'rgba(28,25,23,0.92)', backdropFilter: 'blur(6px)',
+                    borderRadius: 8, padding: '6px 10px',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    border: '1px solid var(--bg-border)', fontSize: 12,
+                  }}>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Recorrido</span>
+                    <input
+                      type="date"
+                      value={trackDate}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={e => setTrackDate(e.target.value || new Date().toISOString().slice(0, 10))}
+                      style={{
+                        background: 'var(--bg-elevated)', color: 'var(--text-base)',
+                        border: '1px solid var(--bg-border)', borderRadius: 4,
+                        padding: '3px 6px', fontSize: 12, fontFamily: 'inherit',
+                      }}
+                    />
+                    {!isTrackToday && (
+                      <button
+                        onClick={() => setTrackDate(new Date().toISOString().slice(0, 10))}
+                        style={{
+                          background: 'var(--accent-energy)', color: '#fff', border: 'none',
+                          borderRadius: 4, padding: '3px 8px', fontSize: 11, fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        title="Volver al día de hoy"
+                      >Hoy</button>
+                    )}
+                  </div>
 
                   {/* Badge de conexión superpuesto en el mapa */}
                   <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 500, pointerEvents: 'none' }}>
@@ -769,7 +814,7 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
       URL.revokeObjectURL(url)
       setOpen(false)
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Error al generar el informe')
+      toast.error(e instanceof Error ? e.message : 'Error al generar el informe')
     } finally {
       setLoading(false)
     }

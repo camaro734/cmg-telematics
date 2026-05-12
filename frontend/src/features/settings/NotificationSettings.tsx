@@ -31,7 +31,7 @@ export default function NotificationSettings() {
     queryKey: keys.tenants(),
     queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants'),
     enabled: isCmg,
-    staleTime: Infinity,
+    staleTime: 60_000,
   })
 
   const tenantParam = isCmg && selectedTenantId ? `?tenant_id=${selectedTenantId}` : ''

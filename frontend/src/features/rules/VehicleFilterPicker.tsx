@@ -19,14 +19,14 @@ export default function VehicleFilterPicker({ value, onChange }: Props) {
   const { data: vehicleTypes = [] } = useQuery({
     queryKey: keys.vehicleTypes(),
     queryFn: () => apiClient.get<VehicleTypeOut[]>('/api/v1/vehicle-types'),
-    staleTime: Infinity,
+    staleTime: 60_000,
     enabled: value.scope === 'type',
   })
 
   const { data: vehicles = [] } = useQuery({
     queryKey: keys.vehicles(),
     queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
-    staleTime: Infinity,
+    staleTime: 60_000,
     enabled: value.scope === 'vehicle',
   })
 
