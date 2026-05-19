@@ -31,3 +31,18 @@ frontend/build/
 
 # Git worktrees
 .worktrees/
+
+# Claude Code local config
+.claude/
+
+# Expo mobile cache
+mobile/.expo/
+
+# Runtime uploads
+backend/uploads/
+
+# Temp folder
+temp/
+
+# Old backup files
+*.bak.*
