@@ -691,3 +691,50 @@ Al final de cada respuesta con cambios:
 2. Bloque "Validación" con comandos concretos
 3. Aviso de migración / breaking change si aplica
 4. Recomendación de modelo si conviene cambiar para la próxima tarea
+
+═══════════════════════════════════════════════════════════════
+## 15. ENTORNO DE EJECUCIÓN — LEER ANTES DE CADA SESIÓN
+═══════════════════════════════════════════════════════════════
+
+### ⚠️ ESTE SERVIDOR ES PRODUCCIÓN
+
+`/opt/cmg-telematic1` en el VPS 213.210.20.183 es el ÚNICO despliegue.
+Los contenedores que levanta docker compose son los que sirven a 
+Wasterent y PREZERO ahora mismo.
+
+- Caddy: expone 443 al mundo
+- ingest-svc: expone 5027 al mundo, recibe FMC650 reales
+- postgres: contiene datos de producción de clientes
+- redis: estado en vivo de operaciones reales
+
+NO existe entorno de staging separado en este servidor.
+NO existe "BD local" — la BD de Docker ES la BD de producción.
+NO existe carpeta de desarrollo aislada.
+
+### Comandos que REQUIEREN confirmación explícita de Carlos
+
+Antes de ejecutar cualquiera de estos, PARAR y preguntar:
+
+- `alembic upgrade head` / `alembic upgrade <revision>`
+- `alembic downgrade <revision>`
+- `docker compose down` / `docker compose restart`
+- `docker stop` / `docker rm` / `docker kill`
+- Cualquier `psql` que no sea SELECT puro
+- Modificar `.env`, `docker-compose.yml`, `Caddyfile`
+- Eliminar volúmenes Docker (`docker volume rm`)
+- `git push --force` o cualquier `git push` (sin --force también)
+- Cualquier operación de filesystem fuera de `alembic/versions/`,
+  `docs/`, `backups/`
+
+### Si un prompt habla de "local" o "staging"
+
+Si un prompt o instrucción menciona:
+- "Verificar localmente antes de producción"
+- "Probar en local primero"
+- "Aplicar en staging"
+- "Entorno de desarrollo"
+
+PARAR. En este servidor "local" y "producción" son lo mismo.
+Avisar a Carlos antes de ejecutar el comando.
+
+### Identificación rápida de contenedores de producción
