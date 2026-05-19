@@ -1,4 +1,5 @@
 cmgtrack.com {
+    encode zstd gzip
     handle /api/* {
         reverse_proxy core-api:8010
     }
@@ -43,6 +44,23 @@ www.cmgnexus.es {
 }
 
 cmgnexus.es {
+    encode zstd gzip
+    # MCP Gateway para agentes externos (OpenAI)
+    @mcp_unauth {
+        path /mcp*
+        not header X-Agent-Key 2deCPnGIsKKuoFuhU1FgPbMqFTqkkkypKhRuJDpYG60
+    }
+    handle @mcp_unauth {
+        respond "Unauthorized" 401
+    }
+
+    handle /mcp* {
+        reverse_proxy 10.0.0.2:8083 {
+            flush_interval -1
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
     handle {
         reverse_proxy 10.0.0.2:8000 {
             header_up X-Real-IP {remote_host}

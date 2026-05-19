@@ -357,7 +357,7 @@ docker run -d --name cmg-telematic1_frontend_1 --network cmg-telematic1_default 
 - **CAN Manual slots 0–19**: AVL IDs 145–154 (Codec 8) y 380–389 (Codec 8 Extended)
 - **Buffer offline FMC650**: el dispositivo guarda hasta ~130.000 registros en flash interna (10 MB) o microSD (hasta 32 GB). Al reconectar envía todo en Codec 8 idéntico. El ingest-svc lo maneja transparentemente — `ON CONFLICT DO NOTHING` + timestamp original del AVL. No se pierde ningún dato CAN/PTO.
 - **DOUT**: control salidas digitales vía Codec 12, persistencia Redis, restore automático
-- **Ignición con fallback DIN1 + RPM**: `avl_1`/`avl_239` como fallback si no hay CAN ignition. **Si tampoco llegan**, se busca cualquier AVL de RPM conocido (`avl_30`, `avl_36`, `avl_85`, `avl_269`, `avl_10309`) > 200 raw (umbral conservador que filtra ruido sin perder motor real al ralentí). Helper `_ignition_from_can()` en `backend/app/api/v1/vehicles.py` aplicado en endpoint individual y bulk. Necesario porque algunos FMC650 (vacuum-pressure CMG) no tienen activados los I/O elements 239/1 en Teltonika Configurator pero sí mandan RPM del motor por CAN custom (avl_10309 con escala J1939 ×0.125).
+- **Ignición por RPM (primario) + DIN2 fallback**: la fuente principal de ignición es ahora el régimen del motor. Si cualquier AVL conocido de RPM (`avl_30`, `avl_36`, `avl_85`, `avl_269`, `avl_10309`) supera 200 raw → motor en marcha → ignition ON. Si la trama trae RPM y está en 0 → motor parado. **Sólo si la trama no trae ningún AVL de RPM** (vehículo sin CAN de RPM configurado) se cae a DIN2 (`avl_2`) o `avl_239` como fallback. **DIN1 (`avl_1`) ya no es señal de ignición**: se reserva para fallback de PTO (junto a `avl_179`). Esto refleja el cableado físico nuevo: DIN1 → contacto PTO, DIN2 → contacto ignición. Helper `_compute_ignition()` en `services/ingest/src/{writer.py,publisher.py}` y `_ignition_from_can()` en `backend/app/api/v1/vehicles.py` — misma regla en los tres puntos. Frontend y mobile consumen `status.ignition` como bool, sin cambios.
 - **sensor_schema**: por tipo de vehículo con canal CAN, modo Byte/Bit, scale y offset
 - **Mantenimiento predictivo**: planes, templates, intervenciones con reset de acumuladores
 - **Alertas / Rules engine**: threshold, sustained, accumulation, trend, composite, schedule, **geofence** (ray-casting, estado inside/outside en Redis por regla+vehículo)
@@ -464,3 +464,230 @@ Repositorio: https://github.com/camaro734/cmg-telematics (rama master)
 - El protocolo Codec 8 está documentado en /opt/cmg-telematics/backend/app/services/teltonika/
 - El schema TimescaleDB anterior está en /opt/cmg-telematics/backend/app/models/
 - Consultar SOLO como referencia, no copiar código directamente
+═══════════════════════════════════════════════════════════════
+## 12. REGLAS DE TRABAJO PARA CLAUDE CODE
+═══════════════════════════════════════════════════════════════
+
+Esta sección es para el agente Claude que está leyendo este archivo,
+no para los desarrolladores. Define cómo trabajar en este repo para
+maximizar calidad y minimizar coste sin sacrificar lo primero.
+
+### 12.1 Validación obligatoria después de cada cambio
+
+Esto es innegociable. Hay clientes en producción (Wasterent, PREZERO).
+Después de cualquier modificación, Claude DEBE terminar la respuesta con:
+
+1. **Bloque "Validación"** con comandos concretos a ejecutar:
+   - Para backend: `pytest backend/tests/test_X.py::test_Y -xvs`
+   - Para endpoint nuevo: `curl -H "Authorization: Bearer $TOKEN" ...`
+   - Para servicio: `docker compose logs <svc> --tail 100 | grep ERROR`
+   - Para migración: `alembic upgrade head` + verificación SQL del cambio
+2. **Aviso de migración** si tocas un modelo SQLAlchemy:
+   `alembic revision --autogenerate -m "descripción"`
+3. **Aviso de breaking change** si afecta a contratos API/WebSocket
+4. **Sugerencia de rollback** para cambios destructivos:
+   - Cómo revertir si algo falla en producción
+   - Qué backup mirar
+
+Una tarea NO está terminada hasta que Carlos puede validarla.
+
+### 12.2 Lectura de archivos — minimalismo extremo
+
+El repo es grande. Para no quemar tokens:
+
+- **NUNCA** leer `/opt/cmg-telematics` (repo anterior) sin que Carlos lo pida explícitamente
+- **NUNCA** `find` o `ls -R` sobre el repo completo
+- **NUNCA** abrir un archivo "por si acaso"
+- Leer SOLO archivos directamente implicados en la tarea
+- Antes de leer un archivo grande, comprobar si el CLAUDE.md local del subdir tiene la info
+- Si hay un CLAUDE.md en el subdirectorio donde vas a tocar, leerlo PRIMERO
+  (este meta-CLAUDE ya lo dice en regla "Siempre hacer" sección 11)
+- Si necesitas más contexto del que tienes, pregunta por ruta concreta antes de leer
+
+**Excepción explícita:** al inicio de la sesión puedes pedir `tree -L 2`
+o `git status` para orientarte. Una vez. No repetir.
+
+### 12.3 Formato de respuesta
+
+- Directo, sin "Voy a ayudarte con..." ni resúmenes innecesarios
+- Carlos conoce el stack — no re-expliques FastAPI, SQLAlchemy, React Query
+- Código completo y pegable, no pseudo-código
+- Diff mínimo: cambias 5 líneas, muestras 5 líneas + 2 de contexto
+- Máximo 1-2 párrafos de contexto antes del código
+- Al final: bloque "Validación" con comando(s) concretos (ver 12.1)
+
+### 12.4 Cuándo preguntar vs cuándo asumir
+
+**Pregunta SIEMPRE antes de:**
+- Cambios en esquema DB (modelos SQLAlchemy, migraciones Alembic)
+- Modificar lógica del ingestor TCP que esté en producción
+- Cambios en autenticación, JWT, RLS, permission_grant
+- Modificar `docker-compose.yml`, `.env`, `.env.production`
+- Borrar o renombrar endpoints existentes
+- Modificar el protocolo Codec 8 / 8 Extended / 12
+- Refactorizar archivos > 200 líneas
+- Tocar continuous aggregates de TimescaleDB
+- Cualquier cambio que afecte a clientes en producción
+
+**Asume sin preguntar:**
+- Estilo de código (sigue el existente — comentarios en español, código en inglés)
+- Naming (sigue convenciones del repo)
+- Imports estándar
+- Añadir un campo opcional a un Pydantic
+- Crear un endpoint nuevo no destructivo
+- Añadir un test que no existe
+- Añadir un toast/confirm en frontend siguiendo el patrón ya existente
+
+### 12.5 NO TOCAR sin aviso explícito
+
+Adicional a la sección 11 "Nunca hacer":
+
+- `/opt/cmg-telematics` (repo anterior, solo consulta)
+- `alembic/versions/*` antiguas — solo crear nuevas
+- Configuración del ingestor TCP en producción (puerto 5027)
+- `.env`, `.env.production`, variables sensibles
+- Estructura de hypertables ya creadas
+- Funciones de parsing Codec 8 en `services/ingest/src/` sin tests previos
+- `tenant_doc_counter` y lógica de numeración PT-{año}-{NNNNN}
+- Cualquier archivo con sufijo `.prod.*` o en carpeta `prod/`
+
+### 12.6 Calidad de código exigida
+
+Producto comercial → estándares altos:
+
+- Type hints en TODA función pública (Python)
+- TypeScript estricto en frontend, no `any` salvo justificado
+- Docstrings en módulos y clases (Google style)
+- No `print()` en código de servicio — `structlog` ya está configurado
+- No `except:` desnudo — siempre tipo específico
+- No funciones > 50 líneas (refactorizar si crece)
+- No archivos > 500 líneas (dividir en módulos)
+  - Excepción conocida: `ReportsPage.tsx` (1196 líneas, refactor estético pendiente)
+- Imports ordenados: stdlib → terceros → locales
+- Logs estructurados con `request_id`, `tenant_id`, `imei` cuando aplique
+
+### 12.7 Testing
+
+- Cada feature nueva con su test correspondiente
+- Tests unitarios para lógica de negocio (rules-engine, parsers Codec)
+- Tests de integración para endpoints (con DB de test)
+- NO ejecutar tests automáticamente — sugerir comando a Carlos
+- NO levantar `docker compose up` sin petición explícita (puede afectar prod)
+- Cobertura objetivo en módulos críticos: ingestor, rules-engine, auth, permission_grant
+
+### 12.8 Escalabilidad — pensar siempre en N=1000 vehículos
+
+Este producto escala. Antes de implementar algo, comprobar:
+
+- ¿Esta query funciona con 1M filas en `telemetry_record`?
+- ¿Estoy haciendo N+1? Usar `selectinload` o `JOIN`
+- ¿Hago un round-trip Redis por elemento? Usar `pipeline()`
+- ¿Filtro por `tenant_id` y tiene índice? (ver migración 022)
+- ¿La agregación temporal usa `time_bucket()` o estoy reinventando?
+- ¿El endpoint puede recibir 200 IDs? Usar `WHERE id = ANY(:ids)` no loop
+
+Patrón establecido (ver Sprint vendibilidad 2026-05-12):
+- Bulk endpoints en lugar de loops
+- `asyncio.gather` con `wait_for` para broadcasts WebSocket
+- Pools asyncpg dimensionados (min_size=10, max_size=40 para ingest)
+- `LIMIT 5000` defensivo en endpoints de series temporales
+
+### 12.9 Multi-tenant — verificación obligatoria
+
+Cualquier endpoint o query que devuelva datos:
+
+1. ¿Filtra por `tenant_id` o equivalente?
+2. ¿Respeta jerarquía cmg/client/subclient?
+3. ¿Usa `assert_can_manage_tenant` cuando gestiona usuarios/recursos?
+4. ¿Para CMG admins, distingue "sin filtro" (ven todo) vs filtro explícito?
+5. ¿WebSocket broadcasts incluyen sentinel `"__cmg__"` cuando aplique?
+
+Un fallo aquí = filtración de datos entre clientes = pérdida del contrato.
+
+### 12.10 Caché de Claude — preservar sesión
+
+- Este CLAUDE.md NO debe modificarse durante una sesión activa
+  (cualquier cambio rompe el caché y multiplica el coste del próximo turno)
+- Cambios al CLAUDE.md → al final de la sesión, no a mitad
+- Si Carlos pide actualizar el CLAUDE.md a mitad de sesión, terminar
+  la tarea actual primero y proponer hacerlo al cerrar
+
+═══════════════════════════════════════════════════════════════
+## 13. SELECCIÓN DE MODELO Y MODO
+═══════════════════════════════════════════════════════════════
+
+Carlos paga API directa, no Pro/Max. Cada token cuenta pero la calidad
+manda — esto es producto comercial.
+
+### 13.1 Modelo por defecto
+
+**Claude Sonnet 4.6** para todo el desarrollo normal.
+
+Razón: equilibrio coste/calidad óptimo para coding serio. Haiku 4.5 es
+demasiado básico para lógica multi-tenant + async + TimescaleDB.
+Opus 4.7 es 5x más caro y solo se justifica en casos concretos.
+
+### 13.2 Cuándo usar Opus 4.7
+
+Carlos puede activarlo con `/model claude-opus-4-7`. Recomendarlo cuando:
+
+- Diseño de arquitectura nueva (nuevo servicio, nuevo flujo de datos)
+- Debugging complejo que toca > 2 archivos y > 1 servicio
+- Race conditions, problemas de concurrencia, deadlocks
+- Decisión de modelado de datos crítico (nuevo agregado, nueva tabla central)
+- Sonnet ha fallado 2+ veces en la misma tarea
+- Análisis de rendimiento / planes de query / optimización TimescaleDB
+- Auditoría de seguridad (RLS, permission_grant, JWT)
+
+Al terminar la tarea compleja, recomendar volver a Sonnet con `/model claude-sonnet-4-6`.
+
+### 13.3 Cuándo usar Haiku 4.5
+
+Solo si Carlos lo pide explícitamente, para:
+- Lecturas masivas (consultar muchos archivos sin razonar)
+- Renombrados mecánicos
+- Búsquedas y greps interpretados
+- Resúmenes de logs
+
+NO usar Haiku para escribir código de negocio.
+
+### 13.4 Thinking mode
+
+- **OFF por defecto** para casi todo
+- **ON automáticamente** (sugerir activarlo) cuando la tarea sea:
+  - Diseño de arquitectura
+  - Debugging de race conditions
+  - Modelado de datos
+  - Decisiones de escalabilidad
+- Carlos puede forzar con `/think` o desactivar con `/think off`
+
+Thinking añade tokens de razonamiento (caros) — usarlo cuando aporta valor real.
+
+### 13.5 Modo permisos
+
+`permissions.default: "ask"` en `~/.claude/settings.json`.
+
+En producción Claude pregunta antes de ejecutar comandos destructivos.
+No usar `"always"` aquí — el coste de un `rm -rf` mal escrito en este
+repo es perder el producto.
+
+═══════════════════════════════════════════════════════════════
+## 14. RESUMEN OPERATIVO PARA CADA SESIÓN
+═══════════════════════════════════════════════════════════════
+
+Al inicio de cada sesión, Claude:
+
+1. Confirma cwd = `/opt/cmg-telematic1`
+2. Lee este CLAUDE.md (ya lo está haciendo)
+3. NO lee otros archivos automáticamente
+4. Espera la tarea de Carlos
+5. Si la tarea afecta a un subdirectorio con su propio CLAUDE.md
+   (backend/, frontend/, services/*/), lo lee antes de tocar nada
+6. Asume modelo Sonnet 4.6 si Carlos no especifica
+
+Al final de cada respuesta con cambios:
+
+1. Resumen breve de qué se cambió (1-2 líneas)
+2. Bloque "Validación" con comandos concretos
+3. Aviso de migración / breaking change si aplica
+4. Recomendación de modelo si conviene cambiar para la próxima tarea

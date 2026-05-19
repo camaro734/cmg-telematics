@@ -6,13 +6,26 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getWorkOrders, changeWorkOrderStatus } from '../api/workOrders';
+import { useQuery } from '@tanstack/react-query';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { getWorkOrders } from '../api/workOrders';
 import { colors, spacing, radius } from '../theme';
+import type { MainTabParamList } from '../navigation/MainNavigator';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { WorkOrder, WorkOrderStatus } from '../types';
+
+type WorkOrdersNavProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Orders'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+type Props = {
+  navigation: WorkOrdersNavProp;
+};
 
 const STATUS_LABELS: Record<WorkOrderStatus, string> = {
   pending:     'Pendiente',
@@ -56,17 +69,13 @@ const badge = StyleSheet.create({
 
 function OrderCard({
   order,
-  onStart,
-  onComplete,
-  onCancel,
+  onPress,
 }: {
   order: WorkOrder;
-  onStart: () => void;
-  onComplete: () => void;
-  onCancel: () => void;
+  onPress: () => void;
 }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.cardTop}>
         <StatusBadge status={order.status} />
         <Text style={[styles.priority, { color: PRIORITY_COLORS[order.priority] }]}>
@@ -94,45 +103,15 @@ function OrderCard({
         </Text>
       )}
       {order.description != null && (
-        <Text style={styles.description}>{order.description}</Text>
+        <Text style={styles.description} numberOfLines={2}>{order.description}</Text>
       )}
 
-      {/* Acciones de transición de estado */}
-      {(order.status === 'pending' || order.status === 'in_progress') && (
-        <View style={styles.actions}>
-          {order.status === 'pending' && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: colors.accent }]}
-              onPress={onStart}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.actionText, { color: colors.accent }]}>Iniciar</Text>
-            </TouchableOpacity>
-          )}
-          {order.status === 'in_progress' && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: colors.accentOk }]}
-              onPress={onComplete}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.actionText, { color: colors.accentOk }]}>Completar</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: colors.bgBorder }]}
-            onPress={onCancel}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionText, { color: colors.textMuted }]}>Cancelar</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+      <Text style={styles.chevron}>›</Text>
+    </TouchableOpacity>
   );
 }
 
-export function WorkOrdersScreen() {
-  const qc = useQueryClient();
+export function WorkOrdersScreen({ navigation }: Props) {
   const [filter, setFilter] = useState<WorkOrderStatus | 'all'>('all');
 
   const { data: orders = [], isLoading, refetch } = useQuery({
@@ -140,24 +119,6 @@ export function WorkOrdersScreen() {
     queryFn: () => getWorkOrders({ status: filter, limit: 100 }),
     refetchInterval: 60_000,
   });
-
-  const { mutate: changeStatus } = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: WorkOrderStatus }) =>
-      changeWorkOrderStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['work-orders'] }),
-    onError: () => Alert.alert('Error', 'No se pudo actualizar el estado.'),
-  });
-
-  const confirmChange = (order: WorkOrder, newStatus: WorkOrderStatus, label: string) => {
-    Alert.alert(
-      label,
-      `¿${label} "${order.title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: label, onPress: () => changeStatus({ id: order.id, status: newStatus }) },
-      ]
-    );
-  };
 
   const activeOrders = orders.filter(o => o.status === 'in_progress').length;
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
@@ -173,7 +134,6 @@ export function WorkOrdersScreen() {
         </View>
       </View>
 
-      {/* Filtro de estado */}
       <View style={styles.filters}>
         {FILTERS.map(f => (
           <TouchableOpacity
@@ -203,9 +163,7 @@ export function WorkOrdersScreen() {
         renderItem={({ item }) => (
           <OrderCard
             order={item}
-            onStart={() => confirmChange(item, 'in_progress', 'Iniciar')}
-            onComplete={() => confirmChange(item, 'done', 'Completar')}
-            onCancel={() => confirmChange(item, 'cancelled', 'Cancelar')}
+            onPress={() => navigation.navigate('WorkOrderDetail', { workOrderId: item.id })}
           />
         )}
         ListEmptyComponent={
@@ -261,17 +219,10 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  priority: { fontSize: 11, fontWeight: '700' },
+  priority: { fontSize: 11, fontWeight: '700', flex: 1 },
+  chevron: { color: colors.textMuted, fontSize: 20, position: 'absolute', right: spacing.md, top: spacing.md },
   meta: { color: colors.textSecondary, fontSize: 13 },
   description: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  actionBtn: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  actionText: { fontSize: 13, fontWeight: '700' },
   empty: {
     color: colors.textMuted,
     textAlign: 'center',

@@ -10,10 +10,32 @@ from src.codec8 import AVLRecord
 logger = logging.getLogger(__name__)
 
 AVL_IGNITION = 239
-AVL_DIN1 = 1   # Ignición via entrada digital (fallback si no hay CAN)
+AVL_DIN1 = 1   # PTO via entrada digital (fallback si no llega avl_179)
 AVL_EXT_VOLTAGE = 66
 AVL_PTO = 179
-AVL_DIN2 = 2   # PTO via entrada digital
+AVL_DIN2 = 2   # Ignición via entrada digital (fallback si no llega RPM ni avl_239)
+
+# AVL IDs que reportan régimen del motor (RPM). Cualquiera > umbral → motor en marcha.
+_RPM_AVL_IDS = (30, 36, 85, 269, 10309)
+_RPM_IGNITION_THRESHOLD = 200
+
+
+def _compute_ignition(io: dict) -> bool:
+    """Detecta ignición. Prioridad:
+    1) Cualquier AVL conocido de RPM > umbral → motor en marcha.
+    2) Si la trama trae RPM pero está en 0 → motor parado (return False).
+    3) Si NO trae ningún AVL de RPM → fallback DIN2 (avl_2) o CAN ignition (avl_239).
+    """
+    has_rpm_data = False
+    for key in _RPM_AVL_IDS:
+        v = io.get(key)
+        if isinstance(v, (int, float)):
+            has_rpm_data = True
+            if v > _RPM_IGNITION_THRESHOLD:
+                return True
+    if has_rpm_data:
+        return False
+    return io.get(AVL_DIN2, 0) == 1 or io.get(AVL_IGNITION, 0) == 1
 
 
 async def write_record(
@@ -26,8 +48,8 @@ async def write_record(
     """Inserta un AVLRecord en telemetry_record."""
     ts = avl.datetime_utc
 
-    ignition = bool(avl.io_elements.get(AVL_IGNITION, 0)) or bool(avl.io_elements.get(AVL_DIN1, 0))
-    pto_active = bool(avl.io_elements.get(AVL_PTO, 0)) or bool(avl.io_elements.get(AVL_DIN2, 0))
+    ignition = _compute_ignition(avl.io_elements)
+    pto_active = bool(avl.io_elements.get(AVL_PTO, 0)) or bool(avl.io_elements.get(AVL_DIN1, 0))
     ext_voltage_mv = avl.io_elements.get(AVL_EXT_VOLTAGE)
 
     known_avl_ids = {AVL_IGNITION, AVL_PTO, AVL_EXT_VOLTAGE}

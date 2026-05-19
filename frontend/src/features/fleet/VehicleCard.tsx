@@ -4,7 +4,7 @@ import { getVehicleIconForSlug } from '../../shared/ui/icons'
 import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleTypeOut, VehicleStatus } from '../../lib/types'
 
-export type VehicleState = 'moving' | 'idle' | 'offline' | 'alert'
+export type VehicleState = 'moving' | 'idle' | 'offline' | 'parked' | 'alert'
 
 const CARD_PULSE_CSS = `
 @keyframes cmg-card-pulse {
@@ -37,6 +37,7 @@ function injectCardPulseCSS() {
 const STATE_COLORS: Record<VehicleState, { dot: string; ring: string; border: string }> = {
   moving:  { dot: 'var(--accent-ok)',   ring: 'rgba(34,197,94,0.45)',  border: 'var(--accent-ok)' },
   idle:    { dot: 'var(--accent-warn)', ring: 'rgba(234,179,8,0.4)',   border: 'var(--accent-warn)' },
+  parked:  { dot: 'var(--accent-info)', ring: 'rgba(56,189,248,0.3)',  border: 'var(--accent-info)' },
   offline: { dot: 'var(--bg-border)',   ring: '',                       border: 'var(--bg-border)' },
   alert:   { dot: 'var(--accent-crit)', ring: 'rgba(239,68,68,0.5)',   border: 'var(--accent-crit)' },
 }
@@ -60,9 +61,9 @@ function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { t
     case 'moving':
       return { text: `${Math.round(status.speed_kmh ?? 0)} km/h`, color: 'var(--accent-ok)' }
     case 'idle':
-      return status.ignition
-        ? { text: 'Parado · motor ON', color: 'var(--accent-warn)' }
-        : { text: 'Parado', color: 'var(--accent-off)' }
+      return { text: 'Parado · motor ON', color: 'var(--accent-warn)' }
+    case 'parked':
+      return { text: 'Parado', color: 'var(--accent-info)' }
     case 'alert':
       return { text: '⚠ Alerta', color: 'var(--accent-crit)' }
     case 'offline': {

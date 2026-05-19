@@ -31,9 +31,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["vehicles"])
 
 
-# AVL IDs conocidos que reportan régimen del motor (RPM). Si CUALQUIERA está
-# por encima del umbral, la ignición está ON aunque ni avl_239 (ignición CAN)
-# ni avl_1 (DIN1) lleguen. Lista cubre Teltonika OBD-II/J1939 estándar y los
+# AVL IDs conocidos que reportan régimen del motor (RPM). Es la fuente PRIMARIA
+# de detección de ignición: si CUALQUIERA está por encima del umbral, el motor
+# está en marcha. Sólo si la trama no trae ningún AVL de RPM se cae a DIN2
+# (avl_2) o CAN ignition (avl_239). DIN1 (avl_1) NO es señal de ignición; se
+# usa como fallback de PTO. Lista cubre Teltonika OBD-II/J1939 estándar y los
 # canales custom de los PLCs que se ven en la flota CMG.
 _RPM_AVL_IDS = (
     "avl_30",     # OBD-II Engine RPM
@@ -50,18 +52,23 @@ _RPM_IGNITION_THRESHOLD = 200
 
 
 def _ignition_from_can(can_data: dict) -> bool:
-    """Detecta ignición a partir de CAN data. True si:
-    - DIN1 (avl_1) = 1, o
-    - Ignición CAN (avl_239) = 1, o
-    - Cualquier AVL conocido de RPM por encima del umbral.
+    """Detecta ignición a partir de CAN data. Prioridad:
+    1) Cualquier AVL conocido de RPM > umbral → motor en marcha.
+    2) Si la trama trae RPM pero está en 0 → motor parado (return False).
+    3) Si NO trae ningún AVL de RPM → fallback DIN2 (avl_2) o CAN ignition (avl_239).
+
+    DIN1 (avl_1) ya NO es señal de ignición; se reserva para el fallback de PTO.
     """
-    if can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1:
-        return True
+    has_rpm_data = False
     for key in _RPM_AVL_IDS:
         v = can_data.get(key)
-        if isinstance(v, (int, float)) and v > _RPM_IGNITION_THRESHOLD:
-            return True
-    return False
+        if isinstance(v, (int, float)):
+            has_rpm_data = True
+            if v > _RPM_IGNITION_THRESHOLD:
+                return True
+    if has_rpm_data:
+        return False
+    return can_data.get("avl_2") == 1 or can_data.get("avl_239") == 1
 
 
 class MaintenanceTemplatesUpdate(BaseModel):
@@ -611,7 +618,7 @@ async def get_vehicles_statuses_bulk(
             if _ignition_from_can(can_data):
                 ignition_val = True
         if not pto_active and can_data:
-            if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
+            if can_data.get("avl_1") == 1 or can_data.get("avl_179") == 1:
                 pto_active = True
 
         last_seen_str = _get(hash_data, "last_seen")
@@ -740,14 +747,14 @@ async def get_vehicle_status(
     pto_active = _parse_bool(pto_str)
     ignition_val = _parse_bool(ignition_str)
 
-    # Fallback ignición: DIN1 (avl_1), CAN ignition (avl_239) o RPM > umbral
+    # Fallback ignición: RPM > umbral (primario); si no llega RPM, DIN2 (avl_2) o avl_239.
     if not ignition_val and can_data:
         if _ignition_from_can(can_data):
             ignition_val = True
 
-    # Fallback PTO: si Redis tiene pto_active=false pero DIN2 (avl_2) o canal CAN (avl_179) = 1.
+    # Fallback PTO: si Redis tiene pto_active=false pero DIN1 (avl_1) o avl_179 = 1.
     if not pto_active and can_data:
-        if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
+        if can_data.get("avl_1") == 1 or can_data.get("avl_179") == 1:
             pto_active = True
 
     # Recalcular online basado en last_seen (< 5 min = online real)

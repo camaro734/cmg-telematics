@@ -52,11 +52,18 @@ Servidor → 0x01 (aceptado) / 0x00 (rechazado)
 
 | AVL ID | Campo BD | Descripción |
 |--------|----------|-------------|
-| 239 | `ignition` | Ignición (bool) |
-| 179 | `pto_active` | PTO State |
+| 30, 36, 85, 269, 10309 | (vía `can_data`) | **RPM motor — fuente PRIMARIA de ignición** (>200 raw → motor en marcha) |
+| 2 (DIN2) | (vía `can_data.avl_2`) | Fallback ignición cuando la trama no trae ningún AVL de RPM |
+| 239 | `ignition` | Ignición CAN — fallback adicional junto a DIN2 cuando no llega RPM |
+| 1 (DIN1) | (vía `can_data.avl_1`) | Fallback PTO cuando no llega `avl_179` |
+| 179 | `pto_active` | PTO State oficial CAN |
 | 66 | `ext_voltage_mv` | Voltaje externo (mV) |
 | 145–154 | `can_data.avl_*` | CAN Manual slots 0–9 |
 | 380–389 | `can_data.avl_*` | CAN Manual slots 10–19 (requieren Codec 8 Extended) |
+
+**Regla de ignición (publisher + writer + core-api):** RPM primario. Si la trama trae cualquier `avl_30/36/85/269/10309` > 200 → motor en marcha. Si trae RPM y está en 0 → motor parado. Si NO trae ningún AVL de RPM → mirar DIN2 (`avl_2`) o `avl_239`. DIN1 NO se mira para ignición — se reserva para PTO.
+
+**Regla de PTO:** `avl_179` (CAN) o DIN1 (`avl_1`) como fallback.
 
 ---
 

@@ -31,7 +31,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#00C8C8"
+          "color": "#F97316"
         }
       ],
       "expo-secure-store",
@@ -39,6 +39,19 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "CMG Track necesita acceso a la ubicación para mostrar tu posición en el mapa."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CMG Track necesita acceso a tus fotos para adjuntarlas al informe.",
+          "cameraPermission": "CMG Track necesita la cámara para fotografiar el servicio."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "14.0" }
         }
       ]
     ]

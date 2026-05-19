@@ -1,5 +1,7 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import logging
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,6 +13,8 @@ from app.schemas.device import DeviceOut, DeviceCreate, DeviceUpdate, DeviceAssi
 from app.models.device import Device
 from app.models.vehicle import Vehicle
 from app.models.tenant import Tenant
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["devices"])
 
@@ -24,6 +28,7 @@ def _check_device_access(device: Device, user: CurrentUser) -> None:
 
 @router.get("", response_model=list[DeviceOut])
 async def list_devices(
+    request: Request,
     tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -34,7 +39,46 @@ async def list_devices(
     elif tenant_id is not None:
         query = query.where(Device.tenant_id == tenant_id)
     result = await db.execute(query.order_by(Device.created_at.desc()))
-    return result.scalars().all()
+    devices = result.scalars().all()
+
+    # device.online y device.last_seen en BD solo se actualizan en handshake/disconnect.
+    # Redis vehicle:{id}:status sí refleja cada paquete de telemetría — superponemos
+    # ese estado real cuando exista, manteniendo BD como fallback.
+    out: list[DeviceOut] = []
+    redis = getattr(request.app.state, "redis", None)
+    redis_states: dict[str, dict] = {}
+    if redis is not None:
+        vehicle_ids = [str(d.vehicle_id) for d in devices if d.vehicle_id]
+        if vehicle_ids:
+            try:
+                pipe = redis.pipeline()
+                for vid in vehicle_ids:
+                    pipe.hgetall(f"vehicle:{vid}:status")
+                results = await pipe.execute()
+                redis_states = dict(zip(vehicle_ids, results))
+            except Exception as e:
+                logger.warning("Redis no disponible en list_devices: %s", e)
+
+    def _decode(val):
+        if val is None:
+            return None
+        return val.decode() if isinstance(val, (bytes, bytearray)) else val
+
+    for d in devices:
+        item = DeviceOut.model_validate(d)
+        if d.vehicle_id:
+            hash_data = redis_states.get(str(d.vehicle_id)) or {}
+            online_raw = _decode(hash_data.get(b"online") if hash_data and isinstance(next(iter(hash_data), None), bytes) else hash_data.get("online"))
+            last_seen_raw = _decode(hash_data.get(b"last_seen") if hash_data and isinstance(next(iter(hash_data), None), bytes) else hash_data.get("last_seen"))
+            if online_raw is not None:
+                item.online = online_raw.lower() in ("true", "1", "yes")
+            if last_seen_raw:
+                try:
+                    item.last_seen = datetime.fromisoformat(last_seen_raw)
+                except (ValueError, TypeError):
+                    pass
+        out.append(item)
+    return out
 
 
 @router.post("", response_model=DeviceOut, status_code=status.HTTP_201_CREATED)

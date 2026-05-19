@@ -27,8 +27,8 @@ function isEffectivelyOnline(status: VehicleStatus | undefined): boolean {
   return (Date.now() - new Date(status.last_seen).getTime()) < 5 * 60_000
 }
 
-type VehicleState = 'moving' | 'idle' | 'offline' | 'alert'
-const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, offline: 3 }
+type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert'
+const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, parked: 3, offline: 4 }
 
 function getVehicleState(
   vehicle: VehicleOut,
@@ -38,13 +38,15 @@ function getVehicleState(
   if (!isEffectivelyOnline(status)) return 'offline'
   if (alerts.some(a => a.vehicle_id === vehicle.id)) return 'alert'
   if ((status!.speed_kmh ?? 0) > 2) return 'moving'
-  return 'idle'
+  if (status!.ignition) return 'idle'
+  return 'parked'
 }
 
 function stateColor(state: VehicleState): string {
   return state === 'alert' ? 'var(--accent-crit)'
     : state === 'moving' ? 'var(--accent-ok)'
     : state === 'idle' ? 'var(--accent-warn)'
+    : state === 'parked' ? 'var(--accent-info)'
     : 'var(--accent-off)'
 }
 

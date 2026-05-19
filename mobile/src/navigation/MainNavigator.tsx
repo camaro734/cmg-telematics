@@ -8,6 +8,7 @@ import { WorkOrdersScreen } from '../screens/WorkOrdersScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { getAlerts } from '../api/alerts';
 import { getWorkOrders } from '../api/workOrders';
+import { useAuthStore } from '../store/authStore';
 import { colors } from '../theme';
 
 export type MainTabParamList = {
@@ -35,6 +36,9 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 export function MainNavigator() {
+  const user = useAuthStore((s) => s.user);
+  const isDriver = user?.role === 'driver';
+
   const { data: alerts = [] } = useQuery({
     queryKey: ['alerts'],
     queryFn: () => getAlerts({ status: 'firing' }),
@@ -49,6 +53,32 @@ export function MainNavigator() {
   });
   const inProgressCount = orders.length;
 
+  const ordersTab = (
+    <Tab.Screen
+      key="Orders"
+      name="Orders"
+      component={WorkOrdersScreen}
+      options={{
+        tabBarLabel: 'Órdenes',
+        tabBarIcon: ({ focused }) => <TabIcon name="Orders" focused={focused} />,
+        tabBarBadge: inProgressCount > 0 ? inProgressCount : undefined,
+        tabBarBadgeStyle: styles.badge,
+      }}
+    />
+  );
+
+  const fleetTab = (
+    <Tab.Screen
+      key="Fleet"
+      name="Fleet"
+      component={FleetScreen}
+      options={{
+        tabBarLabel: 'Flota',
+        tabBarIcon: ({ focused }) => <TabIcon name="Fleet" focused={focused} />,
+      }}
+    />
+  );
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -59,24 +89,8 @@ export function MainNavigator() {
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
-      <Tab.Screen
-        name="Fleet"
-        component={FleetScreen}
-        options={{
-          tabBarLabel: 'Flota',
-          tabBarIcon: ({ focused }) => <TabIcon name="Fleet" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Orders"
-        component={WorkOrdersScreen}
-        options={{
-          tabBarLabel: 'Órdenes',
-          tabBarIcon: ({ focused }) => <TabIcon name="Orders" focused={focused} />,
-          tabBarBadge: inProgressCount > 0 ? inProgressCount : undefined,
-          tabBarBadgeStyle: styles.badge,
-        }}
-      />
+      {isDriver ? ordersTab : fleetTab}
+      {isDriver ? fleetTab : ordersTab}
       <Tab.Screen
         name="Alerts"
         component={AlertsScreen}
