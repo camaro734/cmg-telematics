@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
+from typing import Optional
 from sqlalchemy import String, Text, ForeignKey, DateTime, Boolean, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,8 +18,10 @@ class Driver(Base):
     license_expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    user: Mapped[Optional["User"]] = relationship("User")
     assignments = relationship("VehicleDriverAssignment", back_populates="driver", order_by="VehicleDriverAssignment.assigned_at.desc()")
 
 
