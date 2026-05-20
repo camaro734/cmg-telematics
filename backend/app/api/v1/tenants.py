@@ -49,6 +49,8 @@ async def create_tenant(
 ):
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    if body.tier == "manufacturer" and user.tenant_tier != "cmg":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG puede crear tenants tier=manufacturer")
     # Los clientes solo pueden crear subclientes bajo ellos mismos
     if user.tenant_tier == "client":
         body = body.model_copy(update={"tier": "subclient", "parent_id": user.tenant_id})
