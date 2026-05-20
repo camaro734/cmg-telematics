@@ -430,8 +430,8 @@ export interface MaintenanceLogCreate {
 }
 
 export interface TenantCreate {
-  parent_id: string
-  tier: 'client'
+  parent_id: string | null
+  tier: 'client' | 'manufacturer'
   name: string
   slug: string
 }

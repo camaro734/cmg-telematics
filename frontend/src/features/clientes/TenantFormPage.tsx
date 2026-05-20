@@ -111,6 +111,7 @@ export default function TenantFormPage() {
   const [active, setActive] = useState(true)
   const [formModules, setFormModules] = useState<string[]>([])
   const [showWizard, setShowWizard] = useState(false)
+  const [tier, setTier] = useState<'client' | 'manufacturer'>('client')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [createUser, setCreateUser] = useState(true)
@@ -154,8 +155,10 @@ export default function TenantFormPage() {
       if (isEdit) {
         qc.invalidateQueries({ queryKey: keys.cliente(id!) })
         navigate('/clientes')
-      } else {
+      } else if (tier === 'client') {
         setShowWizard(true)
+      } else {
+        navigate('/clientes')
       }
     },
   })
@@ -172,7 +175,12 @@ export default function TenantFormPage() {
         business_address: businessAddress.trim() || null,
       } satisfies TenantUpdate)
     } else {
-      mutation.mutate({ parent_id: user!.tenant_id, tier: 'client', name: name.trim(), slug: slug.trim() } satisfies TenantCreate)
+      mutation.mutate({
+        parent_id: tier === 'client' ? user!.tenant_id : null,
+        tier,
+        name: name.trim(),
+        slug: slug.trim(),
+      } satisfies TenantCreate)
     }
   }
 
@@ -198,6 +206,28 @@ export default function TenantFormPage() {
           </h2>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {!isEdit && user?.tenant_tier === 'cmg' && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Tipo de tenant
+                </div>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  {([['client', 'Cliente operador'], ['manufacturer', 'Fabricante']] as const).map(([value, label]) => (
+                    <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="tier"
+                        value={value}
+                        checked={tier === value}
+                        onChange={() => setTier(value)}
+                      />
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nombre</span>
               <input value={name} onChange={e => setName(e.target.value)} required style={inputStyle} />
