@@ -54,7 +54,20 @@ export default function TenantsPage() {
             <tbody>
               {clients.map(tenant => (
                 <tr key={tenant.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-primary)', fontSize: 14 }}>{tenant.name}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-primary)', fontSize: 14 }}>
+                    {tenant.name}
+                    {' '}
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500, marginLeft: 4,
+                      ...(tenant.tier === 'manufacturer'
+                        ? { background: 'rgba(56,189,248,0.15)', color: 'var(--accent-info)' }
+                        : tenant.tier === 'subclient'
+                        ? { background: 'rgba(120,113,108,0.15)', color: 'var(--accent-off)' }
+                        : { background: 'rgba(249,115,22,0.15)', color: 'var(--accent-energy)' }),
+                    }}>
+                      {tenant.tier === 'manufacturer' ? 'Fabricante' : tenant.tier === 'subclient' ? 'Subcliente' : 'Cliente'}
+                    </span>
+                  </td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontFamily: 'var(--font-data)', fontSize: 13 }}>{tenant.slug}</td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{
