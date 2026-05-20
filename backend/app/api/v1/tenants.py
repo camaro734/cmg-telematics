@@ -191,6 +191,50 @@ async def patch_tenant(
     return tenant
 
 
+@router.delete("/tenants/{tenant_id}", response_model=TenantOut)
+async def delete_tenant(
+    tenant_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    if user.tenant_tier != "cmg":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG puede borrar tenants")
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    if tenant.tier == "cmg":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se puede borrar un tenant CMG")
+    if not tenant.active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant ya está inactivo")
+    tenant.active = False
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
+@router.post("/tenants/{tenant_id}/reactivate", response_model=TenantOut)
+async def reactivate_tenant(
+    tenant_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    if user.tenant_tier != "cmg":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG puede reactivar tenants")
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    if tenant.active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant ya está activo")
+    tenant.active = True
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
 @router.get("/tenants/{tenant_id}/brand-tokens")
 async def get_brand_tokens(
     tenant_id: uuid.UUID,
