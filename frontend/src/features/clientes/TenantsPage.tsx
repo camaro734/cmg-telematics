@@ -1,13 +1,19 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { TenantOut } from '../../lib/types'
 
 export default function TenantsPage() {
+  const [showInactive, setShowInactive] = useState(false)
+  const qc = useQueryClient()
+  const confirmAsk = useConfirm()
+
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: keys.tenants(),
     queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants'),
@@ -16,8 +22,42 @@ export default function TenantsPage() {
   const { user } = useAuthStore()
   const isClient = user?.tenant_tier === 'client'
   const isAdmin = user?.role === 'admin'
+  const isCmgAdmin = isAdmin && user?.tenant_tier === 'cmg'
+
   // CMG ve todos excepto sí mismo; client ve solo sus subclientes (filtra su propio tenant)
-  const clients = tenants.filter(t => t.tier !== 'cmg' && (isClient ? t.tier === 'subclient' : true))
+  const allClients = tenants.filter(t => t.tier !== 'cmg' && (isClient ? t.tier === 'subclient' : true))
+  const visible = showInactive ? allClients : allClients.filter(t => t.active)
+  const hiddenCount = allClients.filter(t => !t.active).length
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/tenants/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tenants() }),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => apiClient.post(`/api/v1/tenants/${id}/reactivate`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tenants() }),
+  })
+
+  async function handleDelete(tenant: TenantOut) {
+    const ok = await confirmAsk({
+      title: '¿Borrar tenant?',
+      message: `"${tenant.name}" quedará inactivo. Sus vehículos y usuarios no se eliminan.`,
+      confirmLabel: 'Borrar',
+      kind: 'danger',
+    })
+    if (ok) deleteMutation.mutate(tenant.id)
+  }
+
+  async function handleReactivate(tenant: TenantOut) {
+    const ok = await confirmAsk({
+      title: '¿Reactivar tenant?',
+      message: `"${tenant.name}" volverá a estar activo.`,
+      confirmLabel: 'Reactivar',
+      kind: 'info',
+    })
+    if (ok) reactivateMutation.mutate(tenant.id)
+  }
 
   return (
     <Shell title="Clientes">
@@ -26,16 +66,34 @@ export default function TenantsPage() {
           <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 20, fontWeight: 600 }}>
             Clientes
           </h2>
-          {isAdmin && <Link
-            to="/clientes/new"
-            style={{
-              background: 'var(--accent-energy)', color: '#fff',
-              borderRadius: 6, padding: '8px 16px', fontSize: 14,
-              fontWeight: 500, textDecoration: 'none',
-            }}
-          >
-            + Nuevo cliente
-          </Link>}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {isCmgAdmin && hiddenCount > 0 && (
+              <button
+                onClick={() => setShowInactive(v => !v)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--bg-border)',
+                  color: showInactive ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderRadius: 6, padding: '7px 14px', fontSize: 13,
+                  cursor: 'pointer', fontWeight: 500,
+                }}
+              >
+                {showInactive ? `Ocultar inactivos (${hiddenCount})` : `Ver inactivos (${hiddenCount})`}
+              </button>
+            )}
+            {isAdmin && (
+              <Link
+                to="/clientes/new"
+                style={{
+                  background: 'var(--accent-energy)', color: '#fff',
+                  borderRadius: 6, padding: '8px 16px', fontSize: 14,
+                  fontWeight: 500, textDecoration: 'none',
+                }}
+              >
+                + Nuevo cliente
+              </Link>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -52,8 +110,8 @@ export default function TenantsPage() {
               </tr>
             </thead>
             <tbody>
-              {clients.map(tenant => (
-                <tr key={tenant.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              {visible.map(tenant => (
+                <tr key={tenant.id} style={{ borderBottom: '1px solid var(--bg-border)', opacity: tenant.active ? 1 : 0.6 }}>
                   <td style={{ padding: '10px 12px', color: 'var(--text-primary)', fontSize: 14 }}>
                     {tenant.name}
                     {' '}
@@ -78,17 +136,45 @@ export default function TenantsPage() {
                       {tenant.active ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <Link to={`/clientes/${tenant.id}`} style={{ color: 'var(--accent-energy)', fontSize: 13, textDecoration: 'none' }}>
                       Ver detalle →
                     </Link>
+                    {isCmgAdmin && tenant.active && (
+                      <button
+                        onClick={() => handleDelete(tenant)}
+                        disabled={deleteMutation.isPending}
+                        style={{
+                          marginLeft: 12, background: 'transparent',
+                          border: '1px solid rgba(239,68,68,0.4)',
+                          color: 'var(--accent-crit)', borderRadius: 4,
+                          padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+                        }}
+                      >
+                        Borrar
+                      </button>
+                    )}
+                    {isCmgAdmin && !tenant.active && (
+                      <button
+                        onClick={() => handleReactivate(tenant)}
+                        disabled={reactivateMutation.isPending}
+                        style={{
+                          marginLeft: 12, background: 'transparent',
+                          border: '1px solid rgba(34,197,94,0.4)',
+                          color: 'var(--accent-ok)', borderRadius: 4,
+                          padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+                        }}
+                      >
+                        Reactivar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
-              {clients.length === 0 && (
+              {visible.length === 0 && (
                 <tr>
                   <td colSpan={4} style={{ padding: '16px 12px', color: 'var(--text-muted)', fontSize: 13 }}>
-                    Sin clientes. Crea el primero con "+ Nuevo cliente".
+                    {showInactive ? 'No hay tenants inactivos.' : 'Sin clientes. Crea el primero con "+ Nuevo cliente".'}
                   </td>
                 </tr>
               )}
