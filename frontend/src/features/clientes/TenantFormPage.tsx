@@ -5,6 +5,7 @@ import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
+import { toast } from '../../shared/ui/Toast'
 import type { TenantOut, TenantCreate, TenantUpdate } from '../../lib/types'
 
 const WIZARD_STEPS = [
@@ -112,11 +113,12 @@ export default function TenantFormPage() {
   const [formModules, setFormModules] = useState<string[]>([])
   const [showWizard, setShowWizard] = useState(false)
   const [tier, setTier] = useState<'client' | 'manufacturer'>('client')
+  const [adminFullName, setAdminFullName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
-  const [createUser, setCreateUser] = useState(true)
   const [businessCif, setBusinessCif] = useState('')
   const [businessAddress, setBusinessAddress] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const { data: tenant } = useQuery({
     queryKey: keys.cliente(id!),
@@ -141,12 +143,29 @@ export default function TenantFormPage() {
         return apiClient.patch<TenantOut>(`/api/v1/tenants/${id}`, payload)
       }
       const newTenant = await apiClient.post<TenantOut>('/api/v1/tenants', payload)
-      if (createUser && adminEmail && adminPassword) {
+      try {
         await apiClient.post(`/api/v1/tenants/${newTenant.id}/users`, {
           email: adminEmail.trim(),
           password: adminPassword,
+          full_name: adminFullName.trim(),
           role: 'admin',
+        })
+      } catch (userErr: unknown) {
+        // Liberar el slug para futuros intentos con el mismo nombre
+        await apiClient.patch(`/api/v1/tenants/${newTenant.id}`, {
+          slug: `__rb__${newTenant.id.slice(0, 8)}`,
         }).catch(() => {})
+        await apiClient.delete(`/api/v1/tenants/${newTenant.id}`).catch(() => {})
+
+        // Extraer mensaje legible del body Pydantic (raw = "422: {\"detail\":[...]}")
+        const raw = userErr instanceof Error ? userErr.message : ''
+        let detail = ''
+        try {
+          const json = JSON.parse(raw.replace(/^\d+:\s*/, ''))
+          if (typeof json.detail === 'string') detail = json.detail
+          else if (Array.isArray(json.detail)) detail = json.detail[0]?.msg ?? ''
+        } catch { /* body no parseable */ }
+        throw new Error(detail || 'No se pudo crear el usuario admin. Revisa el email (dominio válido) y la contraseña (mínimo 8 caracteres).')
       }
       return newTenant
     },
@@ -158,6 +177,7 @@ export default function TenantFormPage() {
       } else if (tier === 'client') {
         setShowWizard(true)
       } else {
+        toast.success(`Fabricante creado. El admin ${adminEmail.trim()} ya puede entrar en la app.`)
         navigate('/clientes')
       }
     },
@@ -165,6 +185,23 @@ export default function TenantFormPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!isEdit) {
+      const errs: Record<string, string> = {}
+      if (!adminFullName.trim() || adminFullName.trim().length < 2) {
+        errs.adminFullName = 'Mínimo 2 caracteres'
+      }
+      if (!adminEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())) {
+        errs.adminEmail = 'Email no válido'
+      }
+      if (!adminPassword || adminPassword.length < 8) {
+        errs.adminPassword = 'Mínimo 8 caracteres'
+      }
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs)
+        return
+      }
+      setFieldErrors({})
+    }
     if (isEdit) {
       mutation.mutate({
         name: name.trim(),
@@ -195,6 +232,9 @@ export default function TenantFormPage() {
     width: '100%', padding: '8px 12px', background: 'var(--bg-elevated)',
     border: '1px solid var(--bg-border)', borderRadius: 6,
     color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box',
+  }
+  const inputErrorStyle: React.CSSProperties = {
+    ...inputStyle, border: '1px solid var(--accent-crit)',
   }
 
   return (
@@ -302,35 +342,66 @@ export default function TenantFormPage() {
               </div>
             )}
 
-            {/* Usuario admin del cliente (solo en creación) */}
+            {/* Usuario admin — obligatorio en creación */}
             {!isEdit && (
               <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 16, marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Usuario de acceso del cliente
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {tier === 'manufacturer' ? 'Usuario admin del fabricante' : 'Usuario admin del cliente'}
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={createUser} onChange={e => setCreateUser(e.target.checked)} />
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Crear usuario admin para el cliente</span>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  {tier === 'manufacturer'
+                    ? 'Esta persona podrá entrar a la app y gestionar el fabricante.'
+                    : 'Esta persona podrá entrar a la app y gestionar el cliente.'}
+                </p>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nombre completo</span>
+                  <input
+                    type="text"
+                    value={adminFullName}
+                    onChange={e => { setAdminFullName(e.target.value); setFieldErrors(p => ({ ...p, adminFullName: '' })) }}
+                    placeholder="María García"
+                    style={fieldErrors.adminFullName ? inputErrorStyle : inputStyle}
+                  />
+                  {fieldErrors.adminFullName && (
+                    <span style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{fieldErrors.adminFullName}</span>
+                  )}
                 </label>
-                {createUser && (
-                  <>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Email del administrador</span>
-                      <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="admin@empresa.com" style={inputStyle} />
-                    </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Contraseña inicial</span>
-                      <input type="text" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} placeholder="Mínimo 8 caracteres" style={inputStyle} />
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>El cliente deberá cambiarla en el primer acceso.</span>
-                    </label>
-                  </>
-                )}
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Email del administrador</span>
+                  <input
+                    type="email"
+                    value={adminEmail}
+                    onChange={e => { setAdminEmail(e.target.value); setFieldErrors(p => ({ ...p, adminEmail: '' })) }}
+                    placeholder="admin@empresa.com"
+                    style={fieldErrors.adminEmail ? inputErrorStyle : inputStyle}
+                  />
+                  {fieldErrors.adminEmail && (
+                    <span style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{fieldErrors.adminEmail}</span>
+                  )}
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Contraseña inicial</span>
+                  <input
+                    type="text"
+                    value={adminPassword}
+                    onChange={e => { setAdminPassword(e.target.value); setFieldErrors(p => ({ ...p, adminPassword: '' })) }}
+                    placeholder="Mínimo 8 caracteres"
+                    style={fieldErrors.adminPassword ? inputErrorStyle : inputStyle}
+                  />
+                  {fieldErrors.adminPassword
+                    ? <span style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{fieldErrors.adminPassword}</span>
+                    : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>El administrador deberá cambiarla en el primer acceso.</span>
+                  }
+                </label>
               </div>
             )}
 
             {mutation.isError && (
               <p style={{ color: 'var(--accent-crit)', fontSize: 13, margin: 0 }}>
-                Error al guardar. Verifica que el slug sea único.
+                {(mutation.error as Error)?.message ?? 'Error al guardar. Verifica que el slug sea único.'}
               </p>
             )}
 
