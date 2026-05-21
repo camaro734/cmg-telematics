@@ -37,6 +37,10 @@ export function PdfDownloadBtn({
   ]
 
   async function download() {
+    if (isCmg && !tenantId) {
+      toast.error('Selecciona un cliente antes de generar el informe.')
+      return
+    }
     setLoading(true)
     try {
       const params = new URLSearchParams({ year: String(year), month: String(month) })

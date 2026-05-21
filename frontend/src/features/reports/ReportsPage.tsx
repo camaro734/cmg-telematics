@@ -1164,7 +1164,7 @@ export default function ReportsPage() {
               vehicleId={vehicleId}
               vehicles={vehicles}
               isCmg={isCmg}
-              tenantId={tenantId}
+              tenantId={tenantId || selectedVehicle?.tenant_id || ''}
             />
           }
         />
