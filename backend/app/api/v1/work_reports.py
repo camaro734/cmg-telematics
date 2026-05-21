@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import uuid
 from pathlib import Path
@@ -472,7 +473,7 @@ async def download_pdf(
         stops=stops,
     )
 
-    pdf_bytes = HTML(string=html_str).write_pdf()
+    pdf_bytes = await asyncio.to_thread(HTML(string=html_str).write_pdf)
     fname = order.doc_number or f"informe_{order.title[:40].replace(' ', '_')}"
     return Response(
         content=pdf_bytes,

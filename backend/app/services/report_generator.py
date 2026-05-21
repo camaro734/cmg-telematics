@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import calendar
 import uuid
@@ -288,5 +289,7 @@ async def generate_monthly_pdf(
     )
 
     # 10. PDF
-    pdf_bytes = weasyprint.HTML(string=html, base_url=str(_TEMPLATES_DIR)).write_pdf()
+    pdf_bytes = await asyncio.to_thread(
+        lambda: weasyprint.HTML(string=html, base_url=str(_TEMPLATES_DIR)).write_pdf()
+    )
     return pdf_bytes
