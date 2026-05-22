@@ -16,6 +16,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import AsyncSessionLocal
 from app.models.access_audit_log import AccessAuditLog
 from app.models.driver import Driver, VehicleDriverAssignment
 from app.models.tenant import Tenant
@@ -53,9 +54,9 @@ async def _log_access(
         justification=justification,
     )
     try:
-        async with db.begin_nested():
-            db.add(entry)
-            await db.flush([entry])
+        async with AsyncSessionLocal() as audit_session:
+            async with audit_session.begin():
+                audit_session.add(entry)
     except Exception as exc:
         logger.warning(
             "access_audit_log_failed: %s | user=%s vehicle=%s",
