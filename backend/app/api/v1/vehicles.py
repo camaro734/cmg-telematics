@@ -22,7 +22,9 @@ from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.maintenance import MaintenancePlan
 from app.models.device import Device
+from app.models.driver import Driver, VehicleDriverAssignment
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
+from app.api.v1.access_v2 import assert_can_access_vehicle
 
 from pydantic import BaseModel, Field
 
@@ -339,10 +341,24 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Vehicle).where(Vehicle.active == True)
-    if user.tenant_tier != "cmg":
+    if user.tenant_tier == "cmg":
+        if tenant_id is not None:
+            query = query.where(Vehicle.tenant_id == tenant_id)
+    elif user.tenant_tier == "manufacturer":
+        query = query.where(Vehicle.manufacturer_tenant_id == user.tenant_id)
+    elif user.role == "driver":
+        query = query.where(
+            Vehicle.id.in_(
+                select(VehicleDriverAssignment.vehicle_id)
+                .join(Driver, Driver.id == VehicleDriverAssignment.driver_id)
+                .where(
+                    Driver.user_id == user.user_id,
+                    VehicleDriverAssignment.ended_at.is_(None),
+                )
+            )
+        )
+    else:
         query = query.where(Vehicle.tenant_id == user.tenant_id)
-    elif tenant_id is not None:
-        query = query.where(Vehicle.tenant_id == tenant_id)
     from sqlalchemy.orm import joinedload
     result = await db.execute(query.options(joinedload(Vehicle.vehicle_type)).order_by(Vehicle.name))
     vehicles = result.unique().scalars().all()
@@ -652,10 +668,9 @@ async def get_vehicle(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
     return vehicle
 
 
