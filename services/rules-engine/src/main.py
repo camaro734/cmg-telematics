@@ -59,6 +59,38 @@ async def _publish_alert(redis: Redis, alert_id: str, match: RuleMatch) -> None:
     )
 
 
+async def _process_one(db_pool: asyncpg.Pool, redis: Redis, msg_id: str, fields: dict) -> None:
+    raw = fields.get("payload") or fields.get(b"payload", "{}")
+    payload = json.loads(raw)
+    can = payload.get("can_data") or {}
+    if isinstance(can, str):
+        can = json.loads(can)
+    msg = TelemetryMsg(
+        time=datetime.fromisoformat(payload["time"]),
+        device_id=payload["device_id"],
+        vehicle_id=payload["vehicle_id"],
+        tenant_id=payload["tenant_id"],
+        lat=payload.get("lat"),
+        lon=payload.get("lon"),
+        speed_kmh=payload.get("speed_kmh"),
+        ignition=bool(payload.get("ignition")),
+        pto_active=bool(payload.get("pto_active")),
+        can_data=can,
+    )
+    matches = await process_message(_rules, msg, redis, vehicle_type_map=_vehicle_type_map)
+    if matches:
+        async with db_pool.acquire() as conn:
+            for match in matches:
+                alert_id = await _write_alert(conn, match)
+                await _publish_alert(redis, alert_id, match)
+    await handle_field_operations(
+        db_pool, redis,
+        msg.vehicle_id, msg.pto_active,
+        msg.lat, msg.lon,
+    )
+    await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+
+
 async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
     while True:
         try:
@@ -74,35 +106,7 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
             for _stream, messages in entries:
                 for msg_id, fields in messages:
                     try:
-                        raw = fields.get("payload") or fields.get(b"payload", "{}")
-                        payload = json.loads(raw)
-                        can = payload.get("can_data") or {}
-                        if isinstance(can, str):
-                            can = json.loads(can)
-                        msg = TelemetryMsg(
-                            time=datetime.fromisoformat(payload["time"]),
-                            device_id=payload["device_id"],
-                            vehicle_id=payload["vehicle_id"],
-                            tenant_id=payload["tenant_id"],
-                            lat=payload.get("lat"),
-                            lon=payload.get("lon"),
-                            speed_kmh=payload.get("speed_kmh"),
-                            ignition=bool(payload.get("ignition")),
-                            pto_active=bool(payload.get("pto_active")),
-                            can_data=can,
-                        )
-                        matches = await process_message(_rules, msg, redis, vehicle_type_map=_vehicle_type_map)
-                        if matches:
-                            async with db_pool.acquire() as conn:
-                                for match in matches:
-                                    alert_id = await _write_alert(conn, match)
-                                    await _publish_alert(redis, alert_id, match)
-                        await handle_field_operations(
-                            db_pool, redis,
-                            msg.vehicle_id, msg.pto_active,
-                            msg.lat, msg.lon,
-                        )
-                        await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                        await _process_one(db_pool, redis, msg_id, fields)
                     except Exception as exc:
                         logger.error("Error processing %s: %s", msg_id, exc, exc_info=True)
                         await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
