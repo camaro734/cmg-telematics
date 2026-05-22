@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import socket
 import uuid as _uuid
 from datetime import datetime
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 STREAM_KEY = "telemetry.raw"
 ALERTS_KEY = "alerts.fire"
 CONSUMER_GROUP = "rules-workers"
-CONSUMER_NAME = f"worker-{_uuid.uuid4().hex[:8]}"
+CONSUMER_NAME = socket.gethostname()
 ALERTS_MAX_LEN = 10_000
 
 _rules: list[Rule] = []
@@ -91,7 +92,43 @@ async def _process_one(db_pool: asyncpg.Pool, redis: Redis, msg_id: str, fields:
     await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
 
 
+async def _drain_pending(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    """Re-process this consumer's pending messages from before a crash.
+
+    Uses a seen-set to avoid infinite loops: failed messages (no XACK)
+    stay in the PEL for retry on the next restart.
+    """
+    seen: set[str] = set()
+    while True:
+        entries = await redis.xreadgroup(
+            CONSUMER_GROUP, CONSUMER_NAME, {STREAM_KEY: "0"}, count=50
+        )
+        if not entries:
+            break
+        new_work = False
+        for _stream, messages in entries:
+            for msg_id, fields in messages:
+                if msg_id in seen:
+                    continue
+                seen.add(msg_id)
+                new_work = True
+                if not fields:
+                    # Ghost entry: deleted from stream but still in PEL
+                    await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                    continue
+                try:
+                    await _process_one(db_pool, redis, msg_id, fields)
+                except Exception as exc:
+                    logger.error("PEL drain failed %s: %s", msg_id, exc, exc_info=True)
+                    # No XACK — stays in PEL for retry on next restart
+        if not new_work:
+            break
+    if seen:
+        logger.info("PEL drain complete: %d messages attempted", len(seen))
+
+
 async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    await _drain_pending(db_pool, redis)
     while True:
         try:
             entries = await redis.xreadgroup(
@@ -109,7 +146,7 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
                         await _process_one(db_pool, redis, msg_id, fields)
                     except Exception as exc:
                         logger.error("Error processing %s: %s", msg_id, exc, exc_info=True)
-                        await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                        # No XACK — message stays in PEL, recovered on next restart
         except asyncio.CancelledError:
             break
         except Exception as exc:
