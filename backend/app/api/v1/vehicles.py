@@ -892,10 +892,9 @@ async def get_vehicle_track_today(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
 
     rows = (
         await db.execute(
@@ -921,10 +920,9 @@ async def get_vehicle_track(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
     if from_ > to:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from debe ser anterior a to")
 
