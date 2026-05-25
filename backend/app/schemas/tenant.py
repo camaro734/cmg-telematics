@@ -10,6 +10,7 @@ class TenantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     parent_id: uuid.UUID | None = None
+    parent_manufacturer_id: uuid.UUID | None = None
     tier: str
     name: str
     slug: str
@@ -27,6 +28,7 @@ class TenantOut(BaseModel):
 
 class TenantCreate(BaseModel):
     parent_id: uuid.UUID | None = None
+    parent_manufacturer_id: uuid.UUID | None = None
     tier: Literal["client", "manufacturer"] = "client"
     name: str
     slug: str

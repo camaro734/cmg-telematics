@@ -34,6 +34,14 @@ async def list_tenants(
                 (Tenant.parent_id == user.tenant_id)
             ).order_by(Tenant.name)
         )
+    elif user.tenant_tier == "manufacturer":
+        # manufacturer ve su propio tenant + los clientes que ha creado
+        result = await db.execute(
+            select(Tenant).where(
+                (Tenant.id == user.tenant_id) |
+                (Tenant.parent_manufacturer_id == user.tenant_id)
+            ).order_by(Tenant.name)
+        )
     else:
         result = await db.execute(
             select(Tenant).where(Tenant.id == user.tenant_id)
@@ -54,6 +62,16 @@ async def create_tenant(
     # Los clientes solo pueden crear subclientes bajo ellos mismos
     if user.tenant_tier == "client":
         body = body.model_copy(update={"tier": "subclient", "parent_id": user.tenant_id})
+    elif user.tenant_tier == "manufacturer":
+        if user.role != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin para crear clientes")
+        if body.tier != "client":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Un fabricante solo puede crear tenants tier=client")
+        body = body.model_copy(update={
+            "tier": "client",
+            "parent_id": user.tenant_id,
+            "parent_manufacturer_id": user.tenant_id,
+        })
     elif user.tenant_tier not in ("cmg",):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos para crear tenants")
     existing = await db.execute(select(Tenant).where(Tenant.slug == body.slug))
@@ -70,12 +88,13 @@ async def create_tenant(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Tenant padre no encontrado o inactivo",
             )
-        # client must have cmg parent, subclient must have client parent
-        valid_parent_tiers = {"client": "cmg", "subclient": "client"}
-        if body.tier in valid_parent_tiers and parent.tier != valid_parent_tiers[body.tier]:
+        # client must have cmg or manufacturer parent, subclient must have client parent
+        valid_parent_tiers: dict[str, set[str]] = {"client": {"cmg", "manufacturer"}, "subclient": {"client"}}
+        if body.tier in valid_parent_tiers and parent.tier not in valid_parent_tiers[body.tier]:
+            allowed = valid_parent_tiers[body.tier]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Un tenant tier='{body.tier}' debe tener un padre tier='{valid_parent_tiers[body.tier]}'",
+                detail=f"Un tenant tier='{body.tier}' debe tener un padre tier en {{{', '.join(sorted(allowed))}}}",
             )
     elif body.tier in ("client", "subclient"):
         raise HTTPException(
