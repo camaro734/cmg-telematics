@@ -3,7 +3,7 @@
 export interface CurrentUser {
   user_id: string
   tenant_id: string
-  tenant_tier: 'cmg' | 'client' | 'subclient'
+  tenant_tier: 'cmg' | 'client' | 'subclient' | 'manufacturer'
   role: 'admin' | 'operator' | 'viewer' | 'driver'
   email: string
 }
