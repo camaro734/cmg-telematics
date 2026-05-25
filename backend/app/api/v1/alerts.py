@@ -14,6 +14,7 @@ from app.schemas.alert import AlertInstanceOut, AlertInstanceEnrichedOut, AckReq
 from app.models.alert_instance import AlertInstance
 from app.models.alert_rule import AlertRule
 from app.models.vehicle import Vehicle
+from app.api.v1.access_v2 import list_accessible_vehicle_ids
 
 router = APIRouter(tags=["alerts"])
 
@@ -41,10 +42,12 @@ async def list_alerts(
         .join(AlertRule, AlertRule.id == AlertInstance.rule_id)
         .join(Vehicle, Vehicle.id == AlertInstance.vehicle_id)
     )
-    if user.tenant_tier != "cmg":
-        query = query.where(AlertInstance.tenant_id == user.tenant_id)
-    elif tenant_id is not None:
-        query = query.where(AlertInstance.tenant_id == tenant_id)
+    accessible = await list_accessible_vehicle_ids(user, db)
+    if accessible == "ALL":
+        if tenant_id is not None:
+            query = query.where(AlertInstance.tenant_id == tenant_id)
+    else:
+        query = query.where(AlertInstance.vehicle_id.in_(accessible))
     if alert_status:
         query = query.where(AlertInstance.status == alert_status)
     if vehicle_id:
@@ -108,10 +111,12 @@ async def export_alerts_csv(
         select(AlertInstance, AlertRule.name.label("rule_name"), AlertRule.severity)
         .join(AlertRule, AlertRule.id == AlertInstance.rule_id)
     )
-    if user.tenant_tier != "cmg":
-        query = query.where(AlertInstance.tenant_id == user.tenant_id)
-    elif tenant_id is not None:
-        query = query.where(AlertInstance.tenant_id == tenant_id)
+    accessible = await list_accessible_vehicle_ids(user, db)
+    if accessible == "ALL":
+        if tenant_id is not None:
+            query = query.where(AlertInstance.tenant_id == tenant_id)
+    else:
+        query = query.where(AlertInstance.vehicle_id.in_(accessible))
     if alert_status:
         query = query.where(AlertInstance.status == alert_status)
     if vehicle_id:
