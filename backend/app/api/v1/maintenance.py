@@ -21,6 +21,7 @@ from app.models.maintenance import MaintenancePlan, MaintenanceLog
 from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.models.permission_grant import PermissionGrant
+from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
 router = APIRouter(tags=["maintenance"])
 
@@ -189,10 +190,12 @@ async def list_plans(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(MaintenancePlan)
-    if user.tenant_tier != "cmg":
-        query = query.where(MaintenancePlan.tenant_id == user.tenant_id)
-    elif tenant_id is not None:
-        query = query.where(MaintenancePlan.tenant_id == tenant_id)
+    accessible = await list_accessible_vehicle_ids(user, db)
+    if accessible == "ALL":
+        if tenant_id is not None:
+            query = query.where(MaintenancePlan.tenant_id == tenant_id)
+    else:
+        query = query.where(MaintenancePlan.vehicle_id.in_(accessible))
     if vehicle_id:
         query = query.where(MaintenancePlan.vehicle_id == vehicle_id)
     if active is not None:
@@ -248,10 +251,10 @@ async def get_plan(
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
-    if not plan or (user.tenant_tier != "cmg" and str(plan.tenant_id) != str(user.tenant_id)):
+    if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
-    vehicle = await db.get(Vehicle, plan.vehicle_id)
-    return await _to_out(plan, vehicle.name if vehicle else "—", db)
+    vehicle = await assert_can_access_vehicle(user, plan.vehicle_id, db, operation="read")
+    return await _to_out(plan, vehicle.name, db)
 
 
 @router.put("/maintenance/plans/{plan_id}", response_model=MaintenancePlanOut)
@@ -338,8 +341,9 @@ async def list_logs(
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
-    if not plan or (user.tenant_tier != "cmg" and str(plan.tenant_id) != str(user.tenant_id)):
+    if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
+    await assert_can_access_vehicle(user, plan.vehicle_id, db, operation="read")
     result = await db.execute(
         select(MaintenanceLog)
         .where(MaintenanceLog.plan_id == plan_id)
@@ -459,8 +463,9 @@ async def export_maintenance_logs_csv(
         .join(MaintenancePlan, MaintenancePlan.id == MaintenanceLog.plan_id)
         .join(Vehicle, Vehicle.id == MaintenanceLog.vehicle_id)
     )
-    if user.tenant_tier != "cmg":
-        query = query.where(MaintenancePlan.tenant_id == user.tenant_id)
+    accessible = await list_accessible_vehicle_ids(user, db)
+    if accessible != "ALL":
+        query = query.where(MaintenanceLog.vehicle_id.in_(accessible))
     query = query.order_by(MaintenanceLog.performed_at.desc())
     result = await db.execute(query)
     rows = result.all()
