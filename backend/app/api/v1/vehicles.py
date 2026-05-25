@@ -70,7 +70,7 @@ def _ignition_from_can(can_data: dict) -> bool:
                 return True
     if has_rpm_data:
         return False
-    return can_data.get("avl_2") == 1 or can_data.get("avl_239") == 1
+    return can_data.get("avl_1") == 1 or can_data.get("avl_239") == 1
 
 
 class MaintenanceTemplatesUpdate(BaseModel):
@@ -634,7 +634,7 @@ async def get_vehicles_statuses_bulk(
             if _ignition_from_can(can_data):
                 ignition_val = True
         if not pto_active and can_data:
-            if can_data.get("avl_1") == 1 or can_data.get("avl_179") == 1:
+            if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
                 pto_active = True
 
         last_seen_str = _get(hash_data, "last_seen")

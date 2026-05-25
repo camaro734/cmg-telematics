@@ -17,8 +17,8 @@ STATUS_TTL = 7 * 24 * 3600  # 7 días — se actualiza en cada paquete
 # trae ninguno, caemos a DIN2 (avl_2) o CAN ignition (avl_239) como fallback.
 _RPM_AVL_IDS = (30, 36, 85, 269, 10309)
 _RPM_IGNITION_THRESHOLD = 200
-_AVL_DIN1 = 1     # PTO via entrada digital
-_AVL_DIN2 = 2     # Ignición via entrada digital
+_AVL_DIN1 = 1     # Ignición via entrada digital
+_AVL_DIN2 = 2     # PTO via entrada digital
 _AVL_IGNITION = 239
 _AVL_PTO = 179
 
@@ -34,11 +34,11 @@ def _compute_ignition(io: dict) -> bool:
                 return True
     if has_rpm_data:
         return False
-    return io.get(_AVL_DIN2, 0) == 1 or io.get(_AVL_IGNITION, 0) == 1
+    return io.get(_AVL_DIN1, 0) == 1 or io.get(_AVL_IGNITION, 0) == 1
 
 
 def _compute_pto(io: dict) -> bool:
-    return io.get(_AVL_PTO, 0) == 1 or io.get(_AVL_DIN1, 0) == 1
+    return io.get(_AVL_PTO, 0) == 1 or io.get(_AVL_DIN2, 0) == 1
 
 
 async def publish_record(
