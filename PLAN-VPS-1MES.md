@@ -166,3 +166,45 @@ El fix de rules-engine (mismo bug) está en commits 130004d + 1ff93de.
 ---
 
 **Última actualización:** 2026-05-22 (sesión)
+
+---
+
+## PENDIENTE — Bugs descubiertos durante E2E manufacturer creando cliente
+
+Detectados durante prueba E2E con VPS creando "AGUAS DE VALENCIA" el 2026-05-25.
+Backend de creación funciona correctamente. Datos en BD coherentes.
+
+Bugs visuales/de filtrado pendientes de arreglar:
+
+1. **GET /vehicles ignora ?tenant_id para manufacturer**
+   - Síntoma: VPS abre detalle de AGUAS, ve FUSO 3.5 (que es de VPS, no de AGUAS)
+   - Causa: la rama manufacturer en GET /vehicles filtra siempre por
+     manufacturer_tenant_id, ignora el query param tenant_id
+   - Fix: añadir verificación de ownership cuando tenant_id está presente
+   - Archivos: backend/app/api/v1/vehicles.py
+   - Estimado: 15 min + rebuild
+
+2. **GET /alerts probablemente tiene el mismo patrón** (sin verificar)
+   - Auditar: backend/app/api/v1/alerts.py
+   - Si tiene el bug, aplicar mismo fix
+   - Estimado: 15 min + rebuild
+
+3. **GET /maintenance probablemente tiene el mismo patrón** (sin verificar)
+   - Auditar: backend/app/api/v1/maintenance.py
+   - Si tiene el bug, aplicar mismo fix
+   - Estimado: 15 min + rebuild
+
+4. **Frontend muestra "Sin permiso sobre este cliente" en form de creación**
+   - Cosmético, no impide creación
+   - Causa probable: comprobación de permisos sobre tenant inexistente (creación nueva)
+   - Fix: añadir guard "solo mostrar mensaje si tenant existe"
+   - Archivos: frontend/src/features/clientes/TenantFormPage.tsx
+   - Estimado: 10 min + rebuild
+
+Total estimado para terminar Día 4 Semana 1: 1-1.5h en sesión fresca.
+
+Después de esos fixes, falta:
+- Test visual completo del flujo manufacturer (creando + viendo + editando + desactivando)
+- Limpieza decisión sobre AGUAS DE VALENCIA (mantener como prueba real)
+
+**Última actualización:** 2026-05-25 (sesión)
