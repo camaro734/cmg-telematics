@@ -35,11 +35,10 @@ async def list_tenants(
             ).order_by(Tenant.name)
         )
     elif user.tenant_tier == "manufacturer":
-        # manufacturer ve su propio tenant + los clientes que ha creado
+        # manufacturer ve solo los clientes que ha creado (no a sí mismo)
         result = await db.execute(
             select(Tenant).where(
-                (Tenant.id == user.tenant_id) |
-                (Tenant.parent_manufacturer_id == user.tenant_id)
+                Tenant.parent_manufacturer_id == user.tenant_id
             ).order_by(Tenant.name)
         )
     else:
@@ -125,7 +124,13 @@ async def get_tenant(
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    if user.tenant_tier != "cmg" and str(tenant.id) != str(user.tenant_id):
+    if user.tenant_tier == "cmg":
+        pass
+    elif str(tenant.id) == str(user.tenant_id):
+        pass
+    elif user.tenant_tier == "manufacturer" and str(tenant.parent_manufacturer_id) == str(user.tenant_id):
+        pass
+    else:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return tenant
 
@@ -173,10 +178,12 @@ async def patch_tenant(
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    # client solo puede editar sus propios subclientes
+    # verificar ownership según tier del caller
     if user.tenant_tier == "client" and str(tenant.parent_id) != str(user.tenant_id):
         raise HTTPException(status_code=403, detail="Solo puedes editar tus propios subclientes")
-    elif user.tenant_tier not in ("cmg", "client"):
+    elif user.tenant_tier == "manufacturer" and str(tenant.parent_manufacturer_id) != str(user.tenant_id):
+        raise HTTPException(status_code=403, detail="Solo puedes editar tus propios clientes")
+    elif user.tenant_tier not in ("cmg", "client", "manufacturer"):
         raise HTTPException(status_code=403, detail="Sin permisos")
 
     if body.enabled_modules is not None:
@@ -218,11 +225,15 @@ async def delete_tenant(
 ):
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
-    if user.tenant_tier != "cmg":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG puede borrar tenants")
     tenant = await db.get(Tenant, tenant_id)
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    if user.tenant_tier == "cmg":
+        pass
+    elif user.tenant_tier == "manufacturer" and str(tenant.parent_manufacturer_id) == str(user.tenant_id):
+        pass
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG puede borrar tenants")
     if tenant.tier == "cmg":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se puede borrar un tenant CMG")
     if not tenant.active:
