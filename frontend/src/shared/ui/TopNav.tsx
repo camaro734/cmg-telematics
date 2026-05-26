@@ -441,10 +441,9 @@ export default function TopNav() {
   const isMobile = useIsMobile()
 
   const isCmg          = user?.tenant_tier === 'cmg'
-  const isClient       = user?.tenant_tier === 'client'
   const isManufacturer = user?.tenant_tier === 'manufacturer'
   const isAdmin        = user?.role === 'admin'
-  const canManageClients = (isCmg || isClient) && isAdmin
+  const canManageClients = isCmg && isAdmin
   const onReports = location.pathname === '/reports'
 
   const [adminOpen,    setAdminOpen]    = useState(false)
@@ -557,7 +556,7 @@ export default function TopNav() {
               adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
               adminLabel={isCmg ? 'Administración' : 'Cuenta'}
               operatorItems={
-                ((isClient || isManufacturer) && isAdmin
+                (isManufacturer && isAdmin
                   ? [...OPERATOR_ITEMS_BASE, MIS_CLIENTES_ITEM]
                   : OPERATOR_ITEMS_BASE
                 ) as unknown as typeof OPERATOR_ITEMS
@@ -683,7 +682,7 @@ export default function TopNav() {
                 {operatorOpen && (
                   <DropdownMenu
                     items={
-                      ((isClient || isManufacturer) && isAdmin
+                      (isManufacturer && isAdmin
                         ? [...OPERATOR_ITEMS_BASE, MIS_CLIENTES_ITEM]
                         : OPERATOR_ITEMS_BASE
                       ) as unknown as typeof CMG_ADMIN_ITEMS
