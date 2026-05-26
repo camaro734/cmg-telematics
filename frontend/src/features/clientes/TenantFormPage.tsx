@@ -237,6 +237,16 @@ export default function TenantFormPage() {
     ...inputStyle, border: '1px solid var(--accent-crit)',
   }
 
+  const mutationErrorMsg = (() => {
+    if (!mutation.isError) return null
+    const raw = (mutation.error as Error)?.message ?? ''
+    try {
+      const json = JSON.parse(raw.replace(/^\d+:\s*/, ''))
+      if (typeof json.detail === 'string') return json.detail
+    } catch { /* body no parseable */ }
+    return raw || 'Error al guardar. Verifica que el slug sea único.'
+  })()
+
   return (
     <Shell title={isEdit ? 'Editar cliente' : 'Nuevo cliente'}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px 16px', minHeight: '100%', overflowY: 'auto' }}>
@@ -399,9 +409,9 @@ export default function TenantFormPage() {
               </div>
             )}
 
-            {mutation.isError && (
+            {mutationErrorMsg && (
               <p style={{ color: 'var(--accent-crit)', fontSize: 13, margin: 0 }}>
-                {(mutation.error as Error)?.message ?? 'Error al guardar. Verifica que el slug sea único.'}
+                {mutationErrorMsg}
               </p>
             )}
 
