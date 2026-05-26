@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-import uuid
+import socket
 
 import asyncpg
 from redis.asyncio import Redis
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 STREAM_KEY = "alerts.fire"
 CONSUMER_GROUP = "notify-workers"
-CONSUMER_NAME = "notifier-%s" % uuid.uuid4().hex[:8]
+CONSUMER_NAME = "notifier-%s" % socket.gethostname()
 
 
 async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> None:
@@ -81,7 +81,41 @@ async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> N
         )
 
 
+async def _drain_pending(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    """Re-procesa mensajes pendientes de este consumer tras un crash.
+
+    Usa seen-set anti-loop: mensajes que fallan (sin XACK) quedan en
+    el PEL para reintento en el próximo arranque.
+    """
+    seen: set[str] = set()
+    while True:
+        entries = await redis.xreadgroup(
+            CONSUMER_GROUP, CONSUMER_NAME, {STREAM_KEY: "0"}, count=50
+        )
+        if not entries:
+            break
+        new_work = False
+        for _stream, messages in entries:
+            for msg_id, fields in messages:
+                if msg_id in seen:
+                    continue
+                seen.add(msg_id)
+                new_work = True
+                if not fields:
+                    await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                    continue
+                try:
+                    await _process_alert(db_pool, redis, fields)
+                    await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                except Exception as exc:
+                    logger.error("PEL drain failed %s: %s", msg_id, exc, exc_info=True)
+                    # Sin XACK — queda en PEL para reintento en el próximo arranque
+        if not new_work:
+            break
+
+
 async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    await _drain_pending(db_pool, redis)
     while True:
         try:
             entries = await redis.xreadgroup(
@@ -96,7 +130,7 @@ async def _process_stream(db_pool: asyncpg.Pool, redis: Redis) -> None:
                         await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
                     except Exception as exc:
                         logger.error("Error on alert %s: %s", msg_id, exc, exc_info=True)
-                        await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+                        # Sin XACK — queda en PEL, recuperado por _drain_pending al reiniciar
         except asyncio.CancelledError:
             break
         except Exception as exc:
