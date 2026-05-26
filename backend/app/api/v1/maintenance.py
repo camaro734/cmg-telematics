@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func, cast, or_
 from sqlalchemy.dialects.postgresql import array
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_module
 from app.schemas.auth import CurrentUser
 from app.schemas.maintenance import (
     MaintenancePlanCreate, MaintenancePlanUpdate, MaintenancePlanOut,
@@ -187,6 +187,7 @@ async def list_plans(
     active: bool | None = Query(None),
     tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(MaintenancePlan)
@@ -221,6 +222,7 @@ async def list_plans(
 async def create_plan(
     body: MaintenancePlanCreate,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     await _require_admin(user)
@@ -248,6 +250,7 @@ async def create_plan(
 async def get_plan(
     plan_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
@@ -262,6 +265,7 @@ async def update_plan(
     plan_id: uuid.UUID,
     body: MaintenancePlanUpdate,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     await _require_admin(user)
@@ -288,6 +292,7 @@ async def update_plan(
 async def delete_plan(
     plan_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     await _require_admin(user)
@@ -303,6 +308,7 @@ async def create_log(
     plan_id: uuid.UUID,
     body: MaintenanceLogCreate,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
@@ -338,6 +344,7 @@ async def create_log(
 async def list_logs(
     plan_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
@@ -377,6 +384,7 @@ async def complete_plan(
     file: UploadFile | None = File(None),
     description: str | None = Form(None),
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
@@ -452,6 +460,7 @@ async def complete_plan(
 @router.get("/logs/export.csv")
 async def export_maintenance_logs_csv(
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     query = (

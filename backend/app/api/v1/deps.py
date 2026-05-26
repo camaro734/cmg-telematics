@@ -2,7 +2,10 @@
 import uuid
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
 from app.core.security import decode_token
+from app.models.tenant import Tenant
 from app.schemas.auth import CurrentUser
 
 _bearer = HTTPBearer(auto_error=False)
@@ -74,3 +77,23 @@ async def assert_can_manage_tenant(user: CurrentUser, target_tenant_id: uuid.UUI
         if target and str(target.parent_manufacturer_id) == str(user.tenant_id):
             return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permiso sobre este cliente")
+
+
+def require_module(*modules: str):
+    """Dependency factory: verifica que el tenant tenga activo al menos uno de los módulos.
+    Bypass automático para tier=cmg y tier=manufacturer.
+    """
+    async def checker(
+        user: CurrentUser = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> None:
+        if user.tenant_tier in ("cmg", "manufacturer"):
+            return
+        tenant = await db.get(Tenant, user.tenant_id)
+        tenant_modules: list[str] = tenant.enabled_modules if tenant else []
+        if not any(m in tenant_modules for m in modules):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Módulo no habilitado para este tenant",
+            )
+    return checker

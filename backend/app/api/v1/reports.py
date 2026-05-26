@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_module
 from app.core.database import get_db
 from app.models.permission_grant import PermissionGrant
 from app.models.tenant import Tenant
@@ -24,6 +24,7 @@ async def get_monthly_report(
     vehicle_ids: list[uuid.UUID] = Query(default=[]),
     tenant_id: uuid.UUID | None = Query(default=None),
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("reports")),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     # Validar rango de año y mes

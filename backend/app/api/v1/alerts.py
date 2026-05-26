@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_module
 from app.schemas.auth import CurrentUser
 from app.schemas.alert import AlertInstanceOut, AlertInstanceEnrichedOut, AckRequest
 from app.models.alert_instance import AlertInstance
@@ -28,6 +28,7 @@ async def list_alerts(
     tenant_id: uuid.UUID | None = Query(None),
     limit: int = 50,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("alerts")),
     db: AsyncSession = Depends(get_db),
 ):
     if limit > 200:
@@ -75,6 +76,7 @@ async def acknowledge_alert(
     alert_id: uuid.UUID,
     body: AckRequest,
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("alerts")),
     db: AsyncSession = Depends(get_db),
 ):
     alert = await db.get(AlertInstance, alert_id)
@@ -105,6 +107,7 @@ async def export_alerts_csv(
     triggered_at_to: datetime | None = Query(None),
     tenant_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("alerts")),
     db: AsyncSession = Depends(get_db),
 ):
     query = (
