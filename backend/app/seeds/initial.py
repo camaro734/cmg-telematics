@@ -124,13 +124,18 @@ async def run():
             # Usuario superadmin
             result = await db.execute(select(User).where(User.email == "admin@cmg.es"))
             if not result.scalar_one_or_none():
+                if not settings.seed_admin_password:
+                    raise RuntimeError(
+                        "SEED_ADMIN_PASSWORD no está configurada. "
+                        "Añádela al .env antes de ejecutar el seed."
+                    )
                 admin = User(
                     tenant_id=cmg.id, email="admin@cmg.es",
-                    hashed_password=hash_password("Admin2026!"),
+                    hashed_password=hash_password(settings.seed_admin_password),
                     full_name="Administrador CMG", role="admin",
                 )
                 db.add(admin)
-                logger.info("Creado usuario admin@cmg.es / Admin2026!")
+                logger.info("Creado usuario admin@cmg.es")
 
             # Vehicle types
             for slug, name, sensors in [

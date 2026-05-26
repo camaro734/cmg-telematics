@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     sentry_dsn: str | None = None
+    seed_admin_password: str | None = None
 
     @field_validator("secret_key")
     @classmethod
