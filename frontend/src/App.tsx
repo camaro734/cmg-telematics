@@ -2,6 +2,7 @@ import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
 import RequireAuth from './features/auth/RequireAuth'
+import RequireModule from './features/auth/RequireModule'
 import { SectionErrorBoundary } from './shared/ui/SectionErrorBoundary'
 import { ToastContainer } from './shared/ui/Toast'
 import { ConfirmDialogHost } from './shared/ui/ConfirmDialog'
@@ -104,20 +105,20 @@ export default function App() {
               <Routes>
                 <Route path="fleet"        element={<SectionErrorBoundary label="Fleet"><FleetPage /></SectionErrorBoundary>} />
                 <Route path="vehicles/:id" element={<SectionErrorBoundary label="VehicleDetail"><VehicleDetailPage /></SectionErrorBoundary>} />
-                <Route path="alerts"       element={<SectionErrorBoundary label="Alerts"><AlertsPage /></SectionErrorBoundary>} />
+                <Route path="alerts"       element={<RequireModule module="alerts"><SectionErrorBoundary label="Alerts"><AlertsPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="settings"     element={<SectionErrorBoundary label="Settings"><SettingsPage /></SectionErrorBoundary>} />
                 <Route path="rules"              element={<SectionErrorBoundary label="Rules"><RulesPage /></SectionErrorBoundary>} />
                 <Route path="rules/new"          element={<SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary>} />
                 <Route path="rules/:id"          element={<SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary>} />
-                <Route path="maintenance"          element={<SectionErrorBoundary label="Maintenance"><MaintenancePage /></SectionErrorBoundary>} />
-                <Route path="maintenance/new"      element={<SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary>} />
-                <Route path="maintenance/:id"      element={<SectionErrorBoundary label="MaintenanceDetail"><MaintenancePlanDetailPage /></SectionErrorBoundary>} />
-                <Route path="maintenance/:id/edit" element={<SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary>} />
+                <Route path="maintenance"          element={<RequireModule module="maintenance"><SectionErrorBoundary label="Maintenance"><MaintenancePage /></SectionErrorBoundary></RequireModule>} />
+                <Route path="maintenance/new"      element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary></RequireModule>} />
+                <Route path="maintenance/:id"      element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceDetail"><MaintenancePlanDetailPage /></SectionErrorBoundary></RequireModule>} />
+                <Route path="maintenance/:id/edit" element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="clientes"          element={<SectionErrorBoundary label="Clientes"><TenantsPage /></SectionErrorBoundary>} />
                 <Route path="clientes/new"      element={<SectionErrorBoundary label="ClienteForm"><TenantFormPage /></SectionErrorBoundary>} />
                 <Route path="clientes/:id"      element={<SectionErrorBoundary label="ClienteDetail"><TenantDetailPage /></SectionErrorBoundary>} />
                 <Route path="clientes/:id/edit" element={<SectionErrorBoundary label="ClienteForm"><TenantFormPage /></SectionErrorBoundary>} />
-                <Route path="reports"           element={<SectionErrorBoundary label="Reports"><ReportsPage /></SectionErrorBoundary>} />
+                <Route path="reports"           element={<RequireModule module="reports"><SectionErrorBoundary label="Reports"><ReportsPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="vehiculos"         element={<SectionErrorBoundary label="Vehiculos"><VehiclesPage /></SectionErrorBoundary>} />
                 <Route path="tipos-vehiculo"   element={<SectionErrorBoundary label="TiposVehiculo"><VehicleTypesPage /></SectionErrorBoundary>} />
                 <Route path="devices"          element={<SectionErrorBoundary label="Devices"><DevicesPage /></SectionErrorBoundary>} />
