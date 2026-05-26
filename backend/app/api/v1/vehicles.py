@@ -23,6 +23,7 @@ from app.models.vehicle_type import VehicleType
 from app.models.maintenance import MaintenancePlan
 from app.models.device import Device
 from app.models.driver import Driver, VehicleDriverAssignment
+from app.models.tenant import Tenant
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 from app.api.v1.access_v2 import assert_can_access_vehicle
 
@@ -345,7 +346,18 @@ async def list_vehicles(
         if tenant_id is not None:
             query = query.where(Vehicle.tenant_id == tenant_id)
     elif user.tenant_tier == "manufacturer":
-        query = query.where(Vehicle.manufacturer_tenant_id == user.tenant_id)
+        if tenant_id is not None and str(tenant_id) != str(user.tenant_id):
+            # Manufacturer viendo vehículos de un cliente propio
+            target = await db.get(Tenant, tenant_id)
+            if not target or str(target.parent_manufacturer_id) != str(user.tenant_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Sin permiso para ver vehículos de este tenant",
+                )
+            query = query.where(Vehicle.tenant_id == tenant_id)
+        else:
+            # Manufacturer viendo sus propios vehículos
+            query = query.where(Vehicle.manufacturer_tenant_id == user.tenant_id)
     elif user.role == "driver":
         query = query.where(
             Vehicle.id.in_(
