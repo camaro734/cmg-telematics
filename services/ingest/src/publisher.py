@@ -7,10 +7,10 @@ import json
 import logging
 from redis.asyncio import Redis
 from src.codec8 import AVLRecord
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 STREAM_KEY = "telemetry.raw"
-MAX_STREAM_LEN = 100_000
 STATUS_TTL = 7 * 24 * 3600  # 7 días — se actualiza en cada paquete
 
 # AVL IDs reportando RPM. Cualquiera > umbral → motor en marcha. Si la trama no
@@ -71,7 +71,7 @@ async def publish_record(
     await redis.xadd(
         STREAM_KEY,
         {"payload": json.dumps(payload)},
-        maxlen=MAX_STREAM_LEN,
+        maxlen=settings.stream_maxlen,
         approximate=True,
     )
     await _update_status_hash(redis, avl, vehicle_id, can_data)
