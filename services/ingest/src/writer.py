@@ -5,9 +5,13 @@ Más rendimiento que SQLAlchemy para inserciones de alta frecuencia.
 """
 import asyncpg
 import logging
+from datetime import datetime, timezone
 from src.codec8 import AVLRecord
 
 logger = logging.getLogger(__name__)
+
+# Cualquier timestamp anterior a esta fecha indica RTC sin sincronizar (cold boot FMC650).
+_MIN_VALID_TIME = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
 AVL_IGNITION = 239
 AVL_DIN1 = 1   # Ignición via entrada digital (fallback si no llega RPM ni avl_239)
@@ -47,6 +51,12 @@ async def write_record(
 ) -> None:
     """Inserta un AVLRecord en telemetry_record."""
     ts = avl.datetime_utc
+    if ts < _MIN_VALID_TIME:
+        logger.warning(
+            "Timestamp inválido descartado (RTC sin sync): %s — device_id=%s",
+            ts.isoformat(), device_id,
+        )
+        return
 
     ignition = _compute_ignition(avl.io_elements)
     pto_active = bool(avl.io_elements.get(AVL_PTO, 0)) or bool(avl.io_elements.get(AVL_DIN2, 0))
