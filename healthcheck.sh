@@ -1,7 +1,10 @@
 #!/bin/bash
 # CMG Track Health Monitor — ejecuta cada 5 minutos via cron
 LOG=/var/log/cmg-healthcheck.log
-TELEGRAM_TOKEN=7604956704:AAH_nOUf2i9mLiECiVSHnYrPVhfLXe6F0cQ
+TELEGRAM_TOKEN=$(cat /root/.telegram-token 2>/dev/null)
+if [ -z "$TELEGRAM_TOKEN" ]; then
+  echo "WARNING: /root/.telegram-token vacío o inexistente. Notificaciones DESHABILITADAS." >&2
+fi
 CHAT_ID=5597545280
 ALERT_SENT=/tmp/cmg-alert-sent
 
@@ -12,7 +15,7 @@ send_alert() {
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
       -d "chat_id=${CHAT_ID}" \
       -d "text=$msg" \
-      -d "parse_mode=Markdown" > /dev/null 2>&1
+      -d "parse_mode=HTML" >> /var/log/cmg-telegram.log 2>&1
     touch "$ALERT_SENT"
     echo "$(date): ALERT: $msg" >> "$LOG"
   fi
@@ -24,7 +27,7 @@ send_recovery() {
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
       -d "chat_id=${CHAT_ID}" \
       -d "text=$msg" \
-      -d "parse_mode=Markdown" > /dev/null 2>&1
+      -d "parse_mode=HTML" >> /var/log/cmg-telegram.log 2>&1
     rm -f "$ALERT_SENT"
     echo "$(date): RECOVERY: $msg" >> "$LOG"
   fi
@@ -34,7 +37,7 @@ FAILED=0
 ISSUES=""
 
 # 1. Comprobar contenedores críticos
-for SVC in cmg-telematic1_core-api_1 cmg-telematic1_frontend_1 cmg-telematic1_postgres_1 cmg-telematic1_redis_1 cmg-telematic1_caddy_1; do
+for SVC in cmg-telematic1_core-api_1 cmg-telematic1_frontend_1 cmg-telematic1_postgres_1 cmg-telematic1_redis_1 cmg-telematic1_caddy_1 cmg-telematic1_ingest-svc_1; do
   STATUS=$(docker inspect --format='{{.State.Status}}' "$SVC" 2>/dev/null)
   if [ "$STATUS" != "running" ]; then
     ISSUES+="\n❌ Contenedor caído: $SVC (status: ${STATUS:-no encontrado})"
@@ -73,9 +76,17 @@ if [ "$MEM_FREE" -lt 200 ]; then
 fi
 
 if [ "$FAILED" -eq 1 ]; then
-  send_alert "🚨 *CMG Track — Problema detectado*$ISSUES"
+  send_alert "🚨 <b>CMG Track — Problema detectado</b>$ISSUES"
 else
-  send_recovery "✅ *CMG Track — Recuperado* — Todos los servicios operativos"
-  # Limpiar log viejo si todo OK
-  [ $(wc -l < "$LOG" 2>/dev/null || echo 0) -gt 500 ] && tail -100 "$LOG" > "$LOG".tmp && mv "$LOG".tmp "$LOG"
+  send_recovery "✅ <b>CMG Track — Recuperado</b> — Todos los servicios operativos"
 fi
+
+# Heartbeat: confirma que el script ejecutó hasta el final
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] healthcheck OK — $FAILED issues" >> "$LOG"
+
+# Rotación del log si supera 500 líneas
+if [ $(wc -l < "$LOG" 2>/dev/null || echo 0) -gt 500 ]; then
+  tail -250 "$LOG" > "$LOG".tmp && mv "$LOG".tmp "$LOG"
+fi
+
+exit 0

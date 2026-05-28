@@ -21,6 +21,9 @@ cmgtrack.com {
     handle /openapi.json {
         reverse_proxy core-api:8010
     }
+    handle /health {
+        reverse_proxy core-api:8010
+    }
     handle {
         reverse_proxy frontend:3000
     }
