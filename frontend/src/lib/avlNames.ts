@@ -16,6 +16,7 @@ export const AVL_NAMES: Record<string, { name: string; unit: string }> = {
   avl_19:  { name: 'AdBlue Level', unit: '%' },
   avl_20:  { name: 'AdBlue Level', unit: 'L ×0.1' },
   avl_21:  { name: 'GSM Signal', unit: '0–5' },
+  avl_22:  { name: 'Data Mode', unit: '0–5' },
   avl_23:  { name: 'Engine Load', unit: '%' },
   avl_24:  { name: 'Speed (CAN)', unit: 'km/h' },
   avl_25:  { name: 'Engine Temp', unit: '°C ×0.1' },
@@ -60,8 +61,10 @@ export const AVL_NAMES: Record<string, { name: string; unit: string }> = {
   avl_200: { name: 'Sleep Mode', unit: '' },
   avl_205: { name: 'GSM Cell ID', unit: '' },
   avl_206: { name: 'GSM Area Code', unit: '' },
+  avl_216: { name: 'Odometer? (verificar en Configurator)', unit: '' },
   avl_239: { name: 'Ignition', unit: '0/1' },
   avl_240: { name: 'Movement', unit: '0/1' },
+  avl_241: { name: 'Active GSM Operator', unit: '' },
   avl_245: { name: 'AIN 4', unit: 'V ×0.001' },
   // Manual CAN slots 0–9 → AVL 145–154
   avl_145: { name: 'CAN Manual 0', unit: '' },
@@ -85,6 +88,16 @@ export const AVL_NAMES: Record<string, { name: string; unit: string }> = {
   avl_387: { name: 'CAN Manual 17', unit: '' },
   avl_388: { name: 'CAN Manual 18', unit: '' },
   avl_389: { name: 'CAN Manual 19', unit: '' },
+  // IDs recibidos en producción — pendiente de identificar o confirmar
+  avl_1148: { name: 'Unknown 1148', unit: '' },
+  // CAN Extended J1939 directo — IDs Teltonika para parámetros J1939 nativos
+  avl_10309: { name: 'CAN Extended 1 (J1939)', unit: '' },
+  avl_10310: { name: 'CAN Extended 2 (J1939)', unit: '' },
+  avl_10311: { name: 'CAN Extended 3 (J1939)', unit: '' },
+  avl_10312: { name: 'CAN Extended 4 (J1939)', unit: '' },
+  avl_10313: { name: 'CAN Extended 5 (J1939)', unit: '' },
+  avl_10314: { name: 'CAN Extended 6 (J1939)', unit: '' },
+  avl_10315: { name: 'CAN Extended 7 (J1939)', unit: '' },
 }
 
 /** Lista ordenada de AVL IDs para selectores UI. */

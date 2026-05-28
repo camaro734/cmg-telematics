@@ -23,6 +23,24 @@ AVL_DIN2 = 2   # PTO via entrada digital (fallback si no llega avl_179)
 _RPM_AVL_IDS = (30, 36, 85, 269, 10309)
 _RPM_IGNITION_THRESHOLD = 200
 
+_KNOWN_AVL_IDS: frozenset[int] = frozenset({
+    *_RPM_AVL_IDS,
+    1, 2, 3, 4, 6, 8, 9, 10, 11,
+    14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    31, 33, 34, 35, 37,
+    66, 67, 68, 70, 71, 72, 73, 74, 75,
+    78, 79, 80, 81, 82, 83, 84, 86, 87, 88,
+    104, 113, 127, 135, 139,
+    145, 146, 147, 148, 149, 150, 151, 152, 153, 154,
+    176, 179, 180, 181, 182, 199, 200, 205, 206, 216,
+    239, 240, 241, 245,
+    380, 381, 382, 383, 384, 385, 386, 387, 388, 389,
+    1148, 10310, 10311, 10312, 10313, 10314, 10315,
+})
+
+# Dedup: IDs desconocidos ya reportados (se resetea al reiniciar el servicio)
+_logged_unknown_avl: set[int] = set()
+
 
 def _compute_ignition(io: dict) -> bool:
     """Detecta ignición. Prioridad:
@@ -69,6 +87,15 @@ async def write_record(
         for io_id, value in avl.io_elements.items()
         if io_id not in known_avl_ids
     } or None
+
+    if unknown_ids := {k for k in avl.io_elements
+                       if k not in _KNOWN_AVL_IDS
+                       and k not in _logged_unknown_avl}:
+        logger.info(
+            "AVL IDs nuevos sin catalogar device_id=%s: %s",
+            device_id, sorted(unknown_ids)
+        )
+        _logged_unknown_avl.update(unknown_ids)
 
     await conn.execute("""
         INSERT INTO telemetry_record
