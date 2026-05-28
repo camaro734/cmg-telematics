@@ -77,9 +77,10 @@ describe('ReportsPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('renderiza la página mostrando el título Reportes', () => {
+  it('renderiza la página y establece el document.title', () => {
     wrap()
-    expect(screen.getByText('Reportes')).toBeInTheDocument()
+    // Shell no renderiza el título como DOM visible — solo actualiza document.title
+    expect(document.title).toContain('Reportes')
   })
 
   it('muestra selector de vehículo con placeholder', () => {
@@ -92,9 +93,11 @@ describe('ReportsPage', () => {
     expect(screen.getByText(/Selecciona un vehículo para ver el histórico/i)).toBeInTheDocument()
   })
 
-  it('CMG admin ve selector de cliente en la barra', async () => {
+  it('CMG admin ve el selector de vehículo en la barra', async () => {
     wrap(cmgUser, mockTenants)
-    await waitFor(() => expect(screen.queryByText('— Cliente —')).toBeInTheDocument())
+    // El filtro de tenant migró al TenantContext global (TopNav); en la página
+    // el selector de vehículo sigue visible para todos los roles
+    await waitFor(() => expect(screen.queryByText('— Selecciona un vehículo —')).toBeInTheDocument())
   })
 
   it('client admin no ve selector de cliente', () => {

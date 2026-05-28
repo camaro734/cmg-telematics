@@ -33,11 +33,14 @@ describe('UserFormModal', () => {
     ))
   })
 
-  it('llama a PUT al editar sin campo contraseña', async () => {
+  it('llama a PUT al editar sin contraseña en el payload cuando se deja en blanco', async () => {
     vi.mocked(apiClient.put).mockResolvedValue(existingUser)
     wrap(<UserFormModal tenantId="t1" user={existingUser} onClose={vi.fn()} />)
-    // En modo edición no hay campo contraseña
-    expect(screen.queryByLabelText(/contraseña/i)).not.toBeInTheDocument()
+    // En modo edición el campo contraseña es visible pero no required (cambio opcional)
+    const passwordInput = screen.queryByLabelText(/contraseña/i)
+    expect(passwordInput).toBeInTheDocument()
+    expect(passwordInput).not.toHaveAttribute('required')
+    // No rellenar contraseña → no debe incluirse en el payload del PUT
     fireEvent.click(screen.getByText('Guardar'))
     await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith(
       `/api/v1/users/${existingUser.id}`,

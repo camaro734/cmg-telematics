@@ -23,12 +23,6 @@ vi.mock('../../../features/auth/useAuthStore', () => ({
 vi.mock('../FleetMap', () => ({
   default: () => <div data-testid="fleet-map">Mapa</div>,
 }))
-// VehicleCard es un componente con lógica visual; mockearlo simplifica los tests
-vi.mock('../VehicleCard', () => ({
-  default: ({ vehicle }: { vehicle: VehicleOut }) => (
-    <div data-testid="vehicle-card">{vehicle.name}</div>
-  ),
-}))
 // useIsMobile: retornar false para renderizar la versión desktop en todos los tests
 vi.mock('../../../lib/useIsMobile', () => ({
   useIsMobile: () => false,
@@ -77,12 +71,14 @@ function wrap(preloaded: {
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
 
-  // Pre-populate el cache para evitar llamadas reales a la red
-  qc.setQueryData(keys.vehicles(), vehicles)
+  // Pre-populate el cache para evitar llamadas reales a la red.
+  // Las queries de FleetDashboard incluyen activeTenantId (null por defecto en tests).
+  qc.setQueryData([...keys.vehicles(), null], vehicles)
   qc.setQueryData(keys.vehicleTypes(), [])
   qc.setQueryData(keys.tenants(), [])
   qc.setQueryData(keys.rules(), [])
-  qc.setQueryData([...keys.alerts(), 'firing'], [])
+  qc.setQueryData([...keys.alerts(), 'firing', null], [])
+  qc.setQueryData(['fleet-orders', null], [])
 
   // Cache de statuses bulk
   const ids = vehicles.map(v => v.id).join(',')
@@ -127,7 +123,7 @@ describe('FleetDashboard', () => {
     const statuses = vehicles.map(v => makeStatus(v.id))
     wrap({ vehicles, statuses })
 
-    expect(screen.getAllByTestId('vehicle-card')).toHaveLength(2)
+    // FleetDashboard renderiza los vehículos inline (VehicleCard fue eliminado)
     expect(screen.getByText('WR-04')).toBeInTheDocument()
     expect(screen.getByText('PR-07')).toBeInTheDocument()
   })
@@ -146,24 +142,24 @@ describe('FleetDashboard', () => {
     expect(screen.getByTestId('fleet-map')).toBeInTheDocument()
   })
 
-  it('muestra "Sin incidencias activas" cuando no hay alertas', () => {
+  it('no muestra indicador de alerta cuando no hay alertas', () => {
     vi.mocked(apiClient.get).mockResolvedValue([])
     const vehicles = [makeVehicle('v1', 'WR-04')]
     wrap({ vehicles })
 
-    expect(screen.getByText(/Sin incidencias activas/i)).toBeInTheDocument()
+    // Sin alertas activas no aparece "⚠ Alerta" junto a ningún vehículo
+    expect(screen.queryByText('⚠ Alerta')).not.toBeInTheDocument()
   })
 
-  it('muestra contadores de estado de flota', () => {
+  it('muestra el header FLOTA con los vehículos en la lista', () => {
     vi.mocked(apiClient.get).mockResolvedValue([])
     const vehicles = [makeVehicle('v1', 'WR-04'), makeVehicle('v2', 'PR-07')]
     const statuses = vehicles.map(v => makeStatus(v.id))
-    // Sin señal suficientemente antigua → aparecen como offline
     wrap({ vehicles, statuses })
 
-    // El header siempre muestra los contadores de estado
-    expect(screen.getByText(/en ruta/i)).toBeInTheDocument()
-    expect(screen.getByText(/parados/i)).toBeInTheDocument()
-    expect(screen.getByText(/sin señal/i)).toBeInTheDocument()
+    // El sidebar siempre muestra la cabecera FLOTA con los vehículos inline
+    expect(screen.getByText('FLOTA')).toBeInTheDocument()
+    expect(screen.getByText('WR-04')).toBeInTheDocument()
+    expect(screen.getByText('PR-07')).toBeInTheDocument()
   })
 })

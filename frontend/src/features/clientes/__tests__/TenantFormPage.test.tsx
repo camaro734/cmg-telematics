@@ -37,8 +37,13 @@ describe('TenantFormPage', () => {
   it('llama a POST con tier=client al crear', async () => {
     renderCreate()
     const inputs = screen.getAllByRole('textbox')
+    // inputs[0]=Nombre, inputs[1]=Slug, inputs[2]=Nombre completo admin,
+    // inputs[3]=Email admin, inputs[4]=Contraseña inicial (type="text")
     fireEvent.change(inputs[0], { target: { value: 'Wasterent' } })
     fireEvent.change(inputs[1], { target: { value: 'wasterent' } })
+    fireEvent.change(inputs[2], { target: { value: 'Admin Wasterent' } })
+    fireEvent.change(inputs[3], { target: { value: 'admin@wasterent.com' } })
+    fireEvent.change(inputs[4], { target: { value: 'Secreto123' } })
     fireEvent.click(screen.getByText('Guardar'))
     await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
       '/api/v1/tenants',

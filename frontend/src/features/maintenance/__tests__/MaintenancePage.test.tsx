@@ -26,8 +26,9 @@ const mockPlan: MaintenancePlanOut = {
 
 function wrap(plans: MaintenancePlanOut[] = []) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
-  qc.setQueryData(['maintenance', 'plans'], plans)
-  qc.setQueryData(['vehicles'], [])
+  // MaintenancePage incluye activeTenantId (null por defecto) en las query keys
+  qc.setQueryData(['maintenance', 'plans', null], plans)
+  qc.setQueryData(['vehicles', null], [])
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
