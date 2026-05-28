@@ -49,8 +49,21 @@ def test_reports_unauthenticated():
     assert resp.status_code == 403
 
 
+def _db_with_reports_module() -> AsyncMock:
+    """AsyncSession mock con tenant que tiene enabled_modules=["reports"].
+    require_module("reports") llama a db.get(Tenant, ...) — necesita este mock
+    para que el check de módulos pase antes de llegar a la lógica de negocio.
+    """
+    tenant = MagicMock()
+    tenant.enabled_modules = ["reports"]
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=tenant)
+    return db
+
+
 def test_reports_invalid_month():
     _override_user(CLIENT_USER)
+    _override_db(_db_with_reports_module())
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.get("/api/v1/reports/monthly?year=2026&month=13")
     assert resp.status_code == 400
@@ -58,6 +71,7 @@ def test_reports_invalid_month():
 
 def test_reports_too_many_vehicles():
     _override_user(CLIENT_USER)
+    _override_db(_db_with_reports_module())
     vids = "&".join(f"vehicle_ids={uuid.uuid4()}" for _ in range(16))
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.get(f"/api/v1/reports/monthly?year=2026&month=4&{vids}")
@@ -66,6 +80,7 @@ def test_reports_too_many_vehicles():
 
 def test_reports_client_admin_cross_tenant_forbidden():
     _override_user(CLIENT_USER)
+    _override_db(_db_with_reports_module())
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.get(f"/api/v1/reports/monthly?year=2026&month=4&tenant_id={OTHER_TENANT_ID}")
     assert resp.status_code == 403
@@ -73,7 +88,7 @@ def test_reports_client_admin_cross_tenant_forbidden():
 
 def test_reports_client_admin_own_tenant():
     _override_user(CLIENT_USER)
-    db = AsyncMock()
+    db = _db_with_reports_module()
     vehicle_result = MagicMock()
     vehicle_result.scalars.return_value.all.return_value = []
     db.execute = AsyncMock(side_effect=[vehicle_result])

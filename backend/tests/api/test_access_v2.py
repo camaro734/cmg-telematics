@@ -4,7 +4,7 @@ Patrón: llamadas async directas al helper (no TestClient) con db mockeado.
 asyncio_mode=auto en pyproject.toml → no necesitan decoradores.
 """
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -73,6 +73,24 @@ MANUFACTURER_USER = CurrentUser(
 # ---------------------------------------------------------------------------
 # Constructores de mocks
 # ---------------------------------------------------------------------------
+
+def _make_audit_session_mock() -> MagicMock:
+    """Mock para AsyncSessionLocal() como async context manager doble anidado.
+
+    _log_access hace: async with AsyncSessionLocal() as s: async with s.begin(): s.add(entry)
+    El mock captura la llamada a s.add para que el test pueda inspeccionarla.
+    """
+    txn = MagicMock()
+    txn.__aenter__ = AsyncMock(return_value=None)
+    txn.__aexit__ = AsyncMock(return_value=False)
+
+    session = MagicMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=False)
+    session.begin = MagicMock(return_value=txn)
+    session.add = MagicMock()
+    return session
+
 
 def _make_vehicle(
     tenant_id: uuid.UUID = CLIENT_TENANT_ID,
@@ -158,12 +176,13 @@ async def test_cmg_cross_tenant_triggers_audit():
     """CMG accede a vehículo de otro tenant → crea entrada en AccessAuditLog."""
     vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID)
     db = _make_db(vehicle=vehicle)
+    audit_session = _make_audit_session_mock()
 
-    await assert_can_access_vehicle(CMG_USER, VEHICLE_ID, db, operation="read", scope="all")
+    with patch("app.api.v1.access_v2.AsyncSessionLocal", return_value=audit_session):
+        await assert_can_access_vehicle(CMG_USER, VEHICLE_ID, db, operation="read", scope="all")
 
-    db.begin_nested.assert_called_once()
-    db.add.assert_called_once()
-    added = db.add.call_args[0][0]
+    audit_session.add.assert_called_once()
+    added = audit_session.add.call_args[0][0]
     assert isinstance(added, AccessAuditLog)
     assert added.user_tenant_tier == "cmg"
     assert added.target_tenant_id == CLIENT_TENANT_ID
@@ -268,11 +287,13 @@ async def test_manufacturer_reads_own_manufactured_vehicle():
     """Manufacturer accede a vehículo que él fabricó → devuelve vehicle y registra audit."""
     vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID, manufacturer_tenant_id=MANUF_TENANT_ID)
     db = _make_db(vehicle=vehicle)
+    audit_session = _make_audit_session_mock()
 
-    result = await assert_can_access_vehicle(MANUFACTURER_USER, VEHICLE_ID, db)
+    with patch("app.api.v1.access_v2.AsyncSessionLocal", return_value=audit_session):
+        result = await assert_can_access_vehicle(MANUFACTURER_USER, VEHICLE_ID, db)
 
     assert result is vehicle
-    db.begin_nested.assert_called_once()
+    audit_session.add.assert_called_once()
 
 
 async def test_manufacturer_other_manufacturer_returns_404():

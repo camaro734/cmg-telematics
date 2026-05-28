@@ -61,6 +61,15 @@ def _make_vehicle(
     return vehicle
 
 
+def _db_with_vehicles(vehicles: list) -> AsyncMock:
+    """AsyncSession mock cuyo db.execute devuelve la lista de vehículos vía scalars().all()."""
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = vehicles
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=result)
+    return db
+
+
 def _make_redis_hash() -> dict:
     """Hash de Redis simulado con datos de status de un vehículo."""
     return {
@@ -109,10 +118,8 @@ def test_statuses_unauthenticated():
 def test_statuses_returns_list_for_own_vehicles():
     _override_user(CLIENT_USER)
 
-    db = AsyncMock()
     vehicle = _make_vehicle(VEHICLE_ID_1, CLIENT_TENANT_ID)
-    db.get = AsyncMock(return_value=vehicle)
-
+    db = _db_with_vehicles([vehicle])
     _override_db(db)
 
     redis = _build_redis_mock(hash_data=_make_redis_hash())
@@ -138,11 +145,9 @@ def test_statuses_returns_list_for_own_vehicles():
 def test_statuses_cross_tenant_returns_empty():
     _override_user(CLIENT_USER)
 
-    db = AsyncMock()
-    # Vehículo pertenece a otro tenant
+    # Vehículo pertenece a otro tenant — _check_vehicle_access lo filtrará
     vehicle = _make_vehicle(VEHICLE_ID_1, OTHER_TENANT_ID)
-    db.get = AsyncMock(return_value=vehicle)
-
+    db = _db_with_vehicles([vehicle])
     _override_db(db)
 
     # Redis no debe ser consultado porque no hay IDs accesibles
@@ -177,11 +182,10 @@ def test_statuses_invalid_ids_returns_400():
 def test_statuses_truncates_to_200_ids():
     _override_user(CLIENT_USER)
 
-    # 201 UUIDs válidos pero inexistentes → db.get devuelve None → lista vacía
+    # 201 UUIDs válidos — el endpoint trunca a 200 y la BD no devuelve ninguno
     ids_str = ",".join(str(uuid.uuid4()) for _ in range(201))
 
-    db = AsyncMock()
-    db.get = AsyncMock(return_value=None)  # todos inexistentes
+    db = _db_with_vehicles([])  # ningún vehículo encontrado → lista vacía
     _override_db(db)
 
     client = TestClient(app, raise_server_exceptions=False)
@@ -198,9 +202,8 @@ def test_statuses_truncates_to_200_ids():
 def test_statuses_vehicle_without_redis_data_is_omitted():
     _override_user(CLIENT_USER)
 
-    db = AsyncMock()
     vehicle = _make_vehicle(VEHICLE_ID_1, CLIENT_TENANT_ID)
-    db.get = AsyncMock(return_value=vehicle)
+    db = _db_with_vehicles([vehicle])
     _override_db(db)
 
     # Redis devuelve hash vacío → el vehículo se omite del resultado
@@ -220,9 +223,8 @@ def test_statuses_vehicle_without_redis_data_is_omitted():
 def test_statuses_redis_unavailable_returns_offline():
     _override_user(CLIENT_USER)
 
-    db = AsyncMock()
     vehicle = _make_vehicle(VEHICLE_ID_1, CLIENT_TENANT_ID)
-    db.get = AsyncMock(return_value=vehicle)
+    db = _db_with_vehicles([vehicle])
     _override_db(db)
 
     # Redis falla al ejecutar el pipeline
