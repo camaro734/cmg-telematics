@@ -11,7 +11,7 @@ import logging
 import struct
 from redis.asyncio import Redis
 from src.codec8 import decode_packet, build_ack, build_codec12_command
-from src.writer import write_record, get_device_info, update_device_online
+from src.writer import write_record, get_device_info, update_device_online, update_device_last_packet
 from src.publisher import publish_record, set_vehicle_offline
 from src.config import settings
 
@@ -207,10 +207,10 @@ class TeltonikaConnection:
             body = await self.reader.readexactly(data_length + 4)  # +4 para CRC
             packet = header + body
 
+            codec_id = packet[8] if len(packet) > 8 else 0
             try:
                 records = decode_packet(packet)
             except ValueError as e:
-                codec_id = packet[8] if len(packet) > 8 else 0
                 if codec_id == 0x0C:
                     # Codec 12 response del dispositivo — logueamos y confirmamos el comando
                     try:
@@ -235,6 +235,9 @@ class TeltonikaConnection:
                         self.device_info["vehicle_id"],
                         self.device_info["tenant_id"],
                     )
+                await update_device_last_packet(
+                    conn, self.imei, codec_id, len(records)
+                )
 
             for avl in records:
                 await publish_record(

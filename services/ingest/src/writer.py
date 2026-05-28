@@ -50,6 +50,7 @@ async def write_record(
     tenant_id: str,
 ) -> None:
     """Inserta un AVLRecord en telemetry_record."""
+    received_at = datetime.now(timezone.utc)
     ts = avl.datetime_utc
     if ts < _MIN_VALID_TIME:
         logger.warning(
@@ -73,8 +74,8 @@ async def write_record(
         INSERT INTO telemetry_record
             (time, device_id, vehicle_id, tenant_id,
              lat, lon, speed_kmh, heading, altitude_m,
-             ignition, pto_active, ext_voltage_mv, can_data)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             ignition, pto_active, ext_voltage_mv, can_data, received_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
         ON CONFLICT DO NOTHING
     """,
         ts, device_id, vehicle_id, tenant_id,
@@ -83,7 +84,7 @@ async def write_record(
         float(avl.speed_kmh),
         avl.heading, avl.altitude_m,
         ignition, pto_active, ext_voltage_mv,
-        can_data,
+        can_data, received_at,
     )
 
 
@@ -112,3 +113,16 @@ async def update_device_online(
     await conn.execute("""
         UPDATE device SET online=$1, last_seen=now() WHERE imei=$2
     """, online, imei)
+
+
+async def update_device_last_packet(
+    conn: asyncpg.Connection, imei: str, codec_id: int, record_count: int
+) -> None:
+    codec_name = "8E" if codec_id == 0x8E else "8"
+    await conn.execute("""
+        UPDATE device
+        SET last_packet_at = now(),
+            total_messages  = total_messages + $1,
+            last_codec      = $2
+        WHERE imei = $3
+    """, record_count, codec_name, imei)
