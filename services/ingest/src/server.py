@@ -208,23 +208,27 @@ class TeltonikaConnection:
             packet = header + body
 
             codec_id = packet[8] if len(packet) > 8 else 0
+
+            # Codec 12: respuesta del dispositivo a un comando enviado.
+            # Se intercepta ANTES del decode_packet porque decode_packet solo
+            # entiende Codec 8/8E y lanzaría ValueError a propósito.
+            if codec_id == 0x0C:
+                try:
+                    resp_size = struct.unpack_from(">I", packet, 11)[0]
+                    resp_text = packet[15:15 + resp_size].decode("ascii", errors="replace").strip()
+                    logger.info("Codec 12 ACK de %s: %r", self.imei, resp_text)
+                    last_log_id = await self.redis.get(f"command:{self.imei}:last_log_id")
+                    if last_log_id:
+                        await _confirm_command(last_log_id, resp_text)
+                        await self.redis.delete(f"command:{self.imei}:last_log_id")
+                except Exception:
+                    logger.info("Codec 12 ACK de %s (sin texto)", self.imei)
+                continue
+
             try:
                 records = decode_packet(packet)
             except ValueError as e:
-                if codec_id == 0x0C:
-                    # Codec 12 response del dispositivo — logueamos y confirmamos el comando
-                    try:
-                        resp_size = struct.unpack_from(">I", packet, 11)[0]
-                        resp_text = packet[15:15 + resp_size].decode("ascii", errors="replace").strip()
-                        logger.info("Codec 12 ACK de %s: %r", self.imei, resp_text)
-                        last_log_id = await self.redis.get(f"command:{self.imei}:last_log_id")
-                        if last_log_id:
-                            await _confirm_command(last_log_id, resp_text)
-                            await self.redis.delete(f"command:{self.imei}:last_log_id")
-                    except Exception:
-                        logger.info("Codec 12 ACK de %s (sin texto)", self.imei)
-                else:
-                    logger.error("Paquete inválido de %s (codec=0x%02x): %s", self.imei, codec_id, e)
+                logger.error("Paquete inválido de %s (codec=0x%02x): %s", self.imei, codec_id, e)
                 continue
 
             async with self.db_pool.acquire() as conn:
