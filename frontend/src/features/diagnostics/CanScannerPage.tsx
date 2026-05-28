@@ -1,18 +1,24 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { exportToCsv } from '../../lib/csvExport'
 import { keys } from '../../lib/queryKeys'
-import type { TenantOut, VehicleOut, VehicleTypeOut, SensorDef } from '../../lib/types'
+import type { VehicleOut, VehicleTypeOut, SensorDef, VehicleStatus } from '../../lib/types'
 import { AVL_NAMES } from '../../lib/avlNames'
+import { wsClient } from '../../lib/wsClient'
 
 type ResolvedSensor = {
   label: string
   unit: string
   value: number
+  raw: number
   isBit: boolean
   source: 'custom' | 'std' | 'raw'
+  min?: number
+  max?: number
+  isDuplicate?: boolean
+  duplicateLabels?: string[]
 }
 
 function resolveDisplayItems(
@@ -23,17 +29,24 @@ function resolveDisplayItems(
   const avlNum = parseInt(key.replace('avl_', ''))
   const customs = sensorsByAvlId[avlNum]
   if (customs?.length) {
+    const isDuplicate = customs.length > 1
+    const duplicateLabels = isDuplicate ? customs.map(c => c.label) : undefined
     return customs.map(def => ({
       label: def.label,
       unit: def.unit ?? '',
       value: def.bit_index !== undefined ? (raw >> def.bit_index) & 1 : (def.scale !== undefined ? raw * def.scale : raw),
+      raw,
       isBit: def.bit_index !== undefined,
       source: 'custom' as const,
+      min: def.min,
+      max: def.max,
+      isDuplicate,
+      duplicateLabels,
     }))
   }
   const std = AVL_NAMES[key]
-  if (std) return [{ label: std.name, unit: std.unit, value: raw, isBit: false, source: 'std' as const }]
-  return [{ label: key.toUpperCase(), unit: '', value: raw, isBit: false, source: 'raw' as const }]
+  if (std) return [{ label: std.name, unit: std.unit, value: raw, raw, isBit: false, source: 'std' as const }]
+  return [{ label: key.toUpperCase(), unit: '', value: raw, raw, isBit: false, source: 'raw' as const }]
 }
 
 function resolveColumnHeader(key: string, sensorsByAvlId: Record<number, SensorDef[]>): string {
@@ -69,13 +82,14 @@ function Badge({ on, label }: { on: boolean | null; label: string }) {
 
 export default function CanScannerPage() {
   const queryClient = useQueryClient()
-  const [tenantId, setTenantId] = useState('')
   const [vehicleId, setVehicleId] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [refreshCount, setRefreshCount] = useState(0)
   const [, setTick] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [wsActive, setWsActive] = useState(false)
+  const wsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Forzar re-render cada 30s para actualizar el indicador de antigüedad
   useEffect(() => {
@@ -154,19 +168,10 @@ export default function CanScannerPage() {
     }
   }
 
-  const { data: tenants = [] } = useQuery<TenantOut[]>({
-    queryKey: keys.tenants(),
-    queryFn: () => apiClient.get<TenantOut[]>('/api/v1/tenants'),
-    staleTime: 60_000,
-  })
-
-  const clientTenants = tenants.filter(t => t.tier !== 'cmg')
-
   const { data: vehicles = [] } = useQuery<VehicleOut[]>({
-    queryKey: ['vehicles', tenantId],
-    queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles?tenant_id=${tenantId}`),
-    enabled: !!tenantId,
-    staleTime: 30_000,
+    queryKey: ['vehicles', 'all'],
+    queryFn: () => apiClient.get<VehicleOut[]>('/api/v1/vehicles'),
+    staleTime: 60_000,
   })
 
   const { data: vehicleTypes = [] } = useQuery<VehicleTypeOut[]>({
@@ -182,15 +187,47 @@ export default function CanScannerPage() {
     staleTime: 0,
   })
 
-  // Auto-refresh cada 5s
+  // Auto-refresh cada 5s — solo cuando el WS no está entregando datos
   useEffect(() => {
-    if (autoRefresh && vehicleId) {
+    if (autoRefresh && vehicleId && !wsActive) {
       intervalRef.current = setInterval(() => setRefreshCount(c => c + 1), 5000)
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [autoRefresh, vehicleId])
+  }, [autoRefresh, vehicleId, wsActive])
+
+  // WebSocket: escucha telemetría en vivo y parchea el cache
+  useEffect(() => {
+    if (!vehicleId) { setWsActive(false); return }
+    const unsub = wsClient.onTelemetry((data: VehicleStatus) => {
+      if (data.vehicle_id !== vehicleId) return
+      setWsActive(true)
+      if (wsTimeoutRef.current) clearTimeout(wsTimeoutRef.current)
+      wsTimeoutRef.current = setTimeout(() => setWsActive(false), 30_000)
+      const newRecord: CanRecord = {
+        time: data.last_seen ?? new Date().toISOString(),
+        lat: data.lat, lon: data.lon, speed_kmh: data.speed_kmh,
+        heading: null, altitude_m: null,
+        ignition: data.ignition, pto_active: data.pto_active,
+        ext_voltage_mv: data.ext_voltage_mv,
+        can_data: (data.can_data ?? {}) as Record<string, number>,
+      }
+      queryClient.setQueriesData<CanRecord[]>(
+        { queryKey: ['can-scan', vehicleId] },
+        (old) => {
+          if (!old) return [newRecord]
+          if (old[0]?.time === newRecord.time) return old
+          return [newRecord, ...old].slice(0, 30)
+        }
+      )
+    })
+    return () => {
+      unsub()
+      if (wsTimeoutRef.current) clearTimeout(wsTimeoutRef.current)
+      setWsActive(false)
+    }
+  }, [vehicleId, queryClient])
 
   const latest = records[0] ?? null
 
@@ -262,12 +299,7 @@ export default function CanScannerPage() {
 
         {/* Controls */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={tenantId} onChange={e => { setTenantId(e.target.value); setVehicleId('') }} style={inputStyle}>
-            <option value="">— Selecciona cliente —</option>
-            {clientTenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-
-          <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} disabled={!tenantId} style={inputStyle}>
+          <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={inputStyle}>
             <option value="">— Selecciona vehículo —</option>
             {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} {v.license_plate ? `(${v.license_plate})` : ''}</option>)}
           </select>
@@ -309,6 +341,15 @@ export default function CanScannerPage() {
               Última actualización: {new Date(dataUpdatedAt).toLocaleTimeString('es-ES')}
             </span>
           )}
+
+          {vehicleId && (wsActive ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--accent-ok)', fontWeight: 600 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-ok)' }} />
+              WS en vivo
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: 'var(--accent-off)' }}>Polling</span>
+          ))}
         </div>
 
         {!vehicleId && (
@@ -506,61 +547,114 @@ export default function CanScannerPage() {
               {allCanKeys.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8, opacity: isStale ? 0.7 : 1 }}>
                   {allCanKeys.map(key => {
-                    const raw = latest.can_data[key]
-                    const items = raw !== undefined ? resolveDisplayItems(key, raw, sensorsByAvlId) : []
-                    return items.map((item, itemIdx) => (
-                      <div key={`${key}-${itemIdx}`} style={{
-                        background: 'var(--bg-elevated)',
-                        border: `1px solid ${isVeryStale ? 'var(--bg-border)'
-                          : raw !== undefined
-                          ? item.source === 'custom' ? 'var(--accent-energy)'
-                          : 'var(--bg-border)'
-                          : 'var(--bg-border)'}`,
-                        borderRadius: 6,
-                        padding: '7px 10px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 2,
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: item.source === 'custom' ? 'var(--accent-energy)'
-                                 : item.source === 'std' ? 'var(--text-primary)'
-                                 : 'var(--accent-off)',
+                    const rawVal = latest.can_data[key]
+                    const items = rawVal !== undefined ? resolveDisplayItems(key, rawVal, sensorsByAvlId) : []
+                    const isDuplicate = items.length > 1
+                    // Sentinels J1939: 0xFFFF (uint16 not available), 0xFFFFFFFF (uint32 not available)
+                    const isNA = rawVal === 65535 || rawVal === 4294967295
+                    return (
+                      <Fragment key={key}>
+                        {/* MEJORA 1 — Alerta de avl_id duplicado */}
+                        {isDuplicate && (
+                          <div style={{
+                            gridColumn: '1/-1',
+                            background: 'rgba(239,68,68,0.08)',
+                            border: '1px solid var(--accent-crit)',
+                            borderRadius: 6,
+                            padding: '7px 12px',
+                            fontSize: 11,
+                            color: 'var(--accent-crit)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
                           }}>
-                            {item.label}
-                          </span>
-                          <span style={{ fontSize: 10, color: 'var(--accent-off)', fontFamily: 'var(--font-data)' }}>
-                            {key}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          {item.isBit ? (
-                            <span style={{
-                              fontSize: 12, fontWeight: 700,
-                              color: item.value === 1 ? 'var(--accent-ok)' : 'var(--accent-off)',
-                              fontFamily: 'var(--font-data)',
-                            }}>
-                              {item.value === 1 ? '● ON' : '○ OFF'}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: 'var(--text-primary)' }}>
-                              {raw !== undefined ? item.value.toFixed(item.value % 1 !== 0 ? 2 : 0) : '—'}
-                            </span>
-                          )}
-                          {item.unit && <span style={{ fontSize: 10, color: 'var(--accent-off)' }}>{item.unit}</span>}
-                        </div>
-                        {item.source === 'raw' && vehicleType && (
-                          <button
-                            onClick={() => openLabelModal(key)}
-                            style={{ fontSize: 9, color: 'var(--accent-info)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2, textAlign: 'left' }}
-                          >
-                            ✎ etiquetar
-                          </button>
+                            <strong>⚠ {key} mapeado a {items.length} señales:</strong>
+                            {' '}{items[0].duplicateLabels?.join(' / ')}
+                            {' '}— revisar sensor_schema
+                          </div>
                         )}
-                      </div>
-                    ))
+                        {items.map((item, itemIdx) => {
+                          // MEJORA 2 — Valor fuera de rango
+                          const outOfRange = !item.isBit && !isNA
+                            && item.min !== undefined && item.max !== undefined
+                            && (item.value < item.min || item.value > item.max)
+                          const borderColor = isVeryStale ? 'var(--bg-border)'
+                            : outOfRange ? 'var(--accent-crit)'
+                            : rawVal !== undefined
+                              ? item.source === 'custom' ? 'var(--accent-energy)'
+                              : 'var(--bg-border)'
+                            : 'var(--bg-border)'
+                          return (
+                            <div key={itemIdx} style={{
+                              background: 'var(--bg-elevated)',
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: 6,
+                              padding: '7px 10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 2,
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                <span style={{
+                                  fontSize: 11, fontWeight: 600,
+                                  color: item.source === 'custom' ? 'var(--accent-energy)'
+                                       : item.source === 'std' ? 'var(--text-primary)'
+                                       : 'var(--accent-off)',
+                                }}>
+                                  {item.label}
+                                </span>
+                                <span style={{ fontSize: 10, color: 'var(--accent-off)', fontFamily: 'var(--font-data)' }}>
+                                  {key}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                {/* MEJORA 5 — Badge N/A para sentinels J1939 */}
+                                {isNA ? (
+                                  <span style={{ fontSize: 12, color: 'var(--accent-off)', fontStyle: 'italic' }}>—</span>
+                                ) : item.isBit ? (
+                                  <span style={{
+                                    fontSize: 12, fontWeight: 700,
+                                    color: item.value === 1 ? 'var(--accent-ok)' : 'var(--accent-off)',
+                                    fontFamily: 'var(--font-data)',
+                                  }}>
+                                    {item.value === 1 ? '● ON' : '○ OFF'}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: outOfRange ? 'var(--accent-crit)' : 'var(--text-primary)' }}>
+                                    {rawVal !== undefined ? item.value.toFixed(item.value % 1 !== 0 ? 2 : 0) : '—'}
+                                  </span>
+                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                                  {isNA && (
+                                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--accent-off)', background: 'var(--bg-border)', borderRadius: 3, padding: '1px 5px' }}>
+                                      J1939 N/A
+                                    </span>
+                                  )}
+                                  {!isNA && item.unit && <span style={{ fontSize: 10, color: 'var(--accent-off)' }}>{item.unit}</span>}
+                                  {outOfRange && (
+                                    <span style={{ fontSize: 9, color: 'var(--accent-crit)' }}>⚠ fuera de rango</span>
+                                  )}
+                                </div>
+                              </div>
+                              {/* MEJORA 3 — Valor raw visible bajo el escalado */}
+                              {item.source === 'custom' && !item.isBit && rawVal !== undefined && !isNA && (
+                                <span style={{ fontSize: 9, color: 'var(--accent-off)', fontFamily: 'var(--font-data)', marginTop: 1 }}>
+                                  raw: {rawVal}
+                                </span>
+                              )}
+                              {item.source === 'raw' && vehicleType && (
+                                <button
+                                  onClick={() => openLabelModal(key)}
+                                  style={{ fontSize: 9, color: 'var(--accent-info)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2, textAlign: 'left' }}
+                                >
+                                  ✎ etiquetar
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </Fragment>
+                    )
                   })}
                 </div>
               ) : (
