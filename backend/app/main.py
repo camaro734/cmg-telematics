@@ -100,6 +100,7 @@ async def lifespan(app: FastAPI):
     setup_sentry(settings.sentry_dsn)
     Path("/app/uploads/icons").mkdir(parents=True, exist_ok=True)
     Path("/app/uploads/maintenance_docs").mkdir(parents=True, exist_ok=True)
+    Path("/app/uploads/work_reports").mkdir(parents=True, exist_ok=True)
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     app.state.ws_manager = ConnectionManager()
     from app.core.maintenance_notifier import maintenance_notification_task

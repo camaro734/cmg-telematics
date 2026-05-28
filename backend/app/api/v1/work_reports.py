@@ -24,8 +24,11 @@ from app.schemas.work_report import WorkReportCreate, WorkReportOut
 
 router = APIRouter(prefix="/work-orders", tags=["work-reports"])
 
-UPLOADS_DIR = Path("/app/uploads/work_reports")
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR = (
+    Path("/app/uploads/work_reports")
+    if Path("/app/uploads").exists()
+    else Path(__file__).resolve().parent.parent.parent.parent / "uploads" / "work_reports"
+)
 
 ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
