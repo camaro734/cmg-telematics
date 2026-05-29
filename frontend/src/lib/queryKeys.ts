@@ -35,4 +35,5 @@ export const keys = {
   driver: (id: string) => ['drivers', id] as const,
   driverHistory: (id: string) => ['drivers', id, 'history'] as const,
   workReport: (orderId: string) => ['work-orders', orderId, 'report'] as const,
+  smtpConfig: () => ['settings', 'smtp'] as const,
 }

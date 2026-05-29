@@ -588,3 +588,21 @@ export interface WorkReportOut {
   materials_used: MaterialItem[]
   created_at: string
 }
+
+export interface SmtpConfig {
+  host: string
+  port: number
+  user: string
+  password_set: boolean
+  from_addr: string
+  tls: boolean
+}
+
+export interface SmtpConfigUpdate {
+  host: string
+  port: number
+  user: string
+  password: string
+  from_addr: string
+  tls: boolean
+}
