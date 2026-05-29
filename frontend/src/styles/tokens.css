@@ -119,7 +119,7 @@
   --touch-target: 44px;
 
   /* ---------- Layout ---------- */
-  --sidebar-w: 0px;
+  --sidebar-w: 64px;
   --topbar-h:  62px;
 
   /* ---------- Chart series (Recharts) ---------- */
@@ -196,3 +196,8 @@ input { font: inherit; }
 .caption { font-size: var(--fs-xs);   color: var(--fg-muted); }
 .mono, code, .plate { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .plate   { font-weight: var(--fw-medium); color: var(--fg-tertiary); letter-spacing: 0.02em; }
+
+/* ── Mobile: sidebar oculta ───────────────────────────────────────────── */
+@media (max-width: 767px) {
+  :root { --sidebar-w: 0px; }
+}
