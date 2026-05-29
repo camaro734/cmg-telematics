@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import FleetMap from './FleetMap'
 import { useFleetStore } from './useFleetStore'
 import { useVehicleStatuses } from './useVehicleStatuses'
@@ -106,18 +106,6 @@ export default function FleetDashboard() {
   const [search, setSearch] = useState('')
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
 
-  // Auto-colapsa el sidebar global al entrar en /fleet; lo restaura al salir
-  useEffect(() => {
-    const prev = localStorage.getItem('cmg_sidebar_expanded') ?? 'false'
-    localStorage.setItem('cmg_sidebar_prev_state', prev)
-    localStorage.setItem('cmg_sidebar_expanded', 'false')
-    window.dispatchEvent(new Event('cmg_sidebar_change'))
-    return () => {
-      const prevState = localStorage.getItem('cmg_sidebar_prev_state') ?? 'false'
-      localStorage.setItem('cmg_sidebar_expanded', prevState)
-      window.dispatchEvent(new Event('cmg_sidebar_change'))
-    }
-  }, [])
 
   const filteredVehicles = sortedVehicles.filter(v =>
     search === '' ||

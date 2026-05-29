@@ -119,7 +119,7 @@
   --touch-target: 44px;
 
   /* ---------- Layout ---------- */
-  --sidebar-w: 64px;
+  --sidebar-w: 0px;
   --topbar-h:  62px;
 
   /* ---------- Chart series (Recharts) ---------- */
