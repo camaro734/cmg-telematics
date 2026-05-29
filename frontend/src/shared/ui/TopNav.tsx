@@ -474,14 +474,27 @@ export default function TopNav() {
   }, [])
 
   // KPIs en vivo — vehicle statuses bulk
-  const { data: kpiStatuses } = useQuery<VehicleStatus[]>({
-    queryKey: ['vehicles', 'statuses-kpi'],
-    queryFn: () => apiClient.get<VehicleStatus[]>('/api/v1/vehicles/statuses'),
-    refetchInterval: 30_000,
-    staleTime: 25_000,
+  // KPIs paso 1 — IDs (reutiliza el cache de vehicles, sin duplicar requests)
+  const { data: vehicleIds } = useQuery<string[]>({
+    queryKey: ['vehicles', 'ids-for-kpi'],
+    queryFn: async () => {
+      const list = await apiClient.get<{ id: string }[]>('/api/v1/vehicles?limit=200')
+      return (list ?? []).map(v => v.id)
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
   })
-  const onlineCount  = kpiStatuses?.filter(s => s.online).length ?? 0
-  const movingCount  = kpiStatuses?.filter(s => s.online && (s.speed_kmh ?? 0) > 2).length ?? 0
+  // KPIs paso 2 — statuses solo cuando tenemos IDs (evita el 422)
+  const kpiIds = vehicleIds?.join(',') ?? ''
+  const { data: kpiStatuses } = useQuery<VehicleStatus[]>({
+    queryKey: ['vehicles', 'statuses', kpiIds],
+    queryFn: () => apiClient.get<VehicleStatus[]>(`/api/v1/vehicles/statuses?ids=${kpiIds}`),
+    enabled: kpiIds.length > 0,
+    staleTime: Infinity,
+    refetchInterval: false,
+  })
+  const onlineCount = kpiStatuses?.filter(s => s.online).length ?? 0
+  const movingCount = kpiStatuses?.filter(s => s.online && (s.speed_kmh ?? 0) > 2).length ?? 0
 
   // KPIs en vivo — active alert count
   const { data: alertKpiCount } = useQuery<number>({
