@@ -54,8 +54,10 @@ function injectPulseCSS() {
 }
 
 function isEffectivelyOnline(status: VehicleStatus): boolean {
-  if (!status.online || !status.last_seen) return false
-  return (Date.now() - new Date(status.last_seen).getTime()) < 5 * 60_000
+  if (!status.last_seen) return false
+  const ms = Date.now() - new Date(status.last_seen).getTime()
+  const threshold = status.ignition ? 70 * 60_000 : 62 * 60_000
+  return ms < threshold
 }
 
 // Icono EN MOVIMIENTO — punto pulsante verde

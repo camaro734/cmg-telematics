@@ -1,4 +1,13 @@
 import { useState, useMemo } from 'react'
+
+// Threshold ignition-aware: 70 min con motor, 62 min parado.
+// Evita parpadeos de "sin señal" entre paquetes normales.
+function isVehicleOnline(status: { last_seen: string | null; ignition: boolean | null } | null | undefined): boolean {
+  if (!status?.last_seen) return false
+  const ms = Date.now() - new Date(status.last_seen).getTime()
+  const threshold = status.ignition ? 70 * 60_000 : 62 * 60_000
+  return ms < threshold
+}
 import { SkeletonCard } from '../../shared/ui/SkeletonCard'
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -293,7 +302,7 @@ export default function VehicleDetailPage() {
 
                   {/* Badge de conexión superpuesto en el mapa */}
                   <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 500, pointerEvents: 'none' }}>
-                    {status?.online
+                    {isVehicleOnline(status)
                       ? <div style={{ background: 'rgba(34,197,94,0.92)', color: '#fff', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
                           En directo
@@ -363,9 +372,9 @@ export default function VehicleDetailPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
                     <VDKpiCard
                       title="Velocidad"
-                      value={status?.online && status?.speed_kmh != null ? `${Math.round(status.speed_kmh)}` : '—'}
-                      unit={status?.online && status?.speed_kmh != null ? 'km/h' : undefined}
-                      color={status?.online && (status?.speed_kmh ?? 0) > 0 ? 'var(--info)' : 'var(--fg-muted)'}
+                      value={isVehicleOnline(status) && status?.speed_kmh != null ? `${Math.round(status.speed_kmh)}` : '—'}
+                      unit={isVehicleOnline(status) && status?.speed_kmh != null ? 'km/h' : undefined}
+                      color={isVehicleOnline(status) && (status?.speed_kmh ?? 0) > 0 ? 'var(--info)' : 'var(--fg-muted)'}
                     />
                     <VDKpiCard
                       title="PTO hoy"
@@ -388,7 +397,7 @@ export default function VehicleDetailPage() {
                       <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
                         Telemetría
                       </span>
-                      {status?.online
+                      {isVehicleOnline(status)
                         ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span className="live-dot" style={{ width: 5, height: 5 }}/> En directo
                           </span>
