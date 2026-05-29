@@ -31,7 +31,7 @@ async def _write_alert(conn: asyncpg.Connection, match: RuleMatch) -> str:
         """
         INSERT INTO alert_instance
             (id, rule_id, vehicle_id, tenant_id, triggered_at, status, trigger_value)
-        VALUES ($1, $2::uuid, $3::uuid, $4::uuid, now(), 'firing', $5)
+        VALUES ($1, $2::uuid, $3::uuid, $4::uuid, now(), 'firing', $5::jsonb)
         """,
         alert_id,
         match.rule.id,
