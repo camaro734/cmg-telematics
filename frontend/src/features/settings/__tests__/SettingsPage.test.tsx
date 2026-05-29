@@ -50,6 +50,8 @@ function renderPage() {
 
 function mockGetForClientAdmin() {
   vi.mocked(apiClient.get).mockImplementation((path: string) => {
+    if (path.includes('/vehicles/statuses')) return Promise.resolve([]) as never
+    if (path.includes('/alerts')) return Promise.resolve([]) as never
     if (path.includes('/users')) return Promise.resolve([]) as never
     if (path.includes('/work-cycle-defs')) return Promise.resolve([]) as never
     if (path.includes('/work-cycles/definitions')) return Promise.resolve([]) as never
@@ -68,7 +70,11 @@ describe('SettingsPage', () => {
 
   it('muestra selector de tenant para admin CMG', () => {
     vi.mocked(useAuthStore).mockImplementation(makeStoreMock(cmgAdminUser) as unknown as typeof useAuthStore)
-    vi.mocked(apiClient.get).mockResolvedValue([])
+    vi.mocked(apiClient.get).mockImplementation((path: string) => {
+      if (path.includes('/vehicles/statuses')) return Promise.resolve([]) as never
+      if (path.includes('/alerts')) return Promise.resolve([]) as never
+      return Promise.resolve([]) as never
+    })
     renderPage()
     expect(screen.getByText('TENANT')).toBeInTheDocument()
   })

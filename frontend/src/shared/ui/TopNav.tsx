@@ -747,7 +747,7 @@ export default function TopNav() {
             )}
 
             {/* ── KPI chips + WS dot — solo desktop ─────────────────── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 2 }}>
+            <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 2 }}>
               {onlineCount > 0 && (
                 <Chip color="var(--ok)" soft dot size="sm">{onlineCount} en línea</Chip>
               )}
