@@ -63,7 +63,7 @@ export default function TenantsPage() {
     <Shell title="Clientes">
       <div style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 20, fontWeight: 600 }}>
+          <h2 style={{ margin: 0, color: 'var(--fg-primary)', fontSize: 20, fontWeight: 600 }}>
             Clientes
           </h2>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -72,8 +72,8 @@ export default function TenantsPage() {
                 onClick={() => setShowInactive(v => !v)}
                 style={{
                   background: 'transparent',
-                  border: '1px solid var(--bg-border)',
-                  color: showInactive ? 'var(--text-primary)' : 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                  color: showInactive ? 'var(--fg-primary)' : 'var(--fg-muted)',
                   borderRadius: 6, padding: '7px 14px', fontSize: 13,
                   cursor: 'pointer', fontWeight: 500,
                 }}
@@ -85,7 +85,7 @@ export default function TenantsPage() {
               <Link
                 to="/clientes/new"
                 style={{
-                  background: 'var(--accent-energy)', color: '#fff',
+                  background: 'var(--cmg-teal)', color: '#fff',
                   borderRadius: 6, padding: '8px 16px', fontSize: 14,
                   fontWeight: 500, textDecoration: 'none',
                 }}
@@ -103,41 +103,41 @@ export default function TenantsPage() {
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['Nombre', 'Slug', 'Estado', ''].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-muted)', fontSize: 12, fontWeight: 500 }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--fg-muted)', fontSize: 12, fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {visible.map(tenant => (
-                <tr key={tenant.id} style={{ borderBottom: '1px solid var(--bg-border)', opacity: tenant.active ? 1 : 0.6 }}>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-primary)', fontSize: 14 }}>
+                <tr key={tenant.id} style={{ borderBottom: '1px solid var(--border)', opacity: tenant.active ? 1 : 0.6 }}>
+                  <td style={{ padding: '10px 12px', color: 'var(--fg-primary)', fontSize: 14 }}>
                     {tenant.name}
                     {' '}
                     <span style={{
                       display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500, marginLeft: 4,
                       ...(tenant.tier === 'manufacturer'
-                        ? { background: 'rgba(56,189,248,0.15)', color: 'var(--accent-info)' }
+                        ? { background: 'rgba(56,189,248,0.15)', color: 'var(--info)' }
                         : tenant.tier === 'subclient'
-                        ? { background: 'rgba(120,113,108,0.15)', color: 'var(--accent-off)' }
-                        : { background: 'rgba(249,115,22,0.15)', color: 'var(--accent-energy)' }),
+                        ? { background: 'rgba(120,113,108,0.15)', color: 'var(--offline)' }
+                        : { background: 'rgba(249,115,22,0.15)', color: 'var(--cmg-teal)' }),
                     }}>
                       {tenant.tier === 'manufacturer' ? 'Fabricante' : tenant.tier === 'subclient' ? 'Subcliente' : 'Cliente'}
                     </span>
                   </td>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontFamily: 'var(--font-data)', fontSize: 13 }}>{tenant.slug}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>{tenant.slug}</td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{
                       display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12,
                       background: tenant.active ? 'rgba(34,197,94,0.15)' : 'rgba(120,113,108,0.15)',
-                      color: tenant.active ? 'var(--accent-ok)' : 'var(--accent-off)',
+                      color: tenant.active ? 'var(--ok)' : 'var(--offline)',
                     }}>
                       {tenant.active ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <Link to={`/clientes/${tenant.id}`} style={{ color: 'var(--accent-energy)', fontSize: 13, textDecoration: 'none' }}>
+                    <Link to={`/clientes/${tenant.id}`} style={{ color: 'var(--cmg-teal)', fontSize: 13, textDecoration: 'none' }}>
                       Ver detalle →
                     </Link>
                     {isCmgAdmin && tenant.active && (
@@ -147,7 +147,7 @@ export default function TenantsPage() {
                         style={{
                           marginLeft: 12, background: 'transparent',
                           border: '1px solid rgba(239,68,68,0.4)',
-                          color: 'var(--accent-crit)', borderRadius: 4,
+                          color: 'var(--danger)', borderRadius: 4,
                           padding: '3px 10px', fontSize: 12, cursor: 'pointer',
                         }}
                       >
@@ -161,7 +161,7 @@ export default function TenantsPage() {
                         style={{
                           marginLeft: 12, background: 'transparent',
                           border: '1px solid rgba(34,197,94,0.4)',
-                          color: 'var(--accent-ok)', borderRadius: 4,
+                          color: 'var(--ok)', borderRadius: 4,
                           padding: '3px 10px', fontSize: 12, cursor: 'pointer',
                         }}
                       >
@@ -173,7 +173,7 @@ export default function TenantsPage() {
               ))}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ padding: '16px 12px', color: 'var(--text-muted)', fontSize: 13 }}>
+                  <td colSpan={4} style={{ padding: '16px 12px', color: 'var(--fg-muted)', fontSize: 13 }}>
                     {showInactive ? 'No hay tenants inactivos.' : 'Sin clientes. Crea el primero con "+ Nuevo cliente".'}
                   </td>
                 </tr>

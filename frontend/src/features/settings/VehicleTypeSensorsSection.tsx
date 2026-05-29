@@ -9,15 +9,15 @@ const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'linear', 'battery
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
-  border: '1px solid var(--bg-border)',
+  border: '1px solid var(--border)',
   borderRadius: 8,
   padding: 20,
 }
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-base)',
-  border: '1px solid var(--bg-border)',
+  color: 'var(--fg-secondary)',
+  border: '1px solid var(--border)',
   borderRadius: 5,
   padding: '6px 10px',
   fontSize: 13,
@@ -116,16 +116,16 @@ export default function VehicleTypeSensorsSection() {
 
   return (
     <div style={sectionStyle}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--text-base)' }}>
+      <h3 style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--fg-secondary)' }}>
         Sensores por tipo de vehículo
       </h3>
 
       {isLoading ? (
-        <div style={{ color: 'var(--accent-off)', fontSize: 13 }}>Cargando…</div>
+        <div style={{ color: 'var(--offline)', fontSize: 13 }}>Cargando…</div>
       ) : (
         <>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 11, color: 'var(--accent-off)', display: 'block', marginBottom: 4 }}>
+            <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
               Tipo de vehículo
             </label>
             <select
@@ -143,39 +143,39 @@ export default function VehicleTypeSensorsSection() {
           {selectedType && (
             <>
               {selectedType.sensor_schema.length === 0 ? (
-                <div style={{ color: 'var(--accent-off)', fontSize: 13, marginBottom: 12 }}>
+                <div style={{ color: 'var(--offline)', fontSize: 13, marginBottom: 12 }}>
                   No hay sensores configurados. Añade uno del catálogo CAN.
                 </div>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--accent-off)' }}>Label</th>
-                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--accent-off)' }}>AVL ID</th>
-                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--accent-off)' }}>Gauge</th>
-                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--accent-off)' }}>Min / Max</th>
-                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--accent-off)' }}>Unidad</th>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--offline)' }}>Label</th>
+                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--offline)' }}>AVL ID</th>
+                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--offline)' }}>Gauge</th>
+                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--offline)' }}>Min / Max</th>
+                      <th style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--offline)' }}>Unidad</th>
                       <th style={{ width: 32 }} />
                     </tr>
                   </thead>
                   <tbody>
                     {selectedType.sensor_schema.map(s => (
-                      <tr key={s.key} style={{ borderBottom: '1px solid var(--bg-elevated)' }}>
-                        <td style={{ padding: '5px 8px', color: 'var(--text-base)' }}>{s.label}</td>
-                        <td style={{ padding: '5px 8px', color: 'var(--accent-energy)', fontFamily: 'var(--font-data)', fontSize: 11 }}>
+                      <tr key={s.key} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '5px 8px', color: 'var(--fg-secondary)' }}>{s.label}</td>
+                        <td style={{ padding: '5px 8px', color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                           {s.avl_id != null ? `avl_${s.avl_id}` : '—'}
                         </td>
-                        <td style={{ padding: '5px 8px', color: 'var(--accent-off)' }}>{s.gauge_type}</td>
-                        <td style={{ padding: '5px 8px', color: 'var(--accent-off)', fontFamily: 'var(--font-data)', fontSize: 11 }}>
+                        <td style={{ padding: '5px 8px', color: 'var(--offline)' }}>{s.gauge_type}</td>
+                        <td style={{ padding: '5px 8px', color: 'var(--offline)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                           {s.min ?? 0} / {s.max ?? 100}
                         </td>
-                        <td style={{ padding: '5px 8px', color: 'var(--accent-off)' }}>{s.unit ?? '—'}</td>
+                        <td style={{ padding: '5px 8px', color: 'var(--offline)' }}>{s.unit ?? '—'}</td>
                         <td style={{ padding: '5px 8px' }}>
                           <button
                             onClick={() => handleRemove(s.avl_id)}
                             disabled={patchSchemaMutation.isPending}
                             title="Eliminar sensor"
-                            style={{ background: 'none', border: 'none', color: 'var(--accent-crit)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2 }}
+                            style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2 }}
                           >
                             ×
                           </button>
@@ -187,12 +187,12 @@ export default function VehicleTypeSensorsSection() {
               )}
 
               {removeError && (
-                <div style={{ color: 'var(--accent-crit)', fontSize: 12, marginBottom: 8 }}>{removeError}</div>
+                <div style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 8 }}>{removeError}</div>
               )}
 
               <button
                 onClick={() => { setShowModal(true); setForm({}); setModalError(null) }}
-                style={{ padding: '5px 12px', background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                style={{ padding: '5px 12px', background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
               >
                 + Añadir sensor
               </button>
@@ -206,12 +206,12 @@ export default function VehicleTypeSensorsSection() {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
           onClick={e => { if (e.target === e.currentTarget) { setShowModal(false); setModalError(null) } }}
         >
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 480, maxWidth: '92vw', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, width: 480, maxWidth: '92vw', maxHeight: '80vh', overflowY: 'auto' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: 14 }}>Añadir sensor CAN</h3>
             <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
               <div>
-                <label style={{ fontSize: 11, color: 'var(--accent-off)', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                   Parámetro del catálogo *
                 </label>
                 <select
@@ -240,7 +240,7 @@ export default function VehicleTypeSensorsSection() {
               {form.avl_id != null && (
                 <>
                   <div>
-                    <label style={{ fontSize: 11, color: 'var(--accent-off)', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                       Label mostrado *
                     </label>
                     <input
@@ -252,7 +252,7 @@ export default function VehicleTypeSensorsSection() {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 11, color: 'var(--accent-off)', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                       Tipo de gauge *
                     </label>
                     <select
@@ -266,7 +266,7 @@ export default function VehicleTypeSensorsSection() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <div>
-                      <label style={{ fontSize: 11, color: 'var(--accent-off)', display: 'block', marginBottom: 4 }}>Mín</label>
+                      <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Mín</label>
                       <input
                         type="number"
                         style={inputStyle}
@@ -275,7 +275,7 @@ export default function VehicleTypeSensorsSection() {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, color: 'var(--accent-off)', display: 'block', marginBottom: 4 }}>Máx</label>
+                      <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Máx</label>
                       <input
                         type="number"
                         style={inputStyle}
@@ -285,28 +285,28 @@ export default function VehicleTypeSensorsSection() {
                     </div>
                   </div>
 
-                  <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', borderRadius: 5, fontSize: 11, color: 'var(--accent-off)' }}>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', borderRadius: 5, fontSize: 11, color: 'var(--offline)' }}>
                     {AVL_CATALOG.find(p => p.avl_id === form.avl_id)?.description}
                   </div>
                 </>
               )}
 
               {modalError && (
-                <div style={{ color: 'var(--accent-crit)', fontSize: 12 }}>{modalError}</div>
+                <div style={{ color: 'var(--danger)', fontSize: 12 }}>{modalError}</div>
               )}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); setModalError(null) }}
-                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-base)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
+                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={patchSchemaMutation.isPending || form.avl_id == null}
-                  style={{ padding: '6px 14px', background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+                  style={{ padding: '6px 14px', background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
                 >
                   {patchSchemaMutation.isPending ? 'Guardando…' : 'Añadir'}
                 </button>

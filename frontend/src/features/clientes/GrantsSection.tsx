@@ -34,27 +34,27 @@ export default function GrantsSection({ tenantId }: Props) {
     <div>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
             {['Tipo', 'Acciones', ''].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-muted)', fontSize: 12 }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--fg-muted)', fontSize: 12 }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {grants.length === 0 ? (
             <tr>
-              <td colSpan={3} style={{ padding: '10px', color: 'var(--text-muted)', fontSize: 13 }}>Sin grants activos</td>
+              <td colSpan={3} style={{ padding: '10px', color: 'var(--fg-muted)', fontSize: 13 }}>Sin grants activos</td>
             </tr>
           ) : grants.map(g => (
-            <tr key={g.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-              <td style={{ padding: '8px 10px', color: 'var(--text-primary)', fontSize: 13 }}>{g.resource_type}</td>
-              <td style={{ padding: '8px 10px', color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-data)' }}>
+            <tr key={g.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '8px 10px', color: 'var(--fg-primary)', fontSize: 13 }}>{g.resource_type}</td>
+              <td style={{ padding: '8px 10px', color: 'var(--fg-muted)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
                 {g.allowed_actions.join(', ')}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'right' }}>
                 <button
                   onClick={() => revokeMutation.mutate(g.id)}
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-crit)', fontSize: 12, cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: 12, cursor: 'pointer' }}
                 >
                   Revocar
                 </button>
@@ -70,8 +70,8 @@ export default function GrantsSection({ tenantId }: Props) {
           onChange={e => setSelectedIdx(Number(e.target.value))}
           style={{
             flex: 1, padding: '7px 10px', background: 'var(--bg-elevated)',
-            border: '1px solid var(--bg-border)', borderRadius: 6,
-            color: 'var(--text-primary)', fontSize: 13,
+            border: '1px solid var(--border)', borderRadius: 6,
+            color: 'var(--fg-primary)', fontSize: 13,
           }}
         >
           {GRANT_TYPES.map((g, i) => <option key={i} value={i}>{g.label}</option>)}
@@ -84,7 +84,7 @@ export default function GrantsSection({ tenantId }: Props) {
           })}
           disabled={createMutation.isPending}
           style={{
-            background: 'var(--accent-energy)', color: '#fff', border: 'none',
+            background: 'var(--cmg-teal)', color: '#fff', border: 'none',
             borderRadius: 6, padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
           }}
         >

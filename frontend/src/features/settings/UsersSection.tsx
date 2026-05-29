@@ -26,11 +26,11 @@ export default function UsersSection() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 15, fontWeight: 600 }}>Usuarios</h3>
+        <h3 style={{ margin: 0, color: 'var(--fg-primary)', fontSize: 15, fontWeight: 600 }}>Usuarios</h3>
         <button
           onClick={() => { setEditingUser(undefined); setShowModal(true) }}
           style={{
-            background: 'var(--accent-energy)', color: '#fff', border: 'none',
+            background: 'var(--cmg-teal)', color: '#fff', border: 'none',
             borderRadius: 6, padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
           }}
         >
@@ -40,23 +40,23 @@ export default function UsersSection() {
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
             {['Email', 'Nombre', 'Rol', 'Estado', ''].map(h => (
-              <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-muted)', fontSize: 12 }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--fg-muted)', fontSize: 12 }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {users.map(u => (
-            <tr key={u.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-              <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--text-primary)' }}>{u.email}</td>
-              <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--text-muted)' }}>{u.full_name}</td>
-              <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>{u.role}</td>
+            <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--fg-primary)' }}>{u.email}</td>
+              <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--fg-muted)' }}>{u.full_name}</td>
+              <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{u.role}</td>
               <td style={{ padding: '8px 10px' }}>
                 <span style={{
                   display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 11,
                   background: u.active ? 'rgba(34,197,94,0.15)' : 'rgba(120,113,108,0.15)',
-                  color: u.active ? 'var(--accent-ok)' : 'var(--accent-off)',
+                  color: u.active ? 'var(--ok)' : 'var(--offline)',
                 }}>
                   {u.active ? 'Activo' : 'Inactivo'}
                 </span>
@@ -64,14 +64,14 @@ export default function UsersSection() {
               <td style={{ padding: '8px 10px', textAlign: 'right' }}>
                 <button
                   onClick={() => { setEditingUser(u); setShowModal(true) }}
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-energy)', fontSize: 12, cursor: 'pointer', marginRight: 8 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--cmg-teal)', fontSize: 12, cursor: 'pointer', marginRight: 8 }}
                 >
                   Editar
                 </button>
                 {u.active && (
                   <button
                     onClick={() => deactivate.mutate(u.id)}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent-crit)', fontSize: 12, cursor: 'pointer' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: 12, cursor: 'pointer' }}
                   >
                     Desactivar
                   </button>

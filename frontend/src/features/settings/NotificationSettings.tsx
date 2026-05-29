@@ -7,13 +7,13 @@ import { useAuthStore } from '../auth/useAuthStore'
 import type { SettingsOut, TenantOut } from '../../lib/types'
 
 const INPUT: CSSProperties = {
-  background: 'var(--bg-base)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-base)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '8px 10px', width: '100%', boxSizing: 'border-box',
 }
 
 const LABEL: CSSProperties = {
-  fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)',
+  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)',
   display: 'block', marginBottom: 4, letterSpacing: '0.05em',
 }
 
@@ -63,7 +63,7 @@ export default function NotificationSettings() {
 
   return (
     <div style={{ maxWidth: 480 }}>
-      <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', marginBottom: 20 }}>
+      <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, color: 'var(--fg-primary)', marginBottom: 20 }}>
         Notificaciones por email
       </div>
 
@@ -92,13 +92,13 @@ export default function NotificationSettings() {
               placeholder="operaciones@empresa.com"
               style={INPUT}
             />
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', marginTop: 6 }}>
               Cuando se dispare una alerta, se enviará un aviso a esta dirección. Cada regla puede además tener su propio email específico.
             </div>
           </div>
 
           {error && (
-            <div style={{ color: 'var(--accent-crit)', fontSize: 12, marginBottom: 8 }}>
+            <div style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 8 }}>
               {(error as Error).message}
             </div>
           )}
@@ -108,8 +108,8 @@ export default function NotificationSettings() {
               onClick={() => mutate()}
               disabled={isPending}
               style={{
-                padding: '7px 20px', fontSize: 13, fontFamily: 'var(--font-ui)',
-                background: 'var(--accent-energy)', border: 'none',
+                padding: '7px 20px', fontSize: 13, fontFamily: 'var(--font-sans)',
+                background: 'var(--cmg-teal)', border: 'none',
                 borderRadius: 6, color: 'var(--bg-base)',
                 cursor: isPending ? 'wait' : 'pointer',
               }}
@@ -117,7 +117,7 @@ export default function NotificationSettings() {
               {isPending ? 'Guardando…' : 'Guardar'}
             </button>
             {saved && (
-              <span style={{ color: 'var(--accent-ok)', fontSize: 12, fontFamily: 'var(--font-ui)' }}>
+              <span style={{ color: 'var(--ok)', fontSize: 12, fontFamily: 'var(--font-sans)' }}>
                 Guardado
               </span>
             )}

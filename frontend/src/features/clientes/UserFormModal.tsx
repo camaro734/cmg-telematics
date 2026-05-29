@@ -43,8 +43,8 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '7px 10px', background: 'var(--bg-base)',
-    border: '1px solid var(--bg-border)', borderRadius: 6,
-    color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box',
+    border: '1px solid var(--border)', borderRadius: 6,
+    color: 'var(--fg-primary)', fontSize: 13, boxSizing: 'border-box',
   }
 
   return (
@@ -54,27 +54,27 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
     }}>
       <div style={{
         background: 'var(--bg-surface)', borderRadius: 10, padding: 24,
-        width: 400, border: '1px solid var(--bg-border)',
+        width: 400, border: '1px solid var(--border)',
       }}>
-        <h3 style={{ margin: '0 0 20px', color: 'var(--text-primary)', fontSize: 16, fontWeight: 600 }}>
+        <h3 style={{ margin: '0 0 20px', color: 'var(--fg-primary)', fontSize: 16, fontWeight: 600 }}>
           {isEdit ? 'Editar usuario' : 'Nuevo usuario'}
         </h3>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {!isEdit && (
             <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Email</span>
+              <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Email</span>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={inputStyle} />
             </label>
           )}
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Nombre completo</span>
+            <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Nombre completo</span>
             <input value={fullName} onChange={e => setFullName(e.target.value)} required style={inputStyle} />
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Rol</span>
+            <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Rol</span>
             <select value={role} onChange={e => setRole(e.target.value as UserOut['role'])} style={inputStyle}>
               <option value="admin">Admin</option>
               <option value="operator">Operador</option>
@@ -84,8 +84,8 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              Contraseña{isEdit && <span style={{ color: 'var(--accent-off)', fontWeight: 400 }}> — dejar en blanco para no cambiar</span>}
+            <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>
+              Contraseña{isEdit && <span style={{ color: 'var(--offline)', fontWeight: 400 }}> — dejar en blanco para no cambiar</span>}
             </span>
             <input
               type="password"
@@ -99,7 +99,7 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
           </label>
 
           {mutation.isError && (
-            <p style={{ color: 'var(--accent-crit)', fontSize: 12, margin: 0 }}>Error al guardar.</p>
+            <p style={{ color: 'var(--danger)', fontSize: 12, margin: 0 }}>Error al guardar.</p>
           )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
@@ -107,7 +107,7 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
               type="submit"
               disabled={mutation.isPending}
               style={{
-                flex: 1, background: 'var(--accent-energy)', color: '#fff',
+                flex: 1, background: 'var(--cmg-teal)', color: '#fff',
                 border: 'none', borderRadius: 6, padding: '8px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer',
               }}
             >
@@ -117,8 +117,8 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
               type="button"
               onClick={onClose}
               style={{
-                flex: 1, background: 'transparent', color: 'var(--text-muted)',
-                border: '1px solid var(--bg-border)', borderRadius: 6, padding: '8px 0', fontSize: 13, cursor: 'pointer',
+                flex: 1, background: 'transparent', color: 'var(--fg-muted)',
+                border: '1px solid var(--border)', borderRadius: 6, padding: '8px 0', fontSize: 13, cursor: 'pointer',
               }}
             >
               Cancelar

@@ -12,8 +12,8 @@ import type { TenantOut, UserOut, VehicleOut } from '../../lib/types'
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: 20, border: '1px solid var(--bg-border)', marginBottom: 16 }}>
-      <h3 style={{ margin: '0 0 16px', color: 'var(--text-primary)', fontSize: 15, fontWeight: 600 }}>{title}</h3>
+    <div style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: 20, border: '1px solid var(--border)', marginBottom: 16 }}>
+      <h3 style={{ margin: '0 0 16px', color: 'var(--fg-primary)', fontSize: 15, fontWeight: 600 }}>{title}</h3>
       {children}
     </div>
   )
@@ -46,7 +46,7 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
 
   return (
     <SectionCard title="Portal del cliente">
-      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+      <p style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 16 }}>
         URL pública para que el cliente vea el estado de sus vehículos y órdenes sin necesidad de login.
       </p>
       {token ? (
@@ -56,18 +56,18 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
               readOnly
               value={portalUrl!}
               style={{
-                flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-                borderRadius: 6, color: 'var(--text-muted)', fontFamily: 'var(--font-data)',
+                flex: 1, background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: 6, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)',
                 fontSize: 12, padding: '7px 10px',
               }}
             />
             <button
               onClick={copyUrl}
               style={{
-                padding: '7px 14px', borderRadius: 6, border: '1px solid var(--bg-border)',
-                background: copied ? 'var(--accent-ok)' : 'var(--bg-elevated)',
-                color: copied ? '#fff' : 'var(--text-muted)',
-                fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                padding: '7px 14px', borderRadius: 6, border: '1px solid var(--border)',
+                background: copied ? 'var(--ok)' : 'var(--bg-card)',
+                color: copied ? '#fff' : 'var(--fg-muted)',
+                fontFamily: 'var(--font-sans)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
               {copied ? 'Copiado' : 'Copiar'}
@@ -77,9 +77,9 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
               target="_blank"
               rel="noreferrer"
               style={{
-                padding: '7px 14px', borderRadius: 6, border: '1px solid var(--bg-border)',
-                background: 'var(--bg-elevated)', color: 'var(--text-muted)',
-                fontFamily: 'var(--font-ui)', fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap',
+                padding: '7px 14px', borderRadius: 6, border: '1px solid var(--border)',
+                background: 'var(--bg-card)', color: 'var(--fg-muted)',
+                fontFamily: 'var(--font-sans)', fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap',
               }}
             >
               Abrir →
@@ -89,8 +89,8 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
             onClick={async () => { if (await confirmAsk({ title: 'Regenerar token', message: '¿Regenerar el token? El enlace anterior dejará de funcionar.', confirmLabel: 'Regenerar', kind: 'warning' })) generate() }}
             style={{
               alignSelf: 'flex-start', padding: '5px 12px', borderRadius: 6,
-              border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)',
-              color: 'var(--accent-warn)', fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer',
+              border: '1px solid var(--border)', background: 'var(--bg-card)',
+              color: 'var(--warn)', fontFamily: 'var(--font-sans)', fontSize: 12, cursor: 'pointer',
             }}
           >
             Regenerar token
@@ -102,8 +102,8 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
           disabled={isPending}
           style={{
             padding: '8px 18px', borderRadius: 8, border: 'none',
-            background: 'var(--accent-energy)', color: '#fff',
-            fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: 'var(--cmg-teal)', color: '#fff',
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             opacity: isPending ? 0.7 : 1,
           }}
         >
@@ -143,10 +143,10 @@ export default function TenantDetailPage() {
   })
 
   if (isLoading) {
-    return <Shell title="Cliente"><p style={{ padding: 24, color: 'var(--text-muted)' }}>Cargando...</p></Shell>
+    return <Shell title="Cliente"><p style={{ padding: 24, color: 'var(--fg-muted)' }}>Cargando...</p></Shell>
   }
   if (!tenant) {
-    return <Shell title="Cliente"><p style={{ padding: 24, color: 'var(--text-muted)' }}>Cliente no encontrado</p></Shell>
+    return <Shell title="Cliente"><p style={{ padding: 24, color: 'var(--fg-muted)' }}>Cliente no encontrado</p></Shell>
   }
 
   return (
@@ -156,12 +156,12 @@ export default function TenantDetailPage() {
         {/* 1. Cabecera */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
-            <h2 style={{ margin: '0 0 4px', color: 'var(--text-primary)', fontSize: 22, fontWeight: 700 }}>{tenant.name}</h2>
-            <span style={{ color: 'var(--text-muted)', fontSize: 13, fontFamily: 'var(--font-data)' }}>{tenant.slug}</span>
+            <h2 style={{ margin: '0 0 4px', color: 'var(--fg-primary)', fontSize: 22, fontWeight: 700 }}>{tenant.name}</h2>
+            <span style={{ color: 'var(--fg-muted)', fontSize: 13, fontFamily: 'var(--font-mono)' }}>{tenant.slug}</span>
             <span style={{
               marginLeft: 10, display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12,
               background: tenant.active ? 'rgba(34,197,94,0.15)' : 'rgba(120,113,108,0.15)',
-              color: tenant.active ? 'var(--accent-ok)' : 'var(--accent-off)',
+              color: tenant.active ? 'var(--ok)' : 'var(--offline)',
             }}>
               {tenant.active ? 'Activo' : 'Inactivo'}
             </span>
@@ -169,8 +169,8 @@ export default function TenantDetailPage() {
           <Link
             to={`/clientes/${id}/edit`}
             style={{
-              background: 'var(--bg-elevated)', color: 'var(--text-primary)',
-              border: '1px solid var(--bg-border)', borderRadius: 6,
+              background: 'var(--bg-card)', color: 'var(--fg-primary)',
+              border: '1px solid var(--border)', borderRadius: 6,
               padding: '7px 14px', fontSize: 13, textDecoration: 'none',
             }}
           >
@@ -182,23 +182,23 @@ export default function TenantDetailPage() {
         <SectionCard title="Usuarios">
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['Email', 'Nombre', 'Rol', 'Estado', ''].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-muted)', fontSize: 12 }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--fg-muted)', fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--text-primary)' }}>{u.email}</td>
-                  <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--text-muted)' }}>{u.full_name}</td>
-                  <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>{u.role}</td>
+                <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--fg-primary)' }}>{u.email}</td>
+                  <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--fg-muted)' }}>{u.full_name}</td>
+                  <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{u.role}</td>
                   <td style={{ padding: '8px 10px' }}>
                     <span style={{
                       display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 11,
                       background: u.active ? 'rgba(34,197,94,0.15)' : 'rgba(120,113,108,0.15)',
-                      color: u.active ? 'var(--accent-ok)' : 'var(--accent-off)',
+                      color: u.active ? 'var(--ok)' : 'var(--offline)',
                     }}>
                       {u.active ? 'Activo' : 'Inactivo'}
                     </span>
@@ -206,14 +206,14 @@ export default function TenantDetailPage() {
                   <td style={{ padding: '8px 10px', textAlign: 'right' }}>
                     <button
                       onClick={() => { setEditingUser(u); setShowUserModal(true) }}
-                      style={{ background: 'none', border: 'none', color: 'var(--accent-energy)', fontSize: 12, cursor: 'pointer', marginRight: 8 }}
+                      style={{ background: 'none', border: 'none', color: 'var(--cmg-teal)', fontSize: 12, cursor: 'pointer', marginRight: 8 }}
                     >
                       Editar
                     </button>
                     {u.active && (
                       <button
                         onClick={() => deactivateUser.mutate(u.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--accent-crit)', fontSize: 12, cursor: 'pointer' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--danger)', fontSize: 12, cursor: 'pointer' }}
                       >
                         Desactivar
                       </button>
@@ -222,14 +222,14 @@ export default function TenantDetailPage() {
                 </tr>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: '10px', color: 'var(--text-muted)', fontSize: 13 }}>Sin usuarios</td></tr>
+                <tr><td colSpan={5} style={{ padding: '10px', color: 'var(--fg-muted)', fontSize: 13 }}>Sin usuarios</td></tr>
               )}
             </tbody>
           </table>
           <button
             onClick={() => { setEditingUser(undefined); setShowUserModal(true) }}
             style={{
-              background: 'var(--accent-energy)', color: '#fff', border: 'none',
+              background: 'var(--cmg-teal)', color: '#fff', border: 'none',
               borderRadius: 6, padding: '7px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
             }}
           >
@@ -240,21 +240,21 @@ export default function TenantDetailPage() {
         {/* 3. Vehículos */}
         <SectionCard title="Vehículos">
           {vehicles.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 10px' }}>Sin vehículos asignados</p>
+            <p style={{ color: 'var(--fg-muted)', fontSize: 13, margin: '0 0 10px' }}>Sin vehículos asignados</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   {['Nombre', 'Matrícula'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-muted)', fontSize: 12 }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--fg-muted)', fontSize: 12 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {vehicles.map(v => (
-                  <tr key={v.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                    <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--text-primary)' }}>{v.name}</td>
-                    <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                  <tr key={v.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--fg-primary)' }}>{v.name}</td>
+                    <td style={{ padding: '8px 10px', fontSize: 13, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                       {v.license_plate ?? '—'}
                     </td>
                   </tr>
@@ -262,7 +262,7 @@ export default function TenantDetailPage() {
               </tbody>
             </table>
           )}
-          <Link to={`/fleet?tenant=${id}`} style={{ color: 'var(--accent-energy)', fontSize: 13, textDecoration: 'none' }}>
+          <Link to={`/fleet?tenant=${id}`} style={{ color: 'var(--cmg-teal)', fontSize: 13, textDecoration: 'none' }}>
             Ver en Flota →
           </Link>
         </SectionCard>

@@ -51,47 +51,47 @@ function OnboardingWizard({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 12, padding: '32px 28px 24px', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '32px 28px 24px', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, color: 'var(--accent-energy)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--cmg-teal)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
             Cliente creado correctamente
           </div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>Configuración inicial</h2>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--fg-primary)' }}>Configuración inicial</h2>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.5 }}>
             Sigue estos pasos para que el cliente empiece a recibir datos.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 28 }}>
           {WIZARD_STEPS.map((s, i) => (
-            <div key={s.num} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= step ? 'var(--accent-energy)' : 'var(--bg-elevated)', transition: 'background 0.2s' }} />
+            <div key={s.num} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= step ? 'var(--cmg-teal)' : 'var(--bg-elevated)', transition: 'background 0.2s' }} />
           ))}
         </div>
 
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '20px 18px', marginBottom: 20 }}>
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '20px 18px', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'var(--bg-surface)', border: '2px solid var(--accent-energy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: 'var(--bg-surface)', border: '2px solid var(--cmg-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
               {current.icon}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Paso {current.num} de {WIZARD_STEPS.length}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>{current.title}</div>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>{current.description}</p>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>Paso {current.num} de {WIZARD_STEPS.length}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 6 }}>{current.title}</div>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.6 }}>{current.description}</p>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-          <button onClick={() => goTo(current.path)} style={{ flex: 1, background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => goTo(current.path)} style={{ flex: 1, background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
             {current.cta}
           </button>
-          <button onClick={goNext} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--bg-border)', borderRadius: 6, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer' }}>
+          <button onClick={goNext} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-muted)', fontSize: 13, cursor: 'pointer' }}>
             {isLast ? 'Finalizar' : 'Siguiente'}
           </button>
         </div>
 
         <div style={{ textAlign: 'center' }}>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '4px 8px' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: '4px 8px' }}>
             Configurar más tarde
           </button>
         </div>
@@ -230,11 +230,11 @@ export default function TenantFormPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 12px', background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 6,
-    color: 'var(--text-primary)', fontSize: 14, boxSizing: 'border-box',
+    border: '1px solid var(--border)', borderRadius: 6,
+    color: 'var(--fg-primary)', fontSize: 14, boxSizing: 'border-box',
   }
   const inputErrorStyle: React.CSSProperties = {
-    ...inputStyle, border: '1px solid var(--accent-crit)',
+    ...inputStyle, border: '1px solid var(--danger)',
   }
 
   const mutationErrorMsg = (() => {
@@ -250,15 +250,15 @@ export default function TenantFormPage() {
   return (
     <Shell title={isEdit ? 'Editar cliente' : 'Nuevo cliente'}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px 16px', minHeight: '100%', overflowY: 'auto' }}>
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 12, padding: '28px 32px', width: '100%', maxWidth: 520, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-          <h2 style={{ margin: '0 0 24px', color: 'var(--text-primary)', fontSize: 20, fontWeight: 600 }}>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '28px 32px', width: '100%', maxWidth: 520, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+          <h2 style={{ margin: '0 0 24px', color: 'var(--fg-primary)', fontSize: 20, fontWeight: 600 }}>
             {isEdit ? 'Editar cliente' : 'Nuevo cliente'}
           </h2>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {!isEdit && user?.tenant_tier === 'cmg' && (
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Tipo de tenant
                 </div>
                 <div style={{ display: 'flex', gap: 16 }}>
@@ -271,7 +271,7 @@ export default function TenantFormPage() {
                         checked={tier === value}
                         onChange={() => setTier(value)}
                       />
-                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{label}</span>
+                      <span style={{ fontSize: 13, color: 'var(--fg-primary)' }}>{label}</span>
                     </label>
                   ))}
                 </div>
@@ -279,34 +279,34 @@ export default function TenantFormPage() {
             )}
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nombre</span>
+              <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Nombre</span>
               <input value={name} onChange={e => setName(e.target.value)} required style={inputStyle} />
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Slug (identificador único, solo letras minúsculas y guiones)</span>
+              <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Slug (identificador único, solo letras minúsculas y guiones)</span>
               <input
                 value={slug}
                 onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
                 required
-                style={{ ...inputStyle, fontFamily: 'var(--font-data)' }}
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
               />
             </label>
 
             {isEdit && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
-                <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>Activo</span>
+                <span style={{ color: 'var(--fg-primary)', fontSize: 14 }}>Activo</span>
               </label>
             )}
 
             {isEdit && (
-              <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 16, marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Datos legales (aparecerán en el PDF de partes)
                 </div>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>CIF / NIF</span>
+                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>CIF / NIF</span>
                   <input
                     value={businessCif}
                     onChange={e => setBusinessCif(e.target.value)}
@@ -316,7 +316,7 @@ export default function TenantFormPage() {
                   />
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Dirección fiscal</span>
+                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Dirección fiscal</span>
                   <input
                     value={businessAddress}
                     onChange={e => setBusinessAddress(e.target.value)}
@@ -330,7 +330,7 @@ export default function TenantFormPage() {
 
             {isEdit && tenant && (tenant.tier === 'client' || tenant.tier === 'subclient') && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Módulos habilitados
                 </div>
                 {AVAILABLE_MODULES.map(m => (
@@ -346,7 +346,7 @@ export default function TenantFormPage() {
                         }
                       }}
                     />
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{m.label}</span>
+                    <span style={{ fontSize: 13, color: 'var(--fg-primary)' }}>{m.label}</span>
                   </label>
                 ))}
               </div>
@@ -354,18 +354,18 @@ export default function TenantFormPage() {
 
             {/* Usuario admin — obligatorio en creación */}
             {!isEdit && (
-              <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 16, marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {tier === 'manufacturer' ? 'Usuario admin del fabricante' : 'Usuario admin del cliente'}
                 </div>
-                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.5 }}>
                   {tier === 'manufacturer'
                     ? 'Esta persona podrá entrar a la app y gestionar el fabricante.'
                     : 'Esta persona podrá entrar a la app y gestionar el cliente.'}
                 </p>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nombre completo</span>
+                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Nombre completo</span>
                   <input
                     type="text"
                     value={adminFullName}
@@ -374,12 +374,12 @@ export default function TenantFormPage() {
                     style={fieldErrors.adminFullName ? inputErrorStyle : inputStyle}
                   />
                   {fieldErrors.adminFullName && (
-                    <span style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{fieldErrors.adminFullName}</span>
+                    <span style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.adminFullName}</span>
                   )}
                 </label>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Email del administrador</span>
+                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Email del administrador</span>
                   <input
                     type="email"
                     value={adminEmail}
@@ -388,12 +388,12 @@ export default function TenantFormPage() {
                     style={fieldErrors.adminEmail ? inputErrorStyle : inputStyle}
                   />
                   {fieldErrors.adminEmail && (
-                    <span style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{fieldErrors.adminEmail}</span>
+                    <span style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.adminEmail}</span>
                   )}
                 </label>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Contraseña inicial</span>
+                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Contraseña inicial</span>
                   <input
                     type="text"
                     value={adminPassword}
@@ -402,26 +402,26 @@ export default function TenantFormPage() {
                     style={fieldErrors.adminPassword ? inputErrorStyle : inputStyle}
                   />
                   {fieldErrors.adminPassword
-                    ? <span style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{fieldErrors.adminPassword}</span>
-                    : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>El administrador deberá cambiarla en el primer acceso.</span>
+                    ? <span style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.adminPassword}</span>
+                    : <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>El administrador deberá cambiarla en el primer acceso.</span>
                   }
                 </label>
               </div>
             )}
 
             {mutationErrorMsg && (
-              <p style={{ color: 'var(--accent-crit)', fontSize: 13, margin: 0 }}>
+              <p style={{ color: 'var(--danger)', fontSize: 13, margin: 0 }}>
                 {mutationErrorMsg}
               </p>
             )}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
               <button type="submit" disabled={mutation.isPending}
-                style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '9px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
                 {mutation.isPending ? 'Guardando...' : 'Guardar'}
               </button>
               <button type="button" onClick={() => navigate('/clientes')}
-                style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '9px 20px', fontSize: 14, cursor: 'pointer' }}>
+                style={{ background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 6, padding: '9px 20px', fontSize: 14, cursor: 'pointer' }}>
                 Cancelar
               </button>
             </div>
