@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import TopNav from './TopNav'
+import Sidebar from './Sidebar'
 import { useIsMobile } from '../../lib/useIsMobile'
 
 interface ShellProps {
@@ -19,13 +20,15 @@ export default function Shell({ title, children }: ShellProps) {
 
   return (
     <>
+      {!isMobile && <Sidebar />}
       <TopNav />
       <main style={{
         marginTop: 'var(--topbar-h)',
+        marginLeft: isMobile ? 0 : 'var(--sidebar-w)',
         height: 'calc(100vh - var(--topbar-h))',
         overflow: isMobile ? 'auto' : 'hidden',
         overflowX: 'hidden',
-        padding: isMobile ? 0 : undefined,
+        transition: 'margin-left 200ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}>
         {children}
       </main>
