@@ -133,7 +133,7 @@ function DropdownMenu({ items, onClose }: DropdownMenuProps) {
       top: 'calc(100% + 6px)',
       right: 0,
       background: 'var(--bg-elevated)',
-      border: '1px solid var(--bg-border)',
+      border: '1px solid var(--border)',
       borderRadius: 8,
       minWidth: 200,
       padding: '4px 0',
@@ -150,11 +150,11 @@ function DropdownMenu({ items, onClose }: DropdownMenuProps) {
             alignItems: 'center',
             gap: 10,
             padding: '8px 14px',
-            fontFamily: 'var(--font-ui)',
+            fontFamily: 'var(--font-sans)',
             fontSize: 13,
-            color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+            color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
             textDecoration: 'none',
-            background: isActive ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
+            background: isActive ? 'color-mix(in srgb, var(--cmg-teal) 10%, transparent)' : 'transparent',
             transition: 'background 0.12s, color 0.12s',
           })}
         >
@@ -207,7 +207,7 @@ function MobileDrawer({
         left: 0,
         right: 0,
         background: 'var(--bg-surface)',
-        borderBottom: '1px solid var(--bg-border)',
+        borderBottom: '1px solid var(--border)',
         zIndex: 1200,
         display: 'flex',
         flexDirection: 'column',
@@ -216,8 +216,8 @@ function MobileDrawer({
       }}>
         {/* Reports sub-tabs if on reports page */}
         {isOnReports && setReportsTab && (
-          <div style={{ borderBottom: '1px solid var(--bg-border)', padding: '8px 0' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sección de reportes</div>
+          <div style={{ borderBottom: '1px solid var(--border)', padding: '8px 0' }}>
+            <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sección de reportes</div>
             {REPORTS_TABS.map(({ key, label }) => (
               <button
                 key={key}
@@ -227,10 +227,10 @@ function MobileDrawer({
                   alignItems: 'center',
                   width: '100%',
                   padding: '12px 16px',
-                  background: reportsTab === key ? 'color-mix(in srgb, var(--accent-energy) 12%, transparent)' : 'transparent',
-                  borderLeft: `3px solid ${reportsTab === key ? 'var(--accent-energy)' : 'transparent'}`,
-                  color: reportsTab === key ? 'var(--accent-energy)' : 'var(--text-muted)',
-                  fontFamily: 'var(--font-ui)',
+                  background: reportsTab === key ? 'color-mix(in srgb, var(--cmg-teal) 12%, transparent)' : 'transparent',
+                  borderLeft: `3px solid ${reportsTab === key ? 'var(--cmg-teal)' : 'transparent'}`,
+                  color: reportsTab === key ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
+                  fontFamily: 'var(--font-sans)',
                   fontSize: 14,
                   fontWeight: reportsTab === key ? 600 : 400,
                   textAlign: 'left',
@@ -254,12 +254,12 @@ function MobileDrawer({
                 alignItems: 'center',
                 gap: 12,
                 padding: '13px 16px',
-                color: isActive ? 'var(--accent-energy)' : 'var(--text-primary)',
+                color: isActive ? 'var(--cmg-teal)' : 'var(--fg-primary)',
                 textDecoration: 'none',
                 fontSize: 15,
                 fontWeight: isActive ? 600 : 400,
-                background: isActive ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
-                borderLeft: `3px solid ${isActive ? 'var(--accent-energy)' : 'transparent'}`,
+                background: isActive ? 'color-mix(in srgb, var(--cmg-teal) 10%, transparent)' : 'transparent',
+                borderLeft: `3px solid ${isActive ? 'var(--cmg-teal)' : 'transparent'}`,
               })}
             >
               <Icon width={18} height={18}/>
@@ -270,8 +270,8 @@ function MobileDrawer({
 
         {/* Operator section */}
         {showOperator && (
-          <div style={{ borderTop: '1px solid var(--bg-border)', padding: '8px 0' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operaciones</div>
+          <div style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
+            <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operaciones</div>
             {operatorItems.map(({ label, to, Icon }) => (
               <NavLink
                 key={to}
@@ -282,12 +282,12 @@ function MobileDrawer({
                   alignItems: 'center',
                   gap: 12,
                   padding: '11px 16px',
-                  color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                  color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
                   textDecoration: 'none',
                   fontSize: 14,
                   fontWeight: isActive ? 600 : 400,
-                  background: isActive ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
-                  borderLeft: `3px solid ${isActive ? 'var(--accent-energy)' : 'transparent'}`,
+                  background: isActive ? 'color-mix(in srgb, var(--cmg-teal) 10%, transparent)' : 'transparent',
+                  borderLeft: `3px solid ${isActive ? 'var(--cmg-teal)' : 'transparent'}`,
                 })}
               >
                 <Icon width={16} height={16}/>
@@ -299,8 +299,8 @@ function MobileDrawer({
 
         {/* Admin section */}
         {showAdmin && (
-          <div style={{ borderTop: '1px solid var(--bg-border)', padding: '8px 0' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{adminLabel}</div>
+          <div style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
+            <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{adminLabel}</div>
             {adminItems.map(({ label, to, Icon }) => (
               <NavLink
                 key={to}
@@ -311,12 +311,12 @@ function MobileDrawer({
                   alignItems: 'center',
                   gap: 12,
                   padding: '11px 16px',
-                  color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                  color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
                   textDecoration: 'none',
                   fontSize: 14,
                   fontWeight: isActive ? 600 : 400,
-                  background: isActive ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
-                  borderLeft: `3px solid ${isActive ? 'var(--accent-energy)' : 'transparent'}`,
+                  background: isActive ? 'color-mix(in srgb, var(--cmg-teal) 10%, transparent)' : 'transparent',
+                  borderLeft: `3px solid ${isActive ? 'var(--cmg-teal)' : 'transparent'}`,
                 })}
               >
                 <Icon width={16} height={16}/>
@@ -327,14 +327,14 @@ function MobileDrawer({
         )}
 
         {/* User footer */}
-        <div style={{ borderTop: '1px solid var(--bg-border)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{userEmail ?? '—'}</span>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, color: 'var(--fg-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{userEmail ?? '—'}</span>
           <button
             onClick={() => { onLogout(); onClose() }}
             style={{
-              fontSize: 13, color: 'var(--accent-crit)',
+              fontSize: 13, color: 'var(--danger)',
               background: 'none', border: 'none', cursor: 'pointer',
-              fontFamily: 'var(--font-ui)', fontWeight: 600, padding: '4px 8px',
+              fontFamily: 'var(--font-sans)', fontWeight: 600, padding: '4px 8px',
             }}
           >
             Salir
@@ -364,10 +364,10 @@ function TenantSelector() {
     gap: 6,
     padding: '6px 12px',
     borderRadius: 6,
-    border: activeTenantId ? '1px solid var(--accent-energy)' : '1px solid var(--bg-border)',
-    background: activeTenantId ? 'color-mix(in srgb, var(--accent-energy) 12%, transparent)' : 'transparent',
-    color: activeTenantId ? 'var(--accent-energy)' : 'var(--text-muted)',
-    fontFamily: 'var(--font-ui)',
+    border: activeTenantId ? '1px solid var(--cmg-teal)' : '1px solid var(--border)',
+    background: activeTenantId ? 'color-mix(in srgb, var(--cmg-teal) 12%, transparent)' : 'transparent',
+    color: activeTenantId ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
+    fontFamily: 'var(--font-sans)',
     fontSize: 13,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
@@ -379,10 +379,10 @@ function TenantSelector() {
     alignItems: 'center',
     width: '100%',
     padding: '8px 14px',
-    background: active ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
+    background: active ? 'color-mix(in srgb, var(--cmg-teal) 10%, transparent)' : 'transparent',
     border: 'none',
-    color: active ? 'var(--accent-energy)' : 'var(--text-primary)',
-    fontFamily: 'var(--font-ui)',
+    color: active ? 'var(--cmg-teal)' : 'var(--fg-primary)',
+    fontFamily: 'var(--font-sans)',
     fontSize: 13,
     cursor: 'pointer',
     textAlign: 'left',
@@ -407,7 +407,7 @@ function TenantSelector() {
           top: 'calc(100% + 6px)',
           right: 0,
           background: 'var(--bg-elevated)',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           minWidth: 230,
           maxHeight: 340,
@@ -419,7 +419,7 @@ function TenantSelector() {
           <button style={itemStyle(!activeTenantId)} onClick={() => { setActiveTenant(null, null); setOpen(false) }}>
             Todos los clientes
           </button>
-          <div style={{ height: 1, background: 'var(--bg-border)', margin: '4px 0' }}/>
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }}/>
           {tenants.map(t => (
             <button key={t.id} style={itemStyle(activeTenantId === t.id)} onClick={() => { setActiveTenant(t.id, t.name); setOpen(false) }}>
               {t.name}
@@ -471,10 +471,10 @@ export default function TopNav() {
     gap: 6,
     padding: '6px 12px',
     borderRadius: 6,
-    border: '1px solid var(--bg-border)',
+    border: '1px solid var(--border)',
     background: 'transparent',
-    color: 'var(--text-muted)',
-    fontFamily: 'var(--font-ui)',
+    color: 'var(--fg-tertiary)',
+    fontFamily: 'var(--font-sans)',
     fontSize: 13,
     cursor: 'pointer',
     transition: 'background 0.12s, color 0.12s',
@@ -489,13 +489,13 @@ export default function TopNav() {
       right: 0,
       height: 'var(--topbar-h, 52px)',
       background: 'var(--bg-surface)',
-      borderBottom: '1px solid var(--bg-border)',
+      borderBottom: '1px solid var(--border)',
       display: 'flex',
       alignItems: 'center',
       padding: '0 16px',
       gap: 8,
       zIndex: 1000,
-      fontFamily: 'var(--font-ui)',
+      fontFamily: 'var(--font-sans)',
     }}>
 
       {/* ── Logo ──────────────────────────────────────────────────────── */}
@@ -537,10 +537,10 @@ export default function TopNav() {
             onClick={() => setDrawerOpen(o => !o)}
             style={{
               background: 'none',
-              border: '1px solid var(--bg-border)',
+              border: '1px solid var(--border)',
               borderRadius: 6,
               padding: '5px 8px',
-              color: drawerOpen ? 'var(--accent-energy)' : 'var(--text-muted)',
+              color: drawerOpen ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
               display: 'flex',
               alignItems: 'center',
               cursor: 'pointer',
@@ -591,17 +591,17 @@ export default function TopNav() {
                     gap: 5,
                     padding: '0 12px 0 4px',
                     height: 'var(--topbar-h, 52px)',
-                    color: 'var(--text-muted)',
+                    color: 'var(--fg-tertiary)',
                     textDecoration: 'none',
                     fontSize: 13,
-                    borderRight: '1px solid var(--bg-border)',
+                    borderRight: '1px solid var(--border)',
                     marginRight: 4,
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
                     transition: 'color 0.15s',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-energy)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--cmg-teal)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--fg-tertiary)')}
                 >
                   ← Flota
                 </NavLink>
@@ -617,10 +617,10 @@ export default function TopNav() {
                     background: 'none',
                     border: 'none',
                     borderBottom: reportsTab === key
-                      ? '2px solid var(--accent-energy)'
+                      ? '2px solid var(--cmg-teal)'
                       : '2px solid transparent',
-                    color: reportsTab === key ? 'var(--accent-energy)' : 'var(--text-muted)',
-                    fontFamily: 'var(--font-ui)',
+                    color: reportsTab === key ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
+                    fontFamily: 'var(--font-sans)',
                     fontSize: 13,
                     fontWeight: reportsTab === key ? 600 : 400,
                     cursor: 'pointer',
@@ -645,9 +645,9 @@ export default function TopNav() {
                       gap: 7,
                       padding: '0 12px',
                       height: 'var(--topbar-h, 52px)',
-                      color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
+                      color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
                       borderBottom: isActive
-                        ? '2px solid var(--accent-energy)'
+                        ? '2px solid var(--cmg-teal)'
                         : '2px solid transparent',
                       textDecoration: 'none',
                       fontSize: 13,
@@ -734,7 +734,7 @@ export default function TopNav() {
                   top: 'calc(100% + 6px)',
                   right: 0,
                   background: 'var(--bg-elevated)',
-                  border: '1px solid var(--bg-border)',
+                  border: '1px solid var(--border)',
                   borderRadius: 8,
                   minWidth: 180,
                   padding: '4px 0',
@@ -744,8 +744,8 @@ export default function TopNav() {
                   <div style={{
                     padding: '8px 14px 6px',
                     fontSize: 11,
-                    color: 'var(--text-muted)',
-                    borderBottom: '1px solid var(--bg-border)',
+                    color: 'var(--fg-tertiary)',
+                    borderBottom: '1px solid var(--border)',
                     marginBottom: 4,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -762,13 +762,13 @@ export default function TopNav() {
                       background: 'none',
                       border: 'none',
                       textAlign: 'left',
-                      fontFamily: 'var(--font-ui)',
+                      fontFamily: 'var(--font-sans)',
                       fontSize: 13,
-                      color: 'var(--accent-crit)',
+                      color: 'var(--danger)',
                       cursor: 'pointer',
                       transition: 'background 0.12s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--accent-crit) 10%, transparent)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--danger) 10%, transparent)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >
                     Cerrar sesión

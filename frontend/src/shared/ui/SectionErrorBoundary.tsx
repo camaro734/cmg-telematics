@@ -21,17 +21,17 @@ export class SectionErrorBoundary extends Component<Props, State> {
       return (
         <div style={{
           padding: 24, background: 'var(--bg-surface)',
-          border: '1px solid var(--accent-crit)',
+          border: '1px solid var(--danger)',
           borderRadius: 8, margin: 8,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
         }}>
-          <span style={{ color: 'var(--accent-crit)', fontSize: 14 }}>
+          <span style={{ color: 'var(--danger)', fontSize: 14 }}>
             {this.props.label ? `Error en ${this.props.label}` : 'Error inesperado'}
           </span>
           <button
             onClick={() => this.setState({ error: null })}
             style={{
-              padding: '6px 16px', background: 'var(--accent-energy)',
+              padding: '6px 16px', background: 'var(--cmg-teal)',
               color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer',
             }}
           >

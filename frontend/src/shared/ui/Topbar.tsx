@@ -15,7 +15,7 @@ export default function Topbar({ title }: TopbarProps) {
       right: 0,
       height: 'var(--topbar-h)',
       background: 'var(--bg-surface)',
-      borderBottom: '1px solid var(--bg-border)',
+      borderBottom: '1px solid var(--border)',
       display: 'flex',
       alignItems: 'center',
       padding: '0 20px',
@@ -24,14 +24,14 @@ export default function Topbar({ title }: TopbarProps) {
     }}>
       <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{title}</span>
 
-      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+      <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
         {brandName ?? 'CMG Telematics'}
       </span>
 
       <span style={{
         fontSize: 12,
-        color: 'var(--text-dim)',
-        fontFamily: 'var(--font-data)',
+        color: 'var(--fg-dim)',
+        fontFamily: 'var(--font-mono)',
       }}>
         {user?.email}
       </span>
@@ -40,9 +40,9 @@ export default function Topbar({ title }: TopbarProps) {
         onClick={logout}
         style={{
           fontSize: 12,
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           padding: '4px 10px',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           background: 'transparent',
           cursor: 'pointer',

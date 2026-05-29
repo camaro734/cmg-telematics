@@ -20,7 +20,7 @@ export function SkeletonCard({ width = '100%', height = 140 }: Props) {
     <div style={{
       width, height, minWidth: typeof width === 'number' ? width : undefined,
       background: 'var(--bg-surface)',
-      border: '2px solid var(--bg-border)',
+      border: '2px solid var(--border)',
       borderRadius: 8,
       animation: 'cmg-skeleton-pulse 1.4s ease-in-out infinite',
     }} />
@@ -33,7 +33,7 @@ export function SkeletonRow({ height = 56 }: { height?: number }) {
     <div style={{
       width: '100%', height,
       background: 'var(--bg-surface)',
-      border: '1px solid var(--bg-border)',
+      border: '1px solid var(--border)',
       borderRadius: 8,
       animation: 'cmg-skeleton-pulse 1.4s ease-in-out infinite',
     }} />

@@ -33,8 +33,8 @@ function navLinkStyle({ isActive }: { isActive: boolean }) {
     width: 36, height: 36,
     borderRadius: 8,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-    background: isActive ? 'color-mix(in srgb, var(--accent-energy) 15%, transparent)' : 'transparent',
+    color: isActive ? 'var(--cmg-teal)' : 'var(--fg-muted)',
+    background: isActive ? 'var(--cmg-teal-soft)' : 'transparent',
     transition: 'background 0.15s, color 0.15s',
   } as const
 }
@@ -51,7 +51,7 @@ export default function Sidebar() {
       top: 0, left: 0, bottom: 0,
       width: 'var(--sidebar-w)',
       background: 'var(--bg-surface)',
-      borderRight: '1px solid var(--bg-border)',
+      borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -74,7 +74,7 @@ export default function Sidebar() {
               {label === 'Alertas' && alertCount > 0 && (
                 <span style={{
                   position: 'absolute', top: -6, right: -8,
-                  background: 'var(--accent-crit)',
+                  background: 'var(--danger)',
                   color: '#fff', borderRadius: 99,
                   fontSize: 9, fontWeight: 700, lineHeight: 1,
                   padding: '2px 4px', minWidth: 14, textAlign: 'center',
@@ -92,7 +92,7 @@ export default function Sidebar() {
               width: 36, height: 36,
               borderRadius: 8,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--bg-border)',
+              color: 'var(--border)',
               cursor: 'not-allowed',
             }}
           >

@@ -86,7 +86,7 @@ export default function GeofenceMapEditor({ polygon, onChange }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)' }}>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)' }}>
           {polygon.length === 0
             ? 'Haz clic en el mapa para añadir vértices al polígono'
             : polygon.length < 3
@@ -98,9 +98,9 @@ export default function GeofenceMapEditor({ polygon, onChange }: Props) {
             type="button"
             onClick={() => onChange([])}
             style={{
-              fontFamily: 'var(--font-ui)', fontSize: 11, padding: '3px 8px',
-              background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-              borderRadius: 4, color: 'var(--accent-crit)', cursor: 'pointer',
+              fontFamily: 'var(--font-sans)', fontSize: 11, padding: '3px 8px',
+              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+              borderRadius: 4, color: 'var(--danger)', cursor: 'pointer',
             }}
           >
             Borrar zona
@@ -112,7 +112,7 @@ export default function GeofenceMapEditor({ polygon, onChange }: Props) {
         style={{
           height: 280,
           borderRadius: 8,
-          border: `1px solid ${polygon.length >= 3 ? T_ORANGE : 'var(--bg-border)'}`,
+          border: `1px solid ${polygon.length >= 3 ? T_ORANGE : 'var(--border)'}`,
           overflow: 'hidden',
           background: T_BG,
           transition: 'border-color 0.2s',
