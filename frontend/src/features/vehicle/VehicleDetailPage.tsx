@@ -6,7 +6,7 @@ import Shell from '../../shared/ui/Shell'
 import Tabs from '../../shared/ui/Tabs'
 import VehicleHeader from './VehicleHeader'
 import TrackMap from './TrackMap'
-import SensorGrid from './SensorGrid'
+import { SensorWidget } from './SensorWidget'
 import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
@@ -382,61 +382,64 @@ export default function VehicleDetailPage() {
                   </div>
 
                   {/* TELEMETRÍA */}
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '7px 10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Telemetría</span>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '10px 12px' }}>
+                    {/* Barra de estado compacta */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
+                        Telemetría
+                      </span>
                       {status?.online
-                        ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600 }}>● En directo</span>
+                        ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span className="live-dot" style={{ width: 5, height: 5 }}/> En directo
+                          </span>
                         : status?.last_seen
-                          ? <span style={{ color: 'var(--danger)', fontSize: 10, fontWeight: 700 }}>⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h`; })()}</span>
+                          ? <span style={{ color: 'var(--danger)', fontSize: 10, fontWeight: 700 }}>
+                              ⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h` })()}
+                            </span>
                           : <span style={{ color: 'var(--danger)', fontSize: 10 }}>⚠ Sin señal</span>
                       }
-                      {status?.can_data && Object.keys(status.can_data).length > 0 && (
-                        <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 600 }}>
-                          📡 Completa
-                        </button>
+                      {status && (
+                        <>
+                          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: status.ignition ? 'var(--ok)' : 'var(--offline)', padding: '1px 6px', borderRadius: 4, background: status.ignition ? 'var(--ok-soft)' : 'rgba(100,116,139,0.15)' }}>
+                            IGN {status.ignition ? 'ON' : 'OFF'}
+                          </span>
+                          {(status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) && (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--cmg-teal)', padding: '1px 6px', borderRadius: 4, background: 'var(--cmg-teal-soft)' }}>PTO ON</span>
+                          )}
+                          {status.speed_kmh != null && status.speed_kmh > 0 && (
+                            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--fg-tertiary)' }}>{status.speed_kmh.toFixed(0)} km/h</span>
+                          )}
+                          {status.can_data && Object.keys(status.can_data).length > 0 && (
+                            <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 600 }}>
+                              📡 Completa
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
 
-                    {status && !status.online && (
-                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '5px 8px', marginBottom: 5, fontSize: 10, color: 'var(--fg-muted)' }}>
-                        Vehículo apagado o sin cobertura. Último dato conocido.
-                      </div>
-                    )}
-
+                    {/* Widget grid */}
                     {status ? (
-                      <>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
-                          <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--ok)' : 'var(--fg-muted)'} />
-                          <StatusCard label="PTO" value={status.online ? ((status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'var(--cmg-teal)' : 'var(--fg-muted)'} />
-                          <StatusCard label="Velocidad" value={status.online ? (status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—') : '—'} />
-                        </div>
-                        {status.last_seen && (
-                          <div style={{ fontSize: 9, color: 'var(--fg-muted)', marginBottom: 4 }}>
-                            Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        )}
-                        {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
-                            {sensorSchema.filter(s => s.gauge_type === 'led' && s.avl_id != null && s.visible_in_detail !== false).map(s => {
-                              const raw = status.can_data?.[`avl_${s.avl_id}`]
-                              const num = raw != null ? Number(raw) : 0
-                              const active = raw != null && (s.bit_index != null ? ((num >> s.bit_index) & 1) === 1 : num === 1)
-                              return <VDControlBadge key={s.avl_id} label={s.label} active={active} />
-                            })}
-                          </div>
-                        )}
-                        {sensorSchema.some(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led' && s.visible_in_detail !== false) && (
-                          <SensorGrid
-                            compact
-                            sensorSchema={sensorSchema.filter(s => s.gauge_type !== 'battery' && s.gauge_type !== 'led' && s.visible_in_detail !== false)}
-                            canData={{ ...(status.can_data ?? {}), ...(status.ext_voltage_mv != null ? { avl_66: status.ext_voltage_mv } : {}) }}
-                            derivedValues={derivedValues}
-                          />
-                        )}
-                      </>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10 }}>
+                        {sensorSchema
+                          .filter(s => s.visible_in_detail !== false)
+                          .map(s => {
+                            const rawVal: number | null = s.avl_id != null
+                              ? ((status.can_data?.[`avl_${s.avl_id}`] as number | undefined) ?? null)
+                              : s.kpi_key
+                                ? ((derivedValues as Record<string, number | null>)[s.kpi_key] ?? null)
+                                : null
+                            return <SensorWidget key={s.key} sensor={s} value={rawVal} />
+                          })}
+                      </div>
                     ) : (
                       <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
+                    )}
+
+                    {status?.last_seen && (
+                      <div style={{ fontSize: 9, color: 'var(--fg-dim)', marginTop: 8 }}>
+                        Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     )}
                   </div>
 
@@ -444,27 +447,48 @@ export default function VehicleDetailPage() {
                   {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
                     <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
                       <div style={{ fontFamily: 'var(--font-sans)', fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 5 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                         {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
                           const active = !!doutState[d.slot]
                           const loading = !!doutLoading[d.slot]
+                          const assocSensor = d.sensor_key ? sensorSchema.find(s => s.key === d.sensor_key) : null
+                          const assocRawVal: number | null = assocSensor?.avl_id != null
+                            ? ((status?.can_data?.[`avl_${assocSensor.avl_id}`] as number | undefined) ?? null)
+                            : null
+                          const assocVal = assocRawVal != null && assocSensor
+                            ? (assocRawVal * (assocSensor.scale ?? 1) + (assocSensor.offset ?? 0)).toFixed(1)
+                            : null
                           return (
-                            <button
-                              key={d.slot}
-                              title={`DOUT${d.slot}`}
-                              onClick={() => sendDout(d.slot)}
-                              disabled={loading}
-                              style={{
-                                background: active ? 'rgba(34,197,94,0.15)' : 'var(--bg-card)',
-                                border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
-                                borderRadius: 6, padding: '5px 8px', cursor: loading ? 'wait' : 'pointer',
-                                textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
-                                opacity: loading ? 0.7 : 1, transition: 'background 0.2s, border-color 0.2s',
-                              }}
-                            >
-                              <span style={{ fontSize: 11, color: active ? 'var(--ok)' : 'var(--fg-primary)', fontWeight: 600 }}>{d.label}</span>
-                              <span style={{ fontSize: 9, color: active ? 'var(--ok)' : 'var(--fg-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{active ? '●' : '○'}</span>
-                            </button>
+                            <div key={d.slot} style={{
+                              background: active ? 'var(--ok-soft)' : 'var(--bg-card)',
+                              border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
+                              borderRadius: 8, padding: '10px 12px',
+                              display: 'flex', flexDirection: 'column', gap: 6,
+                              transition: 'background 0.2s, border-color 0.2s',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)' }}>{d.label}</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: active ? 'var(--ok)' : 'var(--offline)' }}>
+                                  {active ? '● ON' : '○ OFF'}
+                                </span>
+                              </div>
+                              {assocVal != null && assocSensor && (
+                                <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                                  {assocVal} {assocSensor.unit}
+                                </div>
+                              )}
+                              <button onClick={() => sendDout(d.slot)} disabled={loading}
+                                style={{
+                                  background: active ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
+                                  border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
+                                  borderRadius: 6, padding: '5px 0', fontSize: 11, fontWeight: 600,
+                                  cursor: loading ? 'wait' : 'pointer', color: active ? 'var(--ok)' : 'var(--fg-tertiary)',
+                                  opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
+                                  transition: 'all 0.15s',
+                                }}>
+                                {loading ? '…' : active ? 'Desactivar' : 'Activar'}
+                              </button>
+                            </div>
                           )
                         })}
                       </div>
@@ -716,27 +740,6 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
   )
 }
 
-function StatusChip({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 1,
-      padding: '3px 7px',
-      background: 'var(--bg-card)',
-      border: `1px solid ${color ? `color-mix(in srgb, ${color} 30%, var(--border))` : 'var(--border)'}`,
-      borderRadius: 5,
-      minWidth: 52,
-    }}>
-      <span style={{ fontSize: 8, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: color ?? 'var(--fg-primary)', lineHeight: 1.1 }}>{value}</span>
-    </div>
-  )
-}
-
-function StatusCard({ label, value, color }: { label: string; value: string; color?: string }) {
-  return <StatusChip label={label} value={value} color={color} />
-}
-
-
 function VDKpiCard({ title, value, unit, color }: { title: string; value: string; unit?: string; color: string }) {
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px' }}>
@@ -749,20 +752,6 @@ function VDKpiCard({ title, value, unit, color }: { title: string; value: string
   )
 }
 
-function VDControlBadge({ label, active }: { label: string; active: boolean }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', borderRadius: 6, padding: '6px 10px' }}>
-      <span style={{ fontSize: 11, color: 'var(--fg-primary)' }}>{label}</span>
-      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
-        background: active ? 'color-mix(in srgb, var(--ok) 15%, transparent)' : 'transparent',
-        color: active ? 'var(--ok)' : 'var(--fg-muted)',
-        border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
-      }}>
-        {active ? 'On' : 'Off'}
-      </span>
-    </div>
-  )
-}
 
 function CommandStatusBadge({ status }: { status: CommandLogEntry['status'] }) {
   const map: Record<CommandLogEntry['status'], { label: string; color: string }> = {
