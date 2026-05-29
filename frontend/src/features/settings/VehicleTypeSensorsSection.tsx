@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { VehicleTypeOut, SensorDef } from '../../lib/types'
+import type { VehicleTypeOut, SensorDef, SensorIcon } from '../../lib/types'
 import { AVL_CATALOG, GROUP_LABELS, avlParamToSensorDef } from '../../lib/avlCatalog'
+import { SensorIconComponent, SENSOR_ICONS } from '../../shared/ui/gauges/SensorIconSet'
 
-const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'linear', 'battery', 'numeric', 'led']
+const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'led']
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -114,6 +115,22 @@ export default function VehicleTypeSensorsSection() {
 
   const activeAvlIds = new Set(selectedType?.sensor_schema.map(s => s.avl_id) ?? [])
 
+  const [expandedSensorKey, setExpandedSensorKey] = useState<string | null>(null)
+
+  const GAUGE_LABELS: Record<string, string> = {
+    circular: 'Circular', gauge_arc: 'Arco', linear: 'Barra',
+    tank: 'Cisterna', battery: 'Batería', numeric: 'Numérico', led: 'LED',
+  }
+  const ALL_GAUGE_TYPES: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'led']
+
+  function updateSensorField(sensor: SensorDef, field: string, val: unknown) {
+    if (!selectedType) return
+    const updated = selectedType.sensor_schema.map(s =>
+      s.key === sensor.key ? { ...s, [field]: val } : s
+    )
+    patchSchemaMutation.mutate({ id: selectedType.id, schema: updated })
+  }
+
   return (
     <div style={sectionStyle}>
       <h3 style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--fg-secondary)' }}>
@@ -160,27 +177,99 @@ export default function VehicleTypeSensorsSection() {
                   </thead>
                   <tbody>
                     {selectedType.sensor_schema.map(s => (
-                      <tr key={s.key} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '5px 8px', color: 'var(--fg-secondary)' }}>{s.label}</td>
-                        <td style={{ padding: '5px 8px', color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                          {s.avl_id != null ? `avl_${s.avl_id}` : '—'}
-                        </td>
-                        <td style={{ padding: '5px 8px', color: 'var(--offline)' }}>{s.gauge_type}</td>
-                        <td style={{ padding: '5px 8px', color: 'var(--offline)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                          {s.min ?? 0} / {s.max ?? 100}
-                        </td>
-                        <td style={{ padding: '5px 8px', color: 'var(--offline)' }}>{s.unit ?? '—'}</td>
-                        <td style={{ padding: '5px 8px' }}>
-                          <button
-                            onClick={() => handleRemove(s.avl_id)}
-                            disabled={patchSchemaMutation.isPending}
-                            title="Eliminar sensor"
-                            style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2 }}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
+                      <>
+                        <tr key={s.key} style={{ borderBottom: expandedSensorKey === s.key ? 'none' : '1px solid var(--border)' }}>
+                          <td style={{ padding: '5px 8px', color: 'var(--fg-secondary)' }}>{s.label}</td>
+                          <td style={{ padding: '5px 8px', color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                            {s.avl_id != null ? `avl_${s.avl_id}` : '—'}
+                          </td>
+                          <td style={{ padding: '5px 8px', color: 'var(--offline)' }}>{GAUGE_LABELS[s.gauge_type] ?? s.gauge_type}</td>
+                          <td style={{ padding: '5px 8px', color: 'var(--offline)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                            {s.min ?? 0} / {s.max ?? 100}
+                          </td>
+                          <td style={{ padding: '5px 8px', color: 'var(--offline)' }}>{s.unit ?? '—'}</td>
+                          <td style={{ padding: '5px 8px', whiteSpace: 'nowrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedSensorKey(expandedSensorKey === s.key ? null : s.key)}
+                              title="Configurar visualización"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--fg-dim)', padding: '2px 4px', marginRight: 4 }}
+                            >
+                              {expandedSensorKey === s.key ? '▲' : '▼'}
+                            </button>
+                            {s.icon && <SensorIconComponent icon={s.icon} size={12} />}
+                            <button
+                              onClick={() => handleRemove(s.avl_id)}
+                              disabled={patchSchemaMutation.isPending}
+                              title="Eliminar sensor"
+                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2, marginLeft: 4 }}
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedSensorKey === s.key && (
+                          <tr key={`${s.key}-expand`} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td colSpan={6} style={{ padding: '8px 8px 12px' }}>
+                              <div style={{ padding: '10px 12px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {/* Tipo de visual */}
+                                <div>
+                                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.05em', margin: '0 0 6px' }}>TIPO DE VISUAL</p>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                    {ALL_GAUGE_TYPES.map(gt => (
+                                      <button key={gt} type="button" onClick={() => updateSensorField(s, 'gauge_type', gt)}
+                                        style={{ padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)', background: s.gauge_type === gt ? 'var(--cmg-teal-soft)' : 'var(--bg-card)', border: `1px solid ${s.gauge_type === gt ? 'var(--cmg-teal-line)' : 'var(--border)'}`, color: s.gauge_type === gt ? 'var(--cmg-teal)' : 'var(--fg-tertiary)', transition: 'all 0.15s' }}>
+                                        {GAUGE_LABELS[gt]}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Icono */}
+                                <div>
+                                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.05em', margin: '0 0 6px' }}>ICONO</p>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                    {(Object.keys(SENSOR_ICONS) as SensorIcon[]).map(ic => (
+                                      <button key={ic} type="button" title={ic}
+                                        onClick={() => updateSensorField(s, 'icon', s.icon === ic ? undefined : ic)}
+                                        style={{ width: 32, height: 32, borderRadius: 6, cursor: 'pointer', background: s.icon === ic ? 'var(--cmg-teal-soft)' : 'var(--bg-card)', border: `1px solid ${s.icon === ic ? 'var(--cmg-teal-line)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.icon === ic ? 'var(--cmg-teal)' : 'var(--fg-dim)', transition: 'all 0.15s' }}>
+                                        <SensorIconComponent icon={ic} size={16} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Color y tamaño */}
+                                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                  <div>
+                                    <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.05em', margin: '0 0 6px' }}>COLOR</p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <input type="color" value={s.color ?? '#1D9E75'}
+                                        onChange={e => updateSensorField(s, 'color', e.target.value)}
+                                        style={{ width: 32, height: 28, padding: 2, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }} />
+                                      {s.color && (
+                                        <button type="button" onClick={() => updateSensorField(s, 'color', undefined)}
+                                          style={{ fontSize: 10, color: 'var(--fg-dim)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Quitar</button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.05em', margin: '0 0 6px' }}>TAMAÑO</p>
+                                    <div style={{ display: 'flex', gap: 4 }}>
+                                      {(['sm', 'md', 'lg'] as const).map(sz => (
+                                        <button key={sz} type="button" onClick={() => updateSensorField(s, 'widget_size', sz)}
+                                          style={{ padding: '3px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)', background: (s.widget_size ?? 'md') === sz ? 'var(--cmg-teal-soft)' : 'var(--bg-card)', border: `1px solid ${(s.widget_size ?? 'md') === sz ? 'var(--cmg-teal-line)' : 'var(--border)'}`, color: (s.widget_size ?? 'md') === sz ? 'var(--cmg-teal)' : 'var(--fg-tertiary)' }}>
+                                          {sz === 'sm' ? 'S' : sz === 'md' ? 'M' : 'L'}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))}
                   </tbody>
                 </table>
