@@ -14,7 +14,7 @@ function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
   if (polygon.length < 3) {
     return (
       <div style={{ width: W, height: H, background: 'var(--bg-elevated)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>Sin forma</span>
+        <span style={{ fontSize: 9, color: 'var(--fg-muted)' }}>Sin forma</span>
       </div>
     )
   }
@@ -30,7 +30,7 @@ function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
   const projected = polygon.map(toXY)
   const points = projected.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
   return (
-    <svg width={W} height={H} style={{ background: 'var(--bg-elevated)', borderRadius: 6, flexShrink: 0, border: '1px solid var(--bg-border)' }}>
+    <svg width={W} height={H} style={{ background: 'var(--bg-elevated)', borderRadius: 6, flexShrink: 0, border: '1px solid var(--border)' }}>
       <polygon points={points} fill="rgba(249,115,22,0.18)" stroke="#F97316" strokeWidth="1.5" />
       {projected.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="2.5" fill="#F97316" />)}
     </svg>
@@ -98,7 +98,7 @@ export default function GeofencesPage() {
   }
 
   const btnNew: React.CSSProperties = {
-    background: 'var(--accent-energy)', color: '#fff', border: 'none',
+    background: 'var(--cmg-teal)', color: '#fff', border: 'none',
     borderRadius: 7, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   }
 
@@ -110,7 +110,7 @@ export default function GeofencesPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Geocercas</h1>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '4px 0 0' }}>
               Zonas geográficas que generan alertas cuando un vehículo entra o sale de ellas
             </p>
           </div>
@@ -121,13 +121,13 @@ export default function GeofencesPage() {
 
         {/* Empty state */}
         {geofences.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: 12, border: '1px dashed var(--bg-border)' }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ marginBottom: 12 }}>
+          <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-surface)', borderRadius: 12, border: '1px dashed var(--border)' }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" strokeWidth="1.5" style={{ marginBottom: 12 }}>
               <polygon points="12,3 20,8 20,16 12,21 4,16 4,8" strokeDasharray="2 1.5" />
-              <circle cx="12" cy="12" r="2" fill="var(--text-muted)" stroke="none" />
+              <circle cx="12" cy="12" r="2" fill="var(--fg-muted)" stroke="none" />
             </svg>
-            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 4px' }}>No hay geocercas configuradas</p>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 18px' }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-secondary)', margin: '0 0 4px' }}>No hay geocercas configuradas</p>
+            <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '0 0 18px' }}>
               Dibuja una zona en el mapa para monitorizar entradas y salidas de tus vehículos
             </p>
             {isAdmin && <button style={btnNew} onClick={() => navigate('/rules/new?condition_type=geofence')}>
@@ -145,7 +145,7 @@ export default function GeofencesPage() {
               return (
                 <div key={rule.id} style={{
                   background: 'var(--bg-surface)', borderRadius: 10,
-                  border: '1px solid var(--bg-border)', padding: '14px 16px',
+                  border: '1px solid var(--border)', padding: '14px 16px',
                   display: 'flex', gap: 14, alignItems: 'center',
                 }}>
                   <PolygonPreview polygon={polygon} />
@@ -156,45 +156,45 @@ export default function GeofencesPage() {
                       <span style={{
                         fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase',
                         background: rule.active ? 'rgba(34,197,94,0.12)' : 'var(--bg-elevated)',
-                        color: rule.active ? 'var(--accent-ok)' : 'var(--text-muted)',
-                        border: `1px solid ${rule.active ? 'rgba(34,197,94,0.4)' : 'var(--bg-border)'}`,
+                        color: rule.active ? 'var(--ok)' : 'var(--fg-muted)',
+                        border: `1px solid ${rule.active ? 'rgba(34,197,94,0.4)' : 'var(--border)'}`,
                       }}>
                         {rule.active ? 'Activa' : 'Inactiva'}
                       </span>
                       <span style={{
                         fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase',
                         background: rule.severity === 'critical' ? 'rgba(239,68,68,0.15)' : rule.severity === 'warning' ? 'rgba(234,179,8,0.15)' : 'rgba(56,189,248,0.15)',
-                        color: rule.severity === 'critical' ? 'var(--accent-crit)' : rule.severity === 'warning' ? 'var(--accent-warn)' : 'var(--accent-info)',
+                        color: rule.severity === 'critical' ? 'var(--danger)' : rule.severity === 'warning' ? 'var(--warn)' : 'var(--info)',
                       }}>
                         {rule.severity}
                       </span>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
                         Dispara al{' '}
-                        <b style={{ color: action === 'enter' ? 'var(--accent-ok)' : 'var(--accent-warn)' }}>
+                        <b style={{ color: action === 'enter' ? 'var(--ok)' : 'var(--warn)' }}>
                           {action === 'enter' ? 'entrar en la zona' : 'salir de la zona'}
                         </b>
                       </span>
-                      <span style={{ fontSize: 10, color: 'var(--bg-border)' }}>•</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeLabel(rule)}</span>
-                      <span style={{ fontSize: 10, color: 'var(--bg-border)' }}>•</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{polygon.length} vértices</span>
+                      <span style={{ fontSize: 10, color: 'var(--border)' }}>•</span>
+                      <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{scopeLabel(rule)}</span>
+                      <span style={{ fontSize: 10, color: 'var(--border)' }}>•</span>
+                      <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{polygon.length} vértices</span>
                     </div>
                     {rule.description && (
-                      <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>{rule.description}</p>
+                      <p style={{ fontSize: 11, color: 'var(--fg-muted)', margin: '4px 0 0' }}>{rule.description}</p>
                     )}
                   </div>
 
                   {isAdmin && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                     <button
-                      style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
+                      style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
                       onClick={() => navigate(`/rules/${rule.id}`)}
                     >
                       Editar
                     </button>
                     <button
-                      style={{ background: 'transparent', color: 'var(--accent-crit)', border: '1px solid var(--accent-crit)', borderRadius: 6, padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 500, opacity: isDeleting ? 0.5 : 1 }}
+                      style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 6, padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 500, opacity: isDeleting ? 0.5 : 1 }}
                       onClick={() => handleDelete(rule)}
                       disabled={isDeleting}
                     >

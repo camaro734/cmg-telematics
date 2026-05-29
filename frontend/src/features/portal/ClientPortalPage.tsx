@@ -174,7 +174,7 @@ export default function ClientPortalPage() {
       {/* Header */}
       <header style={{
         background: 'var(--bg-surface, #292524)',
-        borderBottom: '1px solid var(--bg-border, #57534E)',
+        borderBottom: '1px solid var(--border, #57534E)',
         padding: '12px 24px',
         display: 'flex',
         alignItems: 'center',
@@ -185,10 +185,10 @@ export default function ClientPortalPage() {
           <img src={tenant.logo_url} alt="logo" style={{ height: 36, objectFit: 'contain' }}/>
         )}
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary, #E7E5E4)' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-primary, #E7E5E4)' }}>
             {tenant.brand_name ?? tenant.name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted, #78716C)' }}>
+          <div style={{ fontSize: 11, color: 'var(--fg-muted, #78716C)' }}>
             Portal de seguimiento
           </div>
         </div>
@@ -198,7 +198,7 @@ export default function ClientPortalPage() {
             <div style={{ fontSize: 10, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En ruta</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary, #E7E5E4)' }}>{vehicles.length}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--fg-primary, #E7E5E4)' }}>{vehicles.length}</div>
             <div style={{ fontSize: 10, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehículos</div>
           </div>
         </div>
@@ -232,7 +232,7 @@ export default function ClientPortalPage() {
         <div style={{
           width: 340,
           background: 'var(--bg-surface, #292524)',
-          borderLeft: '1px solid var(--bg-border, #57534E)',
+          borderLeft: '1px solid var(--border, #57534E)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',

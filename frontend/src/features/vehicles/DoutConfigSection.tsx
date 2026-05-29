@@ -14,8 +14,8 @@ const emptyDoutForm: DoutFormState = { slot: '1', label: '', enabled: true }
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--border)',
+  color: 'var(--fg-primary)',
   borderRadius: 6,
   padding: '6px 10px',
   fontSize: 13,
@@ -25,7 +25,7 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   fontWeight: 600,
   letterSpacing: '0.04em',
   marginBottom: 4,
@@ -33,7 +33,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--accent-energy)',
+  background: 'var(--cmg-teal)',
   color: '#fff',
   border: 'none',
   borderRadius: 6,
@@ -45,8 +45,8 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-primary)',
-  border: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '7px 16px',
   fontSize: 13,
@@ -114,7 +114,7 @@ export default function DoutConfigSection({ typeId, selectedType }: Props) {
     <>
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Salidas digitales (controles de mando)
           </span>
           {(selectedType.dout_config ?? []).length < 4 && (
@@ -122,33 +122,33 @@ export default function DoutConfigSection({ typeId, selectedType }: Props) {
           )}
         </div>
         {(selectedType.dout_config ?? []).length === 0 ? (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin salidas configuradas. Máximo 4 (DOUT1–DOUT4 del FMC650).</p>
+          <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin salidas configuradas. Máximo 4 (DOUT1–DOUT4 del FMC650).</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['DOUT', 'ETIQUETA', 'HABILITADO', ''].map(h => (
-                  <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
+                  <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--fg-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {(selectedType.dout_config ?? []).map((d, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-data)', color: 'var(--accent-energy)' }}>DOUT{d.slot}</td>
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', color: 'var(--cmg-teal)' }}>DOUT{d.slot}</td>
                   <td style={{ padding: '6px 8px', fontWeight: 600 }}>{d.label}</td>
                   <td style={{ padding: '6px 8px' }}>
                     <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
-                      background: d.enabled ? 'color-mix(in srgb, var(--accent-ok) 15%, transparent)' : 'transparent',
-                      color: d.enabled ? 'var(--accent-ok)' : 'var(--text-muted)',
-                      border: `1px solid ${d.enabled ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+                      background: d.enabled ? 'color-mix(in srgb, var(--ok) 15%, transparent)' : 'transparent',
+                      color: d.enabled ? 'var(--ok)' : 'var(--fg-muted)',
+                      border: `1px solid ${d.enabled ? 'var(--ok)' : 'var(--border)'}`,
                     }}>
                       {d.enabled ? 'Sí' : 'No'}
                     </span>
                   </td>
                   <td style={{ padding: '6px 8px', display: 'flex', gap: 6 }}>
                     <button style={btnSecondary} onClick={() => openEditDout(d, idx)}>✎</button>
-                    <button style={{ ...btnSecondary, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }} onClick={() => deleteDout(idx)}>✕</button>
+                    <button style={{ ...btnSecondary, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => deleteDout(idx)}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -162,8 +162,8 @@ export default function DoutConfigSection({ typeId, selectedType }: Props) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}
           onClick={e => { if (e.target === e.currentTarget) setShowDoutModal(false) }}
         >
-          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--bg-border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--fg-primary)' }}>
               {editingDoutIdx === null ? 'Nueva salida digital' : 'Editar salida digital'}
             </h3>
             <div>
@@ -181,12 +181,12 @@ export default function DoutConfigSection({ typeId, selectedType }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input type="checkbox" id="dout-enabled" checked={doutForm.enabled}
                 onChange={e => setDoutForm(f => ({ ...f, enabled: e.target.checked }))} />
-              <label htmlFor="dout-enabled" style={{ fontSize: 13, color: 'var(--text-primary)', cursor: 'pointer' }}>
+              <label htmlFor="dout-enabled" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
                 Habilitado (visible en controles de mando)
               </label>
             </div>
             {updateDoutMutation.isError && (
-              <div style={{ fontSize: 12, color: 'var(--accent-crit)' }}>
+              <div style={{ fontSize: 12, color: 'var(--danger)' }}>
                 {(updateDoutMutation.error as Error).message}
               </div>
             )}

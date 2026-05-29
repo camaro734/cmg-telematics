@@ -11,8 +11,8 @@ import { useAuthStore } from '../auth/useAuthStore'
 
 const inputStyle = {
   background: 'var(--bg-elevated)',
-  border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--border)',
+  color: 'var(--fg-primary)',
   borderRadius: 6,
   padding: '7px 10px',
   fontSize: 13,
@@ -23,7 +23,7 @@ const inputStyle = {
 const labelStyle = {
   display: 'block',
   fontSize: 11,
-  color: 'var(--text-muted)',
+  color: 'var(--fg-muted)',
   marginBottom: 4,
   textTransform: 'uppercase' as const,
   letterSpacing: '0.05em',
@@ -33,9 +33,9 @@ const thStyle = {
   textAlign: 'left' as const,
   fontSize: 11,
   fontWeight: 600,
-  color: 'var(--text-muted)',
+  color: 'var(--fg-muted)',
   padding: '8px 12px',
-  borderBottom: '1px solid var(--bg-border)',
+  borderBottom: '1px solid var(--border)',
   whiteSpace: 'nowrap' as const,
   textTransform: 'uppercase' as const,
   letterSpacing: '0.04em',
@@ -44,8 +44,8 @@ const thStyle = {
 const tdStyle = {
   padding: '10px 12px',
   fontSize: 13,
-  color: 'var(--text-primary)',
-  borderBottom: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)',
+  borderBottom: '1px solid var(--border)',
   whiteSpace: 'nowrap' as const,
 } as const
 
@@ -276,7 +276,7 @@ export default function VehiclesPage() {
           {isAdmin && <button
             onClick={openCreate}
             style={{
-              background: 'var(--accent-energy)',
+              background: 'var(--cmg-teal)',
               color: '#fff',
               border: 'none',
               borderRadius: 6,
@@ -293,16 +293,16 @@ export default function VehiclesPage() {
         {/* Tabla */}
         <div style={{
           background: 'var(--bg-surface)',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           overflow: 'hidden',
         }}>
           {vehiclesLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>
               Cargando vehículos…
             </div>
           ) : vehicles.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>
               No hay vehículos registrados. Pulsa <strong>+ Nuevo vehículo</strong> para empezar.
             </div>
           ) : (
@@ -330,10 +330,10 @@ export default function VehiclesPage() {
                         style={{ transition: 'background 0.1s' }}
                       >
                         <td style={{ ...tdStyle, fontWeight: 600 }}>
-                          {v.license_plate ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          {v.license_plate ?? <span style={{ color: 'var(--fg-muted)' }}>—</span>}
                         </td>
-                        <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', fontSize: 12 }}>
-                          {v.vin ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                          {v.vin ?? <span style={{ color: 'var(--fg-muted)' }}>—</span>}
                         </td>
                         <td style={tdStyle}>
                           {typeMap.get(v.vehicle_type_id) ?? '—'}
@@ -346,28 +346,28 @@ export default function VehiclesPage() {
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <span style={{
                                 width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                                background: dev.online ? 'var(--accent-ok)' : 'var(--accent-off)',
+                                background: dev.online ? 'var(--ok)' : 'var(--offline)',
                               }} />
                               <span style={{
-                                fontFamily: 'var(--font-data)', fontSize: 12,
-                                color: dev.online ? 'var(--accent-ok)' : 'var(--text-muted)',
+                                fontFamily: 'var(--font-mono)', fontSize: 12,
+                                color: dev.online ? 'var(--ok)' : 'var(--fg-muted)',
                               }}>
                                 {dev.imei}
                               </span>
                             </span>
                           ) : (
-                            <span style={{ color: 'var(--accent-warn)', fontSize: 12 }}>Sin dispositivo</span>
+                            <span style={{ color: 'var(--warn)', fontSize: 12 }}>Sin dispositivo</span>
                           )}
                         </td>
-                        <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: 12 }}>
+                        <td style={{ ...tdStyle, color: 'var(--fg-muted)', fontSize: 12 }}>
                           {dev?.last_seen ? formatLastSeen(dev.last_seen) : '—'}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>
                           {isAdmin && <button
                             onClick={() => openEdit(v)}
                             style={{
-                              background: 'var(--bg-border)',
-                              color: 'var(--text-primary)',
+                              background: 'var(--border)',
+                              color: 'var(--fg-primary)',
                               border: 'none',
                               borderRadius: 4,
                               padding: '4px 10px',
@@ -388,7 +388,7 @@ export default function VehiclesPage() {
         </div>
 
         {!vehiclesLoading && vehicles.length > 0 && (
-          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--fg-muted)' }}>
             {vehicles.length} vehículo{vehicles.length !== 1 ? 's' : ''}
           </div>
         )}
@@ -407,7 +407,7 @@ export default function VehiclesPage() {
         >
           <div style={{
             background: 'var(--bg-surface)',
-            border: '1px solid var(--bg-border)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
             padding: 28,
             width: 460,
@@ -417,12 +417,12 @@ export default function VehiclesPage() {
           }}>
             {/* Cabecera modal */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)' }}>
                 {modal === 'create' ? 'Nuevo vehículo' : 'Editar vehículo'}
               </h2>
               <button
                 onClick={closeModal}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}
+                style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}
               >✕</button>
             </div>
 
@@ -451,7 +451,7 @@ export default function VehiclesPage() {
                   placeholder="17 caracteres"
                   maxLength={17}
                   required
-                  style={{ ...inputStyle, fontFamily: 'var(--font-data)' }}
+                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
                 />
               </div>
 
@@ -484,8 +484,8 @@ export default function VehiclesPage() {
               </div>
 
               {/* Separador opcionales */}
-              <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Opcional
                 </div>
 
@@ -530,7 +530,7 @@ export default function VehiclesPage() {
                     ))}
                   </select>
                   {modal === 'edit' && (
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 4 }}>
                       El cliente no se puede cambiar una vez asignado.
                     </div>
                   )}
@@ -538,8 +538,8 @@ export default function VehiclesPage() {
               </div>
 
               {/* Sección dispositivo GPS */}
-              <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Dispositivo GPS
                 </div>
 
@@ -548,15 +548,15 @@ export default function VehiclesPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{
                       width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                      background: editingDevice.online ? 'var(--accent-ok)' : 'var(--accent-off)',
+                      background: editingDevice.online ? 'var(--ok)' : 'var(--offline)',
                     }} />
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 13, color: 'var(--text-primary)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--fg-primary)' }}>
                       {editingDevice.imei}
                     </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                       {editingDevice.online ? 'Online' : 'Offline'}
                     </span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--fg-muted)', marginLeft: 4 }}>
                       — Para cambiar el dispositivo usa la página de Dispositivos
                     </span>
                   </div>
@@ -570,9 +570,9 @@ export default function VehiclesPage() {
                       onChange={e => setField('imei', e.target.value.replace(/\D/g, ''))}
                       placeholder="15 dígitos (opcional)"
                       maxLength={15}
-                      style={{ ...inputStyle, fontFamily: 'var(--font-data)' }}
+                      style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
                     />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 4 }}>
                       El dispositivo quedará vinculado automáticamente al guardar.
                     </div>
                   </div>
@@ -583,8 +583,8 @@ export default function VehiclesPage() {
               {error && (
                 <div style={{
                   background: 'rgba(239,68,68,0.1)',
-                  border: '1px solid var(--accent-crit)',
-                  color: 'var(--accent-crit)',
+                  border: '1px solid var(--danger)',
+                  color: 'var(--danger)',
                   borderRadius: 6,
                   padding: '8px 12px',
                   fontSize: 13,
@@ -599,8 +599,8 @@ export default function VehiclesPage() {
                   type="button"
                   onClick={closeModal}
                   style={{
-                    background: 'var(--bg-elevated)', color: 'var(--text-muted)',
-                    border: '1px solid var(--bg-border)', borderRadius: 6,
+                    background: 'var(--bg-elevated)', color: 'var(--fg-muted)',
+                    border: '1px solid var(--border)', borderRadius: 6,
                     padding: '8px 16px', fontSize: 13, cursor: 'pointer',
                   }}
                 >
@@ -610,8 +610,8 @@ export default function VehiclesPage() {
                   type="submit"
                   disabled={saving}
                   style={{
-                    background: saving ? 'var(--bg-elevated)' : 'var(--accent-energy)',
-                    color: saving ? 'var(--text-muted)' : '#fff',
+                    background: saving ? 'var(--bg-elevated)' : 'var(--cmg-teal)',
+                    color: saving ? 'var(--fg-muted)' : '#fff',
                     border: 'none', borderRadius: 6,
                     padding: '8px 20px', fontSize: 13, fontWeight: 600,
                     cursor: saving ? 'not-allowed' : 'pointer',

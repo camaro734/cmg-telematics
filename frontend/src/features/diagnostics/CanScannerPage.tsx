@@ -71,7 +71,7 @@ interface CanRecord {
 }
 
 function Badge({ on, label }: { on: boolean | null; label: string }) {
-  const color = on == null ? 'var(--accent-off)' : on ? 'var(--accent-ok)' : 'var(--accent-off)'
+  const color = on == null ? 'var(--offline)' : on ? 'var(--ok)' : 'var(--offline)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
@@ -286,8 +286,8 @@ export default function CanScannerPage() {
 
   const inputStyle = {
     background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)',
-    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    color: 'var(--fg-primary)',
     borderRadius: 6,
     padding: '6px 10px',
     fontSize: 13,
@@ -307,7 +307,7 @@ export default function CanScannerPage() {
           <button
             onClick={() => setRefreshCount(c => c + 1)}
             disabled={!vehicleId}
-            style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '6px 14px', fontSize: 13, cursor: vehicleId ? 'pointer' : 'not-allowed' }}
+            style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', fontSize: 13, cursor: vehicleId ? 'pointer' : 'not-allowed' }}
           >
             ↻ Actualizar
           </button>
@@ -316,9 +316,9 @@ export default function CanScannerPage() {
             onClick={() => setAutoRefresh(a => !a)}
             disabled={!vehicleId}
             style={{
-              background: autoRefresh ? 'var(--accent-ok)' : 'var(--bg-elevated)',
-              color: autoRefresh ? '#fff' : 'var(--text-primary)',
-              border: '1px solid var(--bg-border)',
+              background: autoRefresh ? 'var(--ok)' : 'var(--bg-elevated)',
+              color: autoRefresh ? '#fff' : 'var(--fg-primary)',
+              border: '1px solid var(--border)',
               borderRadius: 6, padding: '6px 14px', fontSize: 13,
               cursor: vehicleId ? 'pointer' : 'not-allowed',
               fontWeight: autoRefresh ? 600 : 400,
@@ -330,66 +330,66 @@ export default function CanScannerPage() {
           {records.length > 0 && (
             <button
               onClick={handleExport}
-              style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+              style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
             >
               Exportar CSV
             </button>
           )}
 
           {dataUpdatedAt > 0 && (
-            <span style={{ fontSize: 11, color: 'var(--accent-off)' }}>
+            <span style={{ fontSize: 11, color: 'var(--offline)' }}>
               Última actualización: {new Date(dataUpdatedAt).toLocaleTimeString('es-ES')}
             </span>
           )}
 
           {vehicleId && (wsActive ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--accent-ok)', fontWeight: 600 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-ok)' }} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--ok)', fontWeight: 600 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok)' }} />
               WS en vivo
             </span>
           ) : (
-            <span style={{ fontSize: 11, color: 'var(--accent-off)' }}>Polling</span>
+            <span style={{ fontSize: 11, color: 'var(--offline)' }}>Polling</span>
           ))}
         </div>
 
         {!vehicleId && (
-          <div style={{ color: 'var(--accent-off)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>
+          <div style={{ color: 'var(--offline)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>
             Selecciona un cliente y un vehículo para ver los datos CAN en tiempo real.
           </div>
         )}
 
         {vehicleId && isLoading && (
-          <div style={{ color: 'var(--accent-off)', fontSize: 13 }}>Cargando datos…</div>
+          <div style={{ color: 'var(--offline)', fontSize: 13 }}>Cargando datos…</div>
         )}
 
         {vehicleId && !isLoading && records.length === 0 && (
-          <div style={{ color: 'var(--accent-off)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>
+          <div style={{ color: 'var(--offline)', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>
             Sin datos en las últimas 2 horas para este vehículo.
           </div>
         )}
 
         {labelingKey && vehicleType && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 420, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, width: 420, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
                 Etiquetar{' '}
-                <span style={{ fontFamily: 'var(--font-data)', color: 'var(--accent-energy)' }}>{labelingKey}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--cmg-teal)' }}>{labelingKey}</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--accent-off)', lineHeight: 1.5 }}>
-                Tipo de vehículo: <strong style={{ color: 'var(--text-primary)' }}>{vehicleType.name}</strong>.
+              <div style={{ fontSize: 11, color: 'var(--offline)', lineHeight: 1.5 }}>
+                Tipo de vehículo: <strong style={{ color: 'var(--fg-primary)' }}>{vehicleType.name}</strong>.
                 Los nombres serán visibles en todos los vehículos de este tipo.
               </div>
 
               {/* Selector de modo */}
-              <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--bg-border)' }}>
+              <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
                 {(['numeric', 'bits'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => setLabelMode(mode)}
                     style={{
                       flex: 1, padding: '7px 0', fontSize: 12, border: 'none', cursor: 'pointer',
-                      background: labelMode === mode ? 'var(--accent-energy)' : 'var(--bg-elevated)',
-                      color: labelMode === mode ? '#fff' : 'var(--accent-off)',
+                      background: labelMode === mode ? 'var(--cmg-teal)' : 'var(--bg-elevated)',
+                      color: labelMode === mode ? '#fff' : 'var(--offline)',
                       fontWeight: labelMode === mode ? 600 : 400,
                     }}
                   >
@@ -406,19 +406,19 @@ export default function CanScannerPage() {
                     value={labelForm.label}
                     onChange={e => setLabelForm(f => ({ ...f, label: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && saveLabel()}
-                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
                   />
                   <input
                     placeholder="Unidad (ej. bar, °C, %) — opcional"
                     value={labelForm.unit}
                     onChange={e => setLabelForm(f => ({ ...f, unit: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && saveLabel()}
-                    style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 5, padding: '7px 10px', fontSize: 13 }}
                   />
                 </>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 11, color: 'var(--accent-off)', marginBottom: 2 }}>
+                  <div style={{ fontSize: 11, color: 'var(--offline)', marginBottom: 2 }}>
                     Activa los bits que quieras etiquetar (bit 0 = bit menos significativo):
                   </div>
                   {bitForms.map((b, i) => (
@@ -427,9 +427,9 @@ export default function CanScannerPage() {
                         type="checkbox"
                         checked={b.enabled}
                         onChange={e => setBitForms(f => f.map((x, j) => j === i ? { ...x, enabled: e.target.checked } : x))}
-                        style={{ accentColor: 'var(--accent-energy)', width: 14, height: 14, flexShrink: 0 }}
+                        style={{ accentColor: 'var(--cmg-teal)', width: 14, height: 14, flexShrink: 0 }}
                       />
-                      <span style={{ fontSize: 11, fontFamily: 'var(--font-data)', color: 'var(--accent-off)', width: 34, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--offline)', width: 34, flexShrink: 0 }}>
                         bit {i}
                       </span>
                       <input
@@ -438,8 +438,8 @@ export default function CanScannerPage() {
                         value={b.label}
                         onChange={e => setBitForms(f => f.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
                         style={{
-                          flex: 1, background: 'var(--bg-elevated)', color: b.enabled ? 'var(--text-primary)' : 'var(--accent-off)',
-                          border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px', fontSize: 12,
+                          flex: 1, background: 'var(--bg-elevated)', color: b.enabled ? 'var(--fg-primary)' : 'var(--offline)',
+                          border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 12,
                           opacity: b.enabled ? 1 : 0.4,
                         }}
                       />
@@ -449,19 +449,19 @@ export default function CanScannerPage() {
               )}
 
               {patchSchemaMutation.isError && (
-                <div style={{ fontSize: 11, color: 'var(--accent-crit)' }}>{(patchSchemaMutation.error as Error).message}</div>
+                <div style={{ fontSize: 11, color: 'var(--danger)' }}>{(patchSchemaMutation.error as Error).message}</div>
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setLabelingKey(null)}
-                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--bg-border)', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}
+                  style={{ padding: '6px 14px', background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={saveLabel}
                   disabled={patchSchemaMutation.isPending || (labelMode === 'numeric' ? !labelForm.label.trim() : !bitForms.some(b => b.enabled && b.label.trim()))}
-                  style={{ padding: '6px 14px', background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 600, opacity: patchSchemaMutation.isPending ? 0.7 : 1 }}
+                  style={{ padding: '6px 14px', background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 600, opacity: patchSchemaMutation.isPending ? 0.7 : 1 }}
                 >
                   {patchSchemaMutation.isPending ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -477,9 +477,9 @@ export default function CanScannerPage() {
           const ageLabel = ageSec < 60 ? 'hace menos de 1 min'
             : ageMin === 1 ? 'hace 1 min'
             : `hace ${ageMin} min`
-          const ageColor = ageSec < 120 ? 'var(--accent-ok)'
-            : ageSec < 600 ? 'var(--accent-warn)'
-            : 'var(--accent-crit)'
+          const ageColor = ageSec < 120 ? 'var(--ok)'
+            : ageSec < 600 ? 'var(--warn)'
+            : 'var(--danger)'
           const isStale = ageSec >= 300   // > 5 min
           const isVeryStale = ageSec >= 600 // > 10 min
           return (
@@ -488,11 +488,11 @@ export default function CanScannerPage() {
             {isStale && (
               <div style={{
                 background: isVeryStale ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
-                border: `1px solid ${isVeryStale ? 'var(--accent-crit)' : 'var(--accent-warn)'}`,
+                border: `1px solid ${isVeryStale ? 'var(--danger)' : 'var(--warn)'}`,
                 borderRadius: 8,
                 padding: '10px 16px',
                 fontSize: 13,
-                color: isVeryStale ? 'var(--accent-crit)' : 'var(--accent-warn)',
+                color: isVeryStale ? 'var(--danger)' : 'var(--warn)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -508,8 +508,8 @@ export default function CanScannerPage() {
             )}
 
             {/* Live snapshot */}
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: 16, opacity: isVeryStale ? 0.75 : 1 }}>
-              <div style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, opacity: isVeryStale ? 0.75 : 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span>ESTADO ACTUAL — {new Date(latest.time).toLocaleString('es-ES')}</span>
                 <span style={{
                   fontSize: 11, fontWeight: 700, color: ageColor,
@@ -519,7 +519,7 @@ export default function CanScannerPage() {
                   {ageLabel}
                 </span>
                 {vehicleType && (
-                  <span style={{ color: 'var(--accent-energy)', fontWeight: 400 }}>
+                  <span style={{ color: 'var(--cmg-teal)', fontWeight: 400 }}>
                     Tipo: {vehicleType.name}
                   </span>
                 )}
@@ -529,17 +529,17 @@ export default function CanScannerPage() {
               <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 12 }}>
                 <Badge on={latest.ignition} label="Ignición" />
                 <Badge on={latest.pto_active} label="PTO" />
-                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                  Velocidad: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.speed_kmh?.toFixed(0) ?? '—'} km/h</strong>
+                <span style={{ fontSize: 12, color: 'var(--fg-primary)' }}>
+                  Velocidad: <strong style={{ fontFamily: 'var(--font-mono)' }}>{latest.speed_kmh?.toFixed(0) ?? '—'} km/h</strong>
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                  Voltaje ext: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.ext_voltage_mv != null ? `${(latest.ext_voltage_mv / 1000).toFixed(2)} V` : '—'}</strong>
+                <span style={{ fontSize: 12, color: 'var(--fg-primary)' }}>
+                  Voltaje ext: <strong style={{ fontFamily: 'var(--font-mono)' }}>{latest.ext_voltage_mv != null ? `${(latest.ext_voltage_mv / 1000).toFixed(2)} V` : '—'}</strong>
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                  GPS: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.lat != null ? `${latest.lat.toFixed(5)}, ${latest.lon?.toFixed(5)}` : '—'}</strong>
+                <span style={{ fontSize: 12, color: 'var(--fg-primary)' }}>
+                  GPS: <strong style={{ fontFamily: 'var(--font-mono)' }}>{latest.lat != null ? `${latest.lat.toFixed(5)}, ${latest.lon?.toFixed(5)}` : '—'}</strong>
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                  Altitud: <strong style={{ fontFamily: 'var(--font-data)' }}>{latest.altitude_m != null ? `${latest.altitude_m} m` : '—'}</strong>
+                <span style={{ fontSize: 12, color: 'var(--fg-primary)' }}>
+                  Altitud: <strong style={{ fontFamily: 'var(--font-mono)' }}>{latest.altitude_m != null ? `${latest.altitude_m} m` : '—'}</strong>
                 </span>
               </div>
 
@@ -559,11 +559,11 @@ export default function CanScannerPage() {
                           <div style={{
                             gridColumn: '1/-1',
                             background: 'rgba(239,68,68,0.08)',
-                            border: '1px solid var(--accent-crit)',
+                            border: '1px solid var(--danger)',
                             borderRadius: 6,
                             padding: '7px 12px',
                             fontSize: 11,
-                            color: 'var(--accent-crit)',
+                            color: 'var(--danger)',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
@@ -578,12 +578,12 @@ export default function CanScannerPage() {
                           const outOfRange = !item.isBit && !isNA
                             && item.min !== undefined && item.max !== undefined
                             && (item.value < item.min || item.value > item.max)
-                          const borderColor = isVeryStale ? 'var(--bg-border)'
-                            : outOfRange ? 'var(--accent-crit)'
+                          const borderColor = isVeryStale ? 'var(--border)'
+                            : outOfRange ? 'var(--danger)'
                             : rawVal !== undefined
-                              ? item.source === 'custom' ? 'var(--accent-energy)'
-                              : 'var(--bg-border)'
-                            : 'var(--bg-border)'
+                              ? item.source === 'custom' ? 'var(--cmg-teal)'
+                              : 'var(--border)'
+                            : 'var(--border)'
                           return (
                             <div key={itemIdx} style={{
                               background: 'var(--bg-elevated)',
@@ -597,55 +597,55 @@ export default function CanScannerPage() {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                                 <span style={{
                                   fontSize: 11, fontWeight: 600,
-                                  color: item.source === 'custom' ? 'var(--accent-energy)'
-                                       : item.source === 'std' ? 'var(--text-primary)'
-                                       : 'var(--accent-off)',
+                                  color: item.source === 'custom' ? 'var(--cmg-teal)'
+                                       : item.source === 'std' ? 'var(--fg-primary)'
+                                       : 'var(--offline)',
                                 }}>
                                   {item.label}
                                 </span>
-                                <span style={{ fontSize: 10, color: 'var(--accent-off)', fontFamily: 'var(--font-data)' }}>
+                                <span style={{ fontSize: 10, color: 'var(--offline)', fontFamily: 'var(--font-mono)' }}>
                                   {key}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 {/* MEJORA 5 — Badge N/A para sentinels J1939 */}
                                 {isNA ? (
-                                  <span style={{ fontSize: 12, color: 'var(--accent-off)', fontStyle: 'italic' }}>—</span>
+                                  <span style={{ fontSize: 12, color: 'var(--offline)', fontStyle: 'italic' }}>—</span>
                                 ) : item.isBit ? (
                                   <span style={{
                                     fontSize: 12, fontWeight: 700,
-                                    color: item.value === 1 ? 'var(--accent-ok)' : 'var(--accent-off)',
-                                    fontFamily: 'var(--font-data)',
+                                    color: item.value === 1 ? 'var(--ok)' : 'var(--offline)',
+                                    fontFamily: 'var(--font-mono)',
                                   }}>
                                     {item.value === 1 ? '● ON' : '○ OFF'}
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-data)', color: outOfRange ? 'var(--accent-crit)' : 'var(--text-primary)' }}>
+                                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: outOfRange ? 'var(--danger)' : 'var(--fg-primary)' }}>
                                     {rawVal !== undefined ? item.value.toFixed(item.value % 1 !== 0 ? 2 : 0) : '—'}
                                   </span>
                                 )}
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                                   {isNA && (
-                                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--accent-off)', background: 'var(--bg-border)', borderRadius: 3, padding: '1px 5px' }}>
+                                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--offline)', background: 'var(--border)', borderRadius: 3, padding: '1px 5px' }}>
                                       J1939 N/A
                                     </span>
                                   )}
-                                  {!isNA && item.unit && <span style={{ fontSize: 10, color: 'var(--accent-off)' }}>{item.unit}</span>}
+                                  {!isNA && item.unit && <span style={{ fontSize: 10, color: 'var(--offline)' }}>{item.unit}</span>}
                                   {outOfRange && (
-                                    <span style={{ fontSize: 9, color: 'var(--accent-crit)' }}>⚠ fuera de rango</span>
+                                    <span style={{ fontSize: 9, color: 'var(--danger)' }}>⚠ fuera de rango</span>
                                   )}
                                 </div>
                               </div>
                               {/* MEJORA 3 — Valor raw visible bajo el escalado */}
                               {item.source === 'custom' && !item.isBit && rawVal !== undefined && !isNA && (
-                                <span style={{ fontSize: 9, color: 'var(--accent-off)', fontFamily: 'var(--font-data)', marginTop: 1 }}>
+                                <span style={{ fontSize: 9, color: 'var(--offline)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
                                   raw: {rawVal}
                                 </span>
                               )}
                               {item.source === 'raw' && vehicleType && (
                                 <button
                                   onClick={() => openLabelModal(key)}
-                                  style={{ fontSize: 9, color: 'var(--accent-info)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2, textAlign: 'left' }}
+                                  style={{ fontSize: 9, color: 'var(--info)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2, textAlign: 'left' }}
                                 >
                                   ✎ etiquetar
                                 </button>
@@ -658,7 +658,7 @@ export default function CanScannerPage() {
                   })}
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: 'var(--accent-off)' }}>
+                <div style={{ fontSize: 12, color: 'var(--offline)' }}>
                   Sin datos can_data. Solo llegan los campos estándar (ignición, PTO, voltaje).
                   Verifica que los IO elements están activados en el Configurator del FMC650.
                 </div>
@@ -666,8 +666,8 @@ export default function CanScannerPage() {
             </div>
 
             {/* History table */}
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, overflow: 'hidden' }}>
-              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--bg-border)', fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, letterSpacing: '0.05em' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--offline)', fontWeight: 600, letterSpacing: '0.05em' }}>
                 ÚLTIMOS {records.length} REGISTROS (2 horas)
               </div>
               <div style={{ overflowX: 'auto' }}>
@@ -694,23 +694,23 @@ export default function CanScannerPage() {
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ ...td, fontFamily: 'var(--font-data)', whiteSpace: 'nowrap' }}>
+                        <td style={{ ...td, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                           {new Date(r.time).toLocaleTimeString('es-ES')}
                         </td>
-                        <td style={{ ...td, color: r.ignition ? 'var(--accent-ok)' : 'var(--accent-off)' }}>
+                        <td style={{ ...td, color: r.ignition ? 'var(--ok)' : 'var(--offline)' }}>
                           {r.ignition == null ? '—' : r.ignition ? '●' : '○'}
                         </td>
-                        <td style={{ ...td, color: r.pto_active ? 'var(--accent-energy)' : 'var(--accent-off)' }}>
+                        <td style={{ ...td, color: r.pto_active ? 'var(--cmg-teal)' : 'var(--offline)' }}>
                           {r.pto_active == null ? '—' : r.pto_active ? '●' : '○'}
                         </td>
-                        <td style={{ ...td, fontFamily: 'var(--font-data)' }}>{r.speed_kmh?.toFixed(0) ?? '—'}</td>
-                        <td style={{ ...td, fontFamily: 'var(--font-data)' }}>
+                        <td style={{ ...td, fontFamily: 'var(--font-mono)' }}>{r.speed_kmh?.toFixed(0) ?? '—'}</td>
+                        <td style={{ ...td, fontFamily: 'var(--font-mono)' }}>
                           {r.ext_voltage_mv != null ? (r.ext_voltage_mv / 1000).toFixed(2) : '—'}
                         </td>
-                        <td style={{ ...td, fontFamily: 'var(--font-data)' }}>{r.lat?.toFixed(5) ?? '—'}</td>
-                        <td style={{ ...td, fontFamily: 'var(--font-data)' }}>{r.lon?.toFixed(5) ?? '—'}</td>
+                        <td style={{ ...td, fontFamily: 'var(--font-mono)' }}>{r.lat?.toFixed(5) ?? '—'}</td>
+                        <td style={{ ...td, fontFamily: 'var(--font-mono)' }}>{r.lon?.toFixed(5) ?? '—'}</td>
                         {allCanKeys.map(k => (
-                          <td key={k} style={{ ...td, fontFamily: 'var(--font-data)' }}>
+                          <td key={k} style={{ ...td, fontFamily: 'var(--font-mono)' }}>
                             {r.can_data[k] !== undefined ? String(r.can_data[k]) : '—'}
                           </td>
                         ))}
@@ -731,14 +731,14 @@ export default function CanScannerPage() {
 const th: React.CSSProperties = {
   textAlign: 'left',
   padding: '6px 10px',
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   fontWeight: 600,
-  borderBottom: '1px solid var(--bg-border)',
+  borderBottom: '1px solid var(--border)',
   whiteSpace: 'nowrap',
 }
 
 const td: React.CSSProperties = {
   padding: '5px 10px',
-  color: 'var(--text-primary)',
+  color: 'var(--fg-primary)',
   whiteSpace: 'nowrap',
 }

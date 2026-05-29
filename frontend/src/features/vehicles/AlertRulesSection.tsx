@@ -6,15 +6,15 @@ import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { VehicleTypeOut, RuleOut } from '../../lib/types'
 
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--accent-energy)', color: '#fff', border: 'none',
+  background: 'var(--cmg-teal)', color: '#fff', border: 'none',
   borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
 }
 const btnGhost: React.CSSProperties = {
-  background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--bg-border)',
+  background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border)',
   borderRadius: 5, padding: '3px 9px', fontSize: 11, cursor: 'pointer',
 }
 const btnDanger: React.CSSProperties = {
-  background: 'transparent', color: 'var(--accent-crit)', border: '1px solid var(--accent-crit)',
+  background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)',
   borderRadius: 5, padding: '3px 9px', fontSize: 11, cursor: 'pointer',
 }
 
@@ -55,23 +55,23 @@ export default function AlertRulesSection({ typeId, selectedType }: Props) {
   return (
     <div style={{ marginTop: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Reglas de alerta
         </span>
         <button style={btnPrimary} onClick={() => navigate(`/rules/new?type_id=${typeId}`)}>+ Nueva regla</button>
       </div>
       {typeRules.length === 0 ? (
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin reglas configuradas para este tipo</p>
+        <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin reglas configuradas para este tipo</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {typeRules.map(r => (
             <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-base)', borderRadius: 6, padding: '6px 10px', gap: 8 }}>
               <span style={{ fontSize: 12, flex: 1 }}>{r.name}</span>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: r.severity === 'critical' ? 'var(--accent-crit)' : r.severity === 'warning' ? 'var(--accent-warn)' : 'var(--accent-info)', color: '#fff', fontWeight: 600, textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: r.severity === 'critical' ? 'var(--danger)' : r.severity === 'warning' ? 'var(--warn)' : 'var(--info)', color: '#fff', fontWeight: 600, textTransform: 'uppercase' }}>
                   {r.severity}
                 </span>
-                <span style={{ fontSize: 10, color: r.active ? 'var(--accent-ok)' : 'var(--text-muted)' }}>
+                <span style={{ fontSize: 10, color: r.active ? 'var(--ok)' : 'var(--fg-muted)' }}>
                   {r.active ? 'Activa' : 'Inactiva'}
                 </span>
                 <button style={btnGhost} onClick={() => navigate(`/rules/${r.id}`)}>Editar</button>

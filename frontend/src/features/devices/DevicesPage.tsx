@@ -116,8 +116,8 @@ export default function DevicesPage() {
   // Estilos reutilizables
   const inputStyle = {
     background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)',
-    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    color: 'var(--fg-primary)',
     borderRadius: 6,
     padding: '7px 10px',
     fontSize: 13,
@@ -128,7 +128,7 @@ export default function DevicesPage() {
   const labelStyle = {
     display: 'block',
     fontSize: 11,
-    color: 'var(--text-muted)',
+    color: 'var(--fg-muted)',
     marginBottom: 4,
   } as const
 
@@ -136,17 +136,17 @@ export default function DevicesPage() {
     textAlign: 'left' as const,
     fontSize: 11,
     fontWeight: 600,
-    color: 'var(--text-muted)',
+    color: 'var(--fg-muted)',
     padding: '8px 12px',
-    borderBottom: '1px solid var(--bg-border)',
+    borderBottom: '1px solid var(--border)',
     whiteSpace: 'nowrap' as const,
   } as const
 
   const tdStyle = {
     padding: '10px 12px',
     fontSize: 13,
-    color: 'var(--text-primary)',
-    borderBottom: '1px solid var(--bg-border)',
+    color: 'var(--fg-primary)',
+    borderBottom: '1px solid var(--border)',
     whiteSpace: 'nowrap' as const,
   } as const
 
@@ -170,7 +170,7 @@ export default function DevicesPage() {
           {isAdmin && <button
             onClick={() => setShowModal(true)}
             style={{
-              background: 'var(--accent-energy)',
+              background: 'var(--cmg-teal)',
               color: '#fff',
               border: 'none',
               borderRadius: 6,
@@ -188,16 +188,16 @@ export default function DevicesPage() {
         {/* Tabla de dispositivos */}
         <div style={{
           background: 'var(--bg-surface)',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           overflow: 'hidden',
         }}>
           {devicesLoading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>
               Cargando dispositivos…
             </div>
           ) : devices.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>
               No hay dispositivos{filterTenantId ? ' para este cliente' : ''}.
             </div>
           ) : (
@@ -221,14 +221,14 @@ export default function DevicesPage() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ ...tdStyle, fontFamily: 'var(--font-data)' }}>
+                      <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)' }}>
                         {device.imei}
                       </td>
                       <td style={tdStyle}>{device.model}</td>
                       <td style={tdStyle}>
                         {device.tenant_id ? (tenantMap.get(device.tenant_id) ?? device.tenant_id) : '—'}
                       </td>
-                      <td style={{ ...tdStyle, color: device.vehicle_id ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      <td style={{ ...tdStyle, color: device.vehicle_id ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
                         {device.vehicle_id ?? '—'}
                       </td>
                       <td style={tdStyle}>
@@ -237,18 +237,18 @@ export default function DevicesPage() {
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                            background: device.online ? 'var(--accent-ok)' : 'var(--accent-off)',
+                            background: device.online ? 'var(--ok)' : 'var(--offline)',
                             flexShrink: 0,
                           }} />
-                          <span style={{ color: device.online ? 'var(--accent-ok)' : 'var(--accent-off)' }}>
+                          <span style={{ color: device.online ? 'var(--ok)' : 'var(--offline)' }}>
                             {device.online ? 'Online' : 'Offline'}
                           </span>
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, color: device.last_seen ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      <td style={{ ...tdStyle, color: device.last_seen ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
                         {formatLastSeen(device.last_seen)}
                       </td>
-                      <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', color: device.firmware_ver ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 12 }}>
+                      <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', color: device.firmware_ver ? 'var(--fg-primary)' : 'var(--fg-muted)', fontSize: 12 }}>
                         {device.firmware_ver ?? '—'}
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -257,8 +257,8 @@ export default function DevicesPage() {
                           disabled={deleteMutation.isPending}
                           style={{
                             background: 'none',
-                            border: '1px solid var(--accent-crit)',
-                            color: 'var(--accent-crit)',
+                            border: '1px solid var(--danger)',
+                            color: 'var(--danger)',
                             borderRadius: 4,
                             padding: '3px 10px',
                             fontSize: 11,
@@ -279,7 +279,7 @@ export default function DevicesPage() {
 
         {/* Contador */}
         {!devicesLoading && devices.length > 0 && (
-          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--fg-muted)' }}>
             {devices.length} dispositivo{devices.length !== 1 ? 's' : ''}
           </div>
         )}
@@ -301,14 +301,14 @@ export default function DevicesPage() {
         >
           <div style={{
             background: 'var(--bg-surface)',
-            border: '1px solid var(--bg-border)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
             padding: 28,
             width: 420,
             maxWidth: '90vw',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)' }}>
                 Nuevo dispositivo
               </h2>
               <button
@@ -316,7 +316,7 @@ export default function DevicesPage() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: 'var(--fg-muted)',
                   cursor: 'pointer',
                   fontSize: 18,
                   lineHeight: 1,
@@ -375,8 +375,8 @@ export default function DevicesPage() {
               {modalError && (
                 <div style={{
                   background: 'rgba(239,68,68,0.1)',
-                  border: '1px solid var(--accent-crit)',
-                  color: 'var(--accent-crit)',
+                  border: '1px solid var(--danger)',
+                  color: 'var(--danger)',
                   borderRadius: 6,
                   padding: '8px 12px',
                   fontSize: 13,
@@ -392,8 +392,8 @@ export default function DevicesPage() {
                   onClick={handleCloseModal}
                   style={{
                     background: 'var(--bg-elevated)',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--bg-border)',
+                    color: 'var(--fg-muted)',
+                    border: '1px solid var(--border)',
                     borderRadius: 6,
                     padding: '8px 16px',
                     fontSize: 13,
@@ -406,8 +406,8 @@ export default function DevicesPage() {
                   type="submit"
                   disabled={createMutation.isPending}
                   style={{
-                    background: createMutation.isPending ? 'var(--bg-elevated)' : 'var(--accent-energy)',
-                    color: createMutation.isPending ? 'var(--text-muted)' : '#fff',
+                    background: createMutation.isPending ? 'var(--bg-elevated)' : 'var(--cmg-teal)',
+                    color: createMutation.isPending ? 'var(--fg-muted)' : '#fff',
                     border: 'none',
                     borderRadius: 6,
                     padding: '8px 20px',

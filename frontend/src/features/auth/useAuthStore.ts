@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   logout: () => {
     localStorage.removeItem(REFRESH_KEY)
     wsClient.disconnect()
-    document.documentElement.style.removeProperty('--accent-energy')
+    document.documentElement.style.removeProperty('--cmg-teal')
     set({ accessToken: null, user: null, enabledModules: [], brandName: null, logoUrl: null })
     window.location.href = '/login'
   },
@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   applyBrandTokens: (tokens) => {
     const root = document.documentElement
     if (tokens.brand_color && /^#[0-9a-fA-F]{6}$/.test(tokens.brand_color)) {
-      root.style.setProperty('--accent-energy', tokens.brand_color)
+      root.style.setProperty('--cmg-teal', tokens.brand_color)
     }
     const safeLogoUrl = tokens.logo_url
       ? (tokens.logo_url.startsWith('https://') || tokens.logo_url.startsWith('/')) ? tokens.logo_url : null

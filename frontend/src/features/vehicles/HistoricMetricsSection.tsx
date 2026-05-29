@@ -36,8 +36,8 @@ const KPI_OPTIONS = [
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--border)',
+  color: 'var(--fg-primary)',
   borderRadius: 6,
   padding: '6px 10px',
   fontSize: 13,
@@ -47,7 +47,7 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   fontWeight: 600,
   letterSpacing: '0.04em',
   marginBottom: 4,
@@ -55,7 +55,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--accent-energy)',
+  background: 'var(--cmg-teal)',
   color: '#fff',
   border: 'none',
   borderRadius: 6,
@@ -67,8 +67,8 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-primary)',
-  border: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '7px 16px',
   fontSize: 13,
@@ -162,7 +162,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
     <>
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Métricas del histórico
           </span>
           {(selectedType.historic_metrics ?? []).length < 5 && (
@@ -170,20 +170,20 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
           )}
         </div>
         {(selectedType.historic_metrics ?? []).length === 0 ? (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin métricas configuradas</p>
+          <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin métricas configuradas</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['MÉTRICA', 'ETIQUETA', 'COLOR', 'TIPO GRÁFICO', 'GRUPO', 'PDF', ''].map(h => (
-                  <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
+                  <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--fg-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {(selectedType.historic_metrics ?? []).map((m, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-data)', color: 'var(--accent-off)', fontSize: 11 }}>{m.key}</td>
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', color: 'var(--offline)', fontSize: 11 }}>{m.key}</td>
                   <td style={{ padding: '6px 8px' }}>{m.label}</td>
                   <td style={{ padding: '6px 8px' }}>
                     <span style={{
@@ -196,7 +196,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                     <span style={{
                       fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
                       background: 'var(--bg-base)',
-                      color: m.chart_type === 'line' ? 'var(--accent-info)' : m.chart_type === 'donut' ? 'var(--accent-energy)' : 'var(--accent-ok)',
+                      color: m.chart_type === 'line' ? 'var(--info)' : m.chart_type === 'donut' ? 'var(--cmg-teal)' : 'var(--ok)',
                     }}>
                       {m.chart_type === 'donut' ? 'Dona' : m.chart_type === 'bar' ? 'Barra' : 'Línea'}
                     </span>
@@ -206,24 +206,24 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                       <span style={{
                         fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
                         background: 'rgba(56,189,248,0.12)',
-                        color: 'var(--accent-info)',
+                        color: 'var(--info)',
                         border: '1px solid rgba(56,189,248,0.25)',
-                        fontFamily: 'var(--font-data)',
+                        fontFamily: 'var(--font-mono)',
                       }}>
                         {m.group}
                       </span>
                     ) : (
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>—</span>
+                      <span style={{ fontSize: 10, color: 'var(--fg-muted)' }}>—</span>
                     )}
                   </td>
                   <td style={{ padding: '6px 8px' }}>
-                    <span style={{ fontSize: 10, color: (m.show_in_pdf ?? true) ? 'var(--accent-ok)' : 'var(--text-muted)' }}>
+                    <span style={{ fontSize: 10, color: (m.show_in_pdf ?? true) ? 'var(--ok)' : 'var(--fg-muted)' }}>
                       {(m.show_in_pdf ?? true) ? '✓' : '—'}
                     </span>
                   </td>
                   <td style={{ padding: '6px 8px', display: 'flex', gap: 6 }}>
                     <button style={btnSecondary} onClick={() => openEditMetric(m, idx)}>✎</button>
-                    <button style={{ ...btnSecondary, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }} onClick={() => deleteMetric(idx)}>✕</button>
+                    <button style={{ ...btnSecondary, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => deleteMetric(idx)}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -237,8 +237,8 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, overflow: 'auto', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) { setShowMetricModal(false); setMetricError(null) } }}
         >
-          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 440, border: '1px solid var(--bg-border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 440, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--fg-primary)' }}>
               {editingMetricIdx === null ? 'Nueva métrica de reporte' : 'Editar métrica de reporte'}
             </h3>
 
@@ -327,9 +327,9 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                     type="color"
                     value={metricForm.color}
                     onChange={e => setMetricForm(f => ({ ...f, color: e.target.value }))}
-                    style={{ width: 36, height: 32, padding: 2, border: '1px solid var(--bg-border)', borderRadius: 6, background: 'var(--bg-elevated)', cursor: 'pointer' }}
+                    style={{ width: 36, height: 32, padding: 2, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-elevated)', cursor: 'pointer' }}
                   />
-                  <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-off)' }}>{metricForm.color}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--offline)' }}>{metricForm.color}</span>
                 </div>
               </div>
               <div>
@@ -370,9 +370,9 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                     onClick={() => setMetricForm(f => ({ ...f, chart_type: opt.value }))}
                     style={{
                       flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      border: metricForm.chart_type === opt.value ? '2px solid var(--accent-energy)' : '1px solid var(--bg-border)',
+                      border: metricForm.chart_type === opt.value ? '2px solid var(--cmg-teal)' : '1px solid var(--border)',
                       background: metricForm.chart_type === opt.value ? 'rgba(249,115,22,0.12)' : 'var(--bg-surface)',
-                      color: metricForm.chart_type === opt.value ? 'var(--accent-energy)' : 'var(--accent-off)',
+                      color: metricForm.chart_type === opt.value ? 'var(--cmg-teal)' : 'var(--offline)',
                     }}
                   >
                     {opt.label}
@@ -389,7 +389,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                 onChange={e => setMetricForm(f => ({ ...f, group: e.target.value }))}
                 placeholder="ej: presiones, horas (opcional)"
               />
-              <div style={{ fontSize: 11, color: 'var(--accent-off)', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--offline)', marginTop: 4 }}>
                 Métricas con el mismo grupo se mostrarán en un solo gráfico multi-serie
               </div>
             </div>
@@ -401,13 +401,13 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                 checked={metricForm.show_in_pdf}
                 onChange={e => setMetricForm(f => ({ ...f, show_in_pdf: e.target.checked }))}
               />
-              <label htmlFor="metric-pdf" style={{ fontSize: 13, color: 'var(--text-primary)', cursor: 'pointer' }}>
+              <label htmlFor="metric-pdf" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
                 Incluir en informe PDF
               </label>
             </div>
 
             {updateMetricsMutation.isError && (
-              <div style={{ fontSize: 12, color: 'var(--accent-crit)' }}>
+              <div style={{ fontSize: 12, color: 'var(--danger)' }}>
                 {(updateMetricsMutation.error as Error).message}
               </div>
             )}

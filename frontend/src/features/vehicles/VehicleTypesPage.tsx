@@ -101,8 +101,8 @@ async function uploadIcon(typeId: string, file: File): Promise<VehicleTypeOut> {
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--border)',
+  color: 'var(--fg-primary)',
   borderRadius: 6,
   padding: '6px 10px',
   fontSize: 13,
@@ -112,7 +112,7 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   fontWeight: 600,
   letterSpacing: '0.04em',
   marginBottom: 4,
@@ -120,7 +120,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--accent-energy)',
+  background: 'var(--cmg-teal)',
   color: '#fff',
   border: 'none',
   borderRadius: 6,
@@ -132,8 +132,8 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-primary)',
-  border: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '7px 16px',
   fontSize: 13,
@@ -295,17 +295,17 @@ export default function VehicleTypesPage() {
         {/* Left panel — type list */}
         <div style={{
           width: 220, flexShrink: 0,
-          borderRight: '1px solid var(--bg-border)',
+          borderRight: '1px solid var(--border)',
           display: 'flex', flexDirection: 'column',
           background: 'var(--bg-surface)',
         }}>
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--bg-border)' }}>
+          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border)' }}>
             <button style={{ ...btnPrimary, width: '100%', fontSize: 12 }} onClick={openNewType}>
               + Nuevo tipo
             </button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-            {isLoading && <div style={{ padding: '12px', fontSize: 12, color: 'var(--accent-off)' }}>Cargando…</div>}
+            {isLoading && <div style={{ padding: '12px', fontSize: 12, color: 'var(--offline)' }}>Cargando…</div>}
             {vehicleTypes.map(vt => (
               <div
                 key={vt.id}
@@ -314,13 +314,13 @@ export default function VehicleTypesPage() {
                   padding: '8px 14px',
                   cursor: 'pointer',
                   fontSize: 13,
-                  color: (selectedType?.id === vt.id) ? 'var(--accent-energy)' : 'var(--text-primary)',
-                  background: (selectedType?.id === vt.id) ? 'color-mix(in srgb, var(--accent-energy) 10%, transparent)' : 'transparent',
-                  borderLeft: (selectedType?.id === vt.id) ? '2px solid var(--accent-energy)' : '2px solid transparent',
+                  color: (selectedType?.id === vt.id) ? 'var(--cmg-teal)' : 'var(--fg-primary)',
+                  background: (selectedType?.id === vt.id) ? 'color-mix(in srgb, var(--cmg-teal) 10%, transparent)' : 'transparent',
+                  borderLeft: (selectedType?.id === vt.id) ? '2px solid var(--cmg-teal)' : '2px solid transparent',
                 }}
               >
                 <div style={{ fontWeight: 600 }}>{vt.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--accent-off)', marginTop: 2, fontFamily: 'var(--font-data)' }}>{vt.slug}</div>
+                <div style={{ fontSize: 10, color: 'var(--offline)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{vt.slug}</div>
               </div>
             ))}
           </div>
@@ -329,13 +329,13 @@ export default function VehicleTypesPage() {
         {/* Right panel — sensors + sections */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {!selectedType ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-off)', fontSize: 13 }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--offline)', fontSize: 13 }}>
               Selecciona un tipo de vehículo
             </div>
           ) : (
             <>
               {/* Type header */}
-              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   {/* Icon row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -343,7 +343,7 @@ export default function VehicleTypesPage() {
                       width: 40, height: 40,
                       background: 'var(--bg-elevated)',
                       borderRadius: 6,
-                      border: '1px solid var(--bg-border)',
+                      border: '1px solid var(--border)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       overflow: 'hidden',
                       flexShrink: 0,
@@ -354,17 +354,17 @@ export default function VehicleTypesPage() {
                             alt="icon"
                             style={{ width: 40, height: 40, objectFit: 'contain' }}
                           />
-                        : <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>🚛</span>
+                        : <span style={{ fontSize: 18, color: 'var(--fg-muted)' }}>🚛</span>
                       }
                     </div>
                     <div>
                       <label style={{
                         padding: '4px 10px',
                         background: 'var(--bg-elevated)',
-                        border: '1px solid var(--bg-border)',
+                        border: '1px solid var(--border)',
                         borderRadius: 6,
                         fontSize: 12,
-                        color: 'var(--text-primary)',
+                        color: 'var(--fg-primary)',
                         cursor: iconMutation.isPending ? 'not-allowed' : 'pointer',
                         opacity: iconMutation.isPending ? 0.6 : 1,
                         display: 'inline-block',
@@ -383,14 +383,14 @@ export default function VehicleTypesPage() {
                         />
                       </label>
                       {iconMutation.isError && (
-                        <div style={{ fontSize: 11, color: 'var(--accent-crit)', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
                           {(iconMutation.error as Error).message}
                         </div>
                       )}
                     </div>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{selectedType.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--accent-off)', fontFamily: 'var(--font-data)', marginTop: 2 }}>slug: {selectedType.slug}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)' }}>{selectedType.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--offline)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>slug: {selectedType.slug}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={btnSecondary} onClick={() => openEditType(selectedType)}>Editar tipo</button>
@@ -409,7 +409,7 @@ export default function VehicleTypesPage() {
               {/* Sensor table + subsections */}
               <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
                 {((selectedType.sensor_schema as SensorDef[]) ?? []).length === 0 ? (
-                  <div style={{ color: 'var(--accent-off)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
+                  <div style={{ color: 'var(--offline)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
                     No hay sensores configurados. Pulsa "+ Añadir sensor" para mapear un AVL ID.
                   </div>
                 ) : (
@@ -417,7 +417,7 @@ export default function VehicleTypesPage() {
                     <thead>
                       <tr style={{ background: 'var(--bg-elevated)' }}>
                         {['AVL ID', 'Nombre', 'Unidad', 'Gauge', 'Bit / Scale', 'Key', 'Visible', ''].map(h => (
-                          <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--accent-off)', fontWeight: 600, borderBottom: '1px solid var(--bg-border)', whiteSpace: 'nowrap' }}>{h}</th>
+                          <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--offline)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -427,25 +427,25 @@ export default function VehicleTypesPage() {
                           onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         >
-                          <td style={{ padding: '6px 10px', fontFamily: 'var(--font-data)', color: 'var(--accent-energy)' }}>
+                          <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', color: 'var(--cmg-teal)' }}>
                             {def.avl_id !== undefined ? `avl_${def.avl_id}` : '—'}
                           </td>
-                          <td style={{ padding: '6px 10px', color: 'var(--text-primary)', fontWeight: 600 }}>{def.label}</td>
-                          <td style={{ padding: '6px 10px', color: 'var(--accent-off)' }}>{def.unit ?? '—'}</td>
-                          <td style={{ padding: '6px 10px', color: 'var(--accent-off)' }}>{def.gauge_type}</td>
-                          <td style={{ padding: '6px 10px', fontFamily: 'var(--font-data)', color: 'var(--accent-info)' }}>
+                          <td style={{ padding: '6px 10px', color: 'var(--fg-primary)', fontWeight: 600 }}>{def.label}</td>
+                          <td style={{ padding: '6px 10px', color: 'var(--offline)' }}>{def.unit ?? '—'}</td>
+                          <td style={{ padding: '6px 10px', color: 'var(--offline)' }}>{def.gauge_type}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', color: 'var(--info)' }}>
                             {def.bit_index !== undefined
                               ? `bit ${def.bit_index}`
                               : (def.scale !== undefined || def.offset !== undefined)
                                 ? `${def.scale != null ? `×${def.scale}` : '×1'}${def.offset != null ? (def.offset >= 0 ? `+${def.offset}` : `${def.offset}`) : ''}`
                                 : '—'}
                           </td>
-                          <td style={{ padding: '6px 10px', color: 'var(--accent-off)', fontFamily: 'var(--font-data)', fontSize: 11 }}>{def.key}</td>
+                          <td style={{ padding: '6px 10px', color: 'var(--offline)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{def.key}</td>
                           <td style={{ padding: '6px 10px' }}>
                             <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
-                              background: (def.visible_in_detail !== false) ? 'color-mix(in srgb, var(--accent-ok) 15%, transparent)' : 'transparent',
-                              color: (def.visible_in_detail !== false) ? 'var(--accent-ok)' : 'var(--text-muted)',
-                              border: `1px solid ${(def.visible_in_detail !== false) ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+                              background: (def.visible_in_detail !== false) ? 'color-mix(in srgb, var(--ok) 15%, transparent)' : 'transparent',
+                              color: (def.visible_in_detail !== false) ? 'var(--ok)' : 'var(--fg-muted)',
+                              border: `1px solid ${(def.visible_in_detail !== false) ? 'var(--ok)' : 'var(--border)'}`,
                             }}>
                               {(def.visible_in_detail !== false) ? 'Sí' : 'No'}
                             </span>
@@ -457,7 +457,7 @@ export default function VehicleTypesPage() {
                             >✎</button>
                             <button
                               onClick={() => deleteSensor(idx)}
-                              style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11, color: 'var(--accent-crit)' }}
+                              style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11, color: 'var(--danger)' }}
                             >✕</button>
                           </td>
                         </tr>
@@ -474,7 +474,7 @@ export default function VehicleTypesPage() {
                   <HistoricMetricsSection typeId={selectedType.id} selectedType={selectedType} />
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
-                  <div style={{ borderTop: '1px solid var(--bg-border)', marginTop: 24, paddingTop: 24 }}>
+                  <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 24 }}>
                     <PdfMetricsSection typeId={selectedType.id} selectedType={selectedType} />
                   </div>
                 )}
@@ -501,8 +501,8 @@ export default function VehicleTypesPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={e => { if (e.target === e.currentTarget) setShowTypeModal(false) }}
         >
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 360, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, width: 360, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg-primary)' }}>
               {editingType ? 'Editar tipo de vehículo' : 'Nuevo tipo de vehículo'}
             </div>
             <div>
@@ -513,7 +513,7 @@ export default function VehicleTypesPage() {
               <label style={labelStyle}>SLUG (identificador interno)</label>
               <input style={inputStyle} value={typeForm.slug} onChange={e => setTypeForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, '_') }))} placeholder="barredora_municipal" />
             </div>
-            {typeError && <div style={{ fontSize: 12, color: 'var(--accent-crit)' }}>{typeError}</div>}
+            {typeError && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{typeError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button style={btnSecondary} onClick={() => setShowTypeModal(false)}>Cancelar</button>
               <button style={btnPrimary} onClick={saveType} disabled={!typeForm.name.trim() || !typeForm.slug.trim()}>
@@ -529,8 +529,8 @@ export default function VehicleTypesPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setShowSensorModal(false) }}
         >
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 500, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, width: 500, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg-primary)' }}>
               {editingSensorIdx === null ? 'Nuevo sensor CAN' : 'Editar sensor CAN'}
             </div>
 
@@ -592,9 +592,9 @@ export default function VehicleTypesPage() {
                       flex: 1,
                       padding: '8px 0',
                       borderRadius: 6,
-                      border: sensorForm.mode === m ? '2px solid var(--accent-energy)' : '1px solid var(--bg-border)',
+                      border: sensorForm.mode === m ? '2px solid var(--cmg-teal)' : '1px solid var(--border)',
                       background: sensorForm.mode === m ? 'rgba(249,115,22,0.12)' : 'var(--bg-elevated)',
-                      color: sensorForm.mode === m ? 'var(--accent-energy)' : 'var(--accent-off)',
+                      color: sensorForm.mode === m ? 'var(--cmg-teal)' : 'var(--offline)',
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -604,7 +604,7 @@ export default function VehicleTypesPage() {
                   </button>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--accent-off)', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--offline)', marginTop: 4 }}>
                 {sensorForm.mode === 'byte'
                   ? 'Usa el valor entero del canal (con multiplicador opcional)'
                   : 'Extrae un bit concreto del byte (para señales de estado 0/1)'}
@@ -626,13 +626,13 @@ export default function VehicleTypesPage() {
                           flex: 1,
                           padding: '8px 0',
                           borderRadius: 6,
-                          border: selected ? '2px solid var(--accent-energy)' : '1px solid var(--bg-border)',
+                          border: selected ? '2px solid var(--cmg-teal)' : '1px solid var(--border)',
                           background: selected ? 'rgba(249,115,22,0.15)' : 'var(--bg-elevated)',
-                          color: selected ? 'var(--accent-energy)' : 'var(--text-primary)',
+                          color: selected ? 'var(--cmg-teal)' : 'var(--fg-primary)',
                           fontSize: 13,
                           fontWeight: 700,
                           cursor: 'pointer',
-                          fontFamily: 'var(--font-data)',
+                          fontFamily: 'var(--font-mono)',
                         }}
                       >
                         {bit}
@@ -726,11 +726,11 @@ export default function VehicleTypesPage() {
                 checked={sensorForm.visible_in_detail}
                 onChange={e => setSensorForm(f => ({ ...f, visible_in_detail: e.target.checked }))}
               />
-              <label htmlFor="sensor-visible" style={{ fontSize: 13, color: 'var(--text-primary)', cursor: 'pointer' }}>
+              <label htmlFor="sensor-visible" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
                 Visible en detalle del vehículo
               </label>
             </div>
-            {sensorError && <div style={{ fontSize: 12, color: 'var(--accent-crit)' }}>{sensorError}</div>}
+            {sensorError && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{sensorError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button style={btnSecondary} onClick={() => setShowSensorModal(false)}>Cancelar</button>
               <button
@@ -749,9 +749,9 @@ export default function VehicleTypesPage() {
       {duplicateSuccess && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 500,
-          background: 'rgba(34,197,94,0.15)', border: '1px solid var(--accent-ok)',
+          background: 'rgba(34,197,94,0.15)', border: '1px solid var(--ok)',
           borderRadius: 8, padding: '10px 18px', fontSize: 13,
-          color: 'var(--accent-ok)', fontWeight: 600,
+          color: 'var(--ok)', fontWeight: 600,
           boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>

@@ -11,24 +11,24 @@ import { useAuthStore } from '../auth/useAuthStore'
 // ── Styles ───────────────────────────────────────────────────────────────────
 const S = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 } as const,
-  title: { fontFamily: 'var(--font-ui)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 } as const,
+  title: { fontFamily: 'var(--font-sans)', fontSize: 20, fontWeight: 700, color: 'var(--fg-primary)', margin: 0 } as const,
   btn: {
-    fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
     padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-    background: 'var(--accent-energy)', color: '#fff',
+    background: 'var(--cmg-teal)', color: '#fff',
   } as const,
   btnSecondary: {
-    fontFamily: 'var(--font-ui)', fontSize: 12, padding: '5px 12px', borderRadius: 6,
-    border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)',
-    color: 'var(--text-muted)', cursor: 'pointer',
+    fontFamily: 'var(--font-sans)', fontSize: 12, padding: '5px 12px', borderRadius: 6,
+    border: '1px solid var(--border)', background: 'var(--bg-elevated)',
+    color: 'var(--fg-muted)', cursor: 'pointer',
   } as const,
   card: {
-    background: 'var(--bg-surface)', border: '1px solid var(--bg-border)',
+    background: 'var(--bg-surface)', border: '1px solid var(--border)',
     borderRadius: 10, padding: '16px 20px',
     display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'start', gap: 12,
   } as const,
-  label: { fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' },
-  value: { fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--text-primary)' },
+  label: { fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' },
+  value: { fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--fg-primary)' },
   grid: { display: 'flex', flexDirection: 'column' as const, gap: 10 },
   overlay: {
     position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.6)',
@@ -40,11 +40,11 @@ const S = {
   },
   field: { display: 'flex', flexDirection: 'column' as const, gap: 4 },
   input: {
-    background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-    borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+    borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
     fontSize: 13, padding: '8px 10px',
   } as const,
-  warn: { fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--accent-warn)' },
+  warn: { fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--warn)' },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
           <textarea style={{ ...S.input, resize: 'vertical', minHeight: 64 }} value={form.notes} onChange={e => update('notes', e.target.value)}/>
         </div>
 
-        {error && <span style={{ ...S.warn, color: 'var(--accent-crit)' }}>{error}</span>}
+        {error && <span style={{ ...S.warn, color: 'var(--danger)' }}>{error}</span>}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button style={S.btnSecondary} onClick={onClose}>Cancelar</button>
@@ -172,18 +172,18 @@ export default function DriversPage() {
         onChange={e => setSearch(e.target.value)}
         style={{
           width: '100%', maxWidth: 320, padding: '7px 12px',
-          background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-          borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+          borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
           fontSize: 13, marginBottom: 16, boxSizing: 'border-box',
         }}
       />
 
       {isLoading && (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando…</div>
+        <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Cargando…</div>
       )}
 
       {!isLoading && drivers.length === 0 && (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+        <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>
           No hay conductores registrados. Pulsa <strong>+ Nuevo conductor</strong> para empezar.
         </div>
       )}
@@ -196,24 +196,24 @@ export default function DriversPage() {
             <div key={d.id} style={S.card}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600, color: 'var(--fg-primary)' }}>
                     {d.full_name}
                   </span>
                   {d.current_vehicle_name && (
                     <span style={{
-                      fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
+                      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
                       padding: '2px 8px', borderRadius: 99,
-                      background: 'color-mix(in srgb, var(--accent-ok) 15%, transparent)',
-                      color: 'var(--accent-ok)',
+                      background: 'color-mix(in srgb, var(--ok) 15%, transparent)',
+                      color: 'var(--ok)',
                     }}>
                       {d.current_vehicle_name}
                     </span>
                   )}
                   {!d.current_vehicle_name && (
                     <span style={{
-                      fontFamily: 'var(--font-ui)', fontSize: 11,
+                      fontFamily: 'var(--font-sans)', fontSize: 11,
                       padding: '2px 8px', borderRadius: 99,
-                      background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+                      background: 'var(--bg-elevated)', color: 'var(--fg-muted)',
                     }}>
                       Sin vehículo
                     </span>
@@ -230,7 +230,7 @@ export default function DriversPage() {
                   {d.license_expiry && (
                     <span style={{
                       ...S.value,
-                      color: expired ? 'var(--accent-crit)' : expirySoon ? 'var(--accent-warn)' : 'var(--text-muted)',
+                      color: expired ? 'var(--danger)' : expirySoon ? 'var(--warn)' : 'var(--fg-muted)',
                       fontWeight: (expired || expirySoon) ? 600 : 400,
                     }}>
                       {expired ? 'Licencia vencida' : expirySoon ? `Vence: ${d.license_expiry}` : `Vence: ${d.license_expiry}`}
@@ -251,7 +251,7 @@ export default function DriversPage() {
                   Editar
                 </button>
                 <button
-                  style={{ ...S.btnSecondary, color: 'var(--accent-crit)' }}
+                  style={{ ...S.btnSecondary, color: 'var(--danger)' }}
                   onClick={async () => { if (await confirmAsk({ title: 'Desactivar conductor', message: `¿Desactivar a ${d.full_name}?`, confirmLabel: 'Desactivar', kind: 'danger' })) deactivate(d.id) }}
                 >
                   Desactivar

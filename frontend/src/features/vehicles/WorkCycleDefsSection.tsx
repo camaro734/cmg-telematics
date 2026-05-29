@@ -13,8 +13,8 @@ const TRIGGER_OPTIONS = [
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--border)',
+  color: 'var(--fg-primary)',
   borderRadius: 6,
   padding: '6px 10px',
   fontSize: 13,
@@ -24,7 +24,7 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   fontWeight: 600,
   letterSpacing: '0.04em',
   marginBottom: 4,
@@ -32,7 +32,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--accent-energy)',
+  background: 'var(--cmg-teal)',
   color: '#fff',
   border: 'none',
   borderRadius: 6,
@@ -44,8 +44,8 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-primary)',
-  border: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '7px 16px',
   fontSize: 13,
@@ -153,9 +153,9 @@ function FieldPicker({ label, schemaKeys, checked, custom, onCheckedChange, onCu
           {schemaKeys.map(k => (
             <label key={k} style={{
               display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer',
-              padding: '3px 8px', borderRadius: 4, border: '1px solid var(--bg-border)',
+              padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)',
               background: checked.has(k) ? 'rgba(249,115,22,0.12)' : 'var(--bg-elevated)',
-              color: checked.has(k) ? 'var(--accent-energy)' : 'var(--text-primary)',
+              color: checked.has(k) ? 'var(--cmg-teal)' : 'var(--fg-primary)',
             }}>
               <input type="checkbox" style={{ display: 'none' }} checked={checked.has(k)} onChange={() => toggle(k)} />
               {k}
@@ -258,35 +258,35 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
   return (
     <div style={{ marginTop: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Ciclos de trabajo
         </span>
         <button style={btnPrimary} onClick={openNew}>+ Añadir definición</button>
       </div>
 
       {isLoading ? (
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cargando…</p>
+        <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Cargando…</p>
       ) : definitions.length === 0 ? (
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin definiciones de ciclos configuradas</p>
+        <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin definiciones de ciclos configuradas</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
               {['NOMBRE', 'TRIGGER', 'CONFIG', 'SNAPSHOT', 'AGGREGATE', 'ACTIVO', ''].map(h => (
-                <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
+                <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--fg-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {definitions.map(d => (
-              <tr key={d.id} style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '6px 8px', fontWeight: 600 }}>{d.name}</td>
-                <td style={{ padding: '6px 8px', color: 'var(--accent-energy)', fontFamily: 'var(--font-data)', fontSize: 11 }}>{d.trigger_type}</td>
-                <td style={{ padding: '6px 8px', color: 'var(--text-muted)', fontFamily: 'var(--font-data)', fontSize: 11 }}>{triggerConfigSummary(d)}</td>
-                <td style={{ padding: '6px 8px', color: 'var(--accent-off)' }}>
+                <td style={{ padding: '6px 8px', color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{d.trigger_type}</td>
+                <td style={{ padding: '6px 8px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{triggerConfigSummary(d)}</td>
+                <td style={{ padding: '6px 8px', color: 'var(--offline)' }}>
                   {(d.snapshot_fields ?? []).length > 0 ? `${d.snapshot_fields!.length} campos` : '—'}
                 </td>
-                <td style={{ padding: '6px 8px', color: 'var(--accent-off)' }}>
+                <td style={{ padding: '6px 8px', color: 'var(--offline)' }}>
                   {(d.aggregate_fields ?? []).length > 0 ? `${d.aggregate_fields!.length} campos` : '—'}
                 </td>
                 <td style={{ padding: '6px 8px' }}>
@@ -295,7 +295,7 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                     style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 4, border: 'none', cursor: 'pointer',
                       background: d.active ? 'rgba(34,197,94,0.15)' : 'rgba(120,113,108,0.2)',
-                      color: d.active ? 'var(--accent-ok)' : 'var(--accent-off)',
+                      color: d.active ? 'var(--ok)' : 'var(--offline)',
                     }}
                   >
                     {d.active ? 'Activo' : 'Inactivo'}
@@ -305,7 +305,7 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11 }} onClick={() => openEdit(d)}>✎</button>
                     <button
-                      style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }}
+                      style={{ ...btnSecondary, padding: '3px 10px', fontSize: 11, color: 'var(--danger)', borderColor: 'var(--danger)' }}
                       onClick={() => deleteMutation.mutate(d.id)}
                     >✕</button>
                   </div>
@@ -321,8 +321,8 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, overflow: 'auto', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 24, width: 520, maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 24, width: 520, maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--fg-primary)' }}>
               {editingDef === 'new' ? 'Nueva definición de ciclo' : 'Editar definición de ciclo'}
             </h3>
 
@@ -421,7 +421,7 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
               />
 
               {modalError && (
-                <div style={{ color: 'var(--accent-crit)', fontSize: 12 }}>{modalError}</div>
+                <div style={{ color: 'var(--danger)', fontSize: 12 }}>{modalError}</div>
               )}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>

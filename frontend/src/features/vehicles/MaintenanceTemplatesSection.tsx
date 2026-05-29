@@ -21,8 +21,8 @@ const emptyTemplateForm: TemplateFormState = {
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  border: '1px solid var(--bg-border)',
-  color: 'var(--text-primary)',
+  border: '1px solid var(--border)',
+  color: 'var(--fg-primary)',
   borderRadius: 6,
   padding: '6px 10px',
   fontSize: 13,
@@ -32,7 +32,7 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   fontWeight: 600,
   letterSpacing: '0.04em',
   marginBottom: 4,
@@ -40,7 +40,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: 'var(--accent-energy)',
+  background: 'var(--cmg-teal)',
   color: '#fff',
   border: 'none',
   borderRadius: 6,
@@ -52,8 +52,8 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-elevated)',
-  color: 'var(--text-primary)',
-  border: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)',
+  border: '1px solid var(--border)',
   borderRadius: 6,
   padding: '7px 16px',
   fontSize: 13,
@@ -138,7 +138,7 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
     <>
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Planes de mantenimiento
           </span>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -158,9 +158,9 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
         {applyResult !== null && (
           <div style={{
             fontSize: 12,
-            color: applyResult.created > 0 ? 'var(--accent-ok)' : 'var(--accent-off)',
+            color: applyResult.created > 0 ? 'var(--ok)' : 'var(--offline)',
             background: applyResult.created > 0 ? 'rgba(34,197,94,0.08)' : 'rgba(120,113,108,0.08)',
-            border: `1px solid ${applyResult.created > 0 ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+            border: `1px solid ${applyResult.created > 0 ? 'var(--ok)' : 'var(--border)'}`,
             borderRadius: 6,
             padding: '6px 10px',
             marginBottom: 8,
@@ -171,33 +171,33 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
           </div>
         )}
         {applyTemplatesMutation.isError && (
-          <div style={{ fontSize: 12, color: 'var(--accent-crit)', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>
             Error al aplicar plantillas: {(applyTemplatesMutation.error as Error).message}
           </div>
         )}
         {(selectedType.maintenance_templates ?? []).length === 0 ? (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sin plantillas configuradas</p>
+          <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin plantillas configuradas</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['NOMBRE', 'UMBRAL', 'VALOR', '% AVISO', ''].map(h => (
-                  <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
+                  <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--fg-muted)', fontSize: 10, fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {(selectedType.maintenance_templates ?? []).map((tmpl, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '6px 8px' }}>{tmpl.name}</td>
-                  <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>
+                  <td style={{ padding: '6px 8px', color: 'var(--fg-muted)' }}>
                     {{ pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días' }[tmpl.thresholds[0]?.type] ?? tmpl.thresholds[0]?.type}
                   </td>
-                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-data)' }}>{tmpl.thresholds[0]?.value}</td>
-                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-data)' }}>{tmpl.warn_before_pct}%</td>
+                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{tmpl.thresholds[0]?.value}</td>
+                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{tmpl.warn_before_pct}%</td>
                   <td style={{ padding: '6px 8px', display: 'flex', gap: 6 }}>
                     <button style={btnSecondary} onClick={() => openEditTemplate(tmpl, idx)}>Editar</button>
-                    <button style={{ ...btnSecondary, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)' }} onClick={() => deleteTemplate(idx)}>✕</button>
+                    <button style={{ ...btnSecondary, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => deleteTemplate(idx)}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -209,7 +209,7 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
       {/* ── Modal: Plantilla de mantenimiento ──────────────────────────── */}
       {showTemplateModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
-          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--bg-border)' }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--border)' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600 }}>
               {editingTemplateIdx === null ? 'Nueva plantilla' : 'Editar plantilla'}
             </h3>
