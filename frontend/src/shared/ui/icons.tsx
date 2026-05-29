@@ -30,25 +30,43 @@ export function IconDashboard(props: IconProps) {
   )
 }
 
-// Fleet: truck side-profile — cab + cargo box, dual rear axle
-export function IconFlota(props: IconProps) {
+// Fleet: truck side-profile v2 — cab + windshield + cargo body + double wheels
+export function IconFlota({ width = 24, height = 24, ...props }: IconProps) {
   return (
-    <Icon {...props}>
-      {/* chassis rail */}
-      <line x1="1" y1="19" x2="23" y2="19" />
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={width}
+      height={height}
+      {...props}
+    >
+      {/* chassis */}
+      <line x1="1" y1="18" x2="23" y2="18" />
       {/* cab lower */}
-      <path d="M2,19 L2,13 L8,13 L8,19" />
-      {/* cab upper / roof */}
-      <path d="M3,13 L3,8 Q3,7 5,7 L9,7 L9,13" />
+      <path d="M1,18 L1,12 Q1,10 3,10 L8,10 L8,18" />
+      {/* cab upper */}
+      <path d="M2,10 L2,6 Q2,5 4,5 L8,5 L8,10" />
+      {/* windshield */}
+      <rect x="3" y="6" width="4" height="4.5" rx="0.5" strokeWidth={1} opacity={0.65} />
       {/* cargo body */}
-      <rect x="9" y="9" width="13" height="10" rx="1" />
-      {/* wheels */}
-      <circle cx="5" cy="20.5" r="2" />
-      <circle cx="15.5" cy="20.5" r="2" />
-      <circle cx="19.5" cy="20.5" r="2" />
-      {/* exhaust stack */}
-      <line x1="3.5" y1="13" x2="3.5" y2="8" strokeWidth={2} />
-    </Icon>
+      <rect x="8" y="8" width="14" height="10" rx="1.5" />
+      {/* cargo door line */}
+      <line x1="17" y1="8" x2="17" y2="18" strokeDasharray="1.5 1.5" strokeWidth={1} opacity={0.5} />
+      {/* front wheel — double ring */}
+      <circle cx="4.5" cy="20" r="2" />
+      <circle cx="4.5" cy="20" r="0.8" />
+      {/* rear wheels — double rings */}
+      <circle cx="14" cy="20" r="2" />
+      <circle cx="14" cy="20" r="0.8" />
+      <circle cx="19" cy="20" r="2" />
+      <circle cx="19" cy="20" r="0.8" />
+      {/* exhaust */}
+      <line x1="2.5" y1="10" x2="2.5" y2="4.5" strokeWidth={2} />
+    </svg>
   )
 }
 
