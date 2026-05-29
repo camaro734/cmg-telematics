@@ -16,11 +16,12 @@ from app.models.work_order_stop import WorkOrderStop
 from app.models.work_report import WorkReport
 from app.models.tenant_doc_counter import TenantDocCounter
 from app.models.access_audit_log import AccessAuditLog  # noqa
+from app.models.system_settings import SystemSettings
 
 __all__ = [
     "Base", "Tenant", "User", "PermissionGrant", "VehicleType",
     "Vehicle", "Device", "TelemetryRecord", "AlertRule", "AlertInstance",
     "MaintenancePlan", "MaintenanceLog", "CommandLog",
     "Driver", "WorkOrder", "WorkOrderStop", "WorkReport", "TenantDocCounter",
-    "AccessAuditLog",
+    "AccessAuditLog", "SystemSettings",
 ]
