@@ -79,11 +79,28 @@ function Flow({ size = 20 }: IconProps) {
     <line x1="2" y1="14" x2="8" y2="14" opacity={0.5}/>
   </svg>
 }
+function Counter({ size = 20 }: IconProps) {
+  return <svg viewBox={V} width={size} height={size} {...S}>
+    <circle cx="10" cy="10" r="7"/>
+    <path d="M10 10 L13 7"/>
+    <circle cx="10" cy="10" r="1.5" fill="currentColor" stroke="none"/>
+    <line x1="5" y1="15" x2="6.5" y2="13.5" strokeWidth={1}/>
+    <line x1="15" y1="15" x2="13.5" y2="13.5" strokeWidth={1}/>
+    <line x1="10" y1="4" x2="10" y2="5.5" strokeWidth={1}/>
+  </svg>
+}
+function Toggle({ size = 20 }: IconProps) {
+  return <svg viewBox={V} width={size} height={size} {...S}>
+    <rect x="2" y="7" width="16" height="6" rx="3"/>
+    <circle cx="13.5" cy="10" r="2.2" fill="currentColor" stroke="none"/>
+  </svg>
+}
 
 export const SENSOR_ICONS: Record<SensorIcon, React.FC<IconProps>> = {
   pressure: Pressure, temperature: Temperature, fuel: Fuel,
   water: Water, engine: Engine, speed: Speed, voltage: Voltage,
   pump: Pump, valve: Valve, rpm: Rpm, flow: Flow,
+  counter: Counter, toggle: Toggle,
 }
 
 export function SensorIconComponent({ icon, size = 18, color }: { icon?: SensorIcon; size?: number; color?: string }) {
