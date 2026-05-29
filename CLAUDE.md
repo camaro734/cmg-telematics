@@ -244,14 +244,15 @@ Identidad: industrial-moderno. Inspirado en interfaces SCADA/PLC
 pero con estética contemporánea. Único, no derivado de competidores.
 
 ```css
-/* Paleta base — warm grays + energy orange + efficiency green */
---bg-base:       #1C1917;   /* fondo principal (warm dark) */
---bg-surface:    #292524;   /* cards, paneles */
---bg-elevated:   #3C3330;   /* modales, dropdowns */
---bg-border:     #57534E;   /* bordes sutiles */
+/* Paleta base — cold dark */
+--bg-base:       #0F1117;   /* fondo principal (cold dark) */
+--bg-surface:    #1A1D27;   /* sidebar, topbars */
+--bg-card:       #1E2532;   /* cards, paneles */
+--bg-elevated:   #22263A;   /* modales, dropdowns */
+--border:        #2D3148;   /* bordes sutiles */
 
-/* Acentos funcionales */
---accent-energy: #F97316;   /* naranja — hidráulica, energía, CTAs */
+/* Acento de marca */
+--cmg-teal:      #1D9E75;   /* teal — brand, CTAs, estado online */
 --accent-ok:     #22C55E;   /* verde — operativo, eficiencia */
 --accent-warn:   #EAB308;   /* amarillo — advertencia */
 --accent-crit:   #EF4444;   /* rojo — crítico */
