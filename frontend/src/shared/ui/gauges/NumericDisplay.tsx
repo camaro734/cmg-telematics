@@ -21,7 +21,7 @@ const SIZE_MAP: Record<NumericSize, number> = {
 // Colores por estado — usan variables CSS del design system
 const STATUS_COLOR: Record<NumericStatus, string> = {
   normal:  '#FFFFFF',
-  warn:    'var(--cmg-teal)',        // naranja
+  warn:    'var(--cmg-teal)',
   alert:   'var(--danger)',          // rojo
   offline: 'var(--offline)',         // gris cálido
 }
