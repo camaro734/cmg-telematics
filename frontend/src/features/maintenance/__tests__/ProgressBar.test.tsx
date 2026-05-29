@@ -11,21 +11,21 @@ describe('ProgressBar', () => {
   it('color verde para ok', () => {
     const { container } = render(<ProgressBar pct={30} status="ok" />)
     const fills = container.querySelectorAll('div')
-    const fill = Array.from(fills).find(el => el.style.background === 'var(--accent-ok)')
+    const fill = Array.from(fills).find(el => el.style.background === 'var(--ok)')
     expect(fill).toBeTruthy()
   })
 
   it('color naranja para próximo', () => {
     const { container } = render(<ProgressBar pct={92} status="próximo" />)
     const fills = container.querySelectorAll('div')
-    const fill = Array.from(fills).find(el => el.style.background === 'var(--accent-warn)')
+    const fill = Array.from(fills).find(el => el.style.background === 'var(--warn)')
     expect(fill).toBeTruthy()
   })
 
   it('color rojo para vencido', () => {
     const { container } = render(<ProgressBar pct={105} status="vencido" />)
     const fills = container.querySelectorAll('div')
-    const fill = Array.from(fills).find(el => el.style.background === 'var(--accent-crit)')
+    const fill = Array.from(fills).find(el => el.style.background === 'var(--danger)')
     expect(fill).toBeTruthy()
   })
 

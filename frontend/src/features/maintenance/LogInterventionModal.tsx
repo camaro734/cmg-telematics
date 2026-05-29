@@ -48,12 +48,12 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
     })
   }
 
-  const inputStyle = { background: 'var(--bg-base)', border: '1px solid var(--bg-border)', color: 'var(--text-primary)', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const }
+  const inputStyle = { background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ background: 'var(--bg-surface)', borderRadius: 10, padding: 24, width: 420, border: '1px solid var(--bg-border)' }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 20 }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 10, padding: 24, width: 420, border: '1px solid var(--border)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 20 }}>
           Registrar intervención
         </div>
 
@@ -61,7 +61,7 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 8 }}>
                 CONTADORES A RESETEAR
               </div>
               {thresholds.map(t => (
@@ -72,7 +72,7 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
                     checked={selected.includes(t.type)}
                     onChange={() => toggle(t.type)}
                   />
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                  <span style={{ fontSize: 13, color: 'var(--fg-primary)' }}>
                     {THRESHOLD_LABEL[t.type] ?? t.type}
                   </span>
                 </label>
@@ -80,7 +80,7 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
             </div>
 
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>DESCRIPCIÓN</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>DESCRIPCIÓN</div>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
@@ -91,7 +91,7 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
             </div>
 
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>COSTE (€)</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>COSTE (€)</div>
               <input
                 type="number"
                 value={costEur}
@@ -103,20 +103,20 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
               />
             </div>
 
-            {error && <div style={{ color: 'var(--accent-crit)', fontSize: 13 }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
                 type="button"
                 onClick={onClose}
-                style={{ background: 'none', border: '1px solid var(--bg-border)', color: 'var(--text-muted)', borderRadius: 6, padding: '8px 18px', fontSize: 13, cursor: 'pointer' }}
+                style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--fg-muted)', borderRadius: 6, padding: '8px 18px', fontSize: 13, cursor: 'pointer' }}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={mutation.isPending}
-                style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: mutation.isPending ? 'not-allowed' : 'pointer' }}
+                style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: mutation.isPending ? 'not-allowed' : 'pointer' }}
               >
                 {mutation.isPending ? 'Guardando…' : 'Registrar'}
               </button>

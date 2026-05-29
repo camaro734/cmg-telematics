@@ -22,27 +22,27 @@ const S = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
   },
   modal: {
-    background: 'var(--bg-surface)', borderRadius: 12, padding: 28,
+    background: 'var(--bg-elevated)', borderRadius: 12, padding: 28,
     width: 600, maxHeight: '92vh', overflowY: 'auto' as const,
     display: 'flex', flexDirection: 'column' as const, gap: 18,
-    border: '1px solid var(--bg-border)',
+    border: '1px solid var(--border)',
   },
   section: { display: 'flex', flexDirection: 'column' as const, gap: 8 },
   sectionTitle: {
-    fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700,
+    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700,
     textTransform: 'uppercase' as const, letterSpacing: '0.06em',
-    color: 'var(--text-muted)', borderBottom: '1px solid var(--bg-border)',
+    color: 'var(--fg-muted)', borderBottom: '1px solid var(--border)',
     paddingBottom: 6,
   },
-  label: { fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
+  label: { fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
   input: {
-    background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-    borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+    borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
     fontSize: 13, padding: '8px 10px', width: '100%',
   } as const,
-  btn: { fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent-energy)', color: '#fff' } as const,
-  btnSm: { fontFamily: 'var(--font-ui)', fontSize: 12, padding: '5px 12px', borderRadius: 6, border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer' } as const,
-  photoThumb: { width: 80, height: 80, objectFit: 'cover' as const, borderRadius: 6, border: '1px solid var(--bg-border)' },
+  btn: { fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--cmg-teal)', color: '#fff' } as const,
+  btnSm: { fontFamily: 'var(--font-sans)', fontSize: 12, padding: '5px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--fg-muted)', cursor: 'pointer' } as const,
+  photoThumb: { width: 80, height: 80, objectFit: 'cover' as const, borderRadius: 6, border: '1px solid var(--border)' },
 }
 
 // ── Signature canvas ──────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ function SignatureCanvas({ onSigned, existingUrl }: SignatureCanvasProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {existingUrl && !cleared ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <img src={existingUrl} alt="firma" style={{ maxHeight: 100, border: '1px solid var(--bg-border)', borderRadius: 6, background: '#fff', padding: 4 }}/>
+          <img src={existingUrl} alt="firma" style={{ maxHeight: 100, border: '1px solid var(--border)', borderRadius: 6, background: '#fff', padding: 4 }}/>
           <button style={S.btnSm} onClick={() => setCleared(true)}>Firmar de nuevo</button>
         </div>
       ) : (
@@ -121,7 +121,7 @@ function SignatureCanvas({ onSigned, existingUrl }: SignatureCanvasProps) {
             width={520}
             height={120}
             style={{
-              background: '#fff', borderRadius: 6, border: `1px solid ${signed ? 'var(--accent-energy)' : 'var(--bg-border)'}`,
+              background: '#fff', borderRadius: 6, border: `1px solid ${signed ? 'var(--cmg-teal)' : 'var(--border)'}`,
               cursor: 'crosshair', touchAction: 'none', width: '100%', height: 120,
             }}
             onMouseDown={startDraw}
@@ -261,10 +261,10 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ fontFamily: 'var(--font-ui)', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+            <h2 style={{ fontFamily: 'var(--font-sans)', fontSize: 17, fontWeight: 700, color: 'var(--fg-primary)', margin: 0 }}>
               Informe de trabajo
             </h2>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)', margin: '4px 0 0' }}>
               {order.title}
             </p>
           </div>
@@ -276,41 +276,41 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
           <div style={S.section}>
             <div style={S.sectionTitle}>Parada: {stop.title}{stop.client_name ? ` — ${stop.client_name}` : ''}</div>
             {(stop.pto_minutes != null || stop.pump_minutes != null || stop.rpm_avg != null || stop.pressure_min != null || stop.pressure_max != null) && (
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--bg-border)' }}>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--border)' }}>
                 {stop.pto_minutes != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={S.label}>PTO</span>
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-energy)' }}>{stop.pto_minutes.toFixed(0)} min</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--cmg-teal)' }}>{stop.pto_minutes.toFixed(0)} min</span>
                   </div>
                 )}
                 {stop.pump_minutes != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={S.label}>Bomba</span>
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-info)' }}>{stop.pump_minutes.toFixed(0)} min</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--info)' }}>{stop.pump_minutes.toFixed(0)} min</span>
                   </div>
                 )}
                 {stop.rpm_avg != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={S.label}>RPM media</span>
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{stop.rpm_avg.toFixed(0)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--fg-primary)' }}>{stop.rpm_avg.toFixed(0)}</span>
                   </div>
                 )}
                 {stop.pressure_min != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={S.label}>Presión mín</span>
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-info)' }}>{stop.pressure_min.toFixed(0)} mbar</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--info)' }}>{stop.pressure_min.toFixed(0)} mbar</span>
                   </div>
                 )}
                 {stop.pressure_max != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={S.label}>Presión máx</span>
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-warn)' }}>{stop.pressure_max.toFixed(0)} mbar</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--warn)' }}>{stop.pressure_max.toFixed(0)} mbar</span>
                   </div>
                 )}
                 {stop.fuel_l != null && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={S.label}>Combustible</span>
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 15, fontWeight: 700, color: 'var(--accent-warn)' }}>{stop.fuel_l.toFixed(1)} L</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: 'var(--warn)' }}>{stop.fuel_l.toFixed(1)} L</span>
                   </div>
                 )}
               </div>
@@ -326,16 +326,16 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
               {telemetry.stops.map((s, idx) => (
                 <details
                   key={s.id}
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '8px 10px' }}
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px' }}
                 >
-                  <summary style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, color: 'var(--text-primary)', fontSize: 13 }}>
+                  <summary style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, color: 'var(--fg-primary)', fontSize: 13 }}>
                     <span>
-                      <b style={{ color: 'var(--accent-energy)' }}>#{idx + 1}</b>
+                      <b style={{ color: 'var(--cmg-teal)' }}>#{idx + 1}</b>
                       {' '}{s.address ?? '—'}
-                      {s.client_name && <span style={{ color: 'var(--text-muted)' }}> · {s.client_name}</span>}
+                      {s.client_name && <span style={{ color: 'var(--fg-muted)' }}> · {s.client_name}</span>}
                     </span>
                     {s.completed_at && (
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-data)' }}>
+                      <span style={{ color: 'var(--fg-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
                         {new Date(s.completed_at).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
@@ -345,15 +345,15 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
                       const inPdf = telemetry.pdf_metric_keys.includes(k)
                       const meta = METRIC_LABELS[k] ?? { label: k, unit: '' }
                       return (
-                        <li key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid var(--bg-border)' }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{meta.label}</span>
+                        <li key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>
+                          <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>{meta.label}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-data)', fontSize: 12 }}>
+                            <span style={{ color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
                               {v == null ? '—' : `${v} ${meta.unit}`}
                             </span>
                             {inPdf
-                              ? <span title="Aparece en PDF" style={{ color: 'var(--accent-ok)', fontSize: 10 }}>✓ PDF</span>
-                              : <span title="Capturado, no en PDF" style={{ color: 'var(--text-muted)', fontSize: 10 }}>—</span>}
+                              ? <span title="Aparece en PDF" style={{ color: 'var(--ok)', fontSize: 10 }}>✓ PDF</span>
+                              : <span title="Capturado, no en PDF" style={{ color: 'var(--fg-muted)', fontSize: 10 }}>—</span>}
                           </span>
                         </li>
                       )
@@ -404,7 +404,7 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
                   <input style={S.input} placeholder="Material" value={m.name} onChange={e => updateMaterial(i, 'name', e.target.value)}/>
                   <input style={S.input} placeholder="Cantidad" type="number" min="0" step="0.1" value={m.quantity} onChange={e => updateMaterial(i, 'quantity', parseFloat(e.target.value) || 0)}/>
                   <input style={S.input} placeholder="Unidad" value={m.unit} onChange={e => updateMaterial(i, 'unit', e.target.value)}/>
-                  <button style={{ ...S.btnSm, color: 'var(--accent-crit)', padding: '5px 8px' }} onClick={() => removeMaterial(i)}>×</button>
+                  <button style={{ ...S.btnSm, color: 'var(--danger)', padding: '5px 8px' }} onClick={() => removeMaterial(i)}>×</button>
                 </div>
               ))}
             </div>
@@ -449,11 +449,11 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
         </div>
 
         {/* Acciones */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--bg-border)' }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--border)' }}>
           <div>
             {report && (
               <button
-                style={{ ...S.btnSm, color: 'var(--accent-crit)', borderColor: 'var(--accent-crit)', opacity: deleting ? 0.6 : 1 }}
+                style={{ ...S.btnSm, color: 'var(--danger)', borderColor: 'var(--danger)', opacity: deleting ? 0.6 : 1 }}
                 disabled={deleting}
                 onClick={async () => { if (await confirmAsk({ title: 'Eliminar informe', message: '¿Eliminar el informe? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar', kind: 'danger' })) deleteReport() }}
               >
@@ -462,7 +462,7 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
             )}
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {saveMsg && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--accent-ok)' }}>{saveMsg}</span>}
+            {saveMsg && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ok)' }}>{saveMsg}</span>}
             <button
               style={{ ...S.btnSm }}
               disabled={pdfLoading || !report}

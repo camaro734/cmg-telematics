@@ -1,7 +1,7 @@
 const STATUS_COLOR = {
-  ok: 'var(--accent-ok)',
-  'próximo': 'var(--accent-warn)',
-  vencido: 'var(--accent-crit)',
+  ok: 'var(--ok)',
+  'próximo': 'var(--warn)',
+  vencido: 'var(--danger)',
 } as const
 
 interface ProgressBarProps {
@@ -19,7 +19,7 @@ export default function ProgressBar({ pct, status, showLabel = true }: ProgressB
       <div style={{
         flex: 1,
         height: 6,
-        background: 'var(--gauge-track)',
+        background: 'var(--border)',
         borderRadius: 3,
         overflow: 'hidden',
       }}>
@@ -34,7 +34,7 @@ export default function ProgressBar({ pct, status, showLabel = true }: ProgressB
       {showLabel && (
         <span style={{
           fontSize: 11,
-          fontFamily: 'var(--font-data)',
+          fontFamily: 'var(--font-mono)',
           color,
           minWidth: 36,
           textAlign: 'right',

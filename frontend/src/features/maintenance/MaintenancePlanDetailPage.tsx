@@ -34,7 +34,7 @@ export default function MaintenancePlanDetailPage() {
 
   if (!id) return <Navigate to="/maintenance" replace />
   if (isLoading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)' }}>
       Cargando…
     </div>
   )
@@ -58,16 +58,16 @@ export default function MaintenancePlanDetailPage() {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{plan.vehicle_name}</div>
-            <div style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 600, marginTop: 2 }}>{plan.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{plan.vehicle_name}</div>
+            <div style={{ fontSize: 18, color: 'var(--fg-primary)', fontWeight: 600, marginTop: 2 }}>{plan.name}</div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Link to={`/maintenance/${id}/edit`} style={{ background: 'none', border: '1px solid var(--bg-border)', color: 'var(--text-muted)', borderRadius: 6, padding: '8px 16px', fontSize: 12, textDecoration: 'none' }}>
+            <Link to={`/maintenance/${id}/edit`} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--fg-muted)', borderRadius: 6, padding: '8px 16px', fontSize: 12, textDecoration: 'none' }}>
               Editar
             </Link>
             <button
               onClick={() => setShowLog(true)}
-              style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             >
               Registrar intervención
             </button>
@@ -77,12 +77,12 @@ export default function MaintenancePlanDetailPage() {
         {/* Progress cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
           {plan.progress.thresholds.map(t => (
-            <div key={t.type} style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: '16px', border: '1px solid var(--bg-border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 10 }}>
+            <div key={t.type} style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: '16px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 10 }}>
                 {THRESHOLD_LABEL[t.type] ?? t.type.toUpperCase()}
               </div>
-              <div style={{ fontSize: 22, fontFamily: 'var(--font-data)', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 10 }}>
-                {Math.round(t.current)} <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/ {t.limit}</span>
+              <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--fg-primary)', marginBottom: 10 }}>
+                {Math.round(t.current)} <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>/ {t.limit}</span>
               </div>
               <ProgressBar pct={t.pct} status={plan.progress.status} />
             </div>
@@ -92,41 +92,41 @@ export default function MaintenancePlanDetailPage() {
         {/* History */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em' }}>
+            <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em' }}>
               HISTORIAL DE INTERVENCIONES
             </div>
             {logs.length > 0 && (
               <button
                 onClick={handleExportLogs}
-                style={{ padding: '4px 10px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}
+                style={{ padding: '4px 10px', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}
               >
                 Exportar CSV
               </button>
             )}
           </div>
           {logs.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin intervenciones registradas</div>
+            <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Sin intervenciones registradas</div>
           ) : (
-            <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--bg-border)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
               {logs.map((log, i) => (
-                <div key={log.id} style={{ padding: '12px 16px', borderBottom: i < logs.length - 1 ? '1px solid var(--bg-border)' : 'none' }}>
+                <div key={log.id} style={{ padding: '12px 16px', borderBottom: i < logs.length - 1 ? '1px solid var(--border)' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                      <div style={{ fontSize: 13, color: 'var(--fg-primary)' }}>
                         {log.description ?? 'Intervención registrada'}
                       </div>
                       {log.reset_counters.length > 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                        <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3 }}>
                           Resetea: {log.reset_counters.map(c => THRESHOLD_LABEL[c] ?? c).join(', ')}
                         </div>
                       )}
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                      <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                         {new Date(log.performed_at).toLocaleDateString('es-ES')}
                       </div>
                       {log.cost_eur != null && (
-                        <div style={{ fontSize: 12, color: 'var(--accent-ok)', fontFamily: 'var(--font-data)', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: 'var(--ok)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
                           {log.cost_eur.toFixed(2)} €
                         </div>
                       )}

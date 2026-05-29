@@ -12,9 +12,9 @@ import type { MaintenancePlanOut, VehicleOut } from '../../lib/types'
 
 const STATUS_LABEL: Record<string, string> = { ok: 'OK', 'próximo': 'PRÓXIMO', vencido: 'VENCIDO' }
 const STATUS_COLOR: Record<string, string> = {
-  ok: 'var(--accent-ok)',
-  'próximo': 'var(--accent-warn)',
-  vencido: 'var(--accent-crit)',
+  ok: 'var(--ok)',
+  'próximo': 'var(--warn)',
+  vencido: 'var(--danger)',
 }
 const THRESHOLD_LABEL: Record<string, string> = {
   pto_hours: 'h PTO',
@@ -123,8 +123,8 @@ export default function MaintenancePage() {
             onChange={e => setVehicleFilter(e.target.value)}
             style={{
               background: 'var(--bg-elevated)',
-              border: '1px solid var(--bg-border)',
-              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              color: 'var(--fg-primary)',
               borderRadius: 6,
               padding: '6px 10px',
               fontSize: 12,
@@ -136,14 +136,14 @@ export default function MaintenancePage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={handleExportCsv}
-              style={{ padding: '5px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+              style={{ padding: '5px 12px', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
             >
               Exportar CSV
             </button>
             {isAdmin && <Link
               to="/maintenance/new"
               style={{
-                background: 'var(--accent-energy)',
+                background: 'var(--cmg-teal)',
                 color: '#fff',
                 borderRadius: 6,
                 padding: '8px 16px',
@@ -162,14 +162,14 @@ export default function MaintenancePage() {
             {[0,1,2,3].map(i => <SkeletonRow key={i} height={44} />)}
           </div>
         ) : sorted.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin planes de mantenimiento configurados</div>
+          <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Sin planes de mantenimiento configurados</div>
         ) : (
-          <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--bg-border)', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   {['VEHÍCULO', 'PLAN', 'PROGRESO', 'ESTADO', ''].map(h => (
-                    <th key={h} style={{ padding: '8px 16px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', textAlign: 'left' }}>
+                    <th key={h} style={{ padding: '8px 16px', fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textAlign: 'left' }}>
                       {h}
                     </th>
                   ))}
@@ -181,10 +181,10 @@ export default function MaintenancePage() {
                     ? plan.progress.thresholds.reduce((a, b) => a.pct > b.pct ? a : b)
                     : null
                   return (
-                    <tr key={plan.id} style={{ borderBottom: i < sorted.length - 1 ? '1px solid var(--bg-border)' : 'none' }}>
+                    <tr key={plan.id} style={{ borderBottom: i < sorted.length - 1 ? '1px solid var(--border)' : 'none' }}>
                       <td style={{ padding: '10px 16px', fontSize: 13 }}>{plan.vehicle_name}</td>
                       <td style={{ padding: '10px 16px' }}>
-                        <Link to={`/maintenance/${plan.id}`} style={{ color: 'var(--text-primary)', fontSize: 13 }}>
+                        <Link to={`/maintenance/${plan.id}`} style={{ color: 'var(--fg-primary)', fontSize: 13 }}>
                           {plan.name}
                         </Link>
                       </td>
@@ -192,26 +192,26 @@ export default function MaintenancePage() {
                         {worst && (
                           <div>
                             <ProgressBar pct={worst.pct} status={plan.progress.status} />
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+                            <div style={{ fontSize: 10, color: 'var(--fg-muted)', marginTop: 3 }}>
                               {THRESHOLD_LABEL[worst.type] ?? worst.type}: {Math.round(worst.current)}/{worst.limit}
                             </div>
                           </div>
                         )}
                       </td>
                       <td style={{ padding: '10px 16px' }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: STATUS_COLOR[plan.progress.status] ?? 'var(--text-muted)' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: STATUS_COLOR[plan.progress.status] ?? 'var(--fg-muted)' }}>
                           {STATUS_LABEL[plan.progress.status] ?? plan.progress.status.toUpperCase()}
                         </span>
                       </td>
                       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                        {isAdmin && <Link to={`/maintenance/${plan.id}/edit`} style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {isAdmin && <Link to={`/maintenance/${plan.id}/edit`} style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
                           Editar
                         </Link>}
                         {(plan.progress.status === 'próximo' || plan.progress.status === 'vencido') && (
                           <button
                             onClick={() => openComplete(plan)}
                             style={{
-                              background: 'var(--accent-energy)',
+                              background: 'var(--cmg-teal)',
                               color: '#fff',
                               border: 'none',
                               borderRadius: 5,
@@ -238,47 +238,47 @@ export default function MaintenancePage() {
       {/* ── Complete maintenance modal ─────────────────────────────────────────── */}
       {completingPlan && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
-          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 400, border: '1px solid var(--bg-border)' }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 400, border: '1px solid var(--border)' }}>
             <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600 }}>Registrar mantenimiento</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 16 }}>
               {completingPlan.name}
             </p>
 
-            <label style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>
+            <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>
               Documento (factura / albarán){!isCmg && ' *'}
             </label>
             <input
               type="file"
               accept="image/*,.pdf"
               onChange={e => setCompleteFile(e.target.files?.[0] ?? null)}
-              style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-primary, #E7E5E4)', width: '100%' }}
+              style={{ marginBottom: 12, fontSize: 12, color: 'var(--fg-secondary)', width: '100%' }}
             />
 
-            <label style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>
+            <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>
               Descripción (opcional)
             </label>
             <textarea
               value={completeDesc}
               onChange={e => setCompleteDesc(e.target.value)}
               rows={3}
-              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', color: 'var(--text-primary, #E7E5E4)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box', resize: 'vertical', marginBottom: 12 }}
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-secondary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box', resize: 'vertical', marginBottom: 12 }}
             />
 
             {completeError && (
-              <p style={{ fontSize: 12, color: 'var(--accent-crit)', marginBottom: 12 }}>{completeError}</p>
+              <p style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 12 }}>{completeError}</p>
             )}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setCompletingPlan(null)}
-                style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}
+                style={{ background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleComplete}
                 disabled={completeMutation.isPending}
-                style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600, opacity: completeMutation.isPending ? 0.7 : 1 }}
+                style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600, opacity: completeMutation.isPending ? 0.7 : 1 }}
               >
                 {completeMutation.isPending ? 'Guardando…' : 'Confirmar y resetear contador'}
               </button>

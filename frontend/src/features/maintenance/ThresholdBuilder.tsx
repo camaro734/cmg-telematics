@@ -35,8 +35,8 @@ export default function ThresholdBuilder({ thresholds, onChange }: Props) {
 
   const inputStyle = {
     background: 'var(--bg-base)',
-    border: '1px solid var(--bg-border)',
-    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    color: 'var(--fg-primary)',
     borderRadius: 6,
     padding: '6px 10px',
     fontSize: 13,
@@ -60,12 +60,12 @@ export default function ThresholdBuilder({ thresholds, onChange }: Props) {
             onChange={e => update(i, 'value', e.target.value)}
             style={{ ...inputStyle, width: 90 }}
           />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{TYPE_UNIT[t.type]}</span>
+          <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{TYPE_UNIT[t.type]}</span>
           {thresholds.length > 1 && (
             <button
               type="button"
               onClick={() => remove(i)}
-              style={{ background: 'none', border: 'none', color: 'var(--accent-crit)', cursor: 'pointer', fontSize: 16 }}
+              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}
               title="Eliminar umbral"
             >
               ×
@@ -78,8 +78,8 @@ export default function ThresholdBuilder({ thresholds, onChange }: Props) {
         onClick={add}
         style={{
           background: 'none',
-          border: '1px dashed var(--bg-border)',
-          color: 'var(--text-muted)',
+          border: '1px dashed var(--border)',
+          color: 'var(--fg-muted)',
           borderRadius: 6,
           padding: '5px 12px',
           fontSize: 12,

@@ -140,7 +140,7 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
   return (
     <div
       ref={containerRef}
-      style={{ width: '100%', height: 'calc(100vh - 200px)', minHeight: 400, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bg-border)' }}
+      style={{ width: '100%', height: 'calc(100vh - 200px)', minHeight: 400, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}
     />
   )
 }
@@ -231,8 +231,8 @@ function StopLocationPicker({
   }
 
   const inputStyle: React.CSSProperties = {
-    flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-    borderRadius: 5, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+    flex: 1, background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+    borderRadius: 5, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
     fontSize: 12, padding: '6px 9px',
   }
 
@@ -253,7 +253,7 @@ function StopLocationPicker({
             type="button"
             onClick={geocode}
             disabled={searching || !query.trim()}
-            style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 5, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, opacity: searching || !query.trim() ? 0.6 : 1 }}
+            style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 5, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, opacity: searching || !query.trim() ? 0.6 : 1 }}
           >
             {searching ? '…' : 'Buscar'}
           </button>
@@ -261,16 +261,16 @@ function StopLocationPicker({
 
         {/* Dropdown resultados */}
         {showDrop && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, zIndex: 600, boxShadow: '0 6px 20px rgba(0,0,0,0.5)', maxHeight: 210, overflowY: 'auto', marginTop: 2 }}>
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, zIndex: 600, boxShadow: '0 6px 20px rgba(0,0,0,0.5)', maxHeight: 210, overflowY: 'auto', marginTop: 2 }}>
             {noResults ? (
-              <div style={{ padding: '10px 12px', fontSize: 12, fontFamily: 'var(--font-ui)', color: 'var(--text-muted)' }}>
+              <div style={{ padding: '10px 12px', fontSize: 12, fontFamily: 'var(--font-sans)', color: 'var(--fg-muted)' }}>
                 Sin resultados — prueba con otra dirección o haz clic en el mapa
               </div>
             ) : places.map((p, i) => (
               <div
                 key={i}
                 onClick={() => pickPlace(p)}
-                style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'var(--font-ui)', cursor: 'pointer', borderBottom: i < places.length - 1 ? '1px solid var(--bg-border)' : 'none', color: 'var(--text-primary)', lineHeight: 1.4 }}
+                style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'var(--font-sans)', cursor: 'pointer', borderBottom: i < places.length - 1 ? '1px solid var(--border)' : 'none', color: 'var(--fg-primary)', lineHeight: 1.4 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
@@ -282,8 +282,8 @@ function StopLocationPicker({
       </div>
 
       {/* Mapa */}
-      <div ref={containerRef} style={{ width: '100%', height: 220, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--bg-border)' }} />
-      <p style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginTop: 4, marginBottom: 0 }}>
+      <div ref={containerRef} style={{ width: '100%', height: 220, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }} />
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', marginTop: 4, marginBottom: 0 }}>
         Busca una dirección arriba o haz clic en el mapa para fijar la ubicación
         {lat && lon ? ` · ${lat.toFixed(5)}, ${lon.toFixed(5)}` : ''}
       </p>
@@ -296,8 +296,8 @@ const STOP_STATUS_LABELS: Record<WorkOrderStopStatus, string> = {
   pending: 'Pendiente', arrived: 'Llegado', in_progress: 'En trabajo', done: 'Completado', skipped: 'Omitido',
 }
 const STOP_STATUS_COLORS: Record<WorkOrderStopStatus, string> = {
-  pending: 'var(--text-muted)', arrived: 'var(--accent-info)',
-  in_progress: 'var(--accent-energy)', done: 'var(--accent-ok)', skipped: 'var(--accent-warn)',
+  pending: 'var(--fg-muted)', arrived: 'var(--info)',
+  in_progress: 'var(--cmg-teal)', done: 'var(--ok)', skipped: 'var(--warn)',
 }
 
 // ── Panel de paradas de una orden ─────────────────────────────────────────────
@@ -346,30 +346,30 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
 
   const panelStyle: React.CSSProperties = {
     position: 'fixed', top: 0, right: 0, width: 420, height: '100vh',
-    background: 'var(--bg-surface)', borderLeft: '1px solid var(--bg-border)',
+    background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', zIndex: 2000, overflowY: 'auto',
   }
 
   return (
     <div style={panelStyle}>
       {/* Header */}
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bg-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
             Paradas de la ruta
           </div>
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 700, color: 'var(--fg-primary)' }}>
             {order.title}
           </div>
           {order.vehicle_name && (
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>
               🚚 {order.vehicle_name}{order.driver_name ? ` · ${order.driver_name}` : ''}
             </div>
           )}
         </div>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', lineHeight: 1, padding: 4 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--fg-muted)', lineHeight: 1, padding: 4 }}
         >
           ×
         </button>
@@ -377,7 +377,7 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
 
       {/* Lista de paradas */}
       <div style={{ padding: '12px 20px', flex: 1 }}>
-        {isLoading && <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>Cargando paradas…</div>}
+        {isLoading && <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>Cargando paradas…</div>}
 
         {stops.map((stop, idx) => {
           const color = STOP_STATUS_COLORS[stop.status]
@@ -388,7 +388,7 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
 
           return (
             <div key={stop.id} style={{
-              background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
               borderRadius: 8, padding: '12px 14px', marginBottom: 10,
               borderLeft: `3px solid ${color}`,
             }}>
@@ -397,27 +397,27 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%', background: color,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-data)', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
                 }}>
                   {idx + 1}
                 </div>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600, color: 'var(--fg-primary)', flex: 1 }}>
                   {stop.title}
                 </span>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {STOP_STATUS_LABELS[stop.status]}
                 </span>
               </div>
 
               {/* Dirección */}
               {stop.address && (
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)', marginBottom: 4 }}>
                   📍 {stop.address}
                   {stop.lat && stop.lon && (
                     <a
                       href={`https://maps.google.com/maps?q=${stop.lat},${stop.lon}`}
                       target="_blank" rel="noopener noreferrer"
-                      style={{ marginLeft: 8, color: 'var(--accent-info)', fontSize: 11 }}
+                      style={{ marginLeft: 8, color: 'var(--info)', fontSize: 11 }}
                     >
                       Ver mapa ↗
                     </a>
@@ -425,36 +425,36 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                 </div>
               )}
               {stop.client_name && (
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)', marginBottom: 4 }}>
                   👤 Cliente: {stop.client_name}
                 </div>
               )}
 
               {/* Telemetría del trabajo si está completado */}
               {stop.status === 'done' && (stop.pto_minutes || stop.rpm_avg || stop.fuel_l) && (
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--bg-border)' }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
                   {stop.pto_minutes != null && (
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-energy)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cmg-teal)' }}>
                       ⏱ {stop.pto_minutes.toFixed(0)} min PTO
                     </span>
                   )}
                   {stop.pump_minutes != null && (
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-info)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--info)' }}>
                       💧 {stop.pump_minutes.toFixed(0)} min bomba
                     </span>
                   )}
                   {stop.rpm_avg != null && (
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--text-muted)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-muted)' }}>
                       ⚙ {stop.rpm_avg.toFixed(0)} RPM
                     </span>
                   )}
                   {stop.fuel_l != null && (
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-warn)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--warn)' }}>
                       ⛽ {stop.fuel_l.toFixed(1)} L
                     </span>
                   )}
                   {stop.pressure_min != null && (
-                    <span style={{ fontFamily: 'var(--font-data)', fontSize: 12, color: 'var(--accent-crit)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--danger)' }}>
                       🔽 {stop.pressure_min.toFixed(0)} mbar
                     </span>
                   )}
@@ -463,7 +463,7 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
 
               {/* Tiempos */}
               {stop.started_at && (
-                <div style={{ fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-muted)', marginTop: 4 }}>
                   {stop.started_at ? `Inicio: ${new Date(stop.started_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ''}
                   {stop.completed_at ? ` · Fin: ${new Date(stop.completed_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ''}
                 </div>
@@ -476,7 +476,7 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                     key={ns}
                     onClick={() => patchStopStatus({ stopId: stop.id, status: ns })}
                     style={{
-                      fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
+                      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
                       padding: '3px 10px', borderRadius: 6,
                       border: `1px solid ${STOP_STATUS_COLORS[ns]}`,
                       background: 'transparent', color: STOP_STATUS_COLORS[ns], cursor: 'pointer',
@@ -489,9 +489,9 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                   <button
                     onClick={() => onReportStop(stop)}
                     style={{
-                      fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
-                      border: '1px solid var(--accent-energy)', background: 'transparent',
-                      color: 'var(--accent-energy)', cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                      border: '1px solid var(--cmg-teal)', background: 'transparent',
+                      color: 'var(--cmg-teal)', cursor: 'pointer',
                     }}
                   >
                     Informe
@@ -501,9 +501,9 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                   <button
                     onClick={async () => { if (await confirmAsk({ title: 'Eliminar parada', message: '¿Eliminar esta parada?', confirmLabel: 'Eliminar', kind: 'danger' })) deleteStop(stop.id) }}
                     style={{
-                      fontFamily: 'var(--font-ui)', fontSize: 11, padding: '3px 10px', borderRadius: 6,
-                      border: '1px solid var(--bg-border)', background: 'transparent',
-                      color: 'var(--accent-crit)', cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)', fontSize: 11, padding: '3px 10px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'transparent',
+                      color: 'var(--danger)', cursor: 'pointer',
                     }}
                   >
                     Eliminar
@@ -515,7 +515,7 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
         })}
 
         {!isLoading && stops.length === 0 && !addingStop && (
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)', textAlign: 'center', padding: '24px 0' }}>
             Sin paradas. Añade la primera parada de la ruta.
           </div>
         )}
@@ -523,10 +523,10 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
         {/* Formulario nueva parada */}
         {addingStop && (
           <div style={{
-            background: 'var(--bg-base)', border: '1px solid var(--accent-energy)',
+            background: 'var(--bg-base)', border: '1px solid var(--cmg-teal)',
             borderRadius: 8, padding: 14, marginTop: 8,
           }}>
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--accent-energy)', marginBottom: 10 }}>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--cmg-teal)', marginBottom: 10 }}>
               Nueva parada
             </div>
             {[
@@ -535,12 +535,12 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
               { k: 'address', label: 'Dirección', placeholder: 'Calle, número, localidad' },
             ].map(({ k, label, placeholder }) => (
               <div key={k} style={{ marginBottom: 8 }}>
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{label}</div>
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', marginBottom: 3 }}>{label}</div>
                 <input
                   style={{
                     width: '100%', boxSizing: 'border-box',
-                    background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-                    borderRadius: 5, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    borderRadius: 5, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
                     fontSize: 13, padding: '6px 9px',
                   }}
                   value={(newStop as unknown as Record<string, string>)[k] ?? ''}
@@ -550,12 +550,12 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
               </div>
             ))}
             <div style={{ marginBottom: 8 }}>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Notas</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', marginBottom: 3 }}>Notas</div>
               <textarea
                 style={{
                   width: '100%', boxSizing: 'border-box',
-                  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-                  borderRadius: 5, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                  borderRadius: 5, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
                   fontSize: 13, padding: '6px 9px', resize: 'vertical', minHeight: 52,
                 }}
                 value={newStop.notes ?? ''}
@@ -570,12 +570,12 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
               onPick={(la, lo) => { setPickedLat(la); setPickedLon(lo) }}
             />
             {stopError && (
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--accent-crit)', marginTop: 6 }}>{stopError}</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>{stopError}</div>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setAddingStop(false); setStopError('') }}
-                style={{ fontFamily: 'var(--font-ui)', fontSize: 12, padding: '5px 14px', borderRadius: 6, border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                style={{ fontFamily: 'var(--font-sans)', fontSize: 12, padding: '5px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--fg-muted)', cursor: 'pointer' }}
               >
                 Cancelar
               </button>
@@ -583,9 +583,9 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                 disabled={creating || !newStop.title?.trim()}
                 onClick={() => createStop()}
                 style={{
-                  fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700,
+                  fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700,
                   padding: '5px 14px', borderRadius: 6, border: 'none',
-                  background: 'var(--accent-energy)', color: '#fff', cursor: 'pointer',
+                  background: 'var(--cmg-teal)', color: '#fff', cursor: 'pointer',
                   opacity: creating || !newStop.title?.trim() ? 0.6 : 1,
                 }}
               >
@@ -601,10 +601,10 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
             onClick={() => setAddingStop(true)}
             style={{
               width: '100%', marginTop: 8,
-              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+              fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
               padding: '9px 0', borderRadius: 8,
-              border: '1px dashed var(--accent-energy)', background: 'transparent',
-              color: 'var(--accent-energy)', cursor: 'pointer',
+              border: '1px dashed var(--cmg-teal)', background: 'transparent',
+              color: 'var(--cmg-teal)', cursor: 'pointer',
             }}
           >
             + Añadir parada
@@ -620,15 +620,15 @@ const STATUS_LABELS: Record<WorkOrderStatus, string> = {
   pending: 'Pendiente', in_progress: 'En curso', done: 'Completada', cancelled: 'Cancelada',
 }
 const STATUS_COLORS: Record<WorkOrderStatus, string> = {
-  pending: 'var(--accent-info)', in_progress: 'var(--accent-energy)',
-  done: 'var(--accent-ok)', cancelled: 'var(--accent-off)',
+  pending: 'var(--info)', in_progress: 'var(--cmg-teal)',
+  done: 'var(--ok)', cancelled: 'var(--offline)',
 }
 const PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
   low: 'Baja', normal: 'Normal', high: 'Alta', urgent: 'Urgente',
 }
 const PRIORITY_COLORS: Record<WorkOrderPriority, string> = {
-  low: 'var(--text-muted)', normal: 'var(--text-muted)',
-  high: 'var(--accent-warn)', urgent: 'var(--accent-crit)',
+  low: 'var(--fg-muted)', normal: 'var(--fg-muted)',
+  high: 'var(--warn)', urgent: 'var(--danger)',
 }
 
 const ALL_STATUSES: WorkOrderStatus[] = ['pending', 'in_progress', 'done', 'cancelled']
@@ -636,30 +636,30 @@ const ALL_STATUSES: WorkOrderStatus[] = ['pending', 'in_progress', 'done', 'canc
 // ── Styles ────────────────────────────────────────────────────────────────────
 const S = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 } as const,
-  title: { fontFamily: 'var(--font-ui)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 } as const,
-  btn: { fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent-energy)', color: '#fff' } as const,
-  btnSm: { fontFamily: 'var(--font-ui)', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--bg-border)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer' } as const,
+  title: { fontFamily: 'var(--font-sans)', fontSize: 20, fontWeight: 700, color: 'var(--fg-primary)', margin: 0 } as const,
+  btn: { fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--cmg-teal)', color: '#fff' } as const,
+  btnSm: { fontFamily: 'var(--font-sans)', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--fg-muted)', cursor: 'pointer' } as const,
   filters: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' as const },
   chip: (active: boolean) => ({
-    fontFamily: 'var(--font-ui)', fontSize: 12, padding: '4px 12px', borderRadius: 99, cursor: 'pointer', border: 'none',
-    background: active ? 'var(--accent-energy)' : 'var(--bg-elevated)',
-    color: active ? '#fff' : 'var(--text-muted)',
+    fontFamily: 'var(--font-sans)', fontSize: 12, padding: '4px 12px', borderRadius: 99, cursor: 'pointer', border: 'none',
+    background: active ? 'var(--cmg-teal)' : 'var(--bg-elevated)',
+    color: active ? '#fff' : 'var(--fg-muted)',
   }),
-  card: { background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: '14px 18px', display: 'flex', flexDirection: 'column' as const, gap: 8 },
+  card: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', display: 'flex', flexDirection: 'column' as const, gap: 8 },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  label: { fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' },
+  label: { fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' },
   overlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: 'var(--bg-surface)', borderRadius: 12, padding: 28, width: 500, display: 'flex', flexDirection: 'column' as const, gap: 14, maxHeight: '90vh', overflowY: 'auto' as const },
   field: { display: 'flex', flexDirection: 'column' as const, gap: 4 },
-  input: { background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 13, padding: '8px 10px' } as const,
-  select: { background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 13, padding: '8px 10px' } as const,
+  input: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '8px 10px' } as const,
+  select: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '8px 10px' } as const,
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: WorkOrderStatus }) {
   return (
     <span style={{
-      fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
+      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
       padding: '2px 8px', borderRadius: 99,
       background: `color-mix(in srgb, ${STATUS_COLORS[status]} 20%, transparent)`,
       color: STATUS_COLORS[status],
@@ -825,11 +825,11 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
         </div>
 
         {/* ── Datos del cliente final (aparecerán en el PDF del parte) ── */}
-        <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 14 }}>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--fg-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Cliente final del servicio (opcional)
           </span>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 8px' }}>
+          <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', margin: '4px 0 8px' }}>
             Aparecerá en el bloque "Cliente" del PDF del parte de servicio.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -857,20 +857,20 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
         </div>
 
         {/* ── Paradas programadas ── */}
-        <div style={{ borderTop: '1px solid var(--bg-border)', paddingTop: 14 }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div>
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--fg-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Paradas programadas
               </span>
               {draftStops.length > 0 && (
-                <span style={{ fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--accent-energy)', marginLeft: 6 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--cmg-teal)', marginLeft: 6 }}>
                   {draftStops.length}
                 </span>
               )}
             </div>
             <button
-              style={{ ...S.btnSm, background: 'color-mix(in srgb, var(--accent-energy) 15%, transparent)', color: 'var(--accent-energy)', border: '1px solid var(--accent-energy)', fontSize: 12 }}
+              style={{ ...S.btnSm, background: 'color-mix(in srgb, var(--cmg-teal) 15%, transparent)', color: 'var(--cmg-teal)', border: '1px solid var(--cmg-teal)', fontSize: 12 }}
               onClick={addStop}
               type="button"
             >
@@ -879,7 +879,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           </div>
 
           {draftStops.length === 0 && (
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)', margin: '0 0 4px' }}>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)', margin: '0 0 4px' }}>
               Sin paradas — el conductor recibirá las instrucciones generales. Añade paradas para definir los puntos de trabajo con ubicación en el mapa.
             </p>
           )}
@@ -888,13 +888,13 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
             {draftStops.map((stop, idx) => (
               <div key={stop._id} style={{
                 background: 'var(--bg-base)', borderRadius: 8, padding: 12,
-                border: '1px solid var(--bg-border)', borderLeft: '3px solid var(--accent-energy)',
+                border: '1px solid var(--border)', borderLeft: '3px solid var(--cmg-teal)',
               }}>
                 {/* Row 1: número + título + eliminar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{
-                    fontFamily: 'var(--font-data)', fontSize: 11, fontWeight: 700,
-                    color: 'var(--accent-energy)', background: 'rgba(249,115,22,0.15)',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                    color: 'var(--cmg-teal)', background: 'rgba(249,115,22,0.15)',
                     borderRadius: '50%', width: 22, height: 22,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
@@ -907,7 +907,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
                     onChange={e => updateStop(stop._id, 'title', e.target.value)}
                   />
                   <button
-                    style={{ background: 'transparent', border: 'none', color: 'var(--accent-crit)', fontSize: 18, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--danger)', fontSize: 18, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
                     onClick={() => removeStop(stop._id)}
                     title="Eliminar parada"
                     type="button"
@@ -945,8 +945,8 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
                   <button
                     style={{
                       ...S.btnSm, fontSize: 11,
-                      color: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : 'var(--text-muted)'),
-                      borderColor: stop.mapOpen ? 'var(--accent-info)' : (stop.lat ? 'var(--accent-ok)' : undefined),
+                      color: stop.mapOpen ? 'var(--info)' : (stop.lat ? 'var(--ok)' : 'var(--fg-muted)'),
+                      borderColor: stop.mapOpen ? 'var(--info)' : (stop.lat ? 'var(--ok)' : undefined),
                     }}
                     onClick={() => updateStop(stop._id, 'mapOpen', !stop.mapOpen)}
                     type="button"
@@ -957,7 +957,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
                         ? `✓ Ubicación fijada · ${stop.lat.toFixed(4)}, ${stop.lon?.toFixed(4)}`
                         : '📍 Fijar ubicación en mapa'}
                   </button>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', whiteSpace: 'nowrap' }}>
                     Radio llegada:
                     <input
                       type="number"
@@ -988,7 +988,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           </div>
         </div>
 
-        {error && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 11, color: 'var(--accent-crit)' }}>{error}</span>}
+        {error && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--danger)' }}>{error}</span>}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button style={S.btnSm} onClick={onClose} type="button">Cancelar</button>
@@ -1098,7 +1098,7 @@ export default function WorkOrdersPage() {
       )}
 
       {!isLoading && orders.length === 0 && (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+        <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>
           No hay órdenes de trabajo{filter !== 'all' ? ` con estado "${STATUS_LABELS[filter as WorkOrderStatus]}"` : ''}.
         </div>
       )}
@@ -1112,17 +1112,17 @@ export default function WorkOrdersPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <StatusBadge status={o.status}/>
                 <span style={{
-                  fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
+                  fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
                   color: PRIORITY_COLORS[o.priority],
                 }}>
                   {PRIORITY_LABELS[o.priority]}
                 </span>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 600, color: 'var(--fg-primary)' }}>
                   {o.title}
                 </span>
                 {o.status === 'done' && o.doc_number && (
                   <span style={{
-                    fontFamily: 'var(--font-data)', fontSize: 11, color: 'var(--accent-info)',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--info)',
                     background: 'rgba(56,189,248,0.1)', padding: '2px 6px', borderRadius: 4,
                   }}>
                     {o.doc_number}
@@ -1132,13 +1132,13 @@ export default function WorkOrdersPage() {
               <div style={{ display: 'flex', gap: 6 }}>
                 {/* Botones de transición de estado */}
                 {o.status === 'pending' && (
-                  <button style={{ ...S.btnSm, color: 'var(--accent-energy)', borderColor: 'var(--accent-energy)' }}
+                  <button style={{ ...S.btnSm, color: 'var(--cmg-teal)', borderColor: 'var(--cmg-teal)' }}
                     onClick={() => changeStatus({ id: o.id, status: 'in_progress' })}>
                     Iniciar
                   </button>
                 )}
                 {o.status === 'in_progress' && (
-                  <button style={{ ...S.btnSm, color: 'var(--accent-ok)', borderColor: 'var(--accent-ok)' }}
+                  <button style={{ ...S.btnSm, color: 'var(--ok)', borderColor: 'var(--ok)' }}
                     onClick={() => changeStatus({ id: o.id, status: 'done' })}>
                     Completar
                   </button>
@@ -1150,7 +1150,7 @@ export default function WorkOrdersPage() {
                 )}
                 {(o.status === 'in_progress' || o.status === 'done') && (
                   <button
-                    style={{ ...S.btnSm, color: 'var(--accent-info)', borderColor: 'var(--accent-info)' }}
+                    style={{ ...S.btnSm, color: 'var(--info)', borderColor: 'var(--info)' }}
                     onClick={() => setReportOrder(o)}
                   >
                     Informe
@@ -1158,7 +1158,7 @@ export default function WorkOrdersPage() {
                 )}
                 {o.status === 'done' && (
                   <button
-                    style={{ ...S.btnSm, color: 'var(--accent-energy)', borderColor: 'var(--accent-energy)' }}
+                    style={{ ...S.btnSm, color: 'var(--cmg-teal)', borderColor: 'var(--cmg-teal)' }}
                     onClick={() => downloadOrderPdf(o)}
                     title="Descargar parte de servicio en PDF"
                   >
@@ -1166,14 +1166,14 @@ export default function WorkOrdersPage() {
                   </button>
                 )}
                 <button
-                  style={{ ...S.btnSm, borderColor: 'var(--accent-energy)', color: 'var(--accent-energy)' }}
+                  style={{ ...S.btnSm, borderColor: 'var(--cmg-teal)', color: 'var(--cmg-teal)' }}
                   onClick={() => setStopsOrder(o)}
                 >
                   Ruta
                 </button>
                 {isAdmin && <button style={S.btnSm} onClick={() => { setEditing(o); setShowModal(true) }}>Editar</button>}
                 {isAdmin && o.status !== 'in_progress' && (
-                  <button style={{ ...S.btnSm, color: 'var(--accent-crit)' }}
+                  <button style={{ ...S.btnSm, color: 'var(--danger)' }}
                     onClick={async () => { if (await confirmAsk({ title: 'Eliminar orden', message: '¿Eliminar esta orden? Esta acción no se puede deshacer.', confirmLabel: 'Eliminar', kind: 'danger' })) deleteOrder(o.id) }}>
                     Eliminar
                   </button>
@@ -1182,14 +1182,14 @@ export default function WorkOrdersPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-              {o.vehicle_name && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>Vehículo: <b style={{ color: 'var(--text-primary)' }}>{o.vehicle_name}</b></span>}
-              {o.driver_name  && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>Conductor: <b style={{ color: 'var(--text-primary)' }}>{o.driver_name}</b></span>}
-              {o.scheduled_at && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>Programada: {new Date(o.scheduled_at).toLocaleString('es-ES')}</span>}
-              {o.location_address && <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>{o.location_address}</span>}
+              {o.vehicle_name && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>Vehículo: <b style={{ color: 'var(--fg-primary)' }}>{o.vehicle_name}</b></span>}
+              {o.driver_name  && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>Conductor: <b style={{ color: 'var(--fg-primary)' }}>{o.driver_name}</b></span>}
+              {o.scheduled_at && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>Programada: {new Date(o.scheduled_at).toLocaleString('es-ES')}</span>}
+              {o.location_address && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>{o.location_address}</span>}
             </div>
 
             {o.description && (
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>{o.description}</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>{o.description}</span>
             )}
           </div>
         ))}

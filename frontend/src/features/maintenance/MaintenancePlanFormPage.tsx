@@ -79,8 +79,8 @@ export default function MaintenancePlanFormPage() {
     }
   }
 
-  const labelStyle = { fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }
-  const inputStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', color: 'var(--text-primary)', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const }
+  const labelStyle = { fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }
+  const inputStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const }
 
   return (
     <Shell title={isEdit ? 'Editar plan' : 'Nuevo plan de mantenimiento'}>
@@ -127,17 +127,17 @@ export default function MaintenancePlanFormPage() {
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
-              <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Plan activo</span>
+              <span style={{ fontSize: 13, color: 'var(--fg-primary)' }}>Plan activo</span>
             </label>
 
-            {error && <div style={{ color: 'var(--accent-crit)', fontSize: 13 }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 12 }}>
               <button
                 type="submit"
                 disabled={mutation.isPending}
                 style={{
-                  background: 'var(--accent-energy)',
+                  background: 'var(--cmg-teal)',
                   color: '#fff',
                   border: 'none',
                   borderRadius: 6,
@@ -152,7 +152,7 @@ export default function MaintenancePlanFormPage() {
               <button
                 type="button"
                 onClick={() => navigate('/maintenance')}
-                style={{ background: 'none', border: '1px solid var(--bg-border)', color: 'var(--text-muted)', borderRadius: 6, padding: '10px 24px', fontSize: 13, cursor: 'pointer' }}
+                style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--fg-muted)', borderRadius: 6, padding: '10px 24px', fontSize: 13, cursor: 'pointer' }}
               >
                 Cancelar
               </button>
