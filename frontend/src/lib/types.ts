@@ -81,6 +81,7 @@ export interface BrandTokens {
 export type SensorIcon =
   | 'pressure' | 'temperature' | 'fuel' | 'water' | 'engine'
   | 'speed' | 'voltage' | 'pump' | 'valve' | 'rpm' | 'flow'
+  | 'counter' | 'toggle'
 
 export interface TenantOut {
   id: string
@@ -106,7 +107,7 @@ export interface SensorDef {
   unit: string | null
   min?: number
   max?: number
-  gauge_type: 'circular' | 'linear' | 'battery' | 'numeric' | 'led' | 'tank' | 'gauge_arc'
+  gauge_type: 'circular' | 'linear' | 'battery' | 'numeric' | 'led' | 'tank' | 'gauge_arc' | 'counter'
   warn_above?: number
   alert_above?: number
   warn_below?: number
@@ -120,6 +121,7 @@ export interface SensorDef {
   icon?: SensorIcon
   color?: string
   widget_size?: 'sm' | 'md' | 'lg'
+  category?: 'maquina' | 'chasis'
 }
 
 export interface WsMessage {
