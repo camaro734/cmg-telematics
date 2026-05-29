@@ -9,14 +9,14 @@ import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut
 
 
 // ── Design token mirrors (CSS vars can't be used in SVG strings) ────────────
-const T_OK     = '#22C55E'  // var(--accent-ok)
-const T_WARN   = '#EAB308'  // var(--accent-warn)
-const T_CRIT   = '#EF4444'  // var(--accent-crit)
-const T_ORANGE = '#F97316'  // var(--accent-orange)
-const T_INFO   = '#38BDF8'  // var(--accent-info)
+const T_OK     = '#22C55E'  // var(--ok)
+const T_WARN   = '#EAB308'  // var(--warn)
+const T_CRIT   = '#EF4444'  // var(--danger)
+const T_ORANGE = '#F97316'  // var(--cmg-teal)
+const T_INFO   = '#38BDF8'  // var(--info)
 const T_OFF    = '#57534E'  // --bg-border dark
 const T_ELEVATED = '#3C3330' // var(--bg-elevated)
-const T_MUTED  = '#a8a29e'  // var(--text-dim)
+const T_MUTED  = '#a8a29e'  // var(--fg-dim)
 
 // CSS para efecto pulse — se inyecta una sola vez en el documento
 const PULSE_CSS = `
@@ -216,7 +216,7 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
         iconCreateFunction: (cluster) => {
           const count = cluster.getChildCount()
           return L.divIcon({
-            html: `<div style="background:var(--accent-energy);color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid rgba(255,255,255,0.3)">${count}</div>`,
+            html: `<div style="background:var(--cmg-teal);color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid rgba(255,255,255,0.3)">${count}</div>`,
             className: '',
             iconSize: [36, 36],
           })
@@ -383,7 +383,7 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
         radius: 9, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.92,
       })
       marker.bindPopup(`
-        <div style="font-family:var(--font-ui,sans-serif);min-width:170px;padding:2px 0">
+        <div style="font-family:var(--font-sans,sans-serif);min-width:170px;padding:2px 0">
           <div style="font-weight:600;font-size:13px;margin-bottom:4px">${order.title}</div>
           ${order.vehicle_name ? `<div style="font-size:11px;color:#999;margin-bottom:2px">${order.vehicle_name}</div>` : ''}
           ${order.driver_name  ? `<div style="font-size:11px;color:#999;margin-bottom:6px">${order.driver_name}</div>` : ''}

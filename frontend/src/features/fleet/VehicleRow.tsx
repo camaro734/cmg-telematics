@@ -35,7 +35,7 @@ export default function VehicleRow({ vehicle, status, selected, onSelect }: Vehi
   }
 
   return (
-    <div style={{ borderBottom: '1px solid var(--bg-border)' }}>
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
       {/* Fila principal */}
       <div
         onClick={handleClick}
@@ -44,8 +44,8 @@ export default function VehicleRow({ vehicle, status, selected, onSelect }: Vehi
           alignItems: 'center',
           gap: 10,
           padding: '10px 14px',
-          borderLeft: `3px solid ${pto ? 'var(--accent-energy)' : online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
-          background: selected ? 'var(--bg-elevated)' : 'transparent',
+          borderLeft: `3px solid ${pto ? 'var(--cmg-teal)' : online ? 'var(--ok)' : 'var(--border)'}`,
+          background: selected ? 'var(--bg-card)' : 'transparent',
           cursor: 'pointer',
           transition: 'background 0.1s',
         }}
@@ -54,7 +54,7 @@ export default function VehicleRow({ vehicle, status, selected, onSelect }: Vehi
         <span style={{
           width: 8, height: 8,
           borderRadius: '50%',
-          background: pto ? 'var(--accent-energy)' : online ? 'var(--accent-ok)' : 'var(--accent-off)',
+          background: pto ? 'var(--cmg-teal)' : online ? 'var(--ok)' : 'var(--offline)',
           flexShrink: 0,
         }} />
 
@@ -63,14 +63,14 @@ export default function VehicleRow({ vehicle, status, selected, onSelect }: Vehi
           <div style={{
             fontWeight: 500,
             fontSize: 13,
-            color: online ? 'var(--text-primary)' : 'var(--text-muted)',
+            color: online ? 'var(--fg-primary)' : 'var(--fg-muted)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}>
             {vehicle.name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+          <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
             {vehicle.license_plate ?? '—'}
           </div>
         </div>
@@ -80,13 +80,13 @@ export default function VehicleRow({ vehicle, status, selected, onSelect }: Vehi
           <div style={{ textAlign: 'right' }}>
             {online && status?.speed_kmh != null ? (
               <>
-                <div style={{ fontSize: 13, fontFamily: 'var(--font-data)', color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
                   {Math.round(status.speed_kmh)} km/h
                 </div>
                 {pto && <StatusBadge variant="pto" />}
               </>
             ) : (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
                 {status?.last_seen ? relativeTime(status.last_seen) : 'Sin señal'}
               </div>
             )}
@@ -99,12 +99,12 @@ export default function VehicleRow({ vehicle, status, selected, onSelect }: Vehi
               title="Gestionar dispositivo GPS"
               style={{
                 fontSize: 10,
-                fontFamily: 'var(--font-data)',
+                fontFamily: 'var(--font-mono)',
                 fontWeight: 600,
                 padding: '2px 6px',
-                background: showDevice ? 'var(--accent-info)' : 'var(--bg-elevated)',
-                color: showDevice ? '#fff' : 'var(--accent-info)',
-                border: `1px solid var(--accent-info)`,
+                background: showDevice ? 'var(--info)' : 'var(--bg-elevated)',
+                color: showDevice ? '#fff' : 'var(--info)',
+                border: `1px solid var(--info)`,
                 borderRadius: 4,
                 cursor: 'pointer',
                 lineHeight: 1.4,

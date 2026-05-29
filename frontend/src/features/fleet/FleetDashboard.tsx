@@ -43,11 +43,11 @@ function getVehicleState(
 }
 
 function stateColor(state: VehicleState): string {
-  return state === 'alert' ? 'var(--accent-crit)'
-    : state === 'moving' ? 'var(--accent-ok)'
-    : state === 'idle' ? 'var(--accent-warn)'
-    : state === 'parked' ? 'var(--accent-info)'
-    : 'var(--accent-off)'
+  return state === 'alert' ? 'var(--danger)'
+    : state === 'moving' ? 'var(--ok)'
+    : state === 'idle' ? 'var(--warn)'
+    : state === 'parked' ? 'var(--info)'
+    : 'var(--offline)'
 }
 
 const SIDEBAR_W = 290
@@ -75,7 +75,7 @@ function SelectedCard({ vehicle, status, vehicleType, tenant, alertCount, onClos
       position: 'absolute', bottom: 24, right: 20,
       width: 268,
       background: 'rgba(41,37,36,0.97)',
-      border: `1px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+      border: `1px solid ${online ? 'var(--ok)' : 'var(--border)'}`,
       borderRadius: 10,
       boxShadow: '0 6px 32px rgba(0,0,0,0.55)',
       zIndex: 1000,
@@ -83,30 +83,30 @@ function SelectedCard({ vehicle, status, vehicleType, tenant, alertCount, onClos
       backdropFilter: 'blur(6px)',
     }}>
       {/* Header */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--bg-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 68, height: 36, borderRadius: 5, background: 'var(--bg-elevated)', border: `1px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', padding: 3 }}>
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 68, height: 36, borderRadius: 5, background: 'var(--bg-elevated)', border: `1px solid ${online ? 'var(--ok)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', padding: 3 }}>
           {vehicleType?.icon_url
             ? <img src={vehicleType.icon_url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            : <VehicleTypeIcon width={58} height={28} style={{ color: online ? 'var(--accent-ok)' : 'var(--accent-off)', opacity: online ? 1 : 0.5 }} />
+            : <VehicleTypeIcon width={58} height={28} style={{ color: online ? 'var(--ok)' : 'var(--offline)', opacity: online ? 1 : 0.5 }} />
           }
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicle.name}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicle.name}</div>
           {vehicle.license_plate && (
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)', letterSpacing: '0.05em' }}>{vehicle.license_plate}</div>
+            <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>{vehicle.license_plate}</div>
           )}
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
       </div>
 
       {/* Status badges */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--bg-border)' }}>
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           <span style={{
             fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
             background: online ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)',
-            color: online ? 'var(--accent-ok)' : 'var(--accent-off)',
-            border: `1px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+            color: online ? 'var(--ok)' : 'var(--offline)',
+            border: `1px solid ${online ? 'var(--ok)' : 'var(--border)'}`,
           }}>
             {online ? '● Online' : '○ Offline'}
           </span>
@@ -114,8 +114,8 @@ function SelectedCard({ vehicle, status, vehicleType, tenant, alertCount, onClos
             <span style={{
               fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
               background: ignition ? 'rgba(34,197,94,0.12)' : 'var(--bg-elevated)',
-              color: ignition ? 'var(--accent-ok)' : 'var(--accent-off)',
-              border: `1px solid ${ignition ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+              color: ignition ? 'var(--ok)' : 'var(--offline)',
+              border: `1px solid ${ignition ? 'var(--ok)' : 'var(--border)'}`,
             }}>
               Ign. {ignition ? 'ON' : 'OFF'}
             </span>
@@ -123,26 +123,26 @@ function SelectedCard({ vehicle, status, vehicleType, tenant, alertCount, onClos
           {alertCount > 0 && (
             <span style={{
               fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
-              background: 'rgba(239,68,68,0.15)', color: 'var(--accent-crit)',
-              border: '1px solid var(--accent-crit)',
+              background: 'rgba(239,68,68,0.15)', color: 'var(--danger)',
+              border: '1px solid var(--danger)',
             }}>
               ⚠ {alertCount} alerta{alertCount !== 1 ? 's' : ''}
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--fg-muted)', flexWrap: 'wrap' }}>
           {online && speed > 2 && (
-            <span><span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-data)', fontWeight: 600 }}>{speed.toFixed(0)}</span> km/h</span>
+            <span><span style={{ color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{speed.toFixed(0)}</span> km/h</span>
           )}
           {status?.ext_voltage_mv != null && (
-            <span><span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-data)', fontWeight: 600 }}>{(status.ext_voltage_mv / 1000).toFixed(1)}</span> V</span>
+            <span><span style={{ color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{(status.ext_voltage_mv / 1000).toFixed(1)}</span> V</span>
           )}
-          {tenant && <span style={{ color: 'var(--text-muted)' }}>{tenant.name}</span>}
+          {tenant && <span style={{ color: 'var(--fg-muted)' }}>{tenant.name}</span>}
         </div>
 
         {status?.last_seen && (
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+          <div style={{ fontSize: 10, color: 'var(--fg-muted)', marginTop: 6 }}>
             {online ? '● Señal en directo' : relativeTime(status.last_seen)}
           </div>
         )}
@@ -154,9 +154,9 @@ function SelectedCard({ vehicle, status, vehicleType, tenant, alertCount, onClos
           onClick={onDetail}
           style={{
             width: '100%',
-            background: 'var(--accent-energy)', border: 'none', borderRadius: 6,
+            background: 'var(--cmg-teal)', border: 'none', borderRadius: 6,
             padding: '9px 12px', color: '#000', fontWeight: 700, fontSize: 13,
-            cursor: 'pointer', fontFamily: 'var(--font-ui)',
+            cursor: 'pointer', fontFamily: 'var(--font-sans)',
             transition: 'opacity 0.15s',
           }}>
           Ver detalle →
@@ -259,35 +259,35 @@ export default function FleetDashboard() {
         {selectedVehicle && (
           <div style={{
             padding: '10px 14px', background: 'var(--bg-surface)',
-            borderBottom: '1px solid var(--bg-border)',
+            borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVehicle.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
                 {isEffectivelyOnline(selectedStatus) ? '● Online' : '○ Offline'}
                 {selectedStatus?.ignition ? ' · Ign. ON' : ''}
               </div>
             </div>
             <button
               onClick={() => navigate(`/vehicles/${selectedVehicle.id}`)}
-              style={{ background: 'var(--accent-energy)', border: 'none', borderRadius: 6, padding: '7px 12px', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+              style={{ background: 'var(--cmg-teal)', border: 'none', borderRadius: 6, padding: '7px 12px', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
               Ver detalle →
             </button>
-            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: 0 }}>×</button>
+            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 18, padding: 0 }}>×</button>
           </div>
         )}
 
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--bg-border)', background: 'var(--bg-surface)', flexShrink: 0 }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
             <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: '0.07em' }}>FLOTA</span>
-            <span style={{ fontSize: 11, color: 'var(--accent-ok)' }}>● {movingCount}</span>
-            <span style={{ fontSize: 11, color: 'var(--accent-warn)' }}>◑ {idleCount}</span>
-            <span style={{ fontSize: 11, color: 'var(--accent-off)' }}>○ {offlineCount}</span>
+            <span style={{ fontSize: 11, color: 'var(--ok)' }}>● {movingCount}</span>
+            <span style={{ fontSize: 11, color: 'var(--warn)' }}>◑ {idleCount}</span>
+            <span style={{ fontSize: 11, color: 'var(--offline)' }}>○ {offlineCount}</span>
           </div>
           <input type="search" placeholder="Buscar vehículo o matrícula…" value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }} />
+            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--fg-primary)', fontSize: 13, outline: 'none' }} />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px' }}>
@@ -302,11 +302,11 @@ export default function FleetDashboard() {
                 <div key={vehicle.id}
                   onClick={() => useFleetStore.getState().setSelected(vehicle.id === selectedId ? null : vehicle.id)}
                   style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '8px', borderRadius: 6, marginBottom: 3,
-                    background: isSelected ? 'var(--bg-elevated)' : 'transparent',
-                    border: `1px solid ${isSelected ? 'var(--accent-energy)' : 'transparent'}` }}>
+                    background: isSelected ? 'var(--bg-card)' : 'transparent',
+                    border: `1px solid ${isSelected ? 'var(--cmg-teal)' : 'transparent'}` }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: sc, flexShrink: 0 }} />
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicle.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-data)', flexShrink: 0 }}>{vehicle.license_plate ?? '—'}</span>
+                  <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{vehicle.license_plate ?? '—'}</span>
                   <span style={{ fontSize: 11, color: sc, fontWeight: 600, flexShrink: 0 }}>
                     {vState === 'moving' ? `${vStatus?.speed_kmh?.toFixed(0) ?? 0} km/h` : vState === 'idle' ? 'Parado' : vState === 'alert' ? '⚠' : '○'}
                   </span>
@@ -341,19 +341,19 @@ export default function FleetDashboard() {
           display: 'flex', flexDirection: 'column',
           background: 'rgba(28,25,23,0.96)',
           backdropFilter: 'blur(10px)',
-          borderRight: '1px solid var(--bg-border)',
+          borderRight: '1px solid var(--border)',
         }}>
           {/* Header — stats */}
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--bg-border)', flexShrink: 0 }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 12, letterSpacing: '0.08em', color: 'var(--text-primary)', flex: 1 }}>FLOTA</span>
-              <span style={{ fontSize: 11, color: 'var(--accent-ok)' }}>● {movingCount}</span>
-              <span style={{ fontSize: 11, color: 'var(--accent-warn)' }}>◑ {idleCount}</span>
-              <span style={{ fontSize: 11, color: 'var(--accent-off)' }}>○ {offlineCount}</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 12, letterSpacing: '0.08em', color: 'var(--fg-primary)', flex: 1 }}>FLOTA</span>
+              <span style={{ fontSize: 11, color: 'var(--ok)' }}>● {movingCount}</span>
+              <span style={{ fontSize: 11, color: 'var(--warn)' }}>◑ {idleCount}</span>
+              <span style={{ fontSize: 11, color: 'var(--offline)' }}>○ {offlineCount}</span>
             </div>
             <input type="search" placeholder="Buscar vehículo o matrícula…" value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '6px 9px', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }} />
+              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 5, padding: '6px 9px', color: 'var(--fg-primary)', fontSize: 12, outline: 'none' }} />
           </div>
 
           {/* Vehicle list */}
@@ -361,7 +361,7 @@ export default function FleetDashboard() {
             {loadingVehicles
               ? Array.from({ length: 6 }, (_, i) => <SkeletonRow key={i} height={40} />)
               : filteredVehicles.length === 0
-                ? <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '16px 4px' }}>
+                ? <div style={{ color: 'var(--fg-muted)', fontSize: 12, padding: '16px 4px' }}>
                     {search ? `Sin resultados para «${search}»` : 'Sin vehículos registrados'}
                   </div>
                 : filteredVehicles.map(vehicle => {
@@ -375,14 +375,14 @@ export default function FleetDashboard() {
                       style={{
                         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
                         padding: '7px 8px', borderRadius: 5, marginBottom: 2,
-                        background: isSelected ? 'var(--bg-elevated)' : 'transparent',
-                        border: `1px solid ${isSelected ? 'var(--accent-energy)' : 'transparent'}`,
+                        background: isSelected ? 'var(--bg-card)' : 'transparent',
+                        border: `1px solid ${isSelected ? 'var(--cmg-teal)' : 'transparent'}`,
                       }}>
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc, flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: 'var(--fg-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {vehicle.name}
                       </span>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
                         {vehicle.license_plate ?? '—'}
                       </span>
                       <span style={{ fontSize: 10, color: sc, fontWeight: 600, flexShrink: 0, minWidth: 48, textAlign: 'right' }}>
@@ -399,10 +399,10 @@ export default function FleetDashboard() {
 
           {/* Alerts footer */}
           {firingAlerts.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--bg-border)', padding: '8px 14px', flexShrink: 0 }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: '8px 14px', flexShrink: 0 }}>
               <button
                 onClick={() => navigate('/alerts')}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--accent-warn)', fontSize: 11, cursor: 'pointer', fontWeight: 600, padding: 0, width: '100%' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--warn)', fontSize: 11, cursor: 'pointer', fontWeight: 600, padding: 0, width: '100%' }}>
                 ⚠ {firingAlerts.length} incidencia{firingAlerts.length !== 1 ? 's' : ''} activa{firingAlerts.length !== 1 ? 's' : ''} →
               </button>
             </div>
@@ -420,10 +420,10 @@ export default function FleetDashboard() {
           transition: 'left 0.25s ease',
           zIndex: 1001,
           background: 'rgba(28,25,23,0.92)',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           padding: '7px 9px',
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           cursor: 'pointer',
           fontSize: 12,
           backdropFilter: 'blur(4px)',

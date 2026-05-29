@@ -26,7 +26,7 @@ export default function VehicleList() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ padding: 20, color: 'var(--fg-muted)', fontSize: 13 }}>
         Cargando vehículos…
       </div>
     )
@@ -34,7 +34,7 @@ export default function VehicleList() {
 
   if (error) {
     return (
-      <div style={{ padding: 20, color: 'var(--accent-crit)', fontSize: 13 }}>
+      <div style={{ padding: 20, color: 'var(--danger)', fontSize: 13 }}>
         Error al cargar vehículos
       </div>
     )
@@ -42,7 +42,7 @@ export default function VehicleList() {
 
   if (sorted.length === 0) {
     return (
-      <div style={{ padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ padding: 20, color: 'var(--fg-muted)', fontSize: 13 }}>
         No hay vehículos en la flota
       </div>
     )
@@ -55,16 +55,16 @@ export default function VehicleList() {
       {/* Header */}
       <div style={{
         padding: '12px 14px',
-        borderBottom: '1px solid var(--bg-border)',
+        borderBottom: '1px solid var(--border)',
         fontSize: 11,
-        color: 'var(--text-muted)',
+        color: 'var(--fg-muted)',
         fontWeight: 600,
         letterSpacing: '0.06em',
         display: 'flex',
         justifyContent: 'space-between',
       }}>
         <span>VEHÍCULOS ({sorted.length})</span>
-        <span style={{ color: 'var(--accent-ok)' }}>{onlineCount} EN LÍNEA</span>
+        <span style={{ color: 'var(--ok)' }}>{onlineCount} EN LÍNEA</span>
       </div>
 
       {/* List */}

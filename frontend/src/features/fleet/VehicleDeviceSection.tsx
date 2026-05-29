@@ -72,19 +72,19 @@ export default function VehicleDeviceSection({ vehicleId, tenantId, isAdmin }: P
   return (
     <div
       style={{
-        borderTop: '1px solid var(--bg-border)',
-        background: 'var(--bg-elevated)',
+        borderTop: '1px solid var(--border)',
+        background: 'var(--bg-card)',
         padding: '10px 14px',
         fontSize: 12,
       }}
     >
       {/* Cabecera de sección */}
-      <div style={{ color: 'var(--accent-off)', fontFamily: 'var(--font-ui)', marginBottom: 6, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+      <div style={{ color: 'var(--offline)', fontFamily: 'var(--font-sans)', marginBottom: 6, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
         Dispositivo GPS
       </div>
 
       {isLoading ? (
-        <span style={{ color: 'var(--accent-off)' }}>Cargando...</span>
+        <span style={{ color: 'var(--offline)' }}>Cargando...</span>
       ) : assignedDevice ? (
         /* Dispositivo asignado */
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -93,25 +93,25 @@ export default function VehicleDeviceSection({ vehicleId, tenantId, isAdmin }: P
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
-            color: assignedDevice.online ? 'var(--accent-ok)' : 'var(--accent-off)',
+            color: assignedDevice.online ? 'var(--ok)' : 'var(--offline)',
           }}>
             <span style={{
               width: 7,
               height: 7,
               borderRadius: '50%',
-              background: assignedDevice.online ? 'var(--accent-ok)' : 'var(--accent-off)',
+              background: assignedDevice.online ? 'var(--ok)' : 'var(--offline)',
               display: 'inline-block',
             }} />
             {assignedDevice.online ? 'Online' : 'Offline'}
           </span>
 
           {/* IMEI */}
-          <span style={{ fontFamily: 'var(--font-data)', color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)', letterSpacing: '0.02em' }}>
             {assignedDevice.imei}
           </span>
 
           {/* Última señal */}
-          <span style={{ color: 'var(--accent-off)' }}>
+          <span style={{ color: 'var(--offline)' }}>
             Última señal: {formatLastSeen(assignedDevice.last_seen)}
           </span>
 
@@ -139,7 +139,7 @@ export default function VehicleDeviceSection({ vehicleId, tenantId, isAdmin }: P
       ) : (
         /* Sin dispositivo */
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: 'var(--accent-off)' }}>Sin dispositivo asignado</span>
+          <span style={{ color: 'var(--offline)' }}>Sin dispositivo asignado</span>
           {isAdmin && mode === 'idle' && (
             <button
               onClick={handleStartAssign}
@@ -161,11 +161,11 @@ export default function VehicleDeviceSection({ vehicleId, tenantId, isAdmin }: P
             onChange={e => setSelectedDeviceId(e.target.value)}
             style={{
               background: 'var(--bg-base)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--bg-border)',
+              color: 'var(--fg-primary)',
+              border: '1px solid var(--border)',
               borderRadius: 4,
               padding: '3px 6px',
-              fontFamily: 'var(--font-data)',
+              fontFamily: 'var(--font-mono)',
               fontSize: 12,
             }}
           >
@@ -194,7 +194,7 @@ export default function VehicleDeviceSection({ vehicleId, tenantId, isAdmin }: P
             Cancelar
           </button>
           {assignMutation.isError && (
-            <span style={{ color: 'var(--accent-crit)', fontSize: 11 }}>
+            <span style={{ color: 'var(--danger)', fontSize: 11 }}>
               Error al asignar dispositivo
             </span>
           )}
@@ -202,7 +202,7 @@ export default function VehicleDeviceSection({ vehicleId, tenantId, isAdmin }: P
       )}
 
       {unassignMutation.isError && (
-        <div style={{ color: 'var(--accent-crit)', fontSize: 11, marginTop: 4 }}>
+        <div style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>
           Error al desasignar dispositivo
         </div>
       )}
@@ -217,17 +217,17 @@ function btnStyle(variant: 'primary' | 'secondary' | 'danger'): React.CSSPropert
     border: 'none',
     borderRadius: 4,
     fontSize: 11,
-    fontFamily: 'var(--font-ui)',
+    fontFamily: 'var(--font-sans)',
     fontWeight: 500,
     cursor: 'pointer',
     transition: 'opacity 0.15s',
   }
   if (variant === 'primary') {
-    return { ...base, background: 'var(--accent-energy)', color: '#fff' }
+    return { ...base, background: 'var(--cmg-teal)', color: '#fff' }
   }
   if (variant === 'danger') {
-    return { ...base, background: 'var(--bg-border)', color: 'var(--accent-crit)' }
+    return { ...base, background: 'var(--border)', color: 'var(--danger)' }
   }
   // secondary
-  return { ...base, background: 'var(--bg-border)', color: 'var(--text-primary)' }
+  return { ...base, background: 'var(--border)', color: 'var(--fg-primary)' }
 }

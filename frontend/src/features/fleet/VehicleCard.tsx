@@ -35,11 +35,11 @@ function injectCardPulseCSS() {
 }
 
 const STATE_COLORS: Record<VehicleState, { dot: string; ring: string; border: string }> = {
-  moving:  { dot: 'var(--accent-ok)',   ring: 'rgba(34,197,94,0.45)',  border: 'var(--accent-ok)' },
-  idle:    { dot: 'var(--accent-warn)', ring: 'rgba(234,179,8,0.4)',   border: 'var(--accent-warn)' },
-  parked:  { dot: 'var(--accent-info)', ring: 'rgba(56,189,248,0.3)',  border: 'var(--accent-info)' },
-  offline: { dot: 'var(--bg-border)',   ring: '',                       border: 'var(--bg-border)' },
-  alert:   { dot: 'var(--accent-crit)', ring: 'rgba(239,68,68,0.5)',   border: 'var(--accent-crit)' },
+  moving:  { dot: 'var(--ok)',   ring: 'rgba(34,197,94,0.45)',  border: 'var(--ok)' },
+  idle:    { dot: 'var(--warn)', ring: 'rgba(234,179,8,0.4)',   border: 'var(--warn)' },
+  parked:  { dot: 'var(--info)', ring: 'rgba(56,189,248,0.3)',  border: 'var(--info)' },
+  offline: { dot: 'var(--border)',   ring: '',                       border: 'var(--border)' },
+  alert:   { dot: 'var(--danger)', ring: 'rgba(239,68,68,0.5)',   border: 'var(--danger)' },
 }
 
 function StateDot({ state }: { state: VehicleState }) {
@@ -56,22 +56,22 @@ function StateDot({ state }: { state: VehicleState }) {
 }
 
 function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { text: string; color: string } {
-  if (!status) return { text: 'Sin señal', color: 'var(--accent-crit)' }
+  if (!status) return { text: 'Sin señal', color: 'var(--danger)' }
   switch (state) {
     case 'moving':
-      return { text: `${Math.round(status.speed_kmh ?? 0)} km/h`, color: 'var(--accent-ok)' }
+      return { text: `${Math.round(status.speed_kmh ?? 0)} km/h`, color: 'var(--ok)' }
     case 'idle':
-      return { text: 'Parado · motor ON', color: 'var(--accent-warn)' }
+      return { text: 'Parado · motor ON', color: 'var(--warn)' }
     case 'parked':
-      return { text: 'Parado', color: 'var(--accent-info)' }
+      return { text: 'Parado', color: 'var(--info)' }
     case 'alert':
-      return { text: '⚠ Alerta', color: 'var(--accent-crit)' }
+      return { text: '⚠ Alerta', color: 'var(--danger)' }
     case 'offline': {
       const ls = status.last_seen
-      if (!ls) return { text: 'Sin señal', color: 'var(--accent-crit)' }
+      if (!ls) return { text: 'Sin señal', color: 'var(--danger)' }
       const mins = Math.floor((Date.now() - new Date(ls).getTime()) / 60000)
-      if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--accent-crit)' }
-      return { text: `Sin señal · ${Math.floor(mins / 60)}h`, color: 'var(--accent-crit)' }
+      if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--danger)' }
+      return { text: `Sin señal · ${Math.floor(mins / 60)}h`, color: 'var(--danger)' }
     }
   }
 }
@@ -91,7 +91,7 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
   const isMobile = useIsMobile()
 
   const { border } = STATE_COLORS[vehicleState]
-  const borderColor = isSelected ? 'var(--accent-energy)' : border
+  const borderColor = isSelected ? 'var(--cmg-teal)' : border
   const online = vehicleState !== 'offline'
 
   const VehicleIcon = getVehicleIconForSlug(vehicleType?.slug ?? '')
@@ -104,7 +104,7 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
     <VehicleIcon
       width={isMobile ? 48 : 96}
       height={isMobile ? 28 : 48}
-      style={{ color: online ? 'var(--accent-ok)' : 'var(--bg-border)', opacity: online ? 1 : 0.6 }}
+      style={{ color: online ? 'var(--ok)' : 'var(--border)', opacity: online ? 1 : 0.6 }}
     />
   )
 
@@ -132,10 +132,10 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
           {iconEl}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontFamily: 'var(--font-data)', color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {vehicle.license_plate ?? vehicle.name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
             {vehicleType?.name ?? '—'}
           </div>
         </div>
@@ -187,8 +187,8 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
       <div style={{
         marginTop: 6,
         fontSize: 12,
-        fontFamily: 'var(--font-data)',
-        color: 'var(--text-primary)',
+        fontFamily: 'var(--font-mono)',
+        color: 'var(--fg-primary)',
         textAlign: 'center',
         lineHeight: 1.3,
         wordBreak: 'break-all',
