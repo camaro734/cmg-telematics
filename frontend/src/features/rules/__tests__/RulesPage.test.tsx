@@ -8,8 +8,9 @@ import type { RuleOut } from '../../../lib/types'
 vi.mock('../../../lib/apiClient', () => ({
   apiClient: { get: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))
+const mockStore = { user: { role: 'admin', tenant_tier: 'client' }, enabledModules: [], logoUrl: null, brandName: null, logout: vi.fn() }
 vi.mock('../../../features/auth/useAuthStore', () => ({
-  useAuthStore: vi.fn(() => ({ user: { role: 'admin', tenant_tier: 'client' }, enabledModules: [], logoUrl: null, brandName: null, logout: vi.fn() })),
+  useAuthStore: vi.fn((sel?: (s: typeof mockStore) => unknown) => sel ? sel(mockStore) : mockStore),
 }))
 
 import { apiClient } from '../../../lib/apiClient'

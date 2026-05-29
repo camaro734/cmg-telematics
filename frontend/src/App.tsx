@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
 import RequireAuth from './features/auth/RequireAuth'
 import RequireModule from './features/auth/RequireModule'
+import { useAuthStore } from './features/auth/useAuthStore'
 import { SectionErrorBoundary } from './shared/ui/SectionErrorBoundary'
 import { ToastContainer } from './shared/ui/Toast'
 import { ConfirmDialogHost } from './shared/ui/ConfirmDialog'
@@ -88,6 +89,13 @@ function Loading() {
   )
 }
 
+function RequireRules({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(s => s.user)
+  const can = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
+  if (!can) return <Navigate to="/alerts" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <>
@@ -107,9 +115,9 @@ export default function App() {
                 <Route path="vehicles/:id" element={<SectionErrorBoundary label="VehicleDetail"><VehicleDetailPage /></SectionErrorBoundary>} />
                 <Route path="alerts"       element={<RequireModule module="alerts"><SectionErrorBoundary label="Alerts"><AlertsPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="settings"     element={<SectionErrorBoundary label="Settings"><SettingsPage /></SectionErrorBoundary>} />
-                <Route path="rules"              element={<SectionErrorBoundary label="Rules"><RulesPage /></SectionErrorBoundary>} />
-                <Route path="rules/new"          element={<SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary>} />
-                <Route path="rules/:id"          element={<SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary>} />
+                <Route path="rules"              element={<RequireRules><SectionErrorBoundary label="Rules"><RulesPage /></SectionErrorBoundary></RequireRules>} />
+                <Route path="rules/new"          element={<RequireRules><SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary></RequireRules>} />
+                <Route path="rules/:id"          element={<RequireRules><SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary></RequireRules>} />
                 <Route path="maintenance"          element={<RequireModule module="maintenance"><SectionErrorBoundary label="Maintenance"><MaintenancePage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="maintenance/new"      element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="maintenance/:id"      element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceDetail"><MaintenancePlanDetailPage /></SectionErrorBoundary></RequireModule>} />

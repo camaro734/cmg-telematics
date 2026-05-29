@@ -32,7 +32,8 @@ const TH: CSSProperties = {
 
 export default function RulesPage() {
   const qc = useQueryClient()
-  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
+  const user = useAuthStore(s => s.user)
+  const canManageRules = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const { data: rules = [] } = useQuery({
@@ -65,7 +66,7 @@ export default function RulesPage() {
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.06em' }}>
             REGLAS DE ALERTA
           </span>
-          {isAdmin && <Link
+          {canManageRules && <Link
             to="/rules/new"
             style={{
               padding: '6px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
@@ -120,7 +121,7 @@ export default function RulesPage() {
                         />
                       </td>
                       <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                        {isAdmin && (isConfirming ? (
+                        {canManageRules && (isConfirming ? (
                           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
                             ¿Eliminar?{' '}
                             <button onClick={() => deleteMutation.mutate(rule.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}>Sí</button>
