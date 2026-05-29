@@ -68,13 +68,14 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             fields["payload"] if isinstance(fields, dict) and "payload" in fields
                             else fields[b"payload"]
                         )
-                        # Recalcular online según last_seen (< 5 min)
+                        # Calcular online usando received_at (hora servidor), no last_seen
+                        # del dispositivo — así los paquetes del buffer offline no marcan offline
                         from datetime import datetime, timezone
-                        last_seen_str = payload.get("last_seen")
-                        if last_seen_str:
+                        received_str = payload.get("received_at") or payload.get("last_seen")
+                        if received_str:
                             try:
-                                ls = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
-                                age_min = (datetime.now(timezone.utc) - ls).total_seconds() / 60
+                                ts = datetime.fromisoformat(received_str.replace("Z", "+00:00"))
+                                age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
                                 payload["online"] = age_min < 5
                             except Exception:
                                 pass

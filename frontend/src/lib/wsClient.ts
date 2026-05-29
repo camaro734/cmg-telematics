@@ -76,8 +76,13 @@ class WsClientImpl {
         const msg = JSON.parse(event.data as string) as WsMessage
         if (msg.type === 'telemetry' && msg.data) {
           const data = msg.data
-          // Cache individual — lo lee VehicleDetailPage
-          this.queryClient?.setQueryData(keys.vehicleStatus(data.vehicle_id), data)
+          // Cache individual — lo lee VehicleDetailPage.
+          // Merge en lugar de replace: preserva online/last_seen si el mensaje WS
+          // no los incluye (evita parpadeo de "sin señal" entre paquetes).
+          this.queryClient?.setQueryData(
+            keys.vehicleStatus(data.vehicle_id),
+            (old: VehicleStatus | undefined) => old ? { ...old, ...data } : data,
+          )
           // Cache bulk — lo leen FleetMap, FleetDashboard y DashboardPage.
           // Sin este patch, el bulk queda congelado (staleTime: Infinity) y
           // el mapa muestra "sin señal" mientras el detalle se ve online.

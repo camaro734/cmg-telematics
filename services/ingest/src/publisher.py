@@ -53,6 +53,8 @@ async def publish_record(
         f"avl_{k}": v for k, v in avl.io_elements.items()
         if k not in {239, 179, 66}
     }
+    from datetime import datetime, timezone as _tz
+    _now = datetime.now(_tz.utc)
     payload = {
         "time": avl.datetime_utc.isoformat(),
         "device_id": device_id,
@@ -67,6 +69,11 @@ async def publish_record(
         "pto_active": 1 if _compute_pto(avl.io_elements) else 0,
         "ext_voltage_mv": avl.io_elements.get(66),
         "can_data": can_data,
+        # received_at = hora del servidor (no del dispositivo) para calcular online
+        "received_at": _now.isoformat(),
+        # last_seen = timestamp del dispositivo, para mostrar al usuario
+        "last_seen": avl.datetime_utc.isoformat(),
+        "online": True,
     }
     await redis.xadd(
         STREAM_KEY,
