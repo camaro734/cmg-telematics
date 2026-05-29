@@ -8,9 +8,9 @@ import type { Period } from './useReportData'
 
 const btnSecondary: React.CSSProperties = {
   padding: '5px 12px', fontSize: 12, fontWeight: 600,
-  fontFamily: 'var(--font-ui)', border: '1px solid var(--bg-border)',
+  fontFamily: 'var(--font-sans)', border: '1px solid var(--border)',
   borderRadius: 6, cursor: 'pointer',
-  background: 'var(--bg-elevated)', color: 'var(--text-primary)',
+  background: 'var(--bg-card)', color: 'var(--fg-primary)',
   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
 }
 
@@ -62,14 +62,14 @@ export function PdfDownloadBtn({
   }
 
   const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--text-primary)',
+    fontSize: 12, background: 'var(--bg-card)',
+    border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px',
+    color: 'var(--fg-primary)',
   }
 
   return (
     <div style={{ position: 'relative' }}>
-      <button style={{ ...btnSecondary, color: 'var(--accent-energy)', borderColor: 'var(--accent-energy)' }} onClick={() => setOpen(o => !o)}>
+      <button style={{ ...btnSecondary, color: 'var(--cmg-teal)', borderColor: 'var(--cmg-teal)' }} onClick={() => setOpen(o => !o)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
@@ -78,11 +78,11 @@ export function PdfDownloadBtn({
       {open && (
         <div style={{
           position: 'absolute', right: 0, top: '110%', zIndex: 100,
-          background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
           borderRadius: 8, padding: 14, minWidth: 240, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Selecciona período</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>Selecciona período</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selStyle, flex: 1 }}>
               {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
@@ -91,7 +91,7 @@ export function PdfDownloadBtn({
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
             {vehicleId
               ? `Vehículo: ${vehicles.find(v => v.id === vehicleId)?.name ?? vehicleId}`
               : 'Todos los vehículos del tenant'}
@@ -99,7 +99,7 @@ export function PdfDownloadBtn({
           <button
             style={{
               ...btnSecondary, justifyContent: 'center',
-              background: 'var(--accent-energy)', color: '#fff',
+              background: 'var(--cmg-teal)', color: '#fff',
               border: 'none', opacity: loading ? 0.6 : 1,
             }}
             onClick={download}
@@ -139,21 +139,21 @@ export function SelectorBar({
   onBack?: () => void
 }) {
   const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px',
-    color: 'var(--text-primary)',
+    fontSize: 12, background: 'var(--bg-card)',
+    border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px',
+    color: 'var(--fg-primary)',
   }
   const dateInputStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--text-primary)',
+    fontSize: 12, background: 'var(--bg-card)',
+    border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px',
+    color: 'var(--fg-primary)',
   }
   const periodBtn = (p: Period): React.CSSProperties => ({
     padding: '5px 14px', fontSize: 12, fontWeight: 600,
-    fontFamily: 'var(--font-ui)', border: '1px solid var(--bg-border)',
+    fontFamily: 'var(--font-sans)', border: '1px solid var(--border)',
     borderRadius: 20, cursor: 'pointer',
-    background: period === p ? 'var(--accent-energy)' : 'transparent',
-    color: period === p ? '#fff' : 'var(--text-muted)',
+    background: period === p ? 'var(--cmg-teal)' : 'transparent',
+    color: period === p ? '#fff' : 'var(--fg-muted)',
     transition: 'background 0.15s',
   })
   const today = new Date().toISOString().slice(0, 10)
@@ -161,7 +161,7 @@ export function SelectorBar({
   return (
     <div style={{
       padding: '12px 20px',
-      borderBottom: '1px solid var(--bg-border)',
+      borderBottom: '1px solid var(--border)',
       flexShrink: 0,
       display: 'flex',
       alignItems: 'center',
@@ -173,11 +173,11 @@ export function SelectorBar({
           onClick={onBack}
           style={{
             background: 'none',
-            border: '1px solid var(--bg-border)',
+            border: '1px solid var(--border)',
             borderRadius: 6,
             padding: '4px 10px',
             fontSize: 12,
-            color: 'var(--text-muted)',
+            color: 'var(--fg-muted)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -192,7 +192,7 @@ export function SelectorBar({
       <select
         value={vehicleId}
         onChange={e => setVehicleId(e.target.value)}
-        style={{ ...selStyle, color: vehicleId ? 'var(--text-primary)' : 'var(--text-muted)', minWidth: 180 }}
+        style={{ ...selStyle, color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}
       >
         <option value="">— Selecciona un vehículo —</option>
         {vehicles.map(v => (
@@ -210,7 +210,7 @@ export function SelectorBar({
 
       {period === 'custom' && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Desde</label>
+          <label style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Desde</label>
           <input
             type="date"
             value={customFrom}
@@ -222,7 +222,7 @@ export function SelectorBar({
             }}
             style={dateInputStyle}
           />
-          <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Hasta</label>
+          <label style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Hasta</label>
           <input
             type="date"
             value={customTo}

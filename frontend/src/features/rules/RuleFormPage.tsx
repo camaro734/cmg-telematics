@@ -12,23 +12,23 @@ import EscalationBuilder from './EscalationBuilder'
 import type { RuleOut, RuleCreate, ConditionDef, VehicleTypeOut, VehicleOut, SensorDef } from '../../lib/types'
 
 const SECTION: CSSProperties = {
-  marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--bg-border)',
+  marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid var(--border)',
 }
 const LABEL: CSSProperties = {
-  fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
-  color: 'var(--text-muted)', letterSpacing: '0.05em', display: 'block', marginBottom: 6,
+  fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+  color: 'var(--fg-muted)', letterSpacing: '0.05em', display: 'block', marginBottom: 6,
 }
 const INPUT: CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '8px 10px', width: '100%', boxSizing: 'border-box' as const,
 }
 const SEV_BTN = (active: boolean, color: string): CSSProperties => ({
-  padding: '6px 16px', fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 600,
-  border: `1px solid ${active ? color : 'var(--bg-border)'}`,
+  padding: '6px 16px', fontSize: 12, fontFamily: 'var(--font-sans)', fontWeight: 600,
+  border: `1px solid ${active ? color : 'var(--border)'}`,
   borderRadius: 6, cursor: 'pointer',
-  background: active ? color : 'var(--bg-elevated)',
-  color: active ? 'var(--bg-base)' : 'var(--text-muted)',
+  background: active ? color : 'var(--bg-card)',
+  color: active ? 'var(--bg-base)' : 'var(--fg-muted)',
 })
 
 const DEFAULT_CONDITION: ConditionDef = { type: 'threshold', field: '', op: '>', value: 0 }
@@ -161,7 +161,7 @@ export default function RuleFormPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24
       }}>
       <div style={{ 
-        background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 12,
+        background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12,
         width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto',
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)', padding: 28
       }}>
@@ -175,10 +175,10 @@ export default function RuleFormPage() {
               value={form.name}
               onChange={e => { update('name', e.target.value); setNameError('') }}
               placeholder="Nombre de la regla"
-              style={{ ...INPUT, borderColor: nameError ? 'var(--accent-crit)' : 'var(--bg-border)' }}
+              style={{ ...INPUT, borderColor: nameError ? 'var(--danger)' : 'var(--border)' }}
             />
             {nameError && (
-              <div style={{ color: 'var(--accent-crit)', fontSize: 11, fontFamily: 'var(--font-ui)', marginTop: 4 }}>
+              <div style={{ color: 'var(--danger)', fontSize: 11, fontFamily: 'var(--font-sans)', marginTop: 4 }}>
                 {nameError}
               </div>
             )}
@@ -196,9 +196,9 @@ export default function RuleFormPage() {
           <div>
             <label style={LABEL}>SEVERIDAD</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={() => update('severity', 'info')} style={SEV_BTN(form.severity === 'info', 'var(--accent-info)')}>Info</button>
-              <button type="button" onClick={() => update('severity', 'warning')} style={SEV_BTN(form.severity === 'warning', 'var(--accent-warn)')}>Aviso</button>
-              <button type="button" onClick={() => update('severity', 'critical')} style={SEV_BTN(form.severity === 'critical', 'var(--accent-crit)')}>Crítica</button>
+              <button type="button" onClick={() => update('severity', 'info')} style={SEV_BTN(form.severity === 'info', 'var(--info)')}>Info</button>
+              <button type="button" onClick={() => update('severity', 'warning')} style={SEV_BTN(form.severity === 'warning', 'var(--warn)')}>Aviso</button>
+              <button type="button" onClick={() => update('severity', 'critical')} style={SEV_BTN(form.severity === 'critical', 'var(--danger)')}>Crítica</button>
             </div>
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function RuleFormPage() {
         <div style={{ marginBottom: 24 }}>
           <label style={LABEL}>CONFIGURACIÓN</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>No repetir antes de</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>No repetir antes de</span>
             <input
               type="number"
               value={form.cooldown_minutes}
@@ -252,21 +252,21 @@ export default function RuleFormPage() {
               style={{ ...INPUT, width: 80 }}
               min={1}
             />
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>minutos</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>minutos</span>
           </div>
           <label style={{ ...LABEL, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={form.active}
               onChange={e => update('active', e.target.checked)}
-              style={{ accentColor: 'var(--accent-energy)' }}
+              style={{ accentColor: 'var(--cmg-teal)' }}
             />
             Regla activa
           </label>
         </div>
 
         {apiError && (
-          <div style={{ color: 'var(--accent-crit)', fontSize: 12, fontFamily: 'var(--font-ui)', marginBottom: 12 }}>
+          <div style={{ color: 'var(--danger)', fontSize: 12, fontFamily: 'var(--font-sans)', marginBottom: 12 }}>
             {apiError}
           </div>
         )}
@@ -277,8 +277,8 @@ export default function RuleFormPage() {
             onClick={handleSubmit}
             disabled={isPending}
             style={{
-              padding: '8px 24px', fontSize: 13, fontFamily: 'var(--font-ui)', fontWeight: 600,
-              background: 'var(--accent-energy)', border: 'none', borderRadius: 6,
+              padding: '8px 24px', fontSize: 13, fontFamily: 'var(--font-sans)', fontWeight: 600,
+              background: 'var(--cmg-teal)', border: 'none', borderRadius: 6,
               color: 'var(--bg-base)', cursor: isPending ? 'wait' : 'pointer',
             }}
           >
@@ -288,9 +288,9 @@ export default function RuleFormPage() {
             type="button"
             onClick={() => navigate('/rules')}
             style={{
-              padding: '8px 16px', fontSize: 13, fontFamily: 'var(--font-ui)',
-              background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-              borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer',
+              padding: '8px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 6, color: 'var(--fg-muted)', cursor: 'pointer',
             }}
           >
             Cancelar

@@ -3,14 +3,14 @@ import type { CSSProperties } from 'react'
 import type { ActionDef } from '../../lib/types'
 
 const INPUT: CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '6px 8px', flex: 1,
 }
 const BTN: CSSProperties = {
-  padding: '4px 10px', fontSize: 12, fontFamily: 'var(--font-ui)',
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer',
+  padding: '4px 10px', fontSize: 12, fontFamily: 'var(--font-sans)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-muted)', cursor: 'pointer',
 }
 
 interface Props {
@@ -52,26 +52,26 @@ export default function ActionsList({ value, onChange }: Props) {
     onChange(url ? [...filtered, { type: 'webhook', url, method: 'POST' }] : filtered)
   }
 
-  const LABEL_STYLE: CSSProperties = { fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }
+  const LABEL_STYLE: CSSProperties = { fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-primary)', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <label style={LABEL_STYLE}>
-        <input type="checkbox" checked={hasInApp} onChange={e => setInApp(e.target.checked)} style={{ accentColor: 'var(--accent-energy)' }} />
+        <input type="checkbox" checked={hasInApp} onChange={e => setInApp(e.target.checked)} style={{ accentColor: 'var(--cmg-teal)' }} />
         Notificación in-app (siempre recomendado)
       </label>
 
       <div>
         <label style={LABEL_STYLE}>
-          <input type="checkbox" checked={!!emailAction} onChange={e => { if (!e.target.checked) onChange(value.filter(a => a.type !== 'email')) }} style={{ accentColor: 'var(--accent-energy)' }} />
+          <input type="checkbox" checked={!!emailAction} onChange={e => { if (!e.target.checked) onChange(value.filter(a => a.type !== 'email')) }} style={{ accentColor: 'var(--cmg-teal)' }} />
           Email
         </label>
         {emailAction && (
           <div style={{ marginTop: 8, paddingLeft: 24, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {emailAction.recipients?.map(addr => (
               <div key={addr} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)', flex: 1 }}>{addr}</span>
-                <button type="button" onClick={() => removeEmail(addr)} style={{ ...BTN, color: 'var(--accent-crit)' }}>✕</button>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)', flex: 1 }}>{addr}</span>
+                <button type="button" onClick={() => removeEmail(addr)} style={{ ...BTN, color: 'var(--danger)' }}>✕</button>
               </div>
             ))}
             <div style={{ display: 'flex', gap: 8 }}>
@@ -91,7 +91,7 @@ export default function ActionsList({ value, onChange }: Props) {
 
       <div>
         <label style={LABEL_STYLE}>
-          <input type="checkbox" checked={!!webhookAction} onChange={e => { if (!e.target.checked) setWebhook('') }} style={{ accentColor: 'var(--accent-energy)' }} />
+          <input type="checkbox" checked={!!webhookAction} onChange={e => { if (!e.target.checked) setWebhook('') }} style={{ accentColor: 'var(--cmg-teal)' }} />
           Webhook
         </label>
         {webhookAction && (

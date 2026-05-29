@@ -25,26 +25,26 @@ import type {
 
 const card: React.CSSProperties = {
   background: 'var(--bg-surface)',
-  border: '1px solid var(--bg-border)',
+  border: '1px solid var(--border)',
   borderRadius: 8,
   padding: '14px 16px',
 }
 
 const thStyle: React.CSSProperties = {
   padding: '6px 8px', fontSize: 11, fontWeight: 600, textAlign: 'left',
-  borderBottom: '1px solid var(--bg-border)', color: 'var(--text-muted)',
+  borderBottom: '1px solid var(--border)', color: 'var(--fg-muted)',
 }
 
 const tdStyle: React.CSSProperties = {
   padding: '6px 8px', fontSize: 12,
-  color: 'var(--text-primary)', borderBottom: '1px solid var(--bg-border)',
+  color: 'var(--fg-primary)', borderBottom: '1px solid var(--border)',
 }
 
 const btnSecondary: React.CSSProperties = {
   padding: '5px 12px', fontSize: 12, fontWeight: 600,
-  fontFamily: 'var(--font-ui)', border: '1px solid var(--bg-border)',
+  fontFamily: 'var(--font-sans)', border: '1px solid var(--border)',
   borderRadius: 6, cursor: 'pointer',
-  background: 'var(--bg-elevated)', color: 'var(--text-primary)',
+  background: 'var(--bg-card)', color: 'var(--fg-primary)',
   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
 }
 
@@ -169,8 +169,8 @@ function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): num
 function KpiCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div style={{ ...card, flex: 1, minWidth: 130, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, color: accent ?? 'var(--text-primary)', fontFamily: 'var(--font-data)', letterSpacing: '-0.02em' }}>
+      <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 6, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: accent ?? 'var(--fg-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
         {value}
       </div>
       {accent && (
@@ -262,7 +262,7 @@ function HistoricoTab({
 
   if (!vehicleId) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
         Selecciona un vehículo para ver el histórico
       </div>
     )
@@ -363,11 +363,11 @@ function HistoricoTab({
   const tooltipStyle = {
     contentStyle: {
       background: 'var(--bg-elevated)',
-      border: '1px solid var(--bg-border)',
+      border: '1px solid var(--border)',
       borderRadius: 6,
       fontSize: 11,
     },
-    labelStyle: { color: 'var(--text-muted)' },
+    labelStyle: { color: 'var(--fg-muted)' },
   }
 
   return (
@@ -375,16 +375,16 @@ function HistoricoTab({
 
       {/* KPI row */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <KpiCard label="Días operativos" value={String(diasTrabajados)} accent="var(--accent-ok)" />
-        <KpiCard label="Total horas motor" value={totalEngMin > 0 ? fmtHours(totalEngMin) : '—'} accent="var(--accent-info)" />
-        <KpiCard label="Total horas PTO" value={totalPtoMin > 0 ? fmtHours(totalPtoMin) : '—'} accent="var(--accent-energy)" />
-        <KpiCard label="% PTO / Motor" value={ptoPct != null ? `${ptoPct}%` : '—'} accent={ptoPct != null && ptoPct > 80 ? 'var(--accent-warn)' : undefined} />
+        <KpiCard label="Días operativos" value={String(diasTrabajados)} accent="var(--ok)" />
+        <KpiCard label="Total horas motor" value={totalEngMin > 0 ? fmtHours(totalEngMin) : '—'} accent="var(--info)" />
+        <KpiCard label="Total horas PTO" value={totalPtoMin > 0 ? fmtHours(totalPtoMin) : '—'} accent="var(--cmg-teal)" />
+        <KpiCard label="% PTO / Motor" value={ptoPct != null ? `${ptoPct}%` : '—'} accent={ptoPct != null && ptoPct > 80 ? 'var(--warn)' : undefined} />
       </div>
 
       {/* Export + multi-series line chart */}
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
             Desempeño histórico — {PERIOD_LABELS[period]}
           </div>
           <button style={btnSecondary} onClick={handleCsvExport} disabled={kpis.length === 0}>
@@ -393,12 +393,12 @@ function HistoricoTab({
         </div>
 
         {lineData.length === 0 ? (
-          <div style={{ height: isMobile ? 140 : 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12, gap: 6 }}>
+          <div style={{ height: isMobile ? 140 : 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)', fontSize: 12, gap: 6 }}>
             {metrics.length === 0 ? (
               <>
                 <span>Sin métricas de línea configuradas.</span>
                 <span style={{ fontSize: 11, opacity: 0.7 }}>
-                  Ve a <strong style={{ color: 'var(--accent-energy)' }}>Plantillas</strong> y añade métricas con tipo gráfico Línea o Barra.
+                  Ve a <strong style={{ color: 'var(--cmg-teal)' }}>Plantillas</strong> y añade métricas con tipo gráfico Línea o Barra.
                 </span>
               </>
             ) : (
@@ -410,10 +410,10 @@ function HistoricoTab({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData} margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                 <Tooltip {...tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--fg-muted)' }} />
                 {kpiLineMetrics.map((m, i) => (
                   <Line
                     key={m.key}
@@ -437,7 +437,7 @@ function HistoricoTab({
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
 
           <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 8 }}>
               Motor vs PTO
             </div>
             <div style={{ height: isMobile ? 150 : 200 }}>
@@ -458,14 +458,14 @@ function HistoricoTab({
                     {...tooltipStyle}
                     formatter={(v: number) => [fmtHours(v), '']}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--fg-muted)' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 8 }}>
               Distribución del tiempo
             </div>
             <div style={{ height: isMobile ? 150 : 200 }}>
@@ -486,7 +486,7 @@ function HistoricoTab({
                     {...tooltipStyle}
                     formatter={(v: number) => [fmtHours(v), '']}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--fg-muted)' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -506,11 +506,11 @@ function HistoricoTab({
         const allSameUnit = items.every(it => it.metric.unit === firstUnit)
         return (
           <div key={groupName} style={card}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 10 }}>
               {title}{allSameUnit && firstUnit ? ` (${firstUnit})` : ''} — {PERIOD_LABELS[period]}
             </div>
             {!hasData ? (
-              <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+              <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)', fontSize: 12 }}>
                 Sin datos para este período
               </div>
             ) : (
@@ -518,9 +518,9 @@ function HistoricoTab({
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={mergedData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                     <YAxis
-                      tick={{ fontSize: 10, fill: 'var(--accent-off)' }}
+                      tick={{ fontSize: 10, fill: 'var(--offline)' }}
                       unit={allSameUnit && firstUnit ? ` ${firstUnit}` : undefined}
                     />
                     <Tooltip
@@ -532,7 +532,7 @@ function HistoricoTab({
                         return [`${v}${unit ? ' ' + unit : ''}`, label]
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'var(--fg-muted)' }} />
                     {items.map((it, i) => (
                       <Line
                         key={it.metric.key}
@@ -556,11 +556,11 @@ function HistoricoTab({
       {/* Gráficos de línea para métricas AVL individuales (sin group) */}
       {avlGrouped.singles.map(({ metric, data }) => (
         <div key={metric.key} style={card}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 10 }}>
             {metric.label}{metric.unit ? ` (${metric.unit})` : ''} — {PERIOD_LABELS[period]}
           </div>
           {data.length === 0 ? (
-            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)', fontSize: 12 }}>
               Sin datos para este período
             </div>
           ) : (
@@ -568,8 +568,8 @@ function HistoricoTab({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--accent-off)' }} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                   <Tooltip
                     {...tooltipStyle}
                     formatter={(v: number) => [`${v}${metric.unit ? ' ' + metric.unit : ''}`, metric.label]}
@@ -592,7 +592,7 @@ function HistoricoTab({
       {/* Configurable donut charts — metrics with chart_type='donut' */}
       {donutMetrics.length > 0 && customDonutData.length > 0 && (
         <div style={card}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 12 }}>
             Distribución de actividades
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(donutMetrics.length, 3)}, 1fr)`, gap: 12 }}>
@@ -620,9 +620,9 @@ function HistoricoTab({
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', textAlign: 'center' }}>{d.name}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-data)', color: d.color }}>
-                  {d.value} <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{d.unit}</span>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-primary)', textAlign: 'center' }}>{d.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: d.color }}>
+                  {d.value} <span style={{ fontSize: 10, color: 'var(--fg-muted)' }}>{d.unit}</span>
                 </div>
               </div>
             ))}
@@ -638,9 +638,9 @@ function HistoricoTab({
 
 function StatusBadge({ status }: { status: MaintenancePlanOut['progress']['status'] }) {
   const colors: Record<string, string> = {
-    ok: 'var(--accent-ok)',
-    próximo: 'var(--accent-warn)',
-    vencido: 'var(--accent-crit)',
+    ok: 'var(--ok)',
+    próximo: 'var(--warn)',
+    vencido: 'var(--danger)',
   }
   const labels: Record<string, string> = {
     ok: 'OK',
@@ -680,7 +680,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
 
   if (!vehicleId) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
         Selecciona un vehículo para ver los planes de mantenimiento
       </div>
     )
@@ -690,17 +690,17 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, height: isMobile ? undefined : '100%' }}>
 
       <div style={{ ...card, width: isMobile ? '100%' : 210, flexShrink: 0, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-border)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>Planes de mantenimiento</span>
           <Link
             to="/maintenance"
-            style={{ fontSize: 11, color: 'var(--accent-energy)', textDecoration: 'none', whiteSpace: 'nowrap', marginLeft: 8 }}
+            style={{ fontSize: 11, color: 'var(--cmg-teal)', textDecoration: 'none', whiteSpace: 'nowrap', marginLeft: 8 }}
           >
             Ver todo →
           </Link>
         </div>
         {plans.length === 0 ? (
-          <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)' }}>Sin planes</div>
+          <div style={{ padding: 12, fontSize: 12, color: 'var(--fg-muted)' }}>Sin planes</div>
         ) : (
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {plans.map(p => (
@@ -708,12 +708,12 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                 key={p.id}
                 onClick={() => setSelectedPlanId(p.id === selectedPlanId ? null : p.id)}
                 style={{
-                  padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--bg-border)',
-                  background: p.id === selectedPlanId ? 'var(--bg-elevated)' : 'transparent',
+                  padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                  background: p.id === selectedPlanId ? 'var(--bg-card)' : 'transparent',
                   display: 'flex', flexDirection: 'column', gap: 4,
                 }}
               >
-                <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
+                <span style={{ fontSize: 12, color: 'var(--fg-primary)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
                   {p.name}
                 </span>
                 <StatusBadge status={p.progress.status} />
@@ -725,16 +725,16 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
 
       <div style={{ ...card, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {!selectedPlan ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: 'var(--text-muted)', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: 'var(--fg-muted)', fontSize: 13 }}>
             Selecciona un plan
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
               {selectedPlan.name} — Historial de intervenciones
             </div>
             {allLogs.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '16px 0' }}>Sin intervenciones registradas</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-muted)', padding: '16px 0' }}>Sin intervenciones registradas</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 360 }}>
@@ -748,14 +748,14 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                 <tbody>
                   {allLogs.map(log => (
                     <tr key={log.id}>
-                      <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                      <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap' }}>
                         {log.performed_at ? new Date(log.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                       </td>
                       <td style={tdStyle}>{log.description ?? '—'}</td>
                       <td style={tdStyle}>
                         {log.document_url
-                          ? <a href={log.document_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-info)', fontSize: 11 }}>Ver</a>
-                          : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          ? <a href={log.document_url} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontSize: 11 }}>Ver</a>
+                          : <span style={{ color: 'var(--fg-muted)' }}>—</span>
                         }
                       </td>
                     </tr>
@@ -772,16 +772,16 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
         {selectedPlan && (
           <>
             <div style={card}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Estado</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Estado</div>
               <StatusBadge status={selectedPlan.progress.status} />
             </div>
             {selectedPlan.progress.thresholds.map((t, i) => {
               const pct = Math.min(100, Math.round(t.pct))
               const barColor = t.pct >= 100
-                ? 'var(--accent-crit)'
+                ? 'var(--danger)'
                 : t.pct >= (100 - selectedPlan.warn_before_pct)
-                  ? 'var(--accent-warn)'
-                  : 'var(--accent-ok)'
+                  ? 'var(--warn)'
+                  : 'var(--ok)'
               const typeLabel: Record<string, string> = {
                 pto_hours: 'Horas PTO',
                 engine_hours: 'Horas motor',
@@ -789,16 +789,16 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
               }
               return (
                 <div key={i} style={card}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
                     {typeLabel[t.type] ?? t.type}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-data)', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
                     {Math.round(t.current)} / {t.limit}
                   </div>
-                  <div style={{ height: 6, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                  <div style={{ height: 6, borderRadius: 3, background: 'var(--bg-card)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 3, transition: 'width 0.3s' }} />
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{pct}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--fg-muted)', marginTop: 2 }}>{pct}%</div>
                 </div>
               )
             })}
@@ -867,7 +867,7 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
 
   if (!vehicleId) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
         Selecciona un vehículo para ver rutas
       </div>
     )
@@ -893,19 +893,19 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Fecha</label>
+        <label style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Fecha</label>
         <input
           type="date"
           value={date}
           max={today}
           onChange={e => setDate(e.target.value)}
           style={{
-            fontSize: 12, background: 'var(--bg-elevated)',
-            border: '1px solid var(--bg-border)', borderRadius: 5,
-            padding: '5px 8px', color: 'var(--text-primary)',
+            fontSize: 12, background: 'var(--bg-card)',
+            border: '1px solid var(--border)', borderRadius: 5,
+            padding: '5px 8px', color: 'var(--fg-primary)',
           }}
         />
-        {isFetching && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Cargando…</span>}
+        {isFetching && <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Cargando…</span>}
         {stats && (
           <div style={{ display: 'flex', gap: 16, marginLeft: 8 }}>
             <StatChip icon="📍" label="Distancia" value={`${stats.distKm.toFixed(1)} km`} />
@@ -917,9 +917,9 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
 
       {noData ? (
         <div style={{
-          height: 380, background: 'var(--bg-elevated)', borderRadius: 8,
+          height: 380, background: 'var(--bg-card)', borderRadius: 8,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 8, color: 'var(--text-muted)', fontSize: 13,
+          gap: 8, color: 'var(--fg-muted)', fontSize: 13,
         }}>
           <svg width={36} height={36} viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
             <path d="M8 32 Q14 20 20 24 Q26 28 32 8"/>
@@ -931,16 +931,16 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
         </div>
       ) : (
         <div style={{ position: 'relative' }}>
-          <div ref={containerRef} style={{ width: '100%', height: isMobile ? 280 : 440, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bg-border)' }} />
+          <div ref={containerRef} style={{ width: '100%', height: isMobile ? 280 : 440, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }} />
           <div style={{
             position: 'absolute', bottom: 12, right: 12, zIndex: 1000,
-            background: 'rgba(28,25,23,0.92)', border: '1px solid var(--bg-border)',
-            borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)',
+            background: 'rgba(28,25,23,0.92)', border: '1px solid var(--border)',
+            borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'var(--fg-muted)',
             display: 'flex', flexDirection: 'column', gap: 4, backdropFilter: 'blur(4px)',
           }}>
-            <span style={{ color: 'var(--accent-ok)' }}>● Inicio</span>
-            <span style={{ color: 'var(--accent-info)' }}>● Fin</span>
-            <span style={{ color: 'var(--text-muted)', marginTop: 2 }}>{validPoints.length} puntos GPS</span>
+            <span style={{ color: 'var(--ok)' }}>● Inicio</span>
+            <span style={{ color: 'var(--info)' }}>● Fin</span>
+            <span style={{ color: 'var(--fg-muted)', marginTop: 2 }}>{validPoints.length} puntos GPS</span>
           </div>
         </div>
       )}
@@ -952,13 +952,13 @@ function StatChip({ icon, label, value }: { icon: string; label: string; value: 
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6,
-      background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
       borderRadius: 6, padding: '4px 10px',
     }}>
       <span style={{ fontSize: 13 }}>{icon}</span>
       <div>
-        <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-data)', color: 'var(--text-primary)' }}>{value}</div>
+        <div style={{ fontSize: 9, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{value}</div>
       </div>
     </div>
   )
@@ -988,7 +988,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
 
   if (!vehicleId) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
         Selecciona un vehículo para ver las alertas
       </div>
     )
@@ -1000,19 +1000,19 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
     .sort((a, b) => (b.triggered_at > a.triggered_at ? 1 : -1))
 
   const statusColors: Record<string, string> = {
-    firing: 'var(--accent-crit)',
-    escalated: 'var(--accent-crit)',
-    acknowledged: 'var(--accent-warn)',
-    resolved: 'var(--accent-ok)',
+    firing: 'var(--danger)',
+    escalated: 'var(--danger)',
+    acknowledged: 'var(--warn)',
+    resolved: 'var(--ok)',
   }
   const statusLabels: Record<string, string> = {
     firing: 'Activa', escalated: 'Escalada', acknowledged: 'Reconocida', resolved: 'Resuelta',
   }
 
   const severityColors: Record<string, string> = {
-    critical: 'var(--accent-crit)',
-    warning: 'var(--accent-warn)',
-    info: 'var(--accent-info)',
+    critical: 'var(--danger)',
+    warning: 'var(--warn)',
+    info: 'var(--info)',
   }
   const severityLabels: Record<string, string> = {
     critical: 'CRÍTICA', warning: 'AVISO', info: 'INFO',
@@ -1034,10 +1034,10 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
 
   const severityFilterBtn = (s: Severity, color?: string): React.CSSProperties => ({
     padding: '4px 12px', fontSize: 11, fontWeight: 600,
-    fontFamily: 'var(--font-ui)', border: `1px solid ${color ?? 'var(--bg-border)'}`,
+    fontFamily: 'var(--font-sans)', border: `1px solid ${color ?? 'var(--border)'}`,
     borderRadius: 20, cursor: 'pointer',
-    background: severityFilter === s ? (color ?? 'var(--bg-elevated)') : 'transparent',
-    color: severityFilter === s ? '#fff' : (color ?? 'var(--text-muted)'),
+    background: severityFilter === s ? (color ?? 'var(--bg-card)') : 'transparent',
+    color: severityFilter === s ? '#fff' : (color ?? 'var(--fg-muted)'),
     transition: 'all 0.15s',
   })
 
@@ -1045,7 +1045,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>Severidad:</span>
+          <span style={{ fontSize: 11, color: 'var(--fg-muted)', marginRight: 4 }}>Severidad:</span>
           <button style={severityFilterBtn('all')} onClick={() => setSeverityFilter('all')}>Todas</button>
           <button style={severityFilterBtn('critical', '#EF4444')} onClick={() => setSeverityFilter('critical')}>Crítica</button>
           <button style={severityFilterBtn('warning', '#EAB308')} onClick={() => setSeverityFilter('warning')}>Aviso</button>
@@ -1058,7 +1058,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
 
       <div style={{ ...card, overflowX: 'auto' }}>
         {rows.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '16px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--fg-muted)', padding: '16px 0', textAlign: 'center' }}>
             Sin alertas registradas
           </div>
         ) : (
@@ -1080,7 +1080,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                 const valStr = trigVal.length > 24 ? trigVal.slice(0, 24) + '…' : trigVal
                 return (
                   <tr key={a.id}>
-                    <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap' }}>
                       {a.triggered_at ? new Date(a.triggered_at).toLocaleString('es-ES', {
                         day: '2-digit', month: '2-digit', year: '2-digit',
                         hour: '2-digit', minute: '2-digit',
@@ -1088,7 +1088,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                     </td>
                     <td style={{ ...tdStyle, fontSize: 12 }}>
                       {rule?.name ?? (
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                        <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                           {a.rule_id.slice(0, 8)}…
                         </span>
                       )}
@@ -1097,7 +1097,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
                         background: `${severityColors[sev] ?? '#78716C'}22`,
-                        color: severityColors[sev] ?? 'var(--text-muted)',
+                        color: severityColors[sev] ?? 'var(--fg-muted)',
                       }}>
                         {severityLabels[sev] ?? sev.toUpperCase()}
                       </span>
@@ -1106,12 +1106,12 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
                         background: `${statusColors[a.status] ?? '#78716C'}22`,
-                        color: statusColors[a.status] ?? 'var(--text-muted)',
+                        color: statusColors[a.status] ?? 'var(--fg-muted)',
                       }}>
                         {statusLabels[a.status] ?? a.status.toUpperCase()}
                       </span>
                     </td>
-                    <td style={{ ...tdStyle, fontFamily: 'var(--font-data)', fontSize: 11 }}>
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                       {valStr}
                     </td>
                   </tr>

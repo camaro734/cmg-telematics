@@ -9,9 +9,9 @@ import { useAuthStore } from '../auth/useAuthStore'
 import type { RuleOut } from '../../lib/types'
 
 const SEVERITY_LABEL: Record<string, { label: string; color: string }> = {
-  info:     { label: 'INFO',    color: 'var(--accent-info)' },
-  warning:  { label: 'AVISO',   color: 'var(--accent-warn)' },
-  critical: { label: 'CRÍTICA', color: 'var(--accent-crit)' },
+  info:     { label: 'INFO',    color: 'var(--info)' },
+  warning:  { label: 'AVISO',   color: 'var(--warn)' },
+  critical: { label: 'CRÍTICA', color: 'var(--danger)' },
 }
 
 const SCOPE_LABEL: Record<string, string> = {
@@ -21,12 +21,12 @@ const SCOPE_LABEL: Record<string, string> = {
 }
 
 const TD: CSSProperties = {
-  padding: '10px 12px', fontFamily: 'var(--font-ui)', fontSize: 13,
-  color: 'var(--text-primary)', borderBottom: '1px solid var(--bg-elevated)',
+  padding: '10px 12px', fontFamily: 'var(--font-sans)', fontSize: 13,
+  color: 'var(--fg-primary)', borderBottom: '1px solid var(--bg-card)',
 }
 const TH: CSSProperties = {
-  padding: '8px 12px', fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
-  color: 'var(--text-muted)', borderBottom: '1px solid var(--bg-border)',
+  padding: '8px 12px', fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
+  color: 'var(--fg-muted)', borderBottom: '1px solid var(--border)',
   letterSpacing: '0.05em', textAlign: 'left' as const,
 }
 
@@ -62,14 +62,14 @@ export default function RulesPage() {
     <Shell title="Reglas">
       <div style={{ padding: 24, maxWidth: 1100, overflowY: 'auto', height: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.06em' }}>
             REGLAS DE ALERTA
           </span>
           {isAdmin && <Link
             to="/rules/new"
             style={{
-              padding: '6px 16px', fontSize: 13, fontFamily: 'var(--font-ui)',
-              background: 'var(--accent-energy)', border: 'none', borderRadius: 6,
+              padding: '6px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+              background: 'var(--cmg-teal)', border: 'none', borderRadius: 6,
               color: 'var(--bg-base)', textDecoration: 'none', fontWeight: 600,
             }}
           >
@@ -78,8 +78,8 @@ export default function RulesPage() {
         </div>
 
         {rules.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', fontSize: 13, padding: '20px 0' }}>
-            Sin reglas configuradas. <Link to="/rules/new" style={{ color: 'var(--accent-energy)' }}>Crea la primera.</Link>
+          <div style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '20px 0' }}>
+            Sin reglas configuradas. <Link to="/rules/new" style={{ color: 'var(--cmg-teal)' }}>Crea la primera.</Link>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -93,19 +93,19 @@ export default function RulesPage() {
               </thead>
               <tbody>
                 {rules.map(rule => {
-                  const sev = SEVERITY_LABEL[rule.severity] ?? { label: rule.severity, color: 'var(--text-muted)' }
+                  const sev = SEVERITY_LABEL[rule.severity] ?? { label: rule.severity, color: 'var(--fg-muted)' }
                   const isConfirming = confirmDelete === rule.id
                   return (
                     <tr key={rule.id}>
                       <td style={TD}>
-                        <Link to={`/rules/${rule.id}`} style={{ color: 'var(--accent-energy)', textDecoration: 'none' }}>
+                        <Link to={`/rules/${rule.id}`} style={{ color: 'var(--cmg-teal)', textDecoration: 'none' }}>
                           {rule.name}
                         </Link>
                       </td>
-                      <td style={{ ...TD, color: 'var(--text-muted)' }}>
+                      <td style={{ ...TD, color: 'var(--fg-muted)' }}>
                         {SCOPE_LABEL[rule.vehicle_filter.scope] ?? rule.vehicle_filter.scope}
                       </td>
-                      <td style={{ ...TD, color: 'var(--text-muted)' }}>
+                      <td style={{ ...TD, color: 'var(--fg-muted)' }}>
                         {rule.condition.type}
                       </td>
                       <td style={TD}>
@@ -116,23 +116,23 @@ export default function RulesPage() {
                           type="checkbox"
                           checked={rule.active}
                           onChange={() => toggleMutation.mutate({ id: rule.id, active: !rule.active })}
-                          style={{ accentColor: 'var(--accent-energy)', cursor: 'pointer' }}
+                          style={{ accentColor: 'var(--cmg-teal)', cursor: 'pointer' }}
                         />
                       </td>
                       <td style={{ ...TD, whiteSpace: 'nowrap' }}>
                         {isAdmin && (isConfirming ? (
-                          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12 }}>
+                          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
                             ¿Eliminar?{' '}
-                            <button onClick={() => deleteMutation.mutate(rule.id)} style={{ color: 'var(--accent-crit)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 12 }}>Sí</button>
+                            <button onClick={() => deleteMutation.mutate(rule.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}>Sí</button>
                             {' / '}
-                            <button onClick={() => setConfirmDelete(null)} style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 12 }}>No</button>
+                            <button onClick={() => setConfirmDelete(null)} style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}>No</button>
                           </span>
                         ) : (
                           <>
-                            <Link to={`/rules/${rule.id}`} style={{ color: 'var(--text-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
+                            <Link to={`/rules/${rule.id}`} style={{ color: 'var(--fg-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
                             <button
                               onClick={() => setConfirmDelete(rule.id)}
-                              style={{ color: 'var(--accent-crit)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
+                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
                               title="Eliminar regla"
                             >✕</button>
                           </>

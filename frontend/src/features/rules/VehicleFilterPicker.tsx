@@ -5,8 +5,8 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleFilter, VehicleTypeOut, VehicleOut } from '../../lib/types'
 
 const SELECT: CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '6px 8px', width: '100%', boxSizing: 'border-box' as const,
 }
 

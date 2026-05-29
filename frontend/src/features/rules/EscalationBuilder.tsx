@@ -3,8 +3,8 @@ import type { CSSProperties } from 'react'
 import type { EscalationStep } from '../../lib/types'
 
 const INPUT: CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '6px 8px',
 }
 
@@ -57,9 +57,9 @@ export default function EscalationBuilder({ value, onChange }: Props) {
       {value.map((step, i) => {
         const emailAction = step.actions.find(a => a.type === 'email')
         return (
-          <div key={i} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: 12, border: '1px solid var(--bg-border)' }}>
+          <div key={i} style={{ background: 'var(--bg-card)', borderRadius: 8, padding: 12, border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>Si no reconocida en</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>Si no reconocida en</span>
               <input
                 type="number"
                 value={step.delay_minutes}
@@ -67,14 +67,14 @@ export default function EscalationBuilder({ value, onChange }: Props) {
                 style={{ ...INPUT, width: 70 }}
                 min={1}
               />
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)' }}>minutos, enviar email a:</span>
-              <button type="button" onClick={() => removeStep(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--accent-crit)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>minutos, enviar email a:</span>
+              <button type="button" onClick={() => removeStep(i)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 13 }}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 8 }}>
               {emailAction?.recipients?.map(addr => (
                 <div key={addr} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text-muted)', flex: 1 }}>{addr}</span>
-                  <button type="button" onClick={() => removeEmailFromStep(i, addr)} style={{ background: 'none', border: 'none', color: 'var(--accent-crit)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)', flex: 1 }}>{addr}</span>
+                  <button type="button" onClick={() => removeEmailFromStep(i, addr)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 12 }}>✕</button>
                 </div>
               ))}
               <div style={{ display: 'flex', gap: 8 }}>
@@ -95,7 +95,7 @@ export default function EscalationBuilder({ value, onChange }: Props) {
       <button
         type="button"
         onClick={addStep}
-        style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontFamily: 'var(--font-ui)', background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer' }}
+        style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontFamily: 'var(--font-sans)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-muted)', cursor: 'pointer' }}
       >+ Añadir escalón</button>
     </div>
   )

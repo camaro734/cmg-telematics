@@ -3,15 +3,15 @@ import type { ConditionDef, SensorDef } from '../../lib/types'
 import GeofenceMapEditor from '../../shared/ui/GeofenceMapEditor'
 
 const SELECT: CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '6px 8px',
 }
 const INPUT: CSSProperties = {
   ...SELECT, width: 80,
 }
 const LABEL: CSSProperties = {
-  fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)',
+  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)',
 }
 
 const OPS = ['>', '<', '>=', '<=', '==', '!='] as const
@@ -146,9 +146,9 @@ function SimpleCondition({ condition, sensors, onChange }: {
                   }}
                   style={{
                     width: 28, height: 28, borderRadius: 4, border: 'none', cursor: 'pointer',
-                    background: active ? 'var(--accent-energy)' : 'var(--bg-elevated)',
-                    color: active ? 'var(--bg-base)' : 'var(--text-muted)',
-                    fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 600,
+                    background: active ? 'var(--cmg-teal)' : 'var(--bg-card)',
+                    color: active ? 'var(--bg-base)' : 'var(--fg-muted)',
+                    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
                   }}
                 >{d}</button>
               )
@@ -244,14 +244,14 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
             onChange={poly => onChange({ ...condition, polygon: poly })}
           />
           {(condition.polygon?.length ?? 0) < 3 && (
-            <span style={{ ...LABEL, color: 'var(--accent-warn)', fontSize: 11 }}>
+            <span style={{ ...LABEL, color: 'var(--warn)', fontSize: 11 }}>
               El polígono necesita al menos 3 vértices para ser válido.
             </span>
           )}
         </div>
       ) : condition.type === 'composite' ? (
         /* Vista composite: dos sub-condiciones con operador AND/OR entre ellas */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 12, borderLeft: '2px solid var(--bg-border)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 12, borderLeft: '2px solid var(--border)' }}>
           <SimpleCondition
             condition={condition.conditions?.[0] ?? defaultCondition('threshold', sensors)}
             sensors={sensors}
@@ -269,9 +269,9 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
                 onClick={() => onChange({ ...condition, op_composite: op })}
                 style={{
                   padding: '3px 10px', border: 'none', borderRadius: 4, cursor: 'pointer',
-                  fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 700,
-                  background: condition.op_composite === op ? 'var(--accent-energy)' : 'var(--bg-elevated)',
-                  color: condition.op_composite === op ? 'var(--bg-base)' : 'var(--text-muted)',
+                  fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700,
+                  background: condition.op_composite === op ? 'var(--cmg-teal)' : 'var(--bg-card)',
+                  color: condition.op_composite === op ? 'var(--bg-base)' : 'var(--fg-muted)',
                 }}
               >{op}</button>
             ))}
@@ -280,8 +280,8 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
               onClick={removeComposite}
               style={{
                 padding: '3px 8px', border: 'none', borderRadius: 4, cursor: 'pointer',
-                background: 'none', color: 'var(--text-muted)',
-                fontFamily: 'var(--font-ui)', fontSize: 11,
+                background: 'none', color: 'var(--fg-muted)',
+                fontFamily: 'var(--font-sans)', fontSize: 11,
               }}
             >— quitar</button>
           </div>
@@ -304,9 +304,9 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
               onClick={addComposite}
               style={{
                 alignSelf: 'flex-start', padding: '4px 10px', fontSize: 12,
-                fontFamily: 'var(--font-ui)', background: 'var(--bg-elevated)',
-                border: '1px solid var(--bg-border)', borderRadius: 6,
-                color: 'var(--text-muted)', cursor: 'pointer',
+                fontFamily: 'var(--font-sans)', background: 'var(--bg-card)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                color: 'var(--fg-muted)', cursor: 'pointer',
               }}
             >+ Añadir condición AND/OR</button>
           )}
