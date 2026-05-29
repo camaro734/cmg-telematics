@@ -3,21 +3,21 @@ import { useAuthStore } from './useAuthStore'
 
 beforeEach(() => {
   useAuthStore.setState({ accessToken: null, user: null, brandName: null, logoUrl: null })
-  document.documentElement.style.removeProperty('--accent-energy')
+  document.documentElement.style.removeProperty('--cmg-teal')
 })
 
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('applyBrandTokens', () => {
-  it('aplica brand_color válido como --accent-energy', () => {
+  it('aplica brand_color válido como --cmg-teal', () => {
     useAuthStore.getState().applyBrandTokens({ brand_color: '#3056D3' })
-    expect(document.documentElement.style.getPropertyValue('--accent-energy')).toBe('#3056D3')
+    expect(document.documentElement.style.getPropertyValue('--cmg-teal')).toBe('#3056D3')
   })
 
   it('ignora brand_color con formato inválido', () => {
     const spy = vi.spyOn(document.documentElement.style, 'setProperty')
     useAuthStore.getState().applyBrandTokens({ brand_color: '#ZZZZZZ' })
-    expect(spy).not.toHaveBeenCalledWith('--accent-energy', expect.anything())
+    expect(spy).not.toHaveBeenCalledWith('--cmg-teal', expect.anything())
   })
 
   it('guarda brand_name en el store', () => {
@@ -38,11 +38,11 @@ describe('applyBrandTokens', () => {
 })
 
 describe('logout', () => {
-  it('elimina --accent-energy del DOM', () => {
-    document.documentElement.style.setProperty('--accent-energy', '#3056D3')
+  it('elimina --cmg-teal del DOM', () => {
+    document.documentElement.style.setProperty('--cmg-teal', '#3056D3')
     const spy = vi.spyOn(document.documentElement.style, 'removeProperty')
     vi.stubGlobal('location', { href: '' })
     useAuthStore.getState().logout()
-    expect(spy).toHaveBeenCalledWith('--accent-energy')
+    expect(spy).toHaveBeenCalledWith('--cmg-teal')
   })
 })

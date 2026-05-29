@@ -130,28 +130,6 @@
   --chart-5: #34D399;
   --chart-6: #FB923C;
 
-  /* ── ALIASES TEMPORALES — eliminar en Tarea 12 ──────────────────────── */
-  --text-muted:     var(--fg-muted);
-  --bg-border:      var(--border);
-  --text-primary:   var(--fg-primary);
-  --accent-energy:  var(--cmg-teal);
-  --font-ui:        var(--font-sans);
-  --accent-off:     var(--offline);
-  --accent-crit:    var(--danger);
-  --font-data:      var(--font-mono);
-  --accent-ok:      var(--ok);
-  --accent-warn:    var(--warn);
-  --accent-info:    var(--info);
-  --text-dim:       var(--fg-dim);
-  --text-base:      var(--fg-secondary);
-  --text-secondary: var(--fg-secondary);
-  --gauge-track:    var(--border);
-  --gauge-fill:     var(--cmg-teal);
-  --gauge-warn:     var(--warn);
-  --gauge-crit:     var(--danger);
-  --accent:         var(--cmg-teal);
-  --accent-orange:  var(--warn);
-  /* --bg-base, --bg-surface, --bg-elevated conservan nombre — nuevo valor arriba */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
