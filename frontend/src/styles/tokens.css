@@ -150,7 +150,7 @@
   --gauge-warn:     var(--warn);
   --gauge-crit:     var(--danger);
   --accent:         var(--cmg-teal);
-  --accent-orange:  #F59E0B;
+  --accent-orange:  var(--warn);
   /* --bg-base, --bg-surface, --bg-elevated conservan nombre — nuevo valor arriba */
 }
 
