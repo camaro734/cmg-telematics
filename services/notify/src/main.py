@@ -58,7 +58,7 @@ async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> N
     email_dispatched = any(a.get("type") == "email" for a in actions)
 
     for action in actions:
-        await dispatch_action(action, context)
+        await dispatch_action(action, context, db_pool)
 
     # Tenant email fallback: only if no email action was in the rule
     if not email_dispatched and tenant_email:
@@ -69,6 +69,7 @@ async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> N
         await dispatch_action(
             {"type": "email", "recipients": [tenant_email]},
             context,
+            db_pool,
         )
 
     if not email_dispatched and not tenant_email:
@@ -163,7 +164,7 @@ async def _escalation_worker(db_pool: asyncpg.Pool, redis: Redis) -> None:
                     "trigger_value": {},
                 }
                 for action in item.get("actions", []):
-                    await dispatch_action(action, context)
+                    await dispatch_action(action, context, db_pool)
                 logger.info("Escalation fired for alert %s", item["alert_id"])
         except asyncio.CancelledError:
             break

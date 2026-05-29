@@ -1,22 +1,56 @@
-# services/notify/src/dispatcher.py
 import asyncio
 import logging
 import smtplib
+import time
 from email.message import EmailMessage
 import httpx
+import asyncpg
 from src.config import settings
 
 logger = logging.getLogger(__name__)
 
+_smtp_cache: dict | None = None
+_smtp_cache_ts: float = 0.0
+_SMTP_TTL = 300  # 5 minutos
 
-async def dispatch_action(action: dict, context: dict) -> None:
+
+async def _load_smtp_from_db(db_pool: asyncpg.Pool) -> dict:
+    global _smtp_cache, _smtp_cache_ts
+    now = time.monotonic()
+    if _smtp_cache is not None and (now - _smtp_cache_ts) < _SMTP_TTL:
+        return _smtp_cache
+    try:
+        row = await db_pool.fetchrow(
+            "SELECT value FROM system_settings WHERE key = 'smtp'"
+        )
+        if row and row["value"].get("host"):
+            _smtp_cache = row["value"]
+            _smtp_cache_ts = now
+            logger.debug("SMTP config loaded from DB: host=%s", _smtp_cache.get("host"))
+            return _smtp_cache
+    except Exception as exc:
+        logger.warning("Could not load SMTP from DB (%s) — using env fallback", exc)
+
+    _smtp_cache = {
+        "host": settings.smtp_host,
+        "port": settings.smtp_port,
+        "user": settings.smtp_user,
+        "password": settings.smtp_password,
+        "from_addr": settings.smtp_from,
+        "tls": True,
+    }
+    _smtp_cache_ts = now
+    return _smtp_cache
+
+
+async def dispatch_action(action: dict, context: dict, db_pool: asyncpg.Pool | None = None) -> None:
     atype = action.get("type")
     if atype == "email":
-        await _send_email(action, context)
+        await _send_email(action, context, db_pool)
     elif atype == "webhook":
         await _send_webhook(action, context)
     elif atype == "in_app":
-        pass  # already persisted in alert_instance by rules-engine
+        pass
     elif atype in ("push", "sms"):
         logger.info(
             "[stub] Would send %s to alert %s vehicle %s",
@@ -26,14 +60,24 @@ async def dispatch_action(action: dict, context: dict) -> None:
         logger.warning("Unknown action type: %s", atype)
 
 
-async def _send_email(action: dict, context: dict) -> None:
+async def _send_email(action: dict, context: dict, db_pool: asyncpg.Pool | None = None) -> None:
     recipients = action.get("recipients") or action.get("to", [])
-    # Normalize to list if a single string was provided
     if isinstance(recipients, str):
         recipients = [recipients]
     if not recipients:
         return
-    if not settings.smtp_host:
+
+    cfg = await _load_smtp_from_db(db_pool) if db_pool else {
+        "host": settings.smtp_host,
+        "port": settings.smtp_port,
+        "user": settings.smtp_user,
+        "password": settings.smtp_password,
+        "from_addr": settings.smtp_from,
+        "tls": True,
+    }
+
+    smtp_host = cfg.get("host", "")
+    if not smtp_host:
         logger.info(
             "[stub] Email to %s — rule: %s vehicle: %s",
             recipients, context.get("rule_name"), context.get("vehicle_name", context.get("vehicle_id")),
@@ -41,7 +85,7 @@ async def _send_email(action: dict, context: dict) -> None:
         return
 
     msg = EmailMessage()
-    msg["From"] = settings.smtp_from
+    msg["From"] = cfg.get("from_addr", settings.smtp_from)
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = action.get(
         "subject", "[ALERTA] %s — %s" % (
@@ -58,14 +102,20 @@ async def _send_email(action: dict, context: dict) -> None:
         )
     )
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, _smtp_send, msg)
+    await loop.run_in_executor(None, _smtp_send, msg, cfg)
 
 
-def _smtp_send(msg: EmailMessage) -> None:
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as s:
-        if settings.smtp_user:
+def _smtp_send(msg: EmailMessage, cfg: dict) -> None:
+    host = cfg.get("host", settings.smtp_host)
+    port = cfg.get("port", settings.smtp_port)
+    user = cfg.get("user", settings.smtp_user)
+    password = cfg.get("password", settings.smtp_password)
+    tls = cfg.get("tls", True)
+    with smtplib.SMTP(host, port, timeout=30) as s:
+        if tls or user:
             s.starttls()
-            s.login(settings.smtp_user, settings.smtp_password)
+        if user:
+            s.login(user, password)
         s.send_message(msg)
 
 
