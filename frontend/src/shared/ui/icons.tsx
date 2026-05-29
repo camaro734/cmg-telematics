@@ -30,14 +30,14 @@ export function IconDashboard(props: IconProps) {
   )
 }
 
-// Fleet: truck side-profile — cab con windshield + cargo box + ruedas con hub sólido
+// Fleet: truck side-profile — mismo estilo v2 que IconTruckGeneric, viewBox ancho para proporciones correctas
 export function IconFlota({ width = 24, height = 24, ...props }: IconProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 48 28"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       width={width}
@@ -45,27 +45,28 @@ export function IconFlota({ width = 24, height = 24, ...props }: IconProps) {
       {...props}
     >
       {/* chassis */}
-      <line x1="0.5" y1="17" x2="23.5" y2="17" />
-      {/* cab: perfil en dos alturas */}
-      <path d="M1,17 L1,12 L8,12 L8,17" />
-      <path d="M1.5,12 L1.5,6.5 Q1.5,5.5 3.5,5.5 L8,5.5 L8,12" />
-      {/* windshield: relleno con baja opacidad para dar profundidad */}
-      <path d="M3,12 L3,8 Q3,7 4.5,7 L8,7 L8,12 Z"
-        fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1} />
-      {/* cargo box */}
-      <rect x="8" y="7" width="15" height="10" rx="2" />
-      {/* línea de puerta */}
-      <line x1="18" y1="7" x2="18" y2="17" strokeWidth={1} opacity={0.4} />
-      {/* rueda delantera: borde + hub sólido */}
-      <circle cx="4.5" cy="20" r="3" />
-      <circle cx="4.5" cy="20" r="1.2" fill="currentColor" stroke="none" />
-      {/* ruedas traseras: borde + hub sólido */}
-      <circle cx="14" cy="20" r="3" />
-      <circle cx="14" cy="20" r="1.2" fill="currentColor" stroke="none" />
-      <circle cx="19.5" cy="20" r="3" />
-      <circle cx="19.5" cy="20" r="1.2" fill="currentColor" stroke="none" />
-      {/* escape */}
-      <line x1="2.5" y1="5.5" x2="2.5" y2="2" strokeWidth={2.5} />
+      <line x1="3" y1="22" x2="46" y2="22" />
+      {/* cab lower */}
+      <path d="M3,22 L3,15 Q3,13 6,13 L14,13 L14,22" />
+      {/* cab upper */}
+      <path d="M5,13 L5,8 Q5,7 7,7 L14,7 L14,13" />
+      {/* windshield */}
+      <rect x="6" y="8" width="7" height="5.5" rx="1" strokeWidth={1.1} opacity={0.65} />
+      {/* cargo body */}
+      <rect x="14" y="8" width="31" height="14" rx="2" />
+      {/* cargo door line */}
+      <line x1="30" y1="8" x2="30" y2="22" strokeDasharray="2 2" strokeWidth={1} opacity={0.5} />
+      {/* front wheel */}
+      <circle cx="9" cy="24" r="3.5" />
+      <circle cx="9" cy="24" r="1.5" />
+      {/* rear wheels */}
+      <circle cx="30" cy="24" r="3.5" />
+      <circle cx="30" cy="24" r="1.5" />
+      <circle cx="40" cy="24" r="3.5" />
+      <circle cx="40" cy="24" r="1.5" />
+      {/* exhaust */}
+      <line x1="6" y1="13" x2="6" y2="5.5" strokeWidth={2} />
+      <line x1="6" y1="5.5" x2="8.5" y2="5.5" />
     </svg>
   )
 }
