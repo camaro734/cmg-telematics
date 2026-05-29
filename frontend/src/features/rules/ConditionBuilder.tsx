@@ -39,9 +39,14 @@ function numericSensors(sensors: SensorDef[]): SensorDef[] {
   return sensors.filter(s => s.unit !== null)
 }
 
+// Devuelve la clave que usa can_data para este sensor: avl_{id} si tiene avl_id, si no sensor.key
+function sensorFieldKey(s: SensorDef): string {
+  return s.avl_id != null ? `avl_${s.avl_id}` : s.key
+}
+
 function defaultCondition(type: ConditionDef['type'], sensors: SensorDef[]): ConditionDef {
-  const firstKey = sensors[0]?.key ?? ''
-  const firstNumericKey = numericSensors(sensors)[0]?.key ?? firstKey
+  const firstKey = sensors[0] ? sensorFieldKey(sensors[0]) : ''
+  const firstNumericKey = numericSensors(sensors)[0] ? sensorFieldKey(numericSensors(sensors)[0]) : firstKey
   switch (type) {
     case 'threshold':           return { type, field: firstKey, op: '>', value: 0 }
     case 'threshold_sustained': return { type, field: firstKey, op: '>', value: 0, minutes: 5 }
@@ -54,7 +59,7 @@ function defaultCondition(type: ConditionDef['type'], sensors: SensorDef[]): Con
         type, op_composite: 'AND',
         conditions: [
           { type: 'threshold', field: firstKey, op: '>', value: 0 },
-          { type: 'threshold', field: sensors[1]?.key ?? firstKey, op: '>', value: 0 },
+          { type: 'threshold', field: sensors[1] ? sensorFieldKey(sensors[1]) : firstKey, op: '>', value: 0 },
         ],
       }
   }
@@ -69,7 +74,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
   const t = condition.type
   // Acumulador y tendencia solo permiten sensores con unidad numérica
   const sensorList = t === 'accumulation' || t === 'trend_rising' ? numericSensors(sensors) : sensors
-  const unitLabel = sensors.find(s => s.key === condition.field)?.unit ?? ''
+  const unitLabel = sensors.find(s => sensorFieldKey(s) === condition.field || s.key === condition.field)?.unit ?? ''
 
   const update = (patch: Partial<ConditionDef>) => onChange({ ...condition, ...patch })
 
@@ -77,7 +82,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {/* Selector de sensor — muestra el key como valor de opción (necesario para tests y compatibilidad con el modelo de datos) */}
       <select value={condition.field ?? ''} onChange={e => update({ field: e.target.value })} style={SELECT}>
-        {sensorList.map(s => <option key={s.key} value={s.key}>{s.label || s.key}</option>)}
+        {sensorList.map(s => <option key={s.key} value={sensorFieldKey(s)}>{s.label || s.key}</option>)}
       </select>
 
       {/* Campos threshold y threshold_sustained */}
