@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AlertsPage from '../AlertsPage'
@@ -26,19 +26,26 @@ function renderPage() {
 }
 
 describe('AlertsPage', () => {
-  it('muestra sección ALERTAS ACTIVAS', () => {
+  it('muestra tab Activas', () => {
     renderPage()
-    expect(screen.getByText('ALERTAS ACTIVAS')).toBeInTheDocument()
+    expect(screen.getByText('Activas')).toBeInTheDocument()
   })
 
-  it('muestra sección HISTORIAL', () => {
+  it('muestra tab Historial', () => {
     renderPage()
-    expect(screen.getByText('HISTORIAL')).toBeInTheDocument()
+    expect(screen.getByText('Historial')).toBeInTheDocument()
   })
 
-  it('renderiza ActiveAlertsList y AlertHistory', () => {
+  it('renderiza ActiveAlertsList por defecto', () => {
     renderPage()
     expect(screen.getByTestId('active-list')).toBeInTheDocument()
+    expect(screen.queryByTestId('alert-history')).not.toBeInTheDocument()
+  })
+
+  it('muestra AlertHistory al cambiar a tab Historial', () => {
+    renderPage()
+    fireEvent.click(screen.getByText('Historial'))
     expect(screen.getByTestId('alert-history')).toBeInTheDocument()
+    expect(screen.queryByTestId('active-list')).not.toBeInTheDocument()
   })
 })
