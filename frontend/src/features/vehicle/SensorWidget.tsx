@@ -162,33 +162,54 @@ export function SensorWidget({ sensor, value }: SensorWidgetProps) {
     case 'led': {
       const on = scaled != null && scaled > 0
       return (
-        <div
-          style={{
-            ...cardStyle,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            width: '100%',
-          }}
-        >
+        <div style={{ ...cardStyle, flexDirection: 'row', justifyContent: 'space-between', width: '100%', padding: '8px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {icon}
-            <span style={{ fontSize: 12, color: 'var(--fg-secondary)', fontWeight: 500 }}>
+            <span style={{ fontSize: 12, color: 'var(--fg-secondary)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>
               {sensor.label}
             </span>
           </div>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              fontFamily: 'var(--font-mono)',
-              color: on ? 'var(--ok)' : 'var(--offline)',
-            }}
-          >
-            {on ? '● ON' : '○ OFF'}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '3px 10px', borderRadius: 9999,
+            fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-sans)',
+            background: on ? 'var(--ok-soft)' : 'var(--offline-soft)',
+            color: on ? 'var(--ok)' : 'var(--offline)',
+            border: `1px solid ${on ? 'rgba(34,197,94,0.3)' : 'rgba(100,116,139,0.3)'}`,
+            flexShrink: 0,
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', display: 'inline-block', flexShrink: 0 }}/>
+            {on ? 'ON' : 'OFF'}
           </span>
         </div>
       )
     }
+
+    case 'counter':
+      return (
+        <div style={{ ...cardStyle, minWidth: 80 }}>
+          {icon}
+          <div style={{ textAlign: 'center' as const }}>
+            <div style={{
+              fontSize: size > 80 ? 20 : 16, fontWeight: 700,
+              fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)',
+              letterSpacing: '-0.02em', lineHeight: 1,
+            }}>
+              {scaled != null
+                ? scaled.toLocaleString('es-ES', { maximumFractionDigits: 1 })
+                : '—'}
+            </div>
+            {sensor.unit && scaled != null && (
+              <div style={{ fontSize: 10, color: 'var(--fg-muted)', marginTop: 3, fontFamily: 'var(--font-sans)' }}>
+                {sensor.unit}
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 2, fontFamily: 'var(--font-sans)' }}>
+              {sensor.label}
+            </div>
+          </div>
+        </div>
+      )
 
     case 'circular':
     default:
