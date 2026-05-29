@@ -128,11 +128,11 @@ describe('FleetDashboard', () => {
     expect(screen.getByText('PR-07')).toBeInTheDocument()
   })
 
-  it('muestra "Sin vehículos registrados" cuando la lista está vacía', () => {
+  it('muestra "Sin vehículos" cuando la lista está vacía', () => {
     vi.mocked(apiClient.get).mockResolvedValue([])
     wrap({ vehicles: [] })
 
-    expect(screen.getByText('Sin vehículos registrados')).toBeInTheDocument()
+    expect(screen.getByText('Sin vehículos')).toBeInTheDocument()
   })
 
   it('muestra el mapa siempre (con o sin vehículos)', () => {
@@ -151,14 +151,14 @@ describe('FleetDashboard', () => {
     expect(screen.queryByText('⚠ Alerta')).not.toBeInTheDocument()
   })
 
-  it('muestra el header FLOTA con los vehículos en la lista', () => {
+  it('muestra el header del panel con los vehículos en la lista', () => {
     vi.mocked(apiClient.get).mockResolvedValue([])
     const vehicles = [makeVehicle('v1', 'WR-04'), makeVehicle('v2', 'PR-07')]
     const statuses = vehicles.map(v => makeStatus(v.id))
     wrap({ vehicles, statuses })
 
-    // El sidebar siempre muestra la cabecera FLOTA con los vehículos inline
-    expect(screen.getByText('FLOTA')).toBeInTheDocument()
+    // VehicleListPanel muestra "Vehículos" como título y los nombres de los vehículos
+    expect(screen.getByText('Vehículos')).toBeInTheDocument()
     expect(screen.getByText('WR-04')).toBeInTheDocument()
     expect(screen.getByText('PR-07')).toBeInTheDocument()
   })
