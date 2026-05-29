@@ -35,7 +35,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'var(--text-muted)',
+        color: 'var(--fg-muted)',
       }}>
         Cargando…
       </div>

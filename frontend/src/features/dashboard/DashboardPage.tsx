@@ -21,11 +21,11 @@ interface FleetKpis {
 type Accent = 'ok' | 'warn' | 'crit' | 'info' | 'neutral'
 
 const ACCENT_COLOR: Record<Accent, string> = {
-  ok:      'var(--accent-ok)',
-  warn:    'var(--accent-warn)',
-  crit:    'var(--accent-crit)',
-  info:    'var(--accent-info)',
-  neutral: 'var(--text-primary)',
+  ok:      'var(--ok)',
+  warn:    'var(--warn)',
+  crit:    'var(--danger)',
+  info:    'var(--info)',
+  neutral: 'var(--fg-primary)',
 }
 
 function KpiCard({ label, value, sub, accent = 'neutral', onClick }: {
@@ -35,22 +35,22 @@ function KpiCard({ label, value, sub, accent = 'neutral', onClick }: {
     <div
       onClick={onClick}
       style={{
-        background: 'var(--bg-surface)', border: '1px solid var(--bg-border)',
+        background: 'var(--bg-surface)', border: '1px solid var(--border)',
         borderRadius: 10, padding: '20px 24px',
         cursor: onClick ? 'pointer' : 'default',
         transition: 'border-color 0.15s, background 0.15s',
       }}
-      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = 'var(--accent-energy)' }}
-      onMouseLeave={e => { if (onClick) e.currentTarget.style.borderColor = 'var(--bg-border)' }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = 'var(--cmg-teal)' }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.borderColor = 'var(--border)' }}
     >
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>
+      <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>
         {label}
       </div>
-      <div style={{ fontSize: 36, fontWeight: 700, color: ACCENT_COLOR[accent], fontFamily: 'var(--font-data)', lineHeight: 1, marginBottom: 10 }}>
+      <div style={{ fontSize: 36, fontWeight: 700, color: ACCENT_COLOR[accent], fontFamily: 'var(--font-mono)', lineHeight: 1, marginBottom: 10 }}>
         {value}
       </div>
       {sub && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}>{sub}</div>
+        <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>{sub}</div>
       )}
     </div>
   )
@@ -60,9 +60,9 @@ function KpiCard({ label, value, sub, accent = 'neutral', onClick }: {
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 10, padding: 20 }}>
+    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 }}>
       <div style={{
-        fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+        fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)',
         letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14,
       }}>
         {title}
@@ -76,7 +76,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 const ROW_STYLE: React.CSSProperties = {
   padding: '10px 0',
-  borderBottom: '1px solid var(--bg-border)',
+  borderBottom: '1px solid var(--border)',
   display: 'flex',
   flexDirection: 'column',
   gap: 5,
@@ -85,18 +85,18 @@ const ROW_STYLE: React.CSSProperties = {
 // ── Severity badge ────────────────────────────────────────────────────────────
 
 const SEV_COLOR: Record<string, string> = {
-  critical: 'var(--accent-crit)',
-  warning:  'var(--accent-warn)',
-  info:     'var(--accent-info)',
+  critical: 'var(--danger)',
+  warning:  'var(--warn)',
+  info:     'var(--info)',
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
-  const c = SEV_COLOR[severity] ?? 'var(--accent-off)'
+  const c = SEV_COLOR[severity] ?? 'var(--offline)'
   return (
     <span style={{
       display: 'inline-block', padding: '2px 7px', borderRadius: 4, fontSize: 10,
       background: `color-mix(in srgb, ${c} 18%, transparent)`,
-      color: c, fontFamily: 'var(--font-ui)', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap',
+      color: c, fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap',
     }}>
       {severity}
     </span>
@@ -106,22 +106,22 @@ function SeverityBadge({ severity }: { severity: string }) {
 // ── Order status chip ─────────────────────────────────────────────────────────
 
 const ORDER_COLOR: Record<string, string> = {
-  pending:     'var(--accent-info)',
-  in_progress: 'var(--accent-energy)',
-  done:        'var(--accent-ok)',
-  cancelled:   'var(--accent-off)',
+  pending:     'var(--info)',
+  in_progress: 'var(--cmg-teal)',
+  done:        'var(--ok)',
+  cancelled:   'var(--offline)',
 }
 const ORDER_LABEL: Record<string, string> = {
   pending: 'Pendiente', in_progress: 'En curso', done: 'Completada', cancelled: 'Cancelada',
 }
 
 function StatusChip({ status }: { status: string }) {
-  const c = ORDER_COLOR[status] ?? 'var(--accent-off)'
+  const c = ORDER_COLOR[status] ?? 'var(--offline)'
   return (
     <span style={{
       display: 'inline-block', padding: '2px 7px', borderRadius: 4, fontSize: 10,
       background: `color-mix(in srgb, ${c} 18%, transparent)`,
-      color: c, fontFamily: 'var(--font-ui)', fontWeight: 600, whiteSpace: 'nowrap',
+      color: c, fontFamily: 'var(--font-sans)', fontWeight: 600, whiteSpace: 'nowrap',
     }}>
       {ORDER_LABEL[status] ?? status}
     </span>
@@ -143,7 +143,7 @@ function relTime(iso: string | null): string {
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 function Empty({ msg }: { msg: string }) {
-  return <div style={{ padding: '20px 0', color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>{msg}</div>
+  return <div style={{ padding: '20px 0', color: 'var(--fg-muted)', fontSize: 13, textAlign: 'center' }}>{msg}</div>
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -279,31 +279,31 @@ export default function DashboardPage() {
         {/* ── Gráfica de utilización diaria ────────────────────────────────── */}
         {fleetKpis && fleetKpis.by_day.length > 0 && (
           <div style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--bg-border)',
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
             borderRadius: 10, padding: 20, marginBottom: 24,
           }}>
             <div style={{
-              fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+              fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)',
               letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14,
             }}>Utilización diaria (últimos 7 días)</div>
             <div style={{ width: '100%', height: 220 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={fleetKpis.by_day} margin={{ top: 5, right: 12, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
                     dataKey="date"
                     tickFormatter={d => {
                       const date = new Date(d)
                       return `${date.getDate()}/${date.getMonth() + 1}`
                     }}
-                    stroke="var(--text-muted)"
+                    stroke="var(--fg-muted)"
                     fontSize={11}
                   />
-                  <YAxis stroke="var(--text-muted)" fontSize={11} />
+                  <YAxis stroke="var(--fg-muted)" fontSize={11} />
                   <Tooltip
                     contentStyle={{
                       background: 'var(--bg-elevated)',
-                      border: '1px solid var(--bg-border)',
+                      border: '1px solid var(--border)',
                       borderRadius: 6,
                       fontSize: 12,
                     }}
@@ -331,14 +331,14 @@ export default function DashboardPage() {
                   return (
                     <div key={a.id} style={ROW_STYLE}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 13, color: 'var(--fg-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {rule?.name ?? 'Alerta'}
                         </span>
                         <SeverityBadge severity={rule?.severity ?? 'warning'}/>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{veh?.name ?? a.vehicle_id.slice(0, 8)}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{relTime(a.triggered_at)}</span>
+                        <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{veh?.name ?? a.vehicle_id.slice(0, 8)}</span>
+                        <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{relTime(a.triggered_at)}</span>
                       </div>
                     </div>
                   )
@@ -353,14 +353,14 @@ export default function DashboardPage() {
               : [...inProgressOrders, ...pendingOrders].slice(0, 7).map(o => (
                   <div key={o.id} style={ROW_STYLE}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 13, color: 'var(--fg-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {o.title}
                       </span>
                       <StatusChip status={o.status}/>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.vehicle_name ?? '—'}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.driver_name ?? '—'}</span>
+                      <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{o.vehicle_name ?? '—'}</span>
+                      <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{o.driver_name ?? '—'}</span>
                     </div>
                   </div>
                 ))
@@ -374,19 +374,19 @@ export default function DashboardPage() {
               : urgentPlans.slice(0, 7).map(p => {
                   const pct = maxPct(p)
                   const overdue = p.progress.status === 'vencido'
-                  const barColor = overdue ? 'var(--accent-crit)' : 'var(--accent-warn)'
+                  const barColor = overdue ? 'var(--danger)' : 'var(--warn)'
                   return (
                     <div key={p.id} style={ROW_STYLE}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 13, color: 'var(--fg-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {p.name}
                         </span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: barColor, fontFamily: 'var(--font-data)', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: barColor, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                           {Math.round(pct)}%
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.vehicle_name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{p.vehicle_name}</span>
                         <span style={{
                           fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
                           background: `color-mix(in srgb, ${barColor} 15%, transparent)`,
@@ -395,7 +395,7 @@ export default function DashboardPage() {
                           {overdue ? 'VENCIDO' : 'PRÓXIMO'}
                         </span>
                       </div>
-                      <div style={{ height: 3, background: 'var(--bg-elevated)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: 3, background: 'var(--bg-card)', borderRadius: 2, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: barColor, borderRadius: 2 }}/>
                       </div>
                     </div>

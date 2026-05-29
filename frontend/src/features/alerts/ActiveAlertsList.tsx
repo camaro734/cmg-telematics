@@ -14,8 +14,8 @@ function timeAgo(iso: string): string {
 
 const CARD: CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 12,
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--bg-border)',
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border)',
   borderRadius: 8, padding: '12px 16px',
 }
 
@@ -33,7 +33,7 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
 
   if (alerts.length === 0) {
     return (
-      <div style={{ padding: '20px 0', color: 'var(--accent-ok)', fontFamily: 'var(--font-ui)', fontSize: 13 }}>
+      <div style={{ padding: '20px 0', color: 'var(--ok)', fontFamily: 'var(--font-sans)', fontSize: 13 }}>
         Sin alertas activas
       </div>
     )
@@ -44,28 +44,28 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
       {alerts.map(alert => {
         const rule = ruleMap[alert.rule_id]
         const isCritical = rule?.severity === 'critical' || alert.status === 'escalated'
-        const color = isCritical ? 'var(--accent-crit)' : 'var(--accent-warn)'
+        const color = isCritical ? 'var(--danger)' : 'var(--warn)'
 
         return (
           <div key={alert.id} style={{ ...CARD, borderLeft: `3px solid ${color}` }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
                 {rule?.name ?? 'Regla desconocida'}
               </div>
-              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)' }}>
                 {vehicleMap[alert.vehicle_id] ?? 'Vehículo desconocido'}{' · '}{timeAgo(alert.triggered_at)}
               </div>
             </div>
             {alert.trigger_value != null && (
-              <div style={{ fontFamily: 'var(--font-data)', fontSize: 13, color, flexShrink: 0 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color, flexShrink: 0 }}>
                 {String(alert.trigger_value.value ?? JSON.stringify(alert.trigger_value))}
               </div>
             )}
             <button
               onClick={() => setAckAlert(alert)}
               style={{
-                padding: '4px 12px', fontSize: 12, fontFamily: 'var(--font-ui)',
+                padding: '4px 12px', fontSize: 12, fontFamily: 'var(--font-sans)',
                 background: 'transparent', border: `1px solid ${color}`,
                 borderRadius: 6, color, cursor: 'pointer', flexShrink: 0,
               }}

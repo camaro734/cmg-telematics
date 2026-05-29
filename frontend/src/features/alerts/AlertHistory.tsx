@@ -8,15 +8,15 @@ import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
 type HistoryStatus = 'all' | 'acknowledged' | 'resolved'
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
-  firing:       { label: 'ACTIVA',     color: 'var(--accent-crit)' },
-  escalated:    { label: 'ESCALADA',   color: 'var(--accent-crit)' },
-  acknowledged: { label: 'RECONOCIDA', color: 'var(--accent-warn)' },
-  resolved:     { label: 'RESUELTA',   color: 'var(--accent-ok)'   },
+  firing:       { label: 'ACTIVA',     color: 'var(--danger)' },
+  escalated:    { label: 'ESCALADA',   color: 'var(--danger)' },
+  acknowledged: { label: 'RECONOCIDA', color: 'var(--warn)' },
+  resolved:     { label: 'RESUELTA',   color: 'var(--ok)'   },
 }
 
 const SELECT: CSSProperties = {
-  background: 'var(--bg-base)', border: '1px solid var(--bg-border)',
-  borderRadius: 6, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+  background: 'var(--bg-base)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 12, padding: '4px 8px',
 }
 
@@ -79,14 +79,14 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
       </div>
 
       {rows.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>
+        <div style={{ color: 'var(--fg-muted)', fontSize: 13, padding: '20px 0' }}>
           Sin registros para el período seleccionado
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-ui)', fontSize: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-sans)', fontSize: 12 }}>
             <thead>
-              <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ color: 'var(--fg-muted)', borderBottom: '1px solid var(--border)' }}>
                 {['Fecha', 'Vehículo', 'Regla', 'Valor', 'Estado', 'Nota'].map(h => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
@@ -94,21 +94,21 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
             </thead>
             <tbody>
               {rows.map(a => {
-                const badge = STATUS_BADGE[a.status] ?? { label: a.status, color: 'var(--text-muted)' }
+                const badge = STATUS_BADGE[a.status] ?? { label: a.status, color: 'var(--fg-muted)' }
                 const tv = a.trigger_value
                 const val = tv?.value != null ? String(tv.value) : '—'
                 return (
-                  <tr key={a.id} style={{ borderBottom: '1px solid var(--bg-elevated)' }}>
-                    <td style={{ ...TD, fontFamily: 'var(--font-data)', whiteSpace: 'nowrap' }}>
+                  <tr key={a.id} style={{ borderBottom: '1px solid var(--bg-card)' }}>
+                    <td style={{ ...TD, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                       {new Date(a.triggered_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td style={TD}>{vehicleMap[a.vehicle_id] ?? '—'}</td>
                     <td style={TD}>{ruleMap[a.rule_id] ?? '—'}</td>
-                    <td style={{ ...TD, fontFamily: 'var(--font-data)' }}>{val}</td>
+                    <td style={{ ...TD, fontFamily: 'var(--font-mono)' }}>{val}</td>
                     <td style={TD}>
                       <span style={{ color: badge.color, fontWeight: 600 }}>{badge.label}</span>
                     </td>
-                    <td style={{ ...TD, color: 'var(--text-muted)' }}>{a.ack_note ?? '—'}</td>
+                    <td style={{ ...TD, color: 'var(--fg-muted)' }}>{a.ack_note ?? '—'}</td>
                   </tr>
                 )
               })}

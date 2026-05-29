@@ -11,8 +11,8 @@ import { useAuthStore } from '../auth/useAuthStore'
 import { useTenantContext } from '../../lib/useTenantContext'
 
 const SECTION_LABEL: CSSProperties = {
-  fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-ui)',
-  color: 'var(--text-muted)', letterSpacing: '0.06em',
+  fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-sans)',
+  color: 'var(--fg-muted)', letterSpacing: '0.06em',
   marginBottom: 12,
 }
 
@@ -67,7 +67,7 @@ export default function AlertsPage() {
     <Shell title="Alertas">
       <div style={{ padding: 24, maxWidth: 1200, overflowY: 'auto', height: '100%' }}>
         {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--bg-border)', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
           {(['activas', 'reglas'] as const)
             .filter(t => t === 'activas' || isAdmin)
             .map(t => (
@@ -78,8 +78,8 @@ export default function AlertsPage() {
                   padding: '8px 20px',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: tab === t ? '2px solid var(--accent-energy)' : '2px solid transparent',
-                  color: tab === t ? 'var(--accent-energy)' : 'var(--text-muted)',
+                  borderBottom: tab === t ? '2px solid var(--cmg-teal)' : '2px solid transparent',
+                  color: tab === t ? 'var(--cmg-teal)' : 'var(--fg-muted)',
                   fontSize: 13,
                   fontWeight: tab === t ? 600 : 400,
                   cursor: 'pointer',
@@ -97,7 +97,7 @@ export default function AlertsPage() {
               <div style={{ ...SECTION_LABEL, marginBottom: 0 }}>ALERTAS ACTIVAS</div>
               <button
                 onClick={handleExportCsv}
-                style={{ padding: '5px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+                style={{ padding: '5px 12px', background: 'var(--bg-card)', color: 'var(--fg-secondary, #E7E5E4)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
               >
                 Exportar CSV
               </button>
@@ -112,16 +112,16 @@ export default function AlertsPage() {
         {/* Reglas tab */}
         {tab === 'reglas' && isAdmin && (
           <div style={{ padding: '24px 0', textAlign: 'center' }}>
-            <p style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: 14 }}>
+            <p style={{ color: 'var(--fg-muted)', marginBottom: 16, fontSize: 14 }}>
               Las reglas de alerta definen cuándo se dispara una notificación.
             </p>
             <a
               href="/rules"
               style={{
-                color: 'var(--accent-info)',
+                color: 'var(--info)',
                 fontSize: 14,
                 textDecoration: 'none',
-                borderBottom: '1px solid var(--accent-info)',
+                borderBottom: '1px solid var(--info)',
                 paddingBottom: 2,
               }}
             >

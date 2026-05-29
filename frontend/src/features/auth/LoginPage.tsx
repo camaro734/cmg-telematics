@@ -75,9 +75,9 @@ export default function LoginPage() {
           : <CmgLogoFull />
         }
         <span style={{
-          fontFamily: 'var(--font-ui)',
+          fontFamily: 'var(--font-sans)',
           fontSize: 11,
-          color: 'var(--accent-off)',
+          color: 'var(--offline)',
           letterSpacing: '0.18em',
           textTransform: 'uppercase',
         }}>
@@ -90,16 +90,16 @@ export default function LoginPage() {
         borderRadius: 12,
         padding: 'clamp(24px, 5vw, 36px) clamp(20px, 5vw, 32px)',
         width: 'min(380px, calc(100vw - 32px))',
-        border: '1px solid var(--bg-border)',
+        border: '1px solid var(--border)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
       }}>
-        <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: 13, textAlign: 'center' }}>
+        <p style={{ color: 'var(--fg-muted)', marginBottom: 24, fontSize: 13, textAlign: 'center' }}>
           Inicia sesión para continuar
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor="email" style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>
+            <label htmlFor="email" style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>
               Email
             </label>
             <input
@@ -112,10 +112,10 @@ export default function LoginPage() {
               autoComplete="email"
               style={{
                 background: 'var(--bg-elevated)',
-                border: '1px solid var(--bg-border)',
+                border: '1px solid var(--border)',
                 borderRadius: 6,
                 padding: '8px 12px',
-                color: 'var(--text-primary)',
+                color: 'var(--fg-primary)',
                 outline: 'none',
                 fontSize: 14,
               }}
@@ -123,7 +123,7 @@ export default function LoginPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor="password" style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>
+            <label htmlFor="password" style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>
               Contraseña
             </label>
             <input
@@ -135,10 +135,10 @@ export default function LoginPage() {
               autoComplete="current-password"
               style={{
                 background: 'var(--bg-elevated)',
-                border: '1px solid var(--bg-border)',
+                border: '1px solid var(--border)',
                 borderRadius: 6,
                 padding: '8px 12px',
-                color: 'var(--text-primary)',
+                color: 'var(--fg-primary)',
                 outline: 'none',
                 fontSize: 14,
               }}
@@ -146,14 +146,14 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p style={{ color: 'var(--accent-crit)', fontSize: 13, marginTop: -4 }}>{error}</p>
+            <p style={{ color: 'var(--danger)', fontSize: 13, marginTop: -4 }}>{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
             style={{
-              background: loading ? 'var(--accent-off)' : 'var(--accent-energy)',
+              background: loading ? 'var(--offline)' : 'var(--cmg-teal)',
               color: '#fff',
               borderRadius: 6,
               padding: '10px 0',
@@ -169,7 +169,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ marginTop: 24, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+        <p style={{ marginTop: 24, fontSize: 12, color: 'var(--fg-muted)', textAlign: 'center' }}>
           ¿Olvidaste tu contraseña? Contacta con tu administrador.
         </p>
       </div>

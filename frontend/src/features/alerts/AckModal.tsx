@@ -13,8 +13,8 @@ const OVERLAY: CSSProperties = {
 }
 
 const MODAL: CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--bg-border)',
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border)',
   borderRadius: 10,
   padding: 28,
   width: 420,
@@ -25,7 +25,7 @@ const MODAL: CSSProperties = {
 
 const BTN_BASE: CSSProperties = {
   padding: '6px 16px', fontSize: 13,
-  fontFamily: 'var(--font-ui)',
+  fontFamily: 'var(--font-sans)',
   borderRadius: 6, cursor: 'pointer',
 }
 
@@ -56,11 +56,11 @@ export default function AckModal({ alert, ruleName, vehicleName, onClose, onSucc
   return (
     <div style={OVERLAY} onClick={onClose} role="dialog" aria-modal="true" aria-label="Reconocer alerta">
       <div style={MODAL} onClick={e => e.stopPropagation()}>
-        <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 16, color: 'var(--fg-primary)' }}>
           Reconocer alerta
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          <span style={{ color: 'var(--accent-energy)' }}>{ruleName}</span>{' — '}{vehicleName}
+        <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+          <span style={{ color: 'var(--cmg-teal)' }}>{ruleName}</span>{' — '}{vehicleName}
         </div>
         <textarea
           value={note}
@@ -69,10 +69,10 @@ export default function AckModal({ alert, ruleName, vehicleName, onClose, onSucc
           rows={3}
           style={{
             background: 'var(--bg-base)',
-            border: '1px solid var(--bg-border)',
+            border: '1px solid var(--border)',
             borderRadius: 6,
-            color: 'var(--text-primary)',
-            fontFamily: 'var(--font-ui)',
+            color: 'var(--fg-primary)',
+            fontFamily: 'var(--font-sans)',
             fontSize: 13,
             padding: '8px 10px',
             resize: 'vertical',
@@ -81,7 +81,7 @@ export default function AckModal({ alert, ruleName, vehicleName, onClose, onSucc
           }}
         />
         {error && (
-          <div style={{ fontSize: 12, color: 'var(--accent-crit)' }}>
+          <div style={{ fontSize: 12, color: 'var(--danger)' }}>
             {(error as Error).message}
           </div>
         )}
@@ -89,14 +89,14 @@ export default function AckModal({ alert, ruleName, vehicleName, onClose, onSucc
           <button
             onClick={onClose}
             disabled={isPending}
-            style={{ ...BTN_BASE, background: 'transparent', border: '1px solid var(--bg-border)', color: 'var(--text-muted)' }}
+            style={{ ...BTN_BASE, background: 'transparent', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}
           >
             Cancelar
           </button>
           <button
             onClick={() => mutate()}
             disabled={isPending}
-            style={{ ...BTN_BASE, background: 'var(--accent-energy)', border: 'none', color: 'var(--bg-base)', cursor: isPending ? 'wait' : 'pointer' }}
+            style={{ ...BTN_BASE, background: 'var(--cmg-teal)', border: 'none', color: 'var(--bg-base)', cursor: isPending ? 'wait' : 'pointer' }}
           >
             {isPending ? 'Enviando…' : 'Confirmar'}
           </button>
