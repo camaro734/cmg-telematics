@@ -1,11 +1,11 @@
 export type BadgeVariant = 'online' | 'offline' | 'pto' | 'warn' | 'crit'
 
 const VARIANT_STYLES: Record<BadgeVariant, { bg: string; color: string; label: string }> = {
-  online:  { bg: 'rgba(34,197,94,0.15)',  color: 'var(--accent-ok)',     label: 'EN LÍNEA' },
-  offline: { bg: 'rgba(120,113,108,0.2)', color: 'var(--accent-off)',    label: 'OFFLINE' },
-  pto:     { bg: 'rgba(249,115,22,0.15)', color: 'var(--accent-energy)', label: 'PTO' },
-  warn:    { bg: 'rgba(234,179,8,0.15)',  color: 'var(--accent-warn)',   label: 'ADVERTENCIA' },
-  crit:    { bg: 'rgba(239,68,68,0.15)',  color: 'var(--accent-crit)',   label: 'CRÍTICO' },
+  online:  { bg: 'var(--ok-soft)',        color: 'var(--ok)',        label: 'EN LÍNEA' },
+  offline: { bg: 'var(--offline-soft)',   color: 'var(--offline)',   label: 'OFFLINE' },
+  pto:     { bg: 'var(--cmg-teal-soft)',  color: 'var(--cmg-teal)', label: 'PTO' },
+  warn:    { bg: 'var(--warn-soft)',      color: 'var(--warn)',      label: 'ADVERTENCIA' },
+  crit:    { bg: 'var(--danger-soft)',    color: 'var(--danger)',    label: 'CRÍTICO' },
 }
 
 interface StatusBadgeProps {
@@ -28,7 +28,7 @@ export default function StatusBadge({ variant, label, size = 'sm' }: StatusBadge
       fontSize: size === 'md' ? 12 : 10,
       fontWeight: 600,
       letterSpacing: '0.04em',
-      fontFamily: 'var(--font-ui)',
+      fontFamily: 'var(--font-sans)',
     }}>
       <span style={{
         width: size === 'md' ? 7 : 5,

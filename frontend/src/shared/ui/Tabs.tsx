@@ -13,14 +13,14 @@ interface TabsProps {
 
 const containerStyle: CSSProperties = {
   display: 'flex',
-  borderBottom: '1px solid var(--bg-border)',
+  borderBottom: '1px solid var(--border)',
 }
 
 const TAB_BASE: CSSProperties = {
   padding: '8px 20px',
   fontSize: 12,
   fontWeight: 600,
-  fontFamily: 'var(--font-ui)',
+  fontFamily: 'var(--font-sans)',
   letterSpacing: '0.05em',
   background: 'none',
   border: 'none',
@@ -43,8 +43,8 @@ export default function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
             onClick={() => onTabChange(tab.id)}
             style={{
               ...TAB_BASE,
-              color: isActive ? 'var(--accent-energy)' : 'var(--text-muted)',
-              borderBottom: isActive ? '2px solid var(--accent-energy)' : '2px solid transparent',
+              color: isActive ? 'var(--cmg-teal)' : 'var(--fg-muted)',
+              borderBottom: isActive ? '2px solid var(--cmg-teal)' : '2px solid transparent',
             }}
           >
             {tab.label}

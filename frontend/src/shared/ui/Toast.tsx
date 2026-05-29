@@ -56,10 +56,10 @@ export const toast = {
 // ── Single toast item ─────────────────────────────────────────────────────────
 
 const KIND_STYLE: Record<ToastKind, { border: string; icon: string }> = {
-  success: { border: 'var(--accent-ok)',     icon: '✓' },
-  error:   { border: 'var(--accent-crit)',   icon: '✕' },
-  warning: { border: 'var(--accent-warn)',   icon: '!' },
-  info:    { border: 'var(--accent-info)',   icon: 'i' },
+  success: { border: 'var(--ok)',     icon: '✓' },
+  error:   { border: 'var(--danger)', icon: '✕' },
+  warning: { border: 'var(--warn)',   icon: '!' },
+  info:    { border: 'var(--info)',   icon: 'i' },
 }
 
 const AUTO_CLOSE_MS = 4000
@@ -88,13 +88,13 @@ function ToastItem({ toast }: { toast: ToastItem }) {
         gap: 10,
         padding: '10px 14px',
         background: 'var(--bg-elevated)',
-        border: '1px solid var(--bg-border)',
+        border: '1px solid var(--border)',
         borderLeft: `3px solid ${border}`,
         borderRadius: 8,
         boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        fontFamily: 'var(--font-ui)',
+        fontFamily: 'var(--font-sans)',
         fontSize: 13,
-        color: 'var(--text-primary, #E7E5E4)',
+        color: 'var(--fg-primary, #E7E5E4)',
         maxWidth: 360,
         animation: 'cmg-toast-in 0.18s ease-out',
       }}
@@ -124,7 +124,7 @@ function ToastItem({ toast }: { toast: ToastItem }) {
         style={{
           background: 'none',
           border: 'none',
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           cursor: 'pointer',
           fontSize: 14,
           lineHeight: 1,

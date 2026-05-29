@@ -38,9 +38,9 @@ export function useConfirm() {
 }
 
 const KIND_COLORS: Record<ConfirmKind, string> = {
-  danger: 'var(--accent-crit)',
-  warning: 'var(--accent-warn)',
-  info: 'var(--accent-info)',
+  danger: 'var(--danger)',
+  warning: 'var(--warn)',
+  info: 'var(--info)',
 }
 
 export function ConfirmDialogHost() {
@@ -80,13 +80,13 @@ export function ConfirmDialogHost() {
         style={{
           minWidth: 320, maxWidth: 420,
           background: 'var(--bg-elevated)',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderTop: `3px solid ${accent}`,
           borderRadius: 10,
           padding: 20,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
-          fontFamily: 'var(--font-ui)',
-          color: 'var(--text-primary, #E7E5E4)',
+          fontFamily: 'var(--font-sans)',
+          color: 'var(--fg-primary, #E7E5E4)',
         }}
       >
         {request.title && (
@@ -94,15 +94,15 @@ export function ConfirmDialogHost() {
             {request.title}
           </h3>
         )}
-        <p style={{ margin: '0 0 18px 0', fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+        <p style={{ margin: '0 0 18px 0', fontSize: 13, lineHeight: 1.5, color: 'var(--fg-muted)' }}>
           {request.message}
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
             onClick={() => answer(false)}
             style={{
-              background: 'transparent', color: 'var(--text-primary, #E7E5E4)',
-              border: '1px solid var(--bg-border)', borderRadius: 6,
+              background: 'transparent', color: 'var(--fg-primary, #E7E5E4)',
+              border: '1px solid var(--border)', borderRadius: 6,
               padding: '7px 14px', fontSize: 13, cursor: 'pointer',
             }}
           >
