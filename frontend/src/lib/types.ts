@@ -78,6 +78,10 @@ export interface BrandTokens {
   [key: string]: string | undefined
 }
 
+export type SensorIcon =
+  | 'pressure' | 'temperature' | 'fuel' | 'water' | 'engine'
+  | 'speed' | 'voltage' | 'pump' | 'valve' | 'rpm' | 'flow'
+
 export interface TenantOut {
   id: string
   parent_id: string | null
@@ -102,7 +106,7 @@ export interface SensorDef {
   unit: string | null
   min?: number
   max?: number
-  gauge_type: 'circular' | 'linear' | 'battery' | 'numeric' | 'led'
+  gauge_type: 'circular' | 'linear' | 'battery' | 'numeric' | 'led' | 'tank' | 'gauge_arc'
   warn_above?: number
   alert_above?: number
   warn_below?: number
@@ -113,6 +117,9 @@ export interface SensorDef {
   kpi_key?: string
   bit_index?: number
   visible_in_detail?: boolean
+  icon?: SensorIcon
+  color?: string
+  widget_size?: 'sm' | 'md' | 'lg'
 }
 
 export interface WsMessage {
@@ -124,6 +131,7 @@ export interface DoutSlot {
   slot: number
   label: string
   enabled: boolean
+  sensor_key?: string
 }
 
 export interface HistoricMetricItem {
