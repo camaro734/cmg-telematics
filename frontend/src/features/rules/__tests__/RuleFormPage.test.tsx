@@ -8,8 +8,11 @@ import type { RuleOut, VehicleTypeOut } from '../../../lib/types'
 vi.mock('../../../lib/apiClient', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
 }))
+const mockAuthState = { user: { role: 'admin', tenant_tier: 'client' }, enabledModules: [], logoUrl: null, brandName: null, logout: vi.fn() }
 vi.mock('../../../features/auth/useAuthStore', () => ({
-  useAuthStore: vi.fn(() => ({ user: { role: 'admin', tenant_tier: 'client' }, enabledModules: [], logoUrl: null, brandName: null, logout: vi.fn() })),
+  useAuthStore: vi.fn((selector?: (s: typeof mockAuthState) => unknown) =>
+    typeof selector === 'function' ? selector(mockAuthState) : mockAuthState
+  ),
 }))
 
 import { apiClient } from '../../../lib/apiClient'
@@ -64,18 +67,34 @@ function wrapEdit() {
   )
 }
 
+// Navega el wizard hasta el paso final (paso 5) partiendo desde el paso 1
+async function advanceToReview(nameValue = 'Nueva regla') {
+  // Paso 1: rellenar nombre y avanzar
+  fireEvent.change(screen.getByPlaceholderText(/presión bomba alta/i), { target: { value: nameValue } })
+  fireEvent.click(screen.getByText('Siguiente →'))
+  // Paso 2 → 3 → 4 → 5
+  await waitFor(() => screen.getByText('Siguiente →'))
+  fireEvent.click(screen.getByText('Siguiente →'))
+  await waitFor(() => screen.getByText('Siguiente →'))
+  fireEvent.click(screen.getByText('Siguiente →'))
+  await waitFor(() => screen.getByText('Siguiente →'))
+  fireEvent.click(screen.getByText('Siguiente →'))
+  await waitFor(() => screen.getByText(/Crear regla|Guardar cambios/))
+}
+
 describe('RuleFormPage', () => {
-  it('muestra formulario de creación vacío', () => {
+  it('muestra formulario de creación en paso 1 con campo nombre', () => {
     wrapCreate()
-    expect(screen.getByPlaceholderText(/nombre de la regla/i)).toBeInTheDocument()
-    expect(screen.getByText('Guardar regla')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/presión bomba alta/i)).toBeInTheDocument()
+    // En paso 1 el botón de envío aún no es visible — solo "Siguiente"
+    expect(screen.getByText('Siguiente →')).toBeInTheDocument()
   })
 
   it('submit en creación llama apiClient.post con payload correcto', async () => {
     vi.mocked(apiClient.post).mockResolvedValue(mockRule)
     wrapCreate()
-    fireEvent.change(screen.getByPlaceholderText(/nombre de la regla/i), { target: { value: 'Nueva regla' } })
-    fireEvent.click(screen.getByText('Guardar regla'))
+    await advanceToReview('Nueva regla')
+    fireEvent.click(screen.getByText('Crear regla'))
     await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith(
       '/api/v1/rules',
       expect.objectContaining({ name: 'Nueva regla', condition: expect.objectContaining({ type: 'threshold' }) })
@@ -91,15 +110,17 @@ describe('RuleFormPage', () => {
     vi.mocked(apiClient.put).mockResolvedValue(mockRule)
     wrapEdit()
     await waitFor(() => screen.getByDisplayValue('Presión alta'))
-    fireEvent.click(screen.getByText('Guardar regla'))
+    await advanceToReview('Presión alta')
+    fireEvent.click(screen.getByText('Guardar cambios'))
     await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith(
       '/api/v1/rules/r1', expect.objectContaining({ name: 'Presión alta' })
     ))
   })
 
-  it('muestra error si nombre está vacío al guardar', async () => {
+  it('muestra error si nombre está vacío al intentar avanzar del paso 1', async () => {
     wrapCreate()
-    fireEvent.click(screen.getByText('Guardar regla'))
+    // Intentar avanzar sin rellenar el nombre
+    fireEvent.click(screen.getByText('Siguiente →'))
     expect(screen.getByText(/El nombre es obligatorio/)).toBeInTheDocument()
   })
 })
