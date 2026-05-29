@@ -6,7 +6,7 @@ import type { VehicleTypeOut, SensorDef, SensorIcon } from '../../lib/types'
 import { AVL_CATALOG, GROUP_LABELS, avlParamToSensorDef } from '../../lib/avlCatalog'
 import { SensorIconComponent, SENSOR_ICONS } from '../../shared/ui/gauges/SensorIconSet'
 
-const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'led']
+const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'counter', 'led']
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -119,9 +119,9 @@ export default function VehicleTypeSensorsSection() {
 
   const GAUGE_LABELS: Record<string, string> = {
     circular: 'Circular', gauge_arc: 'Arco', linear: 'Barra',
-    tank: 'Cisterna', battery: 'Batería', numeric: 'Numérico', led: 'LED',
+    tank: 'Cisterna', battery: 'Batería', numeric: 'Numérico', counter: 'Contador', led: 'LED',
   }
-  const ALL_GAUGE_TYPES: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'led']
+  const ALL_GAUGE_TYPES: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'counter', 'led']
 
   function updateSensorField(sensor: SensorDef, field: string, val: unknown) {
     if (!selectedType) return
@@ -263,6 +263,34 @@ export default function VehicleTypeSensorsSection() {
                                         </button>
                                       ))}
                                     </div>
+                                  </div>
+                                  {/* Categoría */}
+                                  <div>
+                                    <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.05em', margin: '0 0 6px' }}>
+                                      CATEGORÍA
+                                    </p>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      {(['maquina', 'chasis'] as const).map(cat => (
+                                        <button
+                                          key={cat}
+                                          type="button"
+                                          onClick={() => updateSensorField(s, 'category', cat)}
+                                          style={{
+                                            padding: '4px 14px', fontSize: 11, fontWeight: 600,
+                                            borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                                            background: (s.category ?? 'maquina') === cat ? 'var(--cmg-teal-soft)' : 'var(--bg-card)',
+                                            border: `1px solid ${(s.category ?? 'maquina') === cat ? 'var(--cmg-teal-line)' : 'var(--border)'}`,
+                                            color: (s.category ?? 'maquina') === cat ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
+                                            transition: 'all 0.15s',
+                                          }}
+                                        >
+                                          {cat === 'maquina' ? 'Máquina' : 'Chasis'}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <p style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 5, fontFamily: 'var(--font-sans)', lineHeight: 1.4 }}>
+                                      Máquina: aparece en el grid principal. Chasis: lista compacta inferior.
+                                    </p>
                                   </div>
                                 </div>
                               </div>
