@@ -98,30 +98,30 @@ function buildAvlSeries(
 function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
     <div style={{
-      background: 'var(--bg-surface)', border: '1px solid var(--bg-border)',
+      background: 'var(--bg-surface)', border: '1px solid var(--border)',
       borderRadius: 8, padding: '12px 14px', flex: 1, minWidth: 120,
     }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-data)', color: accent ?? 'var(--text-primary)' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-mono)', color: accent ?? 'var(--fg-primary)' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
 
 const chartCard: React.CSSProperties = {
   background: 'var(--bg-surface)',
-  border: '1px solid var(--bg-border)',
+  border: '1px solid var(--border)',
   borderRadius: 8,
   padding: '14px 16px',
 }
 
 const chartTitle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+  fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)',
   marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em',
 }
 
 const tooltipStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
   borderRadius: 6, fontSize: 12,
 }
 
@@ -181,15 +181,15 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
 
   const periodBtn = (p: Period): React.CSSProperties => ({
     padding: '4px 12px', fontSize: 12, fontWeight: 600,
-    border: '1px solid var(--bg-border)', borderRadius: 20, cursor: 'pointer',
-    background: period === p ? 'var(--accent-energy)' : 'transparent',
-    color: period === p ? '#fff' : 'var(--text-muted)',
+    border: '1px solid var(--border)', borderRadius: 20, cursor: 'pointer',
+    background: period === p ? 'var(--cmg-teal)' : 'transparent',
+    color: period === p ? '#fff' : 'var(--fg-muted)',
     transition: 'background 0.15s',
   })
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
         Cargando…
       </div>
     )
@@ -209,20 +209,20 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
 
       {/* KPI summary */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <KpiCard label="Días operativos" value={String(diasTrabajados)} accent="var(--accent-ok)" />
+        <KpiCard label="Días operativos" value={String(diasTrabajados)} accent="var(--ok)" />
         <KpiCard label="Horas motor" value={fmtH(totalEngMin)} />
-        <KpiCard label="Horas PTO" value={fmtH(totalPtoMin)} accent="var(--accent-energy)" />
+        <KpiCard label="Horas PTO" value={fmtH(totalPtoMin)} accent="var(--cmg-teal)" />
         <KpiCard
           label="Eficiencia PTO"
           value={ptoPct !== null ? `${ptoPct}%` : '—'}
           sub="tiempo PTO / motor"
-          accent={ptoPct !== null ? (ptoPct > 50 ? 'var(--accent-ok)' : 'var(--accent-warn)') : undefined}
+          accent={ptoPct !== null ? (ptoPct > 50 ? 'var(--ok)' : 'var(--warn)') : undefined}
         />
       </div>
 
       {/* Motor / PTO chart */}
       {engPtoData.length === 0 ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--bg-border)', color: 'var(--text-muted)', fontSize: 13 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', color: 'var(--fg-muted)', fontSize: 13 }}>
           Sin datos para el período seleccionado
         </div>
       ) : (
@@ -230,9 +230,9 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
           <div style={chartTitle}>Motor y PTO — horas</div>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={engPtoData} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} unit="h" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit="h" />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}h`]} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="motor" name="Motor" stroke="#38BDF8" strokeWidth={2} dot={false} />
@@ -251,9 +251,9 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
             <div style={chartTitle}>{metric.label}{metric.unit ? ` — ${metric.unit}` : ''}</div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={data} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? '#F97316'} strokeWidth={2} dot={false} />
               </LineChart>
@@ -272,9 +272,9 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
             <div style={chartTitle}>{metric.label}{metric.unit ? ` — ${metric.unit}` : ''}</div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={data} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? '#38BDF8'} strokeWidth={2} dot={false} />
               </LineChart>

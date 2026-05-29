@@ -194,11 +194,11 @@ export default function TrackMap({ track, status }: TrackMapProps) {
     return (
       <div style={{
         width: '100%', height: '100%', minHeight: 260,
-        background: 'var(--bg-elevated)',
+        background: 'var(--bg-card)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'var(--text-muted)',
+        color: 'var(--fg-muted)',
         fontSize: 13,
         borderRadius: 8,
       }}>

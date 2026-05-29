@@ -78,8 +78,8 @@ function TimeCard({ label, value }: { label: string; value: number | null }) {
   const fmt = value !== null ? formatMinutes(value) : null
   return (
     <div style={{
-      background: 'var(--bg-elevated)',
-      border: `1px solid ${fmt ? 'color-mix(in srgb, var(--accent-info) 25%, var(--bg-border))' : 'var(--bg-border)'}`,
+      background: 'var(--bg-card)',
+      border: `1px solid ${fmt ? 'color-mix(in srgb, var(--info) 25%, var(--border))' : 'var(--border)'}`,
       borderRadius: 7,
       padding: '5px 9px',
       display: 'flex',
@@ -89,9 +89,9 @@ function TimeCard({ label, value }: { label: string; value: number | null }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{
-          fontFamily: 'var(--font-ui)',
+          fontFamily: 'var(--font-sans)',
           fontSize: 8,
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           letterSpacing: '0.8px',
           textTransform: 'uppercase' as const,
           lineHeight: 1.3,
@@ -103,16 +103,16 @@ function TimeCard({ label, value }: { label: string; value: number | null }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
         <span style={{
-          fontFamily: 'var(--font-data)',
+          fontFamily: 'var(--font-mono)',
           fontSize: 15,
           fontWeight: 700,
-          color: fmt ? 'var(--accent-info)' : 'var(--accent-off)',
+          color: fmt ? 'var(--info)' : 'var(--offline)',
           lineHeight: 1,
         }}>
           {fmt ? fmt.main : '—'}
         </span>
         {fmt && (
-          <span style={{ fontFamily: 'var(--font-data)', fontSize: 10, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>
             {fmt.unit}
           </span>
         )}
@@ -128,8 +128,8 @@ function CounterCard({ label, value, unit }: { label: string; value: number | nu
     : '—'
   return (
     <div style={{
-      background: 'var(--bg-elevated)',
-      border: `1px solid ${value !== null ? 'color-mix(in srgb, var(--accent-energy) 25%, var(--bg-border))' : 'var(--bg-border)'}`,
+      background: 'var(--bg-card)',
+      border: `1px solid ${value !== null ? 'color-mix(in srgb, var(--cmg-teal) 25%, var(--border))' : 'var(--border)'}`,
       borderRadius: 7,
       padding: '5px 9px',
       display: 'flex',
@@ -139,9 +139,9 @@ function CounterCard({ label, value, unit }: { label: string; value: number | nu
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{
-          fontFamily: 'var(--font-ui)',
+          fontFamily: 'var(--font-sans)',
           fontSize: 8,
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           letterSpacing: '0.8px',
           textTransform: 'uppercase' as const,
           lineHeight: 1.3,
@@ -155,16 +155,16 @@ function CounterCard({ label, value, unit }: { label: string; value: number | nu
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
         <span style={{
-          fontFamily: 'var(--font-data)',
+          fontFamily: 'var(--font-mono)',
           fontSize: 15,
           fontWeight: 700,
-          color: value !== null ? 'var(--accent-energy)' : 'var(--accent-off)',
+          color: value !== null ? 'var(--cmg-teal)' : 'var(--offline)',
           lineHeight: 1,
         }}>
           {display}
         </span>
         {unit && value !== null && (
-          <span style={{ fontFamily: 'var(--font-data)', fontSize: 10, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-muted)' }}>
             {unit}
           </span>
         )}
@@ -184,15 +184,15 @@ function LedIndicator({ sensor, canData }: { sensor: SensorDef; canData: Record<
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 8,
-      background: 'var(--bg-elevated)',
+      background: 'var(--bg-card)',
       borderRadius: 6,
       padding: '6px 10px',
-      border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+      border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
     }}>
       <span style={{
-        fontFamily: 'var(--font-ui)',
+        fontFamily: 'var(--font-sans)',
         fontSize: 10,
-        color: 'var(--text-muted)',
+        color: 'var(--fg-muted)',
         textTransform: 'uppercase' as const,
         letterSpacing: '0.5px',
         wordBreak: 'break-word' as const,
@@ -206,9 +206,9 @@ function LedIndicator({ sensor, canData }: { sensor: SensorDef; canData: Record<
         padding: '2px 8px',
         borderRadius: 10,
         fontWeight: 600,
-        background: active ? 'color-mix(in srgb, var(--accent-ok) 15%, transparent)' : 'transparent',
-        color: active ? 'var(--accent-ok)' : 'var(--accent-off)',
-        border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+        background: active ? 'color-mix(in srgb, var(--ok) 15%, transparent)' : 'transparent',
+        color: active ? 'var(--ok)' : 'var(--offline)',
+        border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
         flexShrink: 0,
       }}>
         {active ? 'ON' : 'OFF'}
@@ -220,7 +220,7 @@ function LedIndicator({ sensor, canData }: { sensor: SensorDef; canData: Record<
 const groupTitleStyle: React.CSSProperties = {
   fontSize: 9,
   fontWeight: 600,
-  color: 'var(--accent-off)',
+  color: 'var(--offline)',
   letterSpacing: '1px',
   textTransform: 'uppercase',
   marginBottom: 8,
@@ -228,7 +228,7 @@ const groupTitleStyle: React.CSSProperties = {
 
 const dividerStyle: React.CSSProperties = {
   height: 1,
-  background: 'var(--bg-elevated)',
+  background: 'var(--bg-card)',
   margin: '2px 0',
 }
 
@@ -243,14 +243,14 @@ function CompactSensorList({ sensorSchema, canData, derivedValues }: {
       {sensorSchema.map((sensor, i) => {
         const isLed = sensor.gauge_type === 'led'
         let displayValue = '—'
-        let valueColor = 'var(--accent-off)'
+        let valueColor = 'var(--offline)'
 
         if (isLed) {
           const raw = sensor.avl_id != null ? canData[`avl_${sensor.avl_id}`] : undefined
           const num = raw != null ? Number(raw) : 0
           const active = raw != null && (sensor.bit_index != null ? ((num >> sensor.bit_index) & 1) === 1 : num === 1)
           displayValue = active ? 'ON' : raw != null ? 'OFF' : '—'
-          valueColor = active ? 'var(--accent-ok)' : raw != null ? 'var(--text-muted)' : 'var(--accent-off)'
+          valueColor = active ? 'var(--ok)' : raw != null ? 'var(--fg-muted)' : 'var(--offline)'
         } else {
           const value = getSensorValue(sensor, canData, derivedValues)
           if (value !== null) {
@@ -262,11 +262,11 @@ function CompactSensorList({ sensorSchema, canData, derivedValues }: {
               displayValue = `${value.toFixed(decimals)}${sensor.unit ? ' ' + sensor.unit : ''}`
             }
             // Color por umbrales
-            if (sensor.alert_above != null && value >= sensor.alert_above) valueColor = 'var(--accent-crit)'
-            else if (sensor.warn_above != null && value >= sensor.warn_above) valueColor = 'var(--accent-warn)'
-            else if (sensor.alert_below != null && value <= sensor.alert_below) valueColor = 'var(--accent-crit)'
-            else if (sensor.warn_below != null && value <= sensor.warn_below) valueColor = 'var(--accent-warn)'
-            else valueColor = 'var(--accent-info)'
+            if (sensor.alert_above != null && value >= sensor.alert_above) valueColor = 'var(--danger)'
+            else if (sensor.warn_above != null && value >= sensor.warn_above) valueColor = 'var(--warn)'
+            else if (sensor.alert_below != null && value <= sensor.alert_below) valueColor = 'var(--danger)'
+            else if (sensor.warn_below != null && value <= sensor.warn_below) valueColor = 'var(--warn)'
+            else valueColor = 'var(--info)'
           }
         }
 
@@ -274,12 +274,12 @@ function CompactSensorList({ sensorSchema, canData, derivedValues }: {
           <div key={sensor.key} style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             padding: '3px 4px',
-            borderBottom: i < sensorSchema.length - 1 ? '1px solid var(--bg-elevated)' : 'none',
+            borderBottom: i < sensorSchema.length - 1 ? '1px solid var(--bg-card)' : 'none',
           }}>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', lineHeight: 1.3 }}>
+            <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', lineHeight: 1.3 }}>
               {sensor.label}
             </span>
-            <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-data)', color: valueColor, flexShrink: 0, marginLeft: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', color: valueColor, flexShrink: 0, marginLeft: 8 }}>
               {displayValue}
             </span>
           </div>

@@ -3,12 +3,12 @@ import type { VehicleStatus } from '../../lib/types'
 function Card({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'var(--bg-elevated)',
+      background: 'var(--bg-card)',
       borderRadius: 8,
       padding: '12px 16px',
-      border: '1px solid var(--bg-border)',
+      border: '1px solid var(--border)',
     }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 6 }}>
         {label}
       </div>
       {children}
@@ -20,9 +20,9 @@ function Value({ children, color }: { children: React.ReactNode; color?: string 
   return (
     <div style={{
       fontSize: 22,
-      fontFamily: 'var(--font-data)',
+      fontFamily: 'var(--font-mono)',
       fontWeight: 500,
-      color: color ?? 'var(--text-primary)',
+      color: color ?? 'var(--fg-primary)',
     }}>
       {children}
     </div>
@@ -36,7 +36,7 @@ interface StatusPanelProps {
 export default function StatusPanel({ status }: StatusPanelProps) {
   if (!status) {
     return (
-      <div style={{ padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+      <div style={{ padding: '20px 0', color: 'var(--fg-muted)', fontSize: 13 }}>
         Sin datos de estado disponibles
       </div>
     )
@@ -52,19 +52,19 @@ export default function StatusPanel({ status }: StatusPanelProps) {
         marginBottom: 24,
       }}>
         <Card label="VELOCIDAD">
-          <Value color="var(--accent-info)">
+          <Value color="var(--info)">
             {status.speed_kmh != null ? `${Math.round(status.speed_kmh)} km/h` : '—'}
           </Value>
         </Card>
 
         <Card label="IGNICIÓN">
-          <Value color={status.ignition ? 'var(--accent-ok)' : 'var(--accent-off)'}>
+          <Value color={status.ignition ? 'var(--ok)' : 'var(--offline)'}>
             {status.ignition == null ? '—' : status.ignition ? 'ON' : 'OFF'}
           </Value>
         </Card>
 
         <Card label="PTO">
-          <Value color={status.pto_active ? 'var(--accent-energy)' : 'var(--accent-off)'}>
+          <Value color={status.pto_active ? 'var(--cmg-teal)' : 'var(--offline)'}>
             {status.pto_active == null ? '—' : status.pto_active ? 'ACTIVO' : 'INACTIVO'}
           </Value>
         </Card>
@@ -75,7 +75,7 @@ export default function StatusPanel({ status }: StatusPanelProps) {
         <div>
           <div style={{
             fontSize: 10,
-            color: 'var(--text-muted)',
+            color: 'var(--fg-muted)',
             fontWeight: 600,
             letterSpacing: '0.06em',
             marginBottom: 10,
@@ -83,9 +83,9 @@ export default function StatusPanel({ status }: StatusPanelProps) {
             DATOS CAN BUS
           </div>
           <div style={{
-            background: 'var(--bg-elevated)',
+            background: 'var(--bg-card)',
             borderRadius: 8,
-            border: '1px solid var(--bg-border)',
+            border: '1px solid var(--border)',
             overflow: 'hidden',
           }}>
             {Object.entries(status.can_data).map(([key, val], i) => (
@@ -94,12 +94,12 @@ export default function StatusPanel({ status }: StatusPanelProps) {
                 justifyContent: 'space-between',
                 padding: '8px 16px',
                 borderBottom: i < Object.keys(status.can_data!).length - 1
-                  ? '1px solid var(--bg-border)' : 'none',
+                  ? '1px solid var(--border)' : 'none',
               }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                <span style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                   {key}
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
+                <span style={{ fontSize: 12, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>
                   {String(val)}
                 </span>
               </div>
@@ -109,7 +109,7 @@ export default function StatusPanel({ status }: StatusPanelProps) {
       )}
 
       {(!status.can_data || Object.keys(status.can_data).length === 0) && (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+        <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>
           Sin datos CAN disponibles
         </div>
       )}

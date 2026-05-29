@@ -37,7 +37,7 @@ function getDefaultRange(): { from: string; to: string } {
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
-  border: '1px solid var(--bg-border)',
+  border: '1px solid var(--border)',
   borderRadius: 8,
   padding: 16,
 }
@@ -117,11 +117,11 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
       {/* Controls */}
       <div style={{ ...cardStyle, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 10, color: 'var(--accent-off)', marginBottom: 4 }}>DEFINICIÓN</div>
+          <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>DEFINICIÓN</div>
           <select
             value={selectedDefinitionId}
             onChange={e => setSelectedDefinitionId(e.target.value)}
-            style={{ background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }}
+            style={{ background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }}
           >
             <option value="">Todas</option>
             {activeDefinitions.map(d => (
@@ -130,33 +130,33 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: 'var(--accent-off)', marginBottom: 4 }}>DESDE</div>
+          <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>DESDE</div>
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-            style={{ background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }} />
+            style={{ background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }} />
         </div>
         <div>
-          <div style={{ fontSize: 10, color: 'var(--accent-off)', marginBottom: 4 }}>HASTA</div>
+          <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>HASTA</div>
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-            style={{ background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }} />
+            style={{ background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }} />
         </div>
         {selectedDefinitionId && (
           <button
             onClick={() => computeMutation.mutate(selectedDefinitionId)}
             disabled={computeMutation.isPending}
-            style={{ padding: '6px 14px', background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+            style={{ padding: '6px 14px', background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 5, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
           >
             {computeMutation.isPending ? 'Calculando…' : 'Calcular ciclos'}
           </button>
         )}
         {computeMutation.isSuccess && (
-          <span style={{ fontSize: 12, color: 'var(--accent-ok)' }}>
+          <span style={{ fontSize: 12, color: 'var(--ok)' }}>
             {computeMutation.data.computed} ciclos detectados
           </span>
         )}
         {cycles.length > 0 && (
           <button
             onClick={handleExport}
-            style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-base, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
+            style={{ padding: '6px 12px', background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 13, cursor: 'pointer' }}
           >
             Exportar CSV
           </button>
@@ -166,58 +166,58 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
       {/* Table */}
       <div style={cardStyle}>
         {isLoading ? (
-          <div style={{ color: 'var(--accent-off)', fontSize: 13 }}>Cargando ciclos…</div>
+          <div style={{ color: 'var(--offline)', fontSize: 13 }}>Cargando ciclos…</div>
         ) : cycles.length === 0 ? (
-          <div style={{ color: 'var(--accent-off)', fontSize: 13 }}>
+          <div style={{ color: 'var(--offline)', fontSize: 13 }}>
             No hay ciclos para este período.
             {selectedDefinitionId ? ' Pulsa "Calcular ciclos" para detectarlos.' : ' Selecciona una definición y pulsa "Calcular ciclos".'}
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-off)', fontWeight: 600 }}>Definición</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-off)', fontWeight: 600 }}>Inicio</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-off)', fontWeight: 600 }}>Fin</th>
-                <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--accent-off)', fontWeight: 600 }}>Duración</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-off)', fontWeight: 600 }}>GPS</th>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-off)', fontWeight: 600 }}>Datos</th>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--offline)', fontWeight: 600 }}>Definición</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--offline)', fontWeight: 600 }}>Inicio</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--offline)', fontWeight: 600 }}>Fin</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--offline)', fontWeight: 600 }}>Duración</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--offline)', fontWeight: 600 }}>GPS</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--offline)', fontWeight: 600 }}>Datos</th>
               </tr>
             </thead>
             <tbody>
               {cycles.map(cycle => (
                 <React.Fragment key={cycle.id}>
                   <tr
-                    style={{ borderBottom: '1px solid var(--bg-elevated)', cursor: 'pointer' }}
+                    style={{ borderBottom: '1px solid var(--bg-card)', cursor: 'pointer' }}
                     onClick={() => setExpandedId(expandedId === cycle.id ? null : cycle.id)}
                   >
-                    <td style={{ padding: '6px 8px', color: 'var(--text-base, #E7E5E4)' }}>
+                    <td style={{ padding: '6px 8px', color: 'var(--fg-secondary)' }}>
                       {defnMap[cycle.definition_id]?.name ?? '—'}
                     </td>
-                    <td style={{ padding: '6px 8px', color: 'var(--text-base, #E7E5E4)', fontFamily: 'var(--font-data)' }}>
+                    <td style={{ padding: '6px 8px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {formatDate(cycle.started_at)}
                     </td>
-                    <td style={{ padding: '6px 8px', color: 'var(--text-base, #E7E5E4)', fontFamily: 'var(--font-data)' }}>
+                    <td style={{ padding: '6px 8px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {formatDate(cycle.ended_at)}
                     </td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--accent-energy)', fontFamily: 'var(--font-data)' }}>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)' }}>
                       {formatDuration(cycle.duration_seconds)}
                     </td>
-                    <td style={{ padding: '6px 8px', color: 'var(--accent-off)', fontFamily: 'var(--font-data)', fontSize: 11 }}>
+                    <td style={{ padding: '6px 8px', color: 'var(--offline)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                       {cycle.lat != null ? `${Number(cycle.lat).toFixed(4)}, ${Number(cycle.lon).toFixed(4)}` : '—'}
                     </td>
-                    <td style={{ padding: '6px 8px', color: 'var(--accent-info)', fontSize: 11 }}>
+                    <td style={{ padding: '6px 8px', color: 'var(--info)', fontSize: 11 }}>
                       {Object.keys(cycle.cycle_data).length > 0 ? '▶ ver datos' : '—'}
                     </td>
                   </tr>
                   {expandedId === cycle.id && Object.keys(cycle.cycle_data).length > 0 && (
                     <tr key={`${cycle.id}-expanded`}>
-                      <td colSpan={6} style={{ padding: '4px 8px 8px 24px', background: 'var(--bg-elevated)' }}>
+                      <td colSpan={6} style={{ padding: '4px 8px 8px 24px', background: 'var(--bg-card)' }}>
                         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                           {Object.entries(cycle.cycle_data).map(([k, v]) => (
                             <div key={k}>
-                              <span style={{ color: 'var(--accent-off)', fontSize: 10 }}>{k}: </span>
-                              <span style={{ color: 'var(--text-base, #E7E5E4)', fontFamily: 'var(--font-data)', fontSize: 11 }}>{String(v)}</span>
+                              <span style={{ color: 'var(--offline)', fontSize: 10 }}>{k}: </span>
+                              <span style={{ color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{String(v)}</span>
                             </div>
                           ))}
                         </div>

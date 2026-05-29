@@ -220,9 +220,9 @@ export default function VehicleDetailPage() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               background: 'rgba(239,68,68,0.15)',
-              border: '1px solid var(--accent-crit)',
+              border: '1px solid var(--danger)',
               borderRadius: 6, padding: '4px 10px',
-              fontSize: 11, color: 'var(--accent-crit)',
+              fontSize: 11, color: 'var(--danger)',
               textDecoration: 'none', fontWeight: 600,
             }}
           >
@@ -251,8 +251,8 @@ export default function VehicleDetailPage() {
               }>
                 {/* ── MAPA ── */}
                 <div style={{
-                  borderRight: isMobile ? 'none' : '1px solid var(--bg-border)',
-                  borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none',
+                  borderRight: isMobile ? 'none' : '1px solid var(--border)',
+                  borderBottom: isMobile ? '1px solid var(--border)' : 'none',
                   position: 'relative',
                   height: isMobile ? 260 : '100%',
                 }}>
@@ -264,17 +264,17 @@ export default function VehicleDetailPage() {
                     background: 'rgba(28,25,23,0.92)', backdropFilter: 'blur(6px)',
                     borderRadius: 8, padding: '6px 10px',
                     display: 'flex', alignItems: 'center', gap: 8,
-                    border: '1px solid var(--bg-border)', fontSize: 12,
+                    border: '1px solid var(--border)', fontSize: 12,
                   }}>
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Recorrido</span>
+                    <span style={{ color: 'var(--fg-muted)', fontWeight: 600 }}>Recorrido</span>
                     <input
                       type="date"
                       value={trackDate}
                       max={new Date().toISOString().slice(0, 10)}
                       onChange={e => setTrackDate(e.target.value || new Date().toISOString().slice(0, 10))}
                       style={{
-                        background: 'var(--bg-elevated)', color: 'var(--text-base)',
-                        border: '1px solid var(--bg-border)', borderRadius: 4,
+                        background: 'var(--bg-card)', color: 'var(--fg-secondary)',
+                        border: '1px solid var(--border)', borderRadius: 4,
                         padding: '3px 6px', fontSize: 12, fontFamily: 'inherit',
                       }}
                     />
@@ -282,7 +282,7 @@ export default function VehicleDetailPage() {
                       <button
                         onClick={() => setTrackDate(new Date().toISOString().slice(0, 10))}
                         style={{
-                          background: 'var(--accent-energy)', color: '#fff', border: 'none',
+                          background: 'var(--cmg-teal)', color: '#fff', border: 'none',
                           borderRadius: 4, padding: '3px 8px', fontSize: 11, fontWeight: 600,
                           cursor: 'pointer',
                         }}
@@ -320,7 +320,7 @@ export default function VehicleDetailPage() {
                     )}
                     <button
                       onClick={() => { setFleetSelected(id); navigate('/fleet') }}
-                      style={{ color: 'var(--accent-info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11, pointerEvents: 'auto' }}
+                      style={{ color: 'var(--info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11, pointerEvents: 'auto' }}
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                       Ver en mapa de flota
@@ -333,12 +333,12 @@ export default function VehicleDetailPage() {
 
                   {/* ALERTAS ACTIVAS — siempre visible si las hay */}
                   {activeAlertsCount > 0 && (
-                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--accent-crit)', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--accent-crit)', marginBottom: firingAlerts.filter(a => a.vehicle_id === id).length > 0 ? 6 : 0 }}>
+                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--danger)', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--danger)', marginBottom: firingAlerts.filter(a => a.vehicle_id === id).length > 0 ? 6 : 0 }}>
                         🚨 {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''}
                       </div>
                       {firingAlerts.filter(a => a.vehicle_id === id).slice(0, 3).map(a => (
-                        <div key={a.id} style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 6, borderLeft: '2px solid rgba(239,68,68,0.25)', marginTop: 3, fontFamily: 'var(--font-ui)' }}>
+                        <div key={a.id} style={{ fontSize: 11, color: 'var(--fg-muted)', paddingLeft: 6, borderLeft: '2px solid rgba(239,68,68,0.25)', marginTop: 3, fontFamily: 'var(--font-sans)' }}>
                           {a.rule_id.slice(0, 28)}… · {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       ))}
@@ -350,10 +350,10 @@ export default function VehicleDetailPage() {
                     <div style={{
                       background: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.07)' : 'rgba(234,179,8,0.07)',
                       border: `1px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)'}`,
-                      borderLeft: `3px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--accent-crit)' : 'var(--accent-warn)'}`,
+                      borderLeft: `3px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--danger)' : 'var(--warn)'}`,
                       borderRadius: 8, padding: '10px 12px',
                     }}>
-                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 700, color: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--accent-crit)' : 'var(--accent-warn)' }}>
+                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--danger)' : 'var(--warn)' }}>
                         🔧 {maintenancePlans.filter(p => p.progress.status !== 'ok').length} plan{maintenancePlans.filter(p => p.progress.status !== 'ok').length > 1 ? 'es' : ''} de mantenimiento {maintenancePlans.some(p => p.progress.status === 'vencido') ? 'vencido' : 'próximo'}
                       </div>
                     </div>
@@ -365,41 +365,41 @@ export default function VehicleDetailPage() {
                       title="Velocidad"
                       value={status?.online && status?.speed_kmh != null ? `${Math.round(status.speed_kmh)}` : '—'}
                       unit={status?.online && status?.speed_kmh != null ? 'km/h' : undefined}
-                      color={status?.online && (status?.speed_kmh ?? 0) > 0 ? 'var(--accent-info)' : 'var(--text-muted)'}
+                      color={status?.online && (status?.speed_kmh ?? 0) > 0 ? 'var(--info)' : 'var(--fg-muted)'}
                     />
                     <VDKpiCard
                       title="PTO hoy"
                       value={derivedValues.pto_hours_today != null ? `${derivedValues.pto_hours_today}` : '—'}
                       unit={derivedValues.pto_hours_today != null ? 'h' : undefined}
-                      color={derivedValues.pto_hours_today != null && derivedValues.pto_hours_today > 0 ? 'var(--accent-energy)' : 'var(--text-muted)'}
+                      color={derivedValues.pto_hours_today != null && derivedValues.pto_hours_today > 0 ? 'var(--cmg-teal)' : 'var(--fg-muted)'}
                     />
                     <VDKpiCard
                       title="Voltaje"
                       value={status?.ext_voltage_mv != null ? `${(status.ext_voltage_mv / 1000).toFixed(1)}` : '—'}
                       unit={status?.ext_voltage_mv != null ? 'V' : undefined}
-                      color={status?.ext_voltage_mv != null ? (status.ext_voltage_mv < 11500 ? 'var(--accent-crit)' : status.ext_voltage_mv < 12000 ? 'var(--accent-warn)' : 'var(--accent-ok)') : 'var(--text-muted)'}
+                      color={status?.ext_voltage_mv != null ? (status.ext_voltage_mv < 11500 ? 'var(--danger)' : status.ext_voltage_mv < 12000 ? 'var(--warn)' : 'var(--ok)') : 'var(--fg-muted)'}
                     />
                   </div>
 
                   {/* TELEMETRÍA */}
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderTop: '2px solid var(--accent-energy)', borderRadius: 8, padding: '7px 10px' }}>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '7px 10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Telemetría</span>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Telemetría</span>
                       {status?.online
-                        ? <span style={{ color: 'var(--accent-ok)', fontSize: 10, fontWeight: 600 }}>● En directo</span>
+                        ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600 }}>● En directo</span>
                         : status?.last_seen
-                          ? <span style={{ color: 'var(--accent-crit)', fontSize: 10, fontWeight: 700 }}>⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h`; })()}</span>
-                          : <span style={{ color: 'var(--accent-crit)', fontSize: 10 }}>⚠ Sin señal</span>
+                          ? <span style={{ color: 'var(--danger)', fontSize: 10, fontWeight: 700 }}>⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h`; })()}</span>
+                          : <span style={{ color: 'var(--danger)', fontSize: 10 }}>⚠ Sin señal</span>
                       }
                       {status?.can_data && Object.keys(status.can_data).length > 0 && (
-                        <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--bg-border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>
+                        <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 600 }}>
                           📡 Completa
                         </button>
                       )}
                     </div>
 
                     {status && !status.online && (
-                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '5px 8px', marginBottom: 5, fontSize: 10, color: 'var(--text-muted)' }}>
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '5px 8px', marginBottom: 5, fontSize: 10, color: 'var(--fg-muted)' }}>
                         Vehículo apagado o sin cobertura. Último dato conocido.
                       </div>
                     )}
@@ -407,12 +407,12 @@ export default function VehicleDetailPage() {
                     {status ? (
                       <>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
-                          <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--accent-ok)' : 'var(--text-muted)'} />
-                          <StatusCard label="PTO" value={status.online ? ((status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'var(--accent-energy)' : 'var(--text-muted)'} />
+                          <StatusCard label="Ignición" value={status.online ? (status.ignition ? 'ON' : 'OFF') : '—'} color={status.online && status.ignition ? 'var(--ok)' : 'var(--fg-muted)'} />
+                          <StatusCard label="PTO" value={status.online ? ((status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'ON' : 'OFF') : '—'} color={status.online && (status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) ? 'var(--cmg-teal)' : 'var(--fg-muted)'} />
                           <StatusCard label="Velocidad" value={status.online ? (status.speed_kmh != null ? `${status.speed_kmh.toFixed(0)} km/h` : '—') : '—'} />
                         </div>
                         {status.last_seen && (
-                          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 4 }}>
+                          <div style={{ fontSize: 9, color: 'var(--fg-muted)', marginBottom: 4 }}>
                             Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
@@ -436,14 +436,14 @@ export default function VehicleDetailPage() {
                         )}
                       </>
                     ) : (
-                      <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Sin datos en vivo</div>
+                      <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
                     )}
                   </div>
 
                   {/* CONTROLES DOUT */}
                   {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
-                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '7px 10px' }}>
-                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
+                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
+                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 5 }}>
                         {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
                           const active = !!doutState[d.slot]
@@ -455,15 +455,15 @@ export default function VehicleDetailPage() {
                               onClick={() => sendDout(d.slot)}
                               disabled={loading}
                               style={{
-                                background: active ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)',
-                                border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+                                background: active ? 'rgba(34,197,94,0.15)' : 'var(--bg-card)',
+                                border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
                                 borderRadius: 6, padding: '5px 8px', cursor: loading ? 'wait' : 'pointer',
                                 textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
                                 opacity: loading ? 0.7 : 1, transition: 'background 0.2s, border-color 0.2s',
                               }}
                             >
-                              <span style={{ fontSize: 11, color: active ? 'var(--accent-ok)' : 'var(--text-primary, #E7E5E4)', fontWeight: 600 }}>{d.label}</span>
-                              <span style={{ fontSize: 9, color: active ? 'var(--accent-ok)' : 'var(--text-muted)', fontFamily: 'var(--font-data)', flexShrink: 0 }}>{active ? '●' : '○'}</span>
+                              <span style={{ fontSize: 11, color: active ? 'var(--ok)' : 'var(--fg-primary)', fontWeight: 600 }}>{d.label}</span>
+                              <span style={{ fontSize: 9, color: active ? 'var(--ok)' : 'var(--fg-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{active ? '●' : '○'}</span>
                             </button>
                           )
                         })}
@@ -474,9 +474,9 @@ export default function VehicleDetailPage() {
                   {/* VER REPORTES */}
                   <button
                     onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico' } })}
-                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--accent-info)'; el.style.color = 'var(--accent-info)' }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--bg-border)'; el.style.color = 'var(--text-muted)' }}
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--fg-muted)', fontWeight: 600, textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--info)'; el.style.color = 'var(--info)' }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--border)'; el.style.color = 'var(--fg-muted)' }}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     Ver reportes de este vehículo
@@ -486,30 +486,30 @@ export default function VehicleDetailPage() {
               </div>
 
               {/* PANEL TÉCNICO COLAPSABLE */}
-              <div style={{ borderTop: '1px solid var(--bg-border)', flexShrink: 0 }}>
+              <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0 }}>
                 <button onClick={() => setShowBottomPanel(v => !v)}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: 'none', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11 }}>
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: 'none', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 11 }}>
                   <span style={{ transform: showBottomPanel ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
                   {showBottomPanel ? 'Ocultar historial técnico' : 'Historial de comandos e incidencias'}
                 </button>
               </div>
               {showBottomPanel && (
-                <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '2fr 1fr', borderTop: '1px solid var(--bg-border)', height: 180, overflow: 'hidden' }}>
-                  <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--bg-border)', borderBottom: isMobile ? '1px solid var(--bg-border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
+                <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '2fr 1fr', borderTop: '1px solid var(--border)', height: 180, overflow: 'hidden' }}>
+                  <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--border)', borderBottom: isMobile ? '1px solid var(--border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
                     {commandHistory.length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
+                      <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {commandHistory.map(entry => (
-                          <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'start', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4 }}>
+                          <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'start', borderBottom: '1px solid var(--border)', paddingBottom: 4 }}>
                             <div>
-                              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                              <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                                 {new Date(entry.sent_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                               </div>
-                              <div style={{ fontSize: 11, color: 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>{entry.command}</div>
+                              <div style={{ fontSize: 11, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>{entry.command}</div>
                               {(entry.response || entry.error_message) && (
-                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{entry.response ?? entry.error_message}</div>
+                                <div style={{ fontSize: 10, color: 'var(--fg-muted)' }}>{entry.response ?? entry.error_message}</div>
                               )}
                             </div>
                             <CommandStatusBadge status={entry.status} />
@@ -519,12 +519,12 @@ export default function VehicleDetailPage() {
                     )}
                   </div>
                   <div style={{ padding: '10px 14px', overflowY: 'auto' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>INCIDENCIAS</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>INCIDENCIAS</div>
                     {firingAlerts.filter(a => a.vehicle_id === id).length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--accent-ok)' }}>✓ Sin incidencias</div>
+                      <div style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Sin incidencias</div>
                     ) : (
                       firingAlerts.filter(a => a.vehicle_id === id).slice(0, 5).map(a => (
-                        <div key={a.id} style={{ fontSize: 11, color: 'var(--accent-warn)', borderBottom: '1px solid var(--bg-border)', paddingBottom: 4, marginBottom: 4 }}>
+                        <div key={a.id} style={{ fontSize: 11, color: 'var(--warn)', borderBottom: '1px solid var(--border)', paddingBottom: 4, marginBottom: 4 }}>
                           {a.rule_id.slice(0, 8)}… {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       ))
@@ -544,16 +544,16 @@ export default function VehicleDetailPage() {
           {tab === 'maintenance' && (
             <div>
               {maintenancePlans.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin planes de mantenimiento para este vehículo</p>
+                <p style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Sin planes de mantenimiento para este vehículo</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {maintenancePlans.map(plan => (
-                    <div key={plan.id} style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--bg-border)', padding: 16 }}>
+                    <div key={plan.id} style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', padding: 16 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{plan.name}</div>
                           {plan.progress.thresholds.map(t => (
-                            <div key={t.type} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            <div key={t.type} style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
                               {t.current.toFixed(1)} / {t.limit} {{ pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días' }[t.type] ?? t.type}
                               {' '}({t.pct.toFixed(0)}%)
                             </div>
@@ -561,7 +561,7 @@ export default function VehicleDetailPage() {
                         </div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600,
-                            background: plan.progress.status === 'vencido' ? 'var(--accent-crit)' : plan.progress.status === 'próximo' ? 'var(--accent-warn)' : 'var(--accent-ok)',
+                            background: plan.progress.status === 'vencido' ? 'var(--danger)' : plan.progress.status === 'próximo' ? 'var(--warn)' : 'var(--ok)',
                             color: '#fff'
                           }}>
                             {plan.progress.status.toUpperCase()}
@@ -569,7 +569,7 @@ export default function VehicleDetailPage() {
                           {isCmg && (
                             <button
                               onClick={() => openEditPlan(plan)}
-                              style={{ fontSize: 11, padding: '3px 10px', background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 5, cursor: 'pointer', color: 'var(--text-primary, #E7E5E4)' }}
+                              style={{ fontSize: 11, padding: '3px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-primary)' }}
                             >
                               Editar umbrales
                             </button>
@@ -583,24 +583,24 @@ export default function VehicleDetailPage() {
 
               {editingPlan && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
-                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--bg-border)' }}>
+                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--border)' }}>
                     <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600 }}>Editar umbrales</h3>
-                    <label style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre</label>
-                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', color: 'var(--text-primary, #E7E5E4)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 12 }}
+                    <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre</label>
+                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 12 }}
                       value={editPlanForm.name}
                       onChange={e => setEditPlanForm(f => ({ ...f, name: e.target.value }))} />
-                    <label style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor umbral</label>
-                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', color: 'var(--text-primary, #E7E5E4)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 12 }}
+                    <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor umbral</label>
+                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 12 }}
                       type="number" min="1" value={editPlanForm.value}
                       onChange={e => setEditPlanForm(f => ({ ...f, value: e.target.value }))} />
-                    <label style={{ fontSize: 11, color: 'var(--accent-off)', fontWeight: 600, display: 'block', marginBottom: 4 }}>% aviso previo</label>
-                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', color: 'var(--text-primary, #E7E5E4)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 20 }}
+                    <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, display: 'block', marginBottom: 4 }}>% aviso previo</label>
+                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 20 }}
                       type="number" min="1" max="50" value={editPlanForm.warnPct}
                       onChange={e => setEditPlanForm(f => ({ ...f, warnPct: e.target.value }))} />
-                    {editPlanError && <p style={{ color: 'var(--accent-crit)', fontSize: 12, marginBottom: 12 }}>{editPlanError}</p>}
+                    {editPlanError && <p style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 12 }}>{editPlanError}</p>}
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button onClick={() => setEditingPlan(null)} style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary, #E7E5E4)', border: '1px solid var(--bg-border)', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
-                      <button onClick={handleEditPlan} disabled={editPlanMutation.isPending} style={{ background: 'var(--accent-energy)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                      <button onClick={() => setEditingPlan(null)} style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+                      <button onClick={handleEditPlan} disabled={editPlanMutation.isPending} style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                         {editPlanMutation.isPending ? 'Guardando…' : 'Guardar'}
                       </button>
                     </div>
@@ -646,23 +646,23 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
     }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{
         width: 640, maxWidth: '95vw', maxHeight: '85vh',
-        background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 12,
+        background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12,
         boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--bg-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>📡 Telemetría completa</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{Object.keys(canData).length} recibidos · {entries.length} total</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg-primary)' }}>📡 Telemetría completa</div>
+            <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{Object.keys(canData).length} recibidos · {entries.length} total</div>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-muted)', padding: '4px 8px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--fg-muted)', padding: '4px 8px' }}>✕</button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-elevated)', zIndex: 1 }}>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['ID AVL', 'Nombre', 'Valor', 'Unidad'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, fontSize: 10, letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--fg-muted)', fontWeight: 600, fontSize: 10, letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -691,18 +691,18 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
                 }
                 const fallback = AVL_NAMES[avlIdNum]
                 return (
-                  <tr key={key} style={{ borderBottom: '1px solid var(--bg-border)' }}
+                  <tr key={key} style={{ borderBottom: '1px solid var(--border)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '6px 12px', fontFamily: 'var(--font-data)', color: 'var(--accent-energy)', fontSize: 11 }}>{key}</td>
-                    <td style={{ padding: '6px 12px', color: (sensor||fallback) ? 'var(--text-primary)' : 'var(--text-muted)', fontStyle: (sensor||fallback) ? 'normal' : 'italic' }}>
+                    <td style={{ padding: '6px 12px', fontFamily: 'var(--font-mono)', color: 'var(--cmg-teal)', fontSize: 11 }}>{key}</td>
+                    <td style={{ padding: '6px 12px', color: (sensor||fallback) ? 'var(--fg-primary)' : 'var(--fg-muted)', fontStyle: (sensor||fallback) ? 'normal' : 'italic' }}>
                       {sensor?.label ?? fallback?.label ?? '—'}
                     </td>
-                    <td style={{ padding: '6px 12px', fontFamily: 'var(--font-data)', color: val != null ? 'var(--accent-info)' : 'var(--text-muted)', fontWeight: val != null ? 600 : 400, fontStyle: val != null ? 'normal' : 'italic' }}>
+                    <td style={{ padding: '6px 12px', fontFamily: 'var(--font-mono)', color: val != null ? 'var(--info)' : 'var(--fg-muted)', fontWeight: val != null ? 600 : 400, fontStyle: val != null ? 'normal' : 'italic' }}>
                       {val != null ? String(val) : 'Sin dato'}
                     </td>
-                    <td style={{ padding: '6px 12px', color: 'var(--text-muted)' }}>
+                    <td style={{ padding: '6px 12px', color: 'var(--fg-muted)' }}>
                       {sensor?.unit ?? fallback?.unit ?? '—'}
                     </td>
                   </tr>
@@ -721,13 +721,13 @@ function StatusChip({ label, value, color }: { label: string; value: string; col
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 1,
       padding: '3px 7px',
-      background: 'var(--bg-elevated)',
-      border: `1px solid ${color ? `color-mix(in srgb, ${color} 30%, var(--bg-border))` : 'var(--bg-border)'}`,
+      background: 'var(--bg-card)',
+      border: `1px solid ${color ? `color-mix(in srgb, ${color} 30%, var(--border))` : 'var(--border)'}`,
       borderRadius: 5,
       minWidth: 52,
     }}>
-      <span style={{ fontSize: 8, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-data)', color: color ?? 'var(--text-primary)', lineHeight: 1.1 }}>{value}</span>
+      <span style={{ fontSize: 8, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: color ?? 'var(--fg-primary)', lineHeight: 1.1 }}>{value}</span>
     </div>
   )
 }
@@ -739,11 +739,11 @@ function StatusCard({ label, value, color }: { label: string; value: string; col
 
 function VDKpiCard({ title, value, unit, color }: { title: string; value: string; unit?: string; color: string }) {
   return (
-    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)', borderRadius: 7, padding: '6px 9px' }}>
-      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2, lineHeight: 1.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px' }}>
+      <div style={{ fontSize: 9, color: 'var(--fg-muted)', marginBottom: 2, lineHeight: 1.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-        <span style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-data)', color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>{unit}</span>}
+        <span style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-mono)', color, lineHeight: 1 }}>{value}</span>
+        {unit && <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{unit}</span>}
       </div>
     </div>
   )
@@ -751,12 +751,12 @@ function VDKpiCard({ title, value, unit, color }: { title: string; value: string
 
 function VDControlBadge({ label, active }: { label: string; active: boolean }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-elevated)', borderRadius: 6, padding: '6px 10px' }}>
-      <span style={{ fontSize: 11, color: 'var(--text-primary)' }}>{label}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', borderRadius: 6, padding: '6px 10px' }}>
+      <span style={{ fontSize: 11, color: 'var(--fg-primary)' }}>{label}</span>
       <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
-        background: active ? 'color-mix(in srgb, var(--accent-ok) 15%, transparent)' : 'transparent',
-        color: active ? 'var(--accent-ok)' : 'var(--text-muted)',
-        border: `1px solid ${active ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+        background: active ? 'color-mix(in srgb, var(--ok) 15%, transparent)' : 'transparent',
+        color: active ? 'var(--ok)' : 'var(--fg-muted)',
+        border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
       }}>
         {active ? 'On' : 'Off'}
       </span>
@@ -766,10 +766,10 @@ function VDControlBadge({ label, active }: { label: string; active: boolean }) {
 
 function CommandStatusBadge({ status }: { status: CommandLogEntry['status'] }) {
   const map: Record<CommandLogEntry['status'], { label: string; color: string }> = {
-    pending:   { label: 'Pendiente',  color: 'var(--accent-off)' },
-    sent:      { label: 'Enviado',    color: 'var(--accent-info)' },
-    failed:    { label: 'Fallido',    color: 'var(--accent-crit)' },
-    confirmed: { label: 'Confirmado', color: 'var(--accent-ok)' },
+    pending:   { label: 'Pendiente',  color: 'var(--offline)' },
+    sent:      { label: 'Enviado',    color: 'var(--info)' },
+    failed:    { label: 'Fallido',    color: 'var(--danger)' },
+    confirmed: { label: 'Confirmado', color: 'var(--ok)' },
   }
   const { label, color } = map[status] ?? map.pending
   return (
@@ -822,8 +822,8 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
 
   const selStyle: React.CSSProperties = {
     fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--bg-border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--text-primary)',
+    border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px',
+    color: 'var(--fg-primary)',
   }
 
   return (
@@ -832,11 +832,11 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
         onClick={() => setOpen(o => !o)}
         style={{
           background: 'transparent',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           padding: '5px 12px',
           fontSize: 12,
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -848,11 +848,11 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
       {open && (
         <div style={{
           position: 'absolute', right: 0, top: '110%', zIndex: 200,
-          background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)',
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
           borderRadius: 8, padding: 14, minWidth: 240, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Selecciona período</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>Selecciona período</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selStyle, flex: 1 }}>
               {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
@@ -861,12 +861,12 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Vehículo: {vehicleName}</div>
+          <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Vehículo: {vehicleName}</div>
           <button
             onClick={download}
             disabled={loading}
             style={{
-              background: 'var(--accent-energy)', color: '#fff',
+              background: 'var(--cmg-teal)', color: '#fff',
               border: 'none', borderRadius: 6, padding: '7px 14px',
               fontSize: 12, cursor: 'pointer', fontWeight: 600,
               opacity: loading ? 0.6 : 1,

@@ -5,9 +5,9 @@ import type { VehicleOut, VehicleStatus } from '../../lib/types'
 
 function batteryColor(mv: number): string {
   const v = mv / 1000
-  if (v < 11.5) return 'var(--accent-crit)'
-  if (v < 12.0) return 'var(--accent-warn)'
-  return 'var(--accent-ok)'
+  if (v < 11.5) return 'var(--danger)'
+  if (v < 12.0) return 'var(--warn)'
+  return 'var(--ok)'
 }
 
 function relativeTime(iso: string): string {
@@ -34,7 +34,7 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
   return (
     <div style={{
       padding: '12px 20px',
-      borderBottom: '1px solid var(--bg-border)',
+      borderBottom: '1px solid var(--border)',
       background: 'var(--bg-surface)',
       display: 'flex',
       alignItems: 'center',
@@ -44,10 +44,10 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
         onClick={() => navigate('/fleet')}
         style={{
           background: 'transparent',
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           fontSize: 13,
           padding: '4px 10px',
-          border: '1px solid var(--bg-border)',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           flexShrink: 0,
           cursor: 'pointer',
@@ -59,15 +59,15 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
       {/* Icono del tipo de vehículo — contenedor landscape para no deformar */}
       <div style={{
         width: 72, height: 40, borderRadius: 8, flexShrink: 0,
-        background: 'var(--bg-elevated)',
-        border: `2px solid ${online ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+        background: 'var(--bg-card)',
+        border: `2px solid ${online ? 'var(--ok)' : 'var(--border)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         overflow: 'hidden', padding: 4,
         transition: 'border-color 0.3s',
       }}>
         {iconUrl
           ? <img src={iconUrl} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-          : <VehicleTypeIcon width={60} height={30} style={{ color: online ? 'var(--accent-ok)' : 'var(--accent-off)', opacity: online ? 1 : 0.5 }} />
+          : <VehicleTypeIcon width={60} height={30} style={{ color: online ? 'var(--ok)' : 'var(--offline)', opacity: online ? 1 : 0.5 }} />
         }
       </div>
 
@@ -78,8 +78,8 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
           <StatusBadge variant={online ? 'online' : 'offline'} size="md" />
           {status?.pto_active && <StatusBadge variant="pto" size="md" />}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {vehicle.license_plate && <span style={{ fontFamily: 'var(--font-data)', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{vehicle.license_plate}</span>}
+        <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {vehicle.license_plate && <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--fg-primary)', letterSpacing: '0.05em' }}>{vehicle.license_plate}</span>}
           {status?.ext_voltage_mv != null && (
             <span style={{ color: batteryColor(status.ext_voltage_mv) }}>
               ⚡ {(status.ext_voltage_mv / 1000).toFixed(2)} V
@@ -96,16 +96,16 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
           padding: '6px 14px',
-          background: ignition ? 'rgba(34,197,94,0.12)' : 'var(--bg-elevated)',
-          border: `1px solid ${ignition ? 'var(--accent-ok)' : 'var(--bg-border)'}`,
+          background: ignition ? 'rgba(34,197,94,0.12)' : 'var(--bg-card)',
+          border: `1px solid ${ignition ? 'var(--ok)' : 'var(--border)'}`,
           borderRadius: 8,
           flexShrink: 0,
           transition: 'background 0.3s, border-color 0.3s',
         }}>
-          <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Ignición</span>
+          <span style={{ fontSize: 9, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Ignición</span>
           <span style={{
-            fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-data)',
-            color: ignition ? 'var(--accent-ok)' : 'var(--accent-off)',
+            fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-mono)',
+            color: ignition ? 'var(--ok)' : 'var(--offline)',
             lineHeight: 1,
           }}>
             {online ? (ignition ? 'ON' : 'OFF') : '—'}
