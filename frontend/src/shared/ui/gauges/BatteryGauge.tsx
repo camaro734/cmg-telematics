@@ -26,10 +26,10 @@ const cardStyle = {
 }
 
 function batteryColor(value: number | null, warnBelow?: number, alertBelow?: number): string {
-  if (value == null) return 'var(--accent-off)'
-  if (alertBelow != null && value <= alertBelow) return 'var(--accent-crit)'
-  if (warnBelow != null && value <= warnBelow) return 'var(--accent-warn)'
-  return 'var(--accent-energy)'
+  if (value == null) return 'var(--offline)'
+  if (alertBelow != null && value <= alertBelow) return 'var(--danger)'
+  if (warnBelow != null && value <= warnBelow) return 'var(--warn)'
+  return 'var(--cmg-teal)'
 }
 
 function batteryStatus(value: number | null, warnBelow?: number, alertBelow?: number): string {
@@ -86,9 +86,9 @@ export default function BatteryGauge({
     <div style={cardStyle} aria-label={label}>
       {/* Label superior — permite wrap a 2 líneas */}
       <div style={{
-        fontFamily: 'var(--font-ui)',
+        fontFamily: 'var(--font-sans)',
         fontSize: 9,
-        color: 'var(--text-muted)',
+        color: 'var(--fg-muted)',
         letterSpacing: '0.8px',
         textTransform: 'uppercase' as const,
         textAlign: 'center' as const,
@@ -105,7 +105,7 @@ export default function BatteryGauge({
           style={{
             position: 'relative' as const,
             width: 70, height: 26,
-            border: '2px solid var(--bg-border)',
+            border: '2px solid var(--border)',
             borderRadius: 4,
             background: 'var(--bg-base)',
             overflow: 'hidden' as const,
@@ -132,14 +132,14 @@ export default function BatteryGauge({
         {/* Terminal positivo */}
         <div style={{
           width: 4, height: 10,
-          background: 'var(--bg-border)',
+          background: 'var(--border)',
           borderRadius: '0 2px 2px 0',
         }} />
       </div>
 
       {/* Voltaje formateado */}
       <div style={{
-        fontFamily: 'var(--font-data)',
+        fontFamily: 'var(--font-mono)',
         fontSize: 20,
         fontWeight: 700,
         color,
@@ -149,7 +149,7 @@ export default function BatteryGauge({
 
       {/* Estado textual */}
       <div style={{
-        fontFamily: 'var(--font-data)',
+        fontFamily: 'var(--font-mono)',
         fontSize: 9,
         color,
         marginTop: 4,

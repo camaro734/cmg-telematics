@@ -18,43 +18,43 @@ describe('CircularGauge', () => {
     expect(getByText('NIVEL ACEITE')).toBeInTheDocument()
   })
 
-  it('color verde (accent-energy) cuando valor está en rango OK', () => {
+  it('color verde (cmg-teal) cuando valor está en rango OK', () => {
     const { container } = render(
       <CircularGauge value={100} min={0} max={600} unit="bar" label="P."
         warnAbove={300} alertAbove={400} />
     )
-    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-energy)')
+    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--cmg-teal)')
   })
 
-  it('color amarillo (accent-warn) cuando value >= warnAbove', () => {
+  it('color amarillo (warn) cuando value >= warnAbove', () => {
     const { container } = render(
       <CircularGauge value={350} min={0} max={600} unit="bar" label="P."
         warnAbove={300} alertAbove={400} />
     )
-    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-warn)')
+    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--warn)')
   })
 
-  it('color rojo (accent-crit) cuando value >= alertAbove', () => {
+  it('color rojo (danger) cuando value >= alertAbove', () => {
     const { container } = render(
       <CircularGauge value={450} min={0} max={600} unit="bar" label="P."
         warnAbove={300} alertAbove={400} />
     )
-    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-crit)')
+    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--danger)')
   })
 
   it('color amarillo cuando value <= warnBelow', () => {
     const { container } = render(
       <CircularGauge value={15} min={0} max={100} unit="%" label="Nivel" warnBelow={20} />
     )
-    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-warn)')
+    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--warn)')
   })
 
-  it('color rojo (accent-crit) cuando value <= alertBelow', () => {
+  it('color rojo (danger) cuando value <= alertBelow', () => {
     const { container } = render(
       <CircularGauge value={5} min={0} max={100} unit="%" label="Nivel"
         warnBelow={20} alertBelow={10} />
     )
-    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--accent-crit)')
+    expect(container.querySelector('.g-val')).toHaveAttribute('stroke', 'var(--danger)')
   })
 
   it('no renderiza arco ni punto cuando value es null', () => {

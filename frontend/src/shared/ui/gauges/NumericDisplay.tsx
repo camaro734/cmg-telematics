@@ -21,9 +21,9 @@ const SIZE_MAP: Record<NumericSize, number> = {
 // Colores por estado — usan variables CSS del design system
 const STATUS_COLOR: Record<NumericStatus, string> = {
   normal:  '#FFFFFF',
-  warn:    'var(--accent-energy)',   // naranja
-  alert:   'var(--accent-crit)',     // rojo
-  offline: 'var(--accent-off)',      // gris cálido
+  warn:    'var(--cmg-teal)',        // naranja
+  alert:   'var(--danger)',          // rojo
+  offline: 'var(--offline)',         // gris cálido
 }
 
 // Estilos base de la tarjeta — border se calcula en render según status
@@ -62,19 +62,19 @@ export default function NumericDisplay({
   const valueColor = STATUS_COLOR[status]
 
   const isLive = value !== null && value !== undefined && !Number.isNaN(value)
-  const borderColor = status === 'warn' ? 'color-mix(in srgb, var(--accent-warn) 30%, var(--bg-border))'
-    : status === 'alert' ? 'color-mix(in srgb, var(--accent-crit) 30%, var(--bg-border))'
-    : isLive ? 'color-mix(in srgb, var(--accent-info) 25%, var(--bg-border))'
-    : 'var(--bg-border)'
+  const borderColor = status === 'warn' ? 'color-mix(in srgb, var(--warn) 30%, var(--border))'
+    : status === 'alert' ? 'color-mix(in srgb, var(--danger) 30%, var(--border))'
+    : isLive ? 'color-mix(in srgb, var(--info) 25%, var(--border))'
+    : 'var(--border)'
 
   return (
     <div style={{ ...cardBaseStyle, border: `1px solid ${borderColor}` }} aria-label={label}>
       {/* Live indicator */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{
-          fontFamily: 'var(--font-ui)',
+          fontFamily: 'var(--font-sans)',
           fontSize: 9,
-          color: 'var(--text-muted)',
+          color: 'var(--fg-muted)',
           letterSpacing: '0.8px',
           textTransform: 'uppercase' as const,
           textAlign: 'center' as const,
@@ -89,7 +89,7 @@ export default function NumericDisplay({
 
       {/* Valor principal */}
       <div style={{
-        fontFamily: 'var(--font-data)',
+        fontFamily: 'var(--font-mono)',
         fontSize,
         fontWeight: 700,
         color: valueColor,
@@ -100,9 +100,9 @@ export default function NumericDisplay({
 
       {/* Unidad */}
       <div style={{
-        fontFamily: 'var(--font-data)',
+        fontFamily: 'var(--font-mono)',
         fontSize: Math.round(fontSize * 0.42),
-        color: 'var(--accent-off)',
+        color: 'var(--offline)',
         marginTop: 2,
       }}>
         {unit}

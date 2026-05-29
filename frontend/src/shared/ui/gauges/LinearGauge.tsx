@@ -34,12 +34,12 @@ function linearColor(
   colorOverride?: string,
 ): string {
   if (colorOverride) return colorOverride
-  if (value == null) return 'var(--accent-off)'
-  if (alertAbove != null && value >= alertAbove) return 'var(--accent-crit)'
-  if (warnAbove != null && value >= warnAbove) return 'var(--accent-warn)'
-  if (alertBelow != null && value <= alertBelow) return 'var(--accent-crit)'
-  if (warnBelow != null && value <= warnBelow) return 'var(--accent-warn)'
-  return 'var(--accent-energy)'
+  if (value == null) return 'var(--offline)'
+  if (alertAbove != null && value >= alertAbove) return 'var(--danger)'
+  if (warnAbove != null && value >= warnAbove) return 'var(--warn)'
+  if (alertBelow != null && value <= alertBelow) return 'var(--danger)'
+  if (warnBelow != null && value <= warnBelow) return 'var(--warn)'
+  return 'var(--cmg-teal)'
 }
 
 function linearStatus(
@@ -67,9 +67,9 @@ function VerticalBar({
         position: 'relative' as const,
         width: 32,
         height: 100,
-        background: 'var(--gauge-track, #3C3330)',
+        background: 'var(--border, #3C3330)',
         borderRadius: 4,
-        border: '1px solid var(--bg-border)',
+        border: '1px solid var(--border)',
         overflow: 'hidden' as const,
       }}
     >
@@ -88,7 +88,7 @@ function VerticalBar({
           style={{
             position: 'absolute', bottom: `${warnPct}%`, left: 0, width: '100%',
             height: 1,
-            background: 'var(--accent-warn)',
+            background: 'var(--warn)',
             opacity: 0.7,
             pointerEvents: 'none',
           }}
@@ -108,7 +108,7 @@ function HorizontalBar({
         position: 'relative' as const,
         width: '100%',
         height: barHeight,
-        background: 'var(--gauge-track, #3C3330)',
+        background: 'var(--border, #3C3330)',
         borderRadius: 4,
         overflow: 'hidden' as const,
       }}
@@ -128,7 +128,7 @@ function HorizontalBar({
           style={{
             position: 'absolute', left: `${warnPct}%`, top: 0, height: '100%',
             width: 1,
-            background: 'var(--accent-warn)',
+            background: 'var(--warn)',
             opacity: 0.7,
             pointerEvents: 'none',
           }}
@@ -172,9 +172,9 @@ export default function LinearGauge({
     <div style={cardStyle} aria-label={label}>
       {/* Label superior — permite wrap a 2 líneas */}
       <div style={{
-        fontFamily: 'var(--font-ui)',
+        fontFamily: 'var(--font-sans)',
         fontSize: 9,
-        color: 'var(--text-muted)',
+        color: 'var(--fg-muted)',
         letterSpacing: '0.8px',
         textTransform: 'uppercase' as const,
         textAlign: 'center' as const,
@@ -203,7 +203,7 @@ export default function LinearGauge({
 
       {/* Valor numérico */}
       <div style={{
-        fontFamily: 'var(--font-data)',
+        fontFamily: 'var(--font-mono)',
         fontSize: 20,
         fontWeight: 700,
         color,
@@ -214,7 +214,7 @@ export default function LinearGauge({
       {/* Estado textual */}
       {safeValue != null && (
         <div style={{
-          fontFamily: 'var(--font-data)',
+          fontFamily: 'var(--font-mono)',
           fontSize: 9,
           color,
           marginTop: 2,

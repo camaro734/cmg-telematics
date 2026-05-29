@@ -49,7 +49,7 @@ const cardStyle = {
 
 // Calcula el color del arco según umbrales.
 // Usa variables CSS del design system para que los tests de atributo stroke
-// puedan comparar con 'var(--accent-energy)', 'var(--accent-warn)', etc.
+// puedan comparar con 'var(--cmg-teal)', 'var(--warn)', etc.
 function arcColor(
   value: number | null,
   warnAbove?: number,
@@ -59,12 +59,12 @@ function arcColor(
   colorOverride?: string,
 ): string {
   if (colorOverride) return colorOverride
-  if (value == null) return 'var(--accent-off)'
-  if (alertAbove != null && value >= alertAbove) return 'var(--accent-crit)'
-  if (warnAbove != null && value >= warnAbove) return 'var(--accent-warn)'
-  if (alertBelow != null && value <= alertBelow) return 'var(--accent-crit)'
-  if (warnBelow != null && value <= warnBelow) return 'var(--accent-warn)'
-  return 'var(--accent-energy)'
+  if (value == null) return 'var(--offline)'
+  if (alertAbove != null && value >= alertAbove) return 'var(--danger)'
+  if (warnAbove != null && value >= warnAbove) return 'var(--warn)'
+  if (alertBelow != null && value <= alertBelow) return 'var(--danger)'
+  if (warnBelow != null && value <= warnBelow) return 'var(--warn)'
+  return 'var(--cmg-teal)'
 }
 
 // Convierte grados polares a coordenadas cartesianas (origen en cx, cy)
@@ -110,7 +110,7 @@ function ScaleTicks({ cx, cy, r, strokeW }: { cx: number; cy: number; r: number;
         key={i}
         x1={inner.x.toFixed(2)} y1={inner.y.toFixed(2)}
         x2={outer.x.toFixed(2)} y2={outer.y.toFixed(2)}
-        stroke="var(--bg-border)"
+        stroke="var(--border)"
         strokeWidth={1.5}
         strokeLinecap="round"
       />
@@ -187,7 +187,7 @@ export default function CircularGauge({
           <circle
             cx={cx} cy={cy} r={r}
             fill="none"
-            stroke="var(--gauge-track)"
+            stroke="var(--border)"
             strokeWidth={STROKE_W}
             strokeLinecap="round"
             strokeDasharray={`${arcLength.toFixed(2)} ${circumference.toFixed(2)}`}
@@ -229,7 +229,7 @@ export default function CircularGauge({
           fontSize="30"
           fontWeight="700"
           fill={safeValue != null ? '#FFFFFF' : '#4B5563'}
-          fontFamily="var(--font-data)"
+          fontFamily="var(--font-mono)"
         >
           {displayValue}
         </text>
@@ -239,8 +239,8 @@ export default function CircularGauge({
           x={cx} y={cy + 22}
           textAnchor="middle"
           fontSize="9"
-          fill="var(--accent-off)"
-          fontFamily="var(--font-data)"
+          fill="var(--offline)"
+          fontFamily="var(--font-mono)"
         >
           {`/ ${max} ${unit}`}
         </text>
@@ -250,8 +250,8 @@ export default function CircularGauge({
           x={minPos.x.toFixed(2)} y={(minPos.y + 3).toFixed(2)}
           textAnchor="middle"
           fontSize="9"
-          fill="var(--accent-off)"
-          fontFamily="var(--font-data)"
+          fill="var(--offline)"
+          fontFamily="var(--font-mono)"
         >
           {min}
         </text>
@@ -259,8 +259,8 @@ export default function CircularGauge({
           x={maxPos.x.toFixed(2)} y={(maxPos.y + 3).toFixed(2)}
           textAnchor="middle"
           fontSize="9"
-          fill="var(--accent-off)"
-          fontFamily="var(--font-data)"
+          fill="var(--offline)"
+          fontFamily="var(--font-mono)"
         >
           {max}
         </text>
@@ -272,7 +272,7 @@ export default function CircularGauge({
             textAnchor: 'middle' as const,
             fontSize: '8',
             fill: '#A8A29E',
-            fontFamily: 'var(--font-ui)',
+            fontFamily: 'var(--font-sans)',
             letterSpacing: '0.8',
           }
           if (!line2) {
