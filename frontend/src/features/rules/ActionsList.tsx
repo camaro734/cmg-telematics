@@ -63,7 +63,18 @@ export default function ActionsList({ value, onChange }: Props) {
 
       <div>
         <label style={LABEL_STYLE}>
-          <input type="checkbox" checked={!!emailAction} onChange={e => { if (!e.target.checked) onChange(value.filter(a => a.type !== 'email')) }} style={{ accentColor: 'var(--cmg-teal)' }} />
+          <input
+            type="checkbox"
+            checked={!!emailAction}
+            onChange={e => {
+              if (e.target.checked) {
+                onChange([...value.filter(a => a.type !== 'email'), { type: 'email', recipients: [] }])
+              } else {
+                onChange(value.filter(a => a.type !== 'email'))
+              }
+            }}
+            style={{ accentColor: 'var(--cmg-teal)' }}
+          />
           Email
         </label>
         {emailAction && (
