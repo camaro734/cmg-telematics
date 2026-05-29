@@ -16,6 +16,7 @@ import Tabs from '../../shared/ui/Tabs'
 import VehicleHeader from './VehicleHeader'
 import TrackMap from './TrackMap'
 import { SensorWidget } from './SensorWidget'
+import { SensorIconComponent } from '../../shared/ui/gauges/SensorIconSet'
 import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
@@ -428,20 +429,69 @@ export default function VehicleDetailPage() {
                     </div>
 
                     {/* Widget grid */}
-                    {status ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10 }}>
-                        {sensorSchema
-                          .filter(s => s.visible_in_detail !== false)
-                          .map(s => {
-                            const rawVal: number | null = s.avl_id != null
-                              ? ((status.can_data?.[`avl_${s.avl_id}`] as number | undefined) ?? null)
-                              : s.kpi_key
-                                ? ((derivedValues as Record<string, number | null>)[s.kpi_key] ?? null)
-                                : null
-                            return <SensorWidget key={s.key} sensor={s} value={rawVal} />
-                          })}
-                      </div>
-                    ) : (
+                    {status ? (() => {
+                      const getRawVal = (s: typeof sensorSchema[number]): number | null =>
+                        s.avl_id != null
+                          ? ((status.can_data?.[`avl_${s.avl_id}`] as number | undefined) ?? null)
+                          : s.kpi_key ? ((derivedValues as Record<string, number | null>)[s.kpi_key] ?? null) : null
+
+                      const machineSensors = sensorSchema.filter(s =>
+                        s.visible_in_detail !== false && (!s.category || s.category === 'maquina')
+                      )
+                      const chassisSensors = sensorSchema.filter(s =>
+                        s.visible_in_detail !== false && s.category === 'chasis'
+                      )
+                      const chassisHasData = chassisSensors.some(s => getRawVal(s) != null)
+
+                      return (
+                        <>
+                          {machineSensors.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10 }}>
+                              {machineSensors.map(s => (
+                                <SensorWidget key={s.key} sensor={s} value={getRawVal(s)} />
+                              ))}
+                            </div>
+                          )}
+                          {chassisHasData && chassisSensors.length > 0 && (
+                            <div style={{ marginTop: 14, borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
+                              <p style={{
+                                fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)',
+                                letterSpacing: '0.07em', textTransform: 'uppercase' as const, margin: '0 0 8px',
+                              }}>
+                                Estado del chasis
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                {chassisSensors.map(s => {
+                                  const raw = getRawVal(s)
+                                  const val = raw != null ? raw * (s.scale ?? 1) + (s.offset ?? 0) : null
+                                  const display = val != null
+                                    ? (val % 1 === 0 ? val.toLocaleString('es-ES') : val.toFixed(1))
+                                    : '—'
+                                  return (
+                                    <div key={s.key}
+                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderRadius: 6, background: 'transparent', transition: 'background 0.1s' }}
+                                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)' }}
+                                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        {s.icon && <SensorIconComponent icon={s.icon} size={13} color="var(--fg-dim)"/>}
+                                        <span style={{ fontSize: 12, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-sans)' }}>
+                                          {s.label}
+                                        </span>
+                                      </div>
+                                      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: val != null ? 'var(--fg-primary)' : 'var(--fg-dim)' }}>
+                                        {display}
+                                        {s.unit && val != null && <span style={{ fontSize: 10, color: 'var(--fg-muted)', marginLeft: 4 }}>{s.unit}</span>}
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })() : (
                       <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
                     )}
 
