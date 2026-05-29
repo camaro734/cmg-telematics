@@ -30,7 +30,7 @@ export function IconDashboard(props: IconProps) {
   )
 }
 
-// Fleet: truck side-profile v2 — cab + windshield + cargo body + double wheels
+// Fleet: truck side-profile — cab con windshield + cargo box + ruedas con hub sólido
 export function IconFlota({ width = 24, height = 24, ...props }: IconProps) {
   return (
     <svg
@@ -45,27 +45,27 @@ export function IconFlota({ width = 24, height = 24, ...props }: IconProps) {
       {...props}
     >
       {/* chassis */}
-      <line x1="1" y1="18" x2="23" y2="18" />
-      {/* cab lower */}
-      <path d="M1,18 L1,12 Q1,10 3,10 L8,10 L8,18" />
-      {/* cab upper */}
-      <path d="M2,10 L2,6 Q2,5 4,5 L8,5 L8,10" />
-      {/* windshield */}
-      <rect x="3" y="6" width="4" height="4.5" rx="0.5" strokeWidth={1} opacity={0.65} />
-      {/* cargo body */}
-      <rect x="8" y="8" width="14" height="10" rx="1.5" />
-      {/* cargo door line */}
-      <line x1="17" y1="8" x2="17" y2="18" strokeDasharray="1.5 1.5" strokeWidth={1} opacity={0.5} />
-      {/* front wheel — double ring */}
-      <circle cx="4.5" cy="20" r="2" />
-      <circle cx="4.5" cy="20" r="0.8" />
-      {/* rear wheels — double rings */}
-      <circle cx="14" cy="20" r="2" />
-      <circle cx="14" cy="20" r="0.8" />
-      <circle cx="19" cy="20" r="2" />
-      <circle cx="19" cy="20" r="0.8" />
-      {/* exhaust */}
-      <line x1="2.5" y1="10" x2="2.5" y2="4.5" strokeWidth={2} />
+      <line x1="0.5" y1="17" x2="23.5" y2="17" />
+      {/* cab: perfil en dos alturas */}
+      <path d="M1,17 L1,12 L8,12 L8,17" />
+      <path d="M1.5,12 L1.5,6.5 Q1.5,5.5 3.5,5.5 L8,5.5 L8,12" />
+      {/* windshield: relleno con baja opacidad para dar profundidad */}
+      <path d="M3,12 L3,8 Q3,7 4.5,7 L8,7 L8,12 Z"
+        fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={1} />
+      {/* cargo box */}
+      <rect x="8" y="7" width="15" height="10" rx="2" />
+      {/* línea de puerta */}
+      <line x1="18" y1="7" x2="18" y2="17" strokeWidth={1} opacity={0.4} />
+      {/* rueda delantera: borde + hub sólido */}
+      <circle cx="4.5" cy="20" r="3" />
+      <circle cx="4.5" cy="20" r="1.2" fill="currentColor" stroke="none" />
+      {/* ruedas traseras: borde + hub sólido */}
+      <circle cx="14" cy="20" r="3" />
+      <circle cx="14" cy="20" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="19.5" cy="20" r="3" />
+      <circle cx="19.5" cy="20" r="1.2" fill="currentColor" stroke="none" />
+      {/* escape */}
+      <line x1="2.5" y1="5.5" x2="2.5" y2="2" strokeWidth={2.5} />
     </svg>
   )
 }
