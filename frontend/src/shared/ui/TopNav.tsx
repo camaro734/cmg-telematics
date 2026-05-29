@@ -24,6 +24,9 @@ import {
   IconConductores,
   IconGeocercas,
 } from './icons'
+import { Chip } from './Chip'
+import { wsClient } from '../../lib/wsClient'
+import type { VehicleStatus } from '../../lib/types'
 
 // ── Module nav items ─────────────────────────────────────────────────────────
 
@@ -451,6 +454,7 @@ export default function TopNav() {
   const [userOpen,     setUserOpen]     = useState(false)
   const [drawerOpen,   setDrawerOpen]   = useState(false)
   const [logoImgError, setLogoImgError] = useState(false)
+  const [wsConnected, setWsConnected]   = useState(() => wsClient.isConnected())
 
   const adminRef    = useRef<HTMLDivElement>(null)
   const operatorRef = useRef<HTMLDivElement>(null)
@@ -462,6 +466,36 @@ export default function TopNav() {
 
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false) }, [location.pathname])
+
+  // WS connection state
+  useEffect(() => {
+    setWsConnected(wsClient.isConnected())
+    return wsClient.onConnectionChange(setWsConnected)
+  }, [])
+
+  // KPIs en vivo — vehicle statuses bulk
+  const { data: kpiStatuses } = useQuery<VehicleStatus[]>({
+    queryKey: ['vehicles', 'statuses-kpi'],
+    queryFn: () => apiClient.get<VehicleStatus[]>('/api/v1/vehicles/statuses'),
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
+  const onlineCount  = kpiStatuses?.filter(s => s.online).length ?? 0
+  const movingCount  = kpiStatuses?.filter(s => s.online && (s.speed_kmh ?? 0) > 2).length ?? 0
+
+  // KPIs en vivo — active alert count
+  const { data: alertKpiCount } = useQuery<number>({
+    queryKey: ['alerts', 'active-count-kpi'],
+    queryFn: async () => {
+      const [firing, escalated] = await Promise.all([
+        apiClient.get<unknown[]>('/api/v1/alerts?status=firing&limit=200'),
+        apiClient.get<unknown[]>('/api/v1/alerts?status=escalated&limit=200'),
+      ])
+      return (firing?.length ?? 0) + (escalated?.length ?? 0)
+    },
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
 
   const visibleModules = MODULES.filter(m => isCmg || enabledModules.includes(m.key))
 
@@ -711,6 +745,32 @@ export default function TopNav() {
                 )}
               </div>
             )}
+
+            {/* ── KPI chips + WS dot — solo desktop ─────────────────── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 2 }}>
+              {onlineCount > 0 && (
+                <Chip color="var(--ok)" soft dot size="sm">{onlineCount} en línea</Chip>
+              )}
+              {movingCount > 0 && (
+                <Chip color="var(--cmg-teal)" soft dot size="sm">{movingCount} en mov.</Chip>
+              )}
+              {(alertKpiCount ?? 0) > 0 && (
+                <Chip color="var(--danger)" soft dot size="sm">{alertKpiCount} alertas</Chip>
+              )}
+              <span
+                title={wsConnected ? 'Tiempo real activo' : 'Reconectando...'}
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  flexShrink: 0,
+                  background: wsConnected ? 'var(--ok)' : 'var(--offline)',
+                  boxShadow: wsConnected ? '0 0 6px var(--ok)' : 'none',
+                  transition: 'background 0.3s, box-shadow 0.3s',
+                }}
+              />
+            </div>
 
             <div ref={userRef} style={{ position: 'relative' }}>
               <button

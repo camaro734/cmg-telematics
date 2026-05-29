@@ -7,6 +7,7 @@ import type { VehicleStatus } from './types'
 const RECONNECT_MAX_MS = 30_000
 
 type TelemetryCallback = (data: VehicleStatus) => void
+type ConnectionCallback = (connected: boolean) => void
 
 class WsClientImpl {
   private socket: WebSocket | null = null
@@ -15,6 +16,23 @@ class WsClientImpl {
   private token: string | null = null
   private queryClient: QueryClient | null = null
   private listeners = new Set<TelemetryCallback>()
+  private connectionListeners = new Set<ConnectionCallback>()
+  private _connected = false
+
+  isConnected(): boolean {
+    return this._connected
+  }
+
+  onConnectionChange(cb: ConnectionCallback): () => void {
+    this.connectionListeners.add(cb)
+    return () => { this.connectionListeners.delete(cb) }
+  }
+
+  private setConnected(value: boolean): void {
+    if (this._connected === value) return
+    this._connected = value
+    this.connectionListeners.forEach(cb => cb(value))
+  }
 
   connect(token: string, queryClient: QueryClient): void {
     if (this.socket) return
@@ -34,6 +52,7 @@ class WsClientImpl {
       this.socket = null
     }
     this.listeners.clear()
+    this.connectionListeners.clear()
   }
 
   onTelemetry(cb: TelemetryCallback): () => void {
@@ -49,6 +68,7 @@ class WsClientImpl {
 
     this.socket.onopen = () => {
       this.reconnectDelay = 1_000
+      this.setConnected(true)
     }
 
     this.socket.onmessage = (event: MessageEvent) => {
@@ -86,6 +106,7 @@ class WsClientImpl {
 
     this.socket.onclose = () => {
       this.socket = null
+      this.setConnected(false)
       const delay = this.reconnectDelay
       this.reconnectDelay = Math.min(delay * 2, RECONNECT_MAX_MS)
       this.reconnectTimer = setTimeout(() => { this.open() }, delay)
