@@ -61,6 +61,7 @@ def _make_device(tenant_id: uuid.UUID = CLIENT_TENANT_ID) -> MagicMock:
     device.firmware_ver = None
     device.online = False
     device.last_seen = None
+    device.sim_phone = None
     device.active = True
     device.created_at = datetime.now(timezone.utc)
     return device
