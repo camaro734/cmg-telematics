@@ -221,6 +221,19 @@ export default function VehicleTypesPage() {
     },
   })
 
+  const deleteTypeMutation = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/api/v1/vehicle-types/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.vehicleTypes() })
+    },
+  })
+
+  function handleDeleteType(e: React.MouseEvent, vt: VehicleTypeOut) {
+    e.stopPropagation()
+    if (!window.confirm(`¿Eliminar el tipo "${vt.name}"? Esta acción no se puede deshacer.`)) return
+    deleteTypeMutation.mutate(vt.id)
+  }
+
   function saveType() {
     if (!typeForm.name.trim() || !typeForm.slug.trim()) return
     if (editingType) {
@@ -311,6 +324,8 @@ export default function VehicleTypesPage() {
                 key={vt.id}
                 onClick={() => selectType(vt.id)}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   padding: '8px 14px',
                   cursor: 'pointer',
                   fontSize: 13,
@@ -319,8 +334,21 @@ export default function VehicleTypesPage() {
                   borderLeft: (selectedType?.id === vt.id) ? '2px solid var(--cmg-teal)' : '2px solid transparent',
                 }}
               >
-                <div style={{ fontWeight: 600 }}>{vt.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--offline)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{vt.slug}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600 }}>{vt.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--offline)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{vt.slug}</div>
+                </div>
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && (
+                  <button
+                    onClick={e => handleDeleteType(e, vt)}
+                    title="Eliminar tipo"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', opacity: 0.4, fontSize: 14, padding: '2px 4px', flexShrink: 0, lineHeight: 1 }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
           </div>
