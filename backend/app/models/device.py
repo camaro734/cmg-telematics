@@ -18,6 +18,7 @@ class Device(Base):
     firmware_ver: Mapped[str | None] = mapped_column(String(20), nullable=True)
     online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sim_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)  # Teléfono SIM
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

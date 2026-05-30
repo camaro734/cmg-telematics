@@ -15,6 +15,7 @@ class DeviceOut(BaseModel):
     firmware_ver: str | None
     online: bool
     last_seen: datetime | None
+    sim_phone: str | None = None
     active: bool
     created_at: datetime
 
@@ -39,6 +40,7 @@ class DeviceUpdate(BaseModel):
     tenant_id: uuid.UUID | None = None
     active: bool | None = None
     model: str | None = None
+    sim_phone: str | None = None
 
 
 class DeviceAssignVehicle(BaseModel):

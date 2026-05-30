@@ -33,6 +33,7 @@ export default function DevicesPage() {
   const [newImei, setNewImei] = useState('')
   const [newModel, setNewModel] = useState('FMC650')
   const [newTenantId, setNewTenantId] = useState('')
+  const [newSimPhone, setNewSimPhone] = useState('')
   const [modalError, setModalError] = useState<string | null>(null)
 
   // Carga de tenants (para filtro y modal)
@@ -94,6 +95,7 @@ export default function DevicesPage() {
     setNewImei('')
     setNewModel('FMC650')
     setNewTenantId('')
+    setNewSimPhone('')
     setModalError(null)
   }
 
@@ -104,7 +106,7 @@ export default function DevicesPage() {
       setModalError('Selecciona un cliente')
       return
     }
-    createMutation.mutate({ imei: newImei, model: newModel, tenant_id: newTenantId })
+    createMutation.mutate({ imei: newImei, model: newModel, tenant_id: newTenantId, ...(newSimPhone ? { sim_phone: newSimPhone } : {}) } as any)
   }
 
   // Solo tenants no-CMG disponibles para asignar en el modal
@@ -211,6 +213,7 @@ export default function DevicesPage() {
                     <th style={thStyle}>Vehículo</th>
                     <th style={thStyle}>Estado</th>
                     <th style={thStyle}>Última señal</th>
+                    <th style={thStyle}>Teléfono SIM</th>
                     <th style={thStyle}>Firmware</th>
                     <th style={thStyle}></th>
                   </tr>
@@ -247,6 +250,9 @@ export default function DevicesPage() {
                       </td>
                       <td style={{ ...tdStyle, color: device.last_seen ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
                         {formatLastSeen(device.last_seen)}
+                      </td>
+                      <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 12, color: device.sim_phone ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
+                        {device.sim_phone ?? '—'}
                       </td>
                       <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', color: device.firmware_ver ? 'var(--fg-primary)' : 'var(--fg-muted)', fontSize: 12 }}>
                         {device.firmware_ver ?? '—'}
@@ -351,6 +357,19 @@ export default function DevicesPage() {
                   value={newModel}
                   onChange={e => setNewModel(e.target.value)}
                   required
+                  style={inputStyle}
+                />
+              </div>
+
+              {/* Teléfono SIM */}
+              <div>
+                <label style={labelStyle}>Teléfono SIM <span style={{ color: 'var(--fg-muted)' }}>(opcional)</span></label>
+                <input
+                  type="tel"
+                  value={newSimPhone}
+                  onChange={e => setNewSimPhone(e.target.value)}
+                  placeholder="+34 6XX XXX XXX"
+                  maxLength={20}
                   style={inputStyle}
                 />
               </div>

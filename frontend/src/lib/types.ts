@@ -529,6 +529,7 @@ export interface DeviceOut {
   firmware_ver: string | null
   online: boolean
   last_seen: string | null
+  sim_phone: string | null
   active: boolean
   created_at: string
 }
