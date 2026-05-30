@@ -1,6 +1,7 @@
 # backend/app/api/v1/alerts.py
 import csv
 import io
+import json
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -62,8 +63,17 @@ async def list_alerts(
     rows = result.all()
     enriched = []
     for alert, rule_name, severity, vehicle_name in rows:
+        row = {c.key: getattr(alert, c.key) for c in AlertInstance.__table__.columns}
+        # Parche defensivo: trigger_value debe ser dict, pero alertas antiguas lo
+        # almacenaron como string JSON doblemente codificado. Lo normalizamos aquí.
+        tv = row.get('trigger_value')
+        if isinstance(tv, str):
+            try:
+                row['trigger_value'] = json.loads(tv)
+            except (json.JSONDecodeError, ValueError):
+                row['trigger_value'] = None
         enriched.append(AlertInstanceEnrichedOut(
-            **{c.key: getattr(alert, c.key) for c in AlertInstance.__table__.columns},
+            **row,
             rule_name=rule_name,
             severity=severity,
             vehicle_name=vehicle_name,
