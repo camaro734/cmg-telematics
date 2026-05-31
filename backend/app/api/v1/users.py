@@ -35,6 +35,7 @@ async def update_user(
         user.active = body.active
     if body.password is not None:
         user.hashed_password = hash_password(body.password)
+        user.pwd_version = (user.pwd_version or 0) + 1
     await db.commit()
     await db.refresh(user)
     return user

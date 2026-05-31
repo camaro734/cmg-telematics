@@ -25,11 +25,11 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
-def create_refresh_token(data: dict) -> str:
+def create_refresh_token(data: dict, expires_at: datetime | None = None) -> str:
     payload = data.copy()
     payload["jti"] = str(_uuid_lib.uuid4())
-    payload["exp"] = datetime.now(timezone.utc) + timedelta(
-        days=settings.refresh_token_expire_days
+    payload["exp"] = expires_at if expires_at is not None else (
+        datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     )
     payload["type"] = "refresh"
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)

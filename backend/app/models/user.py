@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, CheckConstraint, Date
+from sqlalchemy import String, ForeignKey, DateTime, Boolean, CheckConstraint, Date, Integer
 from sqlalchemy.dialects.postgresql import UUID, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -25,6 +25,7 @@ class User(Base):
     driver_license_expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
     mobile_device_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_mobile_login: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    pwd_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tenant = relationship("Tenant", back_populates="users")

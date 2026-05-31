@@ -67,6 +67,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
         "tenant_tier": tenant_row["tier"],
         "role": user.role,
         "email": user.email,
+        "pwd_version": user.pwd_version,
     }
     return TokenResponse(
         access_token=create_access_token(payload),
@@ -95,6 +96,10 @@ async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Dep
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 
+    token_pwd_version = payload.get("pwd_version")
+    if token_pwd_version is None or token_pwd_version != user.pwd_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revocado")
+
     t_result2 = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules).where(Tenant.id == user.tenant_id))
     tenant_row2 = t_result2.mappings().one_or_none()
     if tenant_row2 is None:
@@ -106,10 +111,16 @@ async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Dep
         "tenant_tier": tenant_row2["tier"],
         "role": user.role,
         "email": user.email,
+        "pwd_version": user.pwd_version,
     }
+    old_exp = payload.get("exp")
+    refresh_expires_at = (
+        datetime.fromtimestamp(old_exp, tz=timezone.utc)
+        if old_exp else None
+    )
     return TokenResponse(
         access_token=create_access_token(new_payload),
-        refresh_token=create_refresh_token(new_payload),
+        refresh_token=create_refresh_token(new_payload, expires_at=refresh_expires_at),
         logo_url=tenant_row2["logo_url"],
         brand_name=tenant_row2["brand_name"],
         enabled_modules=tenant_row2["enabled_modules"] or [],
