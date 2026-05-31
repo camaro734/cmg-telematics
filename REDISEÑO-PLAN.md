@@ -118,3 +118,114 @@ Para mañana o próxima sesión: en qué orden se programan las pantallas, qué 
 ---
 
 Fin del plan. Estado: cerrado en lo conceptual, listo para discutir ejecución.
+
+---
+
+# Plan de ejecución
+
+**Fecha de cierre del plan de ejecución:** 31 mayo 2026
+**Estado:** orden de ejecución decidido, listo para arrancar Fase 1.
+
+## Orden de fases
+
+### Fase 1 — Base: tokens + tipografía (1-2 días)
+- Sustituir los tokens de color cálidos por la paleta fría azul-gris.
+- Integrar tipografía Inter (ya disponible en `temp/design-system/fonts/`).
+- Verificar que todas las pantallas existentes pasan a tener el nuevo "fondo" automáticamente.
+- CI debe quedar verde tras esta fase.
+
+### Fase 1.5 — Componentes compartidos (3-4 días)
+Tres sub-tareas:
+
+**(a) Decidir Topbar.tsx**
+- Confirmar si `frontend/src/shared/ui/Topbar.tsx` se usa todavía en alguna pantalla.
+- Si no se usa, eliminarlo (es duplicado funcional de TopNav.tsx).
+- Si se usa en algún sitio puntual, decidir si se migra al TopNav o se mantiene.
+
+**(b) Crear componentes de formulario compartidos**
+- Crear desde cero: `Input.tsx`, `Select.tsx`, `Checkbox.tsx`, `Textarea.tsx` en `frontend/src/shared/ui/`.
+- Diseño coherente con la paleta fría y los Button/ConfirmDialog existentes.
+- NO migrar los formularios existentes en este paso — solo crear los componentes y un Storybook/ejemplo mínimo.
+- Justificación: hoy cada pantalla tiene sus `<input style={...}>` inline. Migrar a componentes compartidos se hace en cada pantalla cuando le toque, no de golpe.
+
+**(c) Rediseñar componentes existentes con la paleta nueva**
+- Aplicar paleta fría a: `Button.tsx`, `ConfirmDialog.tsx`, `Toast.tsx`, `Chip.tsx`, `StatusBadge.tsx`, `Sparkline.tsx`, todos los `gauges/*.tsx`, `SkeletonCard.tsx`, `SectionErrorBoundary.tsx`.
+- NO tocar estructura, solo estilos.
+- NO tocar `TopNav.tsx` (alto riesgo, se hace en Fase 2 dentro de Flota).
+- NO tocar `GeofenceMapEditor.tsx` (mal ubicado, se reubica cuando toque geocercas).
+
+Tras Fase 1.5, abrir CUALQUIER pantalla de la app y los modales, botones, badges, toasts deben tener look frío nuevo. Aunque las pantallas en sí sigan estructuradas como hoy.
+
+### Fase 2 — Pantalla Flota (2-3 días)
+- Eliminar la banda lateral fija de vehículos.
+- Mapa a ancho completo con estilo CARTO Voyager.
+- Implementar el panel flotante sobre el mapa con buscador, minimizable.
+- Marcador con pin azul Leaflet + halo verde teal.
+- TopNav (que es el componente más complejo del repo) se ajusta aquí si hace falta. Tratar con cuidado.
+
+### Fase 3 — Eliminar Dashboard (medio día)
+- Quitar el enlace "Dashboard" del menú principal.
+- Cambiar la pantalla por defecto tras login a `/fleet`.
+- Redirigir URLs antiguas del Dashboard a Flota.
+
+### Fase 4 — Detalle de vehículo (3-4 días, la más larga)
+- Cabecera densa con KPI integrados.
+- Mapa horizontal grande debajo de pestañas (Voyager, reutilizar de Flota).
+- Estado del equipo en tarjetas compactas DEBAJO del mapa.
+- Etiquetas de gauges en dos líneas fijas.
+- Banner expandible rojo si hay alertas activas.
+
+### Fase 5 — Pantalla Alertas (1-2 días)
+- Barra de gravedad por color (crítica/aviso/info).
+- Agrupación de repeticiones.
+- Datos clave a la vista.
+- Dos acciones: Ver vehículo, Reconocer.
+- Buscador y filtros, contadores por gravedad.
+
+### Fase 6 — Pantalla Mantenimiento (1-2 días)
+- Tres estados (vencido/pronto/al día) con mismo lenguaje visual que Alertas.
+- Botón Realizado con confirmación pequeña.
+- Pestaña Historial.
+
+### Fase 7 — Login (medio día)
+- Quitar texto redundante.
+- Ojo para mostrar/ocultar contraseña.
+- Centrado vertical mejorado, placeholder en email.
+- Mensajes de error específicos, estado de "verificando".
+
+### Fase 8 — Pantalla Reportes (1-2 días)
+- Selección de uno o varios vehículos.
+- Fechas Desde-Hasta siempre visibles + pills como atajos.
+- Botones PDF y CSV junto a filtros.
+- Periodo por defecto: 7 días.
+
+### Fase 9 — PDF de Reportes (proyecto aparte, sin estimación)
+- Arreglar mapa GPS.
+- Omitir páginas vacías.
+- Añadir gráficas (tendencia voltaje, picos RPM).
+- Métricas configuradas en el tipo de vehículo se grafican si hay datos.
+- Gráficas con teal nuevo.
+
+## Reglas transversales
+
+- **CI verde obligatorio entre fases.** Si una fase deja el CI en rojo, no se pasa a la siguiente.
+- **Paradas estratégicas** después de Fase 2 (Flota) y Fase 4 (Detalle): un día usando la app rediseñada parcialmente antes de seguir, para pillar detalles que la planificación no anticipa.
+- **TopNav.tsx con cuidado especial** — componente más complejo del repo (navegación + auth + tenant selector + detección móvil + role guards). Cualquier cambio estructural en él es de alto riesgo.
+- **GeofenceMapEditor.tsx** se reubica de shared/ui a features/geofences/ cuando toquemos geocercas (no en este rediseño).
+
+## Estimación total
+
+- Trabajo efectivo: 13-18 días.
+- Calendario real (con interrupciones, otras tareas, revisiones): 3-5 semanas.
+- PDF de Reportes (Fase 9): a estimar cuando se aborde.
+
+## Estado actual al cerrar la sesión del 31 mayo 2026
+
+- Hallazgo de autenticación: **CERRADO** (commit fb917a8, migración 034 aplicada en producción, verificado en vivo).
+- Hallazgo de gauges vacíos: descartado, no era bug (vehículo de prueba sin datos).
+- Proyecto RGPD: pendiente, requiere abogado especialista.
+- Deuda técnica nueva: sin tests de autenticación (test_refresh_with_invalid_pwd_version, test_password_change_increments_version, test_refresh_inherits_exp). Sesión dedicada cuando termine el rediseño.
+
+## Próximo paso
+
+Arrancar **Fase 1** (tokens + tipografía Inter) en la siguiente sesión.
