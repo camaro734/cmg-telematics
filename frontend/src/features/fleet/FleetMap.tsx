@@ -12,7 +12,7 @@ import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut
 const T_OK     = '#22C55E'  // var(--ok)
 const T_WARN   = '#EAB308'  // var(--warn)
 const T_CRIT   = '#EF4444'  // var(--danger)
-const T_ORANGE = '#F97316'  // var(--cmg-teal)
+const T_ORANGE = 'var(--energy-orange)'  // var(--cmg-teal)
 const T_INFO   = '#38BDF8'  // var(--info)
 const T_OFF    = '#57534E'  // --bg-border dark
 const T_ELEVATED = '#22263A' // var(--bg-elevated)

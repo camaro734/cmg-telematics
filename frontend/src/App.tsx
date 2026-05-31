@@ -35,7 +35,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
           <div style={{ fontSize: 15 }}>Actualizando la aplicación…</div>
           <button
             onClick={() => { sessionStorage.removeItem('chunk_reload'); window.location.reload() }}
-            style={{ padding: '8px 20px', borderRadius: 8, background: '#F97316', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+            style={{ padding: '8px 20px', borderRadius: 8, background: 'var(--cmg-teal)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
           >
             Recargar
           </button>

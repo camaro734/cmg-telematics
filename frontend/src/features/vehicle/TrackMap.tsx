@@ -5,7 +5,7 @@ import type { TrackPoint, VehicleStatus } from '../../lib/types'
 
 // ── Design token mirrors (CSS vars cannot be used in SVG/Leaflet strings) ──
 const T_OK     = '#22C55E'  // var(--accent-ok)
-const T_ORANGE = '#F97316'  // var(--accent-orange)
+const T_ORANGE = 'var(--energy-orange)'  // var(--accent-orange)
 const T_INFO   = '#38BDF8'  // var(--accent-info)
 
 // CSS para efecto pulse en TrackMap — comparte el mismo id que FleetMap para no duplicar

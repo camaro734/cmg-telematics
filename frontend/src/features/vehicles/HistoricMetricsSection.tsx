@@ -27,7 +27,7 @@ const emptyMetricForm: MetricFormState = {
 // Solo campos que existen realmente en la vista telemetry_1h (aggregate continua de TimescaleDB)
 const KPI_OPTIONS = [
   { key: 'engine_on_minutes', label: 'Horas motor',      unit: 'h', transform: 0.01667, color: '#22C55E' },
-  { key: 'pto_active_minutes', label: 'Horas PTO',       unit: 'h', transform: 0.01667, color: '#F97316' },
+  { key: 'pto_active_minutes', label: 'Horas PTO',       unit: 'h', transform: 0.01667, color: 'var(--energy-orange)' },
   { key: 'avg_pressure_1',     label: 'Presión media 1', unit: 'bar', transform: 1,     color: '#38BDF8' },
   { key: 'avg_oil_temp',       label: 'Temp. aceite',    unit: '°C',  transform: 1,     color: '#EAB308' },
 ]

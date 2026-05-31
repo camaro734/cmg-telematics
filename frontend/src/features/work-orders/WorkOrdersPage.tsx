@@ -42,7 +42,7 @@ async function downloadOrderPdf(order: WorkOrderOut) {
 // ── Map view ──────────────────────────────────────────────────────────────────
 
 const C_PENDING     = '#38BDF8'  // info blue
-const C_IN_PROGRESS = '#F97316'  // energy orange
+const C_IN_PROGRESS = 'var(--energy-orange)'  // energy orange
 
 function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -113,7 +113,7 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
       if (!st?.lat || !st?.lon) continue
       const icon = L.divIcon({
         className: '',
-        html: `<div style="background:#F97316;border:2px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 6px #F9731688"></div>`,
+        html: `<div style="background:var(--energy-orange);border:2px solid #fff;border-radius:50%;width:16px;height:16px;box-shadow:0 0 6px rgba(249,115,22,0.53)"></div>`,
         iconSize: [16, 16],
         iconAnchor: [8, 8],
       })
@@ -123,7 +123,7 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
             <div style="font-weight:600;font-size:12px;margin-bottom:4px">🚚 ${o.vehicle_name ?? 'Vehículo'}</div>
             ${o.driver_name ? `<div style="font-size:11px;color:#999">${o.driver_name}</div>` : ''}
             <div style="font-size:11px;color:#999;margin-top:4px">${st.speed_kmh != null ? `${st.speed_kmh.toFixed(0)} km/h` : 'Parado'}</div>
-            <div style="margin-top:6px;font-size:10px;color:#F97316;font-weight:700">📋 ${o.title}</div>
+            <div style="margin-top:6px;font-size:10px;color:var(--energy-orange);font-weight:700">📋 ${o.title}</div>
           </div>
         `)
         .addTo(layerRef.current!)
@@ -153,9 +153,9 @@ function makeStopIcon(label?: string) {
   return L.divIcon({
     html: `<div style="position:relative;width:28px;height:36px">
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.45))">
-        <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z" fill="#F97316"/>
+        <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z" fill="var(--energy-orange)"/>
         <circle cx="14" cy="14" r="6" fill="white"/>
-        ${label ? `<text x="14" y="18" text-anchor="middle" font-size="8" font-weight="700" fill="#F97316" font-family="monospace">${label}</text>` : ''}
+        ${label ? `<text x="14" y="18" text-anchor="middle" font-size="8" font-weight="700" fill="var(--energy-orange)" font-family="monospace">${label}</text>` : ''}
       </svg>
     </div>`,
     className: '',

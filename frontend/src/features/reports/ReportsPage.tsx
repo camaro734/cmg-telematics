@@ -48,10 +48,10 @@ const btnSecondary: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
 }
 
-const CHART_COLORS = ['#F97316', '#22C55E', '#38BDF8', '#EAB308', '#A78BFA']
+const CHART_COLORS = ['var(--energy-orange)', '#22C55E', '#38BDF8', '#EAB308', '#A78BFA']
 
 // Paleta para gráficos multi-serie agrupados
-const GROUP_COLORS = ['#F97316', '#38BDF8', '#22C55E', '#EAB308', '#EF4444', '#A78BFA']
+const GROUP_COLORS = ['var(--energy-orange)', '#38BDF8', '#22C55E', '#EAB308', '#EF4444', '#A78BFA']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -297,8 +297,8 @@ function HistoricoTab({
     unit: m.unit,
   })).filter(d => d.value > 0)
 
-  const pieColors1 = ['#78716C', '#F97316']
-  const pieColors2 = ['#F97316', '#22C55E', '#3C3330']
+  const pieColors1 = ['#78716C', 'var(--energy-orange)']
+  const pieColors2 = ['var(--energy-orange)', '#22C55E', '#3C3330']
 
   function handleCsvExport() {
     const rows = kpis.map(h => ({
@@ -322,7 +322,7 @@ function HistoricoTab({
       ? [{ key: 'engine_on_minutes', label: 'H. Motor', color: '#22C55E', unit: 'min', transform: 1 }]
       : []),
     ...(lineMetrics.length === 0 && kpis.some(h => h.pto_active_minutes != null) && !lineMetrics.find(m => m.key === 'pto_active_minutes')
-      ? [{ key: 'pto_active_minutes', label: 'H. PTO', color: '#F97316', unit: 'min', transform: 1 }]
+      ? [{ key: 'pto_active_minutes', label: 'H. PTO', color: 'var(--energy-orange)', unit: 'min', transform: 1 }]
       : []),
   ]
   // KpiHour columns always use kpis[], even if avl_id is set in the metric config

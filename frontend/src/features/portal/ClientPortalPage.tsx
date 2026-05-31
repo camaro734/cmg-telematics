@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendiente', in_progress: 'En curso', done: 'Completada', cancelled: 'Cancelada',
 }
 const STATUS_COLOR: Record<string, string> = {
-  pending: '#38BDF8', in_progress: '#F97316', done: '#22C55E', cancelled: '#78716C',
+  pending: '#38BDF8', in_progress: 'var(--energy-orange)', done: '#22C55E', cancelled: '#78716C',
 }
 
 // ── Map component ─────────────────────────────────────────────────────────────
@@ -248,7 +248,7 @@ export default function ClientPortalPage() {
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: v.online ? '#22C55E' : '#78716C', flexShrink: 0 }}/>
                   <span style={{ flex: 1, fontSize: 13, color: '#E7E5E4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
                   {v.online && v.speed_kmh != null && (
-                    <span style={{ fontSize: 11, color: '#F97316', fontWeight: 600, flexShrink: 0 }}>{Math.round(v.speed_kmh)} km/h</span>
+                    <span style={{ fontSize: 11, color: 'var(--cmg-teal)', fontWeight: 600, flexShrink: 0 }}>{Math.round(v.speed_kmh)} km/h</span>
                   )}
                 </div>
               ))}

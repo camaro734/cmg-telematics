@@ -82,7 +82,7 @@ function SignatureCanvas({ onSigned, existingUrl }: SignatureCanvasProps) {
     const x = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left
     const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top
     ctx.lineTo(x, y)
-    ctx.strokeStyle = '#F97316'
+    ctx.strokeStyle = 'var(--cmg-teal)'
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
     ctx.stroke()

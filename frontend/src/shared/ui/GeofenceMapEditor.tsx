@@ -5,7 +5,7 @@ import L from 'leaflet'
 const DEFAULT_CENTER: [number, number] = [40.416775, -3.70379]
 const DEFAULT_ZOOM = 6
 
-const T_ORANGE = '#F97316'
+const T_ORANGE = 'var(--energy-orange)'
 const T_BG     = '#1C1917'
 
 interface Props {
