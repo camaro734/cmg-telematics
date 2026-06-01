@@ -41,7 +41,7 @@ async function downloadOrderPdf(order: WorkOrderOut) {
 
 // ── Map view ──────────────────────────────────────────────────────────────────
 
-const C_PENDING     = '#38BDF8'  // info blue
+const C_PENDING     = 'var(--info)'
 const C_IN_PROGRESS = 'var(--energy-orange)'  // energy orange
 
 function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {

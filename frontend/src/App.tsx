@@ -42,7 +42,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
         </div>
       )
       return (
-        <div style={{ padding: 24, background: 'var(--bg-base)', color: '#ef4444', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
+        <div style={{ padding: 24, background: 'var(--bg-base)', color: 'var(--danger)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
           <b>ERROR (ErrorBoundary):</b>{'\n'}{msg}{'\n'}{(this.state.error as Error).stack}
         </div>
       )

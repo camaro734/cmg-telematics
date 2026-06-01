@@ -311,7 +311,7 @@ export default function DashboardPage() {
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="engine_hours" name="Motor" fill="var(--energy-orange)" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="pto_hours" name="PTO" fill="#22C55E" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="pto_hours" name="PTO" fill="var(--ok)" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

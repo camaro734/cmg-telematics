@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendiente', in_progress: 'En curso', done: 'Completada', cancelled: 'Cancelada',
 }
 const STATUS_COLOR: Record<string, string> = {
-  pending: '#38BDF8', in_progress: 'var(--energy-orange)', done: '#22C55E', cancelled: 'var(--offline)',
+  pending: 'var(--info)', in_progress: 'var(--energy-orange)', done: 'var(--ok)', cancelled: 'var(--offline)',
 }
 
 // ── Map component ─────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ export default function ClientPortalPage() {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 20 }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#22C55E' }}>{online}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ok)' }}>{online}</div>
             <div style={{ fontSize: 10, color: 'var(--offline)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En ruta</div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -217,8 +217,8 @@ export default function ClientPortalPage() {
             border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px',
             display: 'flex', gap: 16,
           }}>
-            <span style={{ fontSize: 11, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }}/>
+            <span style={{ fontSize: 11, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', display: 'inline-block' }}/>
               Online
             </span>
             <span style={{ fontSize: 11, color: 'var(--offline)', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -245,7 +245,7 @@ export default function ClientPortalPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
               {vehicles.map(v => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: 'var(--bg-base)', borderRadius: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: v.online ? '#22C55E' : 'var(--offline)', flexShrink: 0 }}/>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: v.online ? 'var(--ok)' : 'var(--offline)', flexShrink: 0 }}/>
                   <span style={{ flex: 1, fontSize: 13, color: 'var(--fg-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
                   {v.online && v.speed_kmh != null && (
                     <span style={{ fontSize: 11, color: 'var(--cmg-teal)', fontWeight: 600, flexShrink: 0 }}>{Math.round(v.speed_kmh)} km/h</span>

@@ -48,10 +48,10 @@ const btnSecondary: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
 }
 
-const CHART_COLORS = ['var(--energy-orange)', '#22C55E', '#38BDF8', '#EAB308', '#A78BFA']
+const CHART_COLORS = ['var(--energy-orange)', 'var(--ok)', 'var(--info)', 'var(--warn)', 'var(--chart-4)']
 
 // Paleta para gráficos multi-serie agrupados
-const GROUP_COLORS = ['var(--energy-orange)', '#38BDF8', '#22C55E', '#EAB308', '#EF4444', '#A78BFA']
+const GROUP_COLORS = ['var(--energy-orange)', 'var(--info)', 'var(--ok)', 'var(--warn)', 'var(--danger)', 'var(--chart-4)']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -298,7 +298,7 @@ function HistoricoTab({
   })).filter(d => d.value > 0)
 
   const pieColors1 = ['var(--offline)', 'var(--energy-orange)']
-  const pieColors2 = ['var(--energy-orange)', '#22C55E', '#1E2532']
+  const pieColors2 = ['var(--energy-orange)', 'var(--ok)', '#1E2532']
 
   function handleCsvExport() {
     const rows = kpis.map(h => ({
@@ -319,7 +319,7 @@ function HistoricoTab({
     ...lineMetrics,
     // Add motor/PTO as fallback only if no line metrics configured
     ...(lineMetrics.length === 0 && kpis.some(h => h.engine_on_minutes != null) && !lineMetrics.find(m => m.key === 'engine_on_minutes')
-      ? [{ key: 'engine_on_minutes', label: 'H. Motor', color: '#22C55E', unit: 'min', transform: 1 }]
+      ? [{ key: 'engine_on_minutes', label: 'H. Motor', color: 'var(--ok)', unit: 'min', transform: 1 }]
       : []),
     ...(lineMetrics.length === 0 && kpis.some(h => h.pto_active_minutes != null) && !lineMetrics.find(m => m.key === 'pto_active_minutes')
       ? [{ key: 'pto_active_minutes', label: 'H. PTO', color: 'var(--energy-orange)', unit: 'min', transform: 1 }]
@@ -855,11 +855,11 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
     L.polyline(latlngs, { color: '#10b981', weight: 4, opacity: 0.9 }).addTo(map)
 
     L.circleMarker(latlngs[0], {
-      radius: 7, fillColor: '#22C55E', color: '#fff', weight: 2, fillOpacity: 1,  // T_OK
+      radius: 7, fillColor: 'var(--ok)', color: '#fff', weight: 2, fillOpacity: 1,
     }).bindTooltip('Inicio').addTo(map)
 
     L.circleMarker(latlngs[latlngs.length - 1], {
-      radius: 7, fillColor: '#38BDF8', color: '#fff', weight: 2, fillOpacity: 1,
+      radius: 7, fillColor: 'var(--info)', color: '#fff', weight: 2, fillOpacity: 1,
     }).bindTooltip('Fin').addTo(map)
 
     try { map.fitBounds(L.latLngBounds(latlngs).pad(0.15)) } catch { /* ignorar */ }
@@ -1047,9 +1047,9 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <span style={{ fontSize: 11, color: 'var(--fg-muted)', marginRight: 4 }}>Severidad:</span>
           <button style={severityFilterBtn('all')} onClick={() => setSeverityFilter('all')}>Todas</button>
-          <button style={severityFilterBtn('critical', '#EF4444')} onClick={() => setSeverityFilter('critical')}>Crítica</button>
-          <button style={severityFilterBtn('warning', '#EAB308')} onClick={() => setSeverityFilter('warning')}>Aviso</button>
-          <button style={severityFilterBtn('info', '#38BDF8')} onClick={() => setSeverityFilter('info')}>Info</button>
+          <button style={severityFilterBtn('critical', 'var(--danger)')} onClick={() => setSeverityFilter('critical')}>Crítica</button>
+          <button style={severityFilterBtn('warning', 'var(--warn)')} onClick={() => setSeverityFilter('warning')}>Aviso</button>
+          <button style={severityFilterBtn('info', 'var(--info)')} onClick={() => setSeverityFilter('info')}>Info</button>
         </div>
         <button style={btnSecondary} onClick={handleCsvExport} disabled={rows.length === 0}>
           ⬇ CSV

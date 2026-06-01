@@ -235,7 +235,7 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
               <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit="h" />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}h`]} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="motor" name="Motor" stroke="#38BDF8" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="motor" name="Motor" stroke="var(--info)" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pto" name="PTO" stroke="var(--energy-orange)" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -276,7 +276,7 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? '#38BDF8'} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? 'var(--info)'} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -413,7 +413,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
             )}
 
             {metricError && (
-              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#ef4444' }}>
+              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid var(--danger)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--danger)' }}>
                 {metricError}
               </div>
             )}
