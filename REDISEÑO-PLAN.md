@@ -175,6 +175,28 @@ Tras Fase 1.5, abrir CUALQUIER pantalla de la app y los modales, botones, badges
 - Etiquetas de gauges en dos líneas fijas.
 - Banner expandible rojo si hay alertas activas.
 
+### Notas de verificación visual del 1 junio 2026
+
+Durante la sesión de cierre de Fase 1.5 (tokenización de paleta cálida)
+se verificó visualmente la pantalla del Detalle de vehículo y se
+confirmaron en vivo los problemas estructurales ya documentados arriba:
+
+- Etiquetas de gauges largas rompen en 4-5 líneas dentro de tarjetas
+  estrechas ("PICO MÁXIMO DE PRESIÓN DE AGUA", "PICO MÁXIMO DEPRESOR
+  SOPLANDO", etc.). La tipografía es legible pero la cuadrícula queda
+  descompensada.
+- Cuando muchos gauges no tienen dato (vehículo de prueba parado), la
+  pantalla muestra muchas tarjetas vacías con solo el dash "—".
+  Esperado en vehículo de prueba.
+- El gauge RPM motor tiene su semicírculo y su número distanciados
+  visualmente; falta cohesión.
+- Layout general: los gauges no respiran, hay sensación de
+  amontonamiento.
+
+Cualquier rediseño de Fase 4 debe resolver estos puntos. La paleta
+fría está aplicada correctamente — el problema es estructural, no
+cromático.
+
 ### Fase 5 — Pantalla Alertas (1-2 días)
 - Barra de gravedad por color (crítica/aviso/info).
 - Agrupación de repeticiones.
