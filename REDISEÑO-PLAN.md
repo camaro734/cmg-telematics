@@ -264,6 +264,31 @@ Arrancar **Fase 1** (tokens + tipografía Inter) en la siguiente sesión.
 
 Plan: sesión dedicada para crear `--offline-12`, `--offline-25` y otros tokens semánticos de opacidad, y revisar todos los hex literales del proyecto en un solo barrido.
 
+### Bug visual del tooltip de Recharts en Reportes (detectado 1 junio 2026)
+
+Pantalla afectada: /reports
+Componentes afectados: tooltips de los gráficos de Recharts
+(al menos en "Motor vs PTO" — probable en todos los charts de
+la pantalla).
+
+Síntoma: el bocadillo (tooltip) que aparece al pasar el ratón
+por una serie de un gráfico tiene fondo oscuro y texto oscuro,
+resultando en contraste prácticamente nulo. El texto se intuye
+pero no se lee con comodidad.
+
+Causa probable: estilo por defecto del componente <Tooltip /> de
+Recharts que no se ha personalizado para la paleta oscura de la
+app. Solución técnica: añadir contentStyle y labelStyle a cada
+<Tooltip /> de la pantalla, o crear un componente Tooltip envuelto
+reutilizable con la configuración cromática del proyecto.
+
+No es bug introducido por el rediseño visual. Probablemente
+preexistente, hecho más evidente al limpiar la paleta cálida.
+
+Trabajo estimado: 20-30 minutos. NO bloquea el resto del rediseño.
+Apto para una sesión corta dedicada o para integrarlo en la
+Fase 8 (rediseño de Reportes).
+
 ## Bug preexistente identificado — 1 junio 2026
 
 Pie chart "Distribución del tiempo" en ReportsPage.tsx asigna colores por índice del array filtrado, no por nombre del segmento. Cuando un segmento (PTO, Motor o Parado) tiene valor cero, los índices restantes "se deslizan" y los segmentos visibles reciben colores que no les corresponden.
