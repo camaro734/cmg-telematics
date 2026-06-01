@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending: 'Pendiente', in_progress: 'En curso', done: 'Completada', cancelled: 'Cancelada',
 }
 const STATUS_COLOR: Record<string, string> = {
-  pending: '#38BDF8', in_progress: 'var(--energy-orange)', done: '#22C55E', cancelled: '#78716C',
+  pending: '#38BDF8', in_progress: 'var(--energy-orange)', done: '#22C55E', cancelled: 'var(--offline)',
 }
 
 // ── Map component ─────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ function PortalMap({ vehicles }: { vehicles: PortalVehicle[] }) {
 
     const positioned = vehicles.filter(v => v.lat != null && v.lon != null)
     positioned.forEach(v => {
-      const color = v.online ? '#22C55E' : '#78716C'
+      const color = v.online ? '#22C55E' : '#64748B' /* Leaflet no acepta var(), hex coherente con --offline */
       const popup = `<b>${v.name}</b><br/>${v.online ? `${v.speed_kmh ?? 0} km/h` : 'Offline'}`
       if (markersRef.current[v.id]) {
         markersRef.current[v.id]
@@ -152,7 +152,7 @@ export default function ClientPortalPage() {
 
   if (loadingTenant) {
     return (
-      <div style={{ minHeight: '100vh', background: '#1C1917', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#78716C', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--offline)', fontFamily: 'Inter, sans-serif' }}>
         Cargando…
       </div>
     )
@@ -160,21 +160,21 @@ export default function ClientPortalPage() {
 
   if (isError || !tenant) {
     return (
-      <div style={{ minHeight: '100vh', background: '#1C1917', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, fontFamily: 'Inter, sans-serif' }}>
         <div style={{ fontSize: 48 }}>🔒</div>
-        <div style={{ color: '#E7E5E4', fontSize: 18, fontWeight: 600 }}>Portal no disponible</div>
-        <div style={{ color: '#78716C', fontSize: 14 }}>El enlace es incorrecto o ha expirado.</div>
+        <div style={{ color: 'var(--fg-primary)', fontSize: 18, fontWeight: 600 }}>Portal no disponible</div>
+        <div style={{ color: 'var(--offline)', fontSize: 14 }}>El enlace es incorrecto o ha expirado.</div>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base, #1C1917)', fontFamily: 'Inter, sans-serif', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', fontFamily: 'Inter, sans-serif', display: 'flex', flexDirection: 'column' }}>
 
       {/* Header */}
       <header style={{
-        background: 'var(--bg-surface, #292524)',
-        borderBottom: '1px solid var(--border, #57534E)',
+        background: 'var(--bg-surface)',
+        borderBottom: '1px solid var(--border)',
         padding: '12px 24px',
         display: 'flex',
         alignItems: 'center',
@@ -185,21 +185,21 @@ export default function ClientPortalPage() {
           <img src={tenant.logo_url} alt="logo" style={{ height: 36, objectFit: 'contain' }}/>
         )}
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-primary, #E7E5E4)' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)' }}>
             {tenant.brand_name ?? tenant.name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--fg-muted, #78716C)' }}>
+          <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
             Portal de seguimiento
           </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 20 }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#22C55E' }}>{online}</div>
-            <div style={{ fontSize: 10, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En ruta</div>
+            <div style={{ fontSize: 10, color: 'var(--offline)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>En ruta</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--fg-primary, #E7E5E4)' }}>{vehicles.length}</div>
-            <div style={{ fontSize: 10, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehículos</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--fg-primary)' }}>{vehicles.length}</div>
+            <div style={{ fontSize: 10, color: 'var(--offline)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehículos</div>
           </div>
         </div>
       </header>
@@ -214,15 +214,15 @@ export default function ClientPortalPage() {
           <div style={{
             position: 'absolute', bottom: 16, left: 16, zIndex: 1000,
             background: 'rgba(28,25,23,0.85)', backdropFilter: 'blur(6px)',
-            border: '1px solid #57534E', borderRadius: 8, padding: '8px 14px',
+            border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px',
             display: 'flex', gap: 16,
           }}>
             <span style={{ fontSize: 11, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }}/>
               Online
             </span>
-            <span style={{ fontSize: 11, color: '#78716C', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#78716C', display: 'inline-block' }}/>
+            <span style={{ fontSize: 11, color: 'var(--offline)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--offline)', display: 'inline-block' }}/>
               Offline
             </span>
           </div>
@@ -231,41 +231,41 @@ export default function ClientPortalPage() {
         {/* Sidebar */}
         <div style={{
           width: 340,
-          background: 'var(--bg-surface, #292524)',
-          borderLeft: '1px solid var(--border, #57534E)',
+          background: 'var(--bg-surface)',
+          borderLeft: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
         }}>
           {/* Vehicles list */}
-          <div style={{ borderBottom: '1px solid #57534E', padding: '12px 16px', flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#78716C', marginBottom: 10 }}>
+          <div style={{ borderBottom: '1px solid var(--border)', padding: '12px 16px', flexShrink: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--offline)', marginBottom: 10 }}>
               Vehículos
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
               {vehicles.map(v => (
-                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#1C1917', borderRadius: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: v.online ? '#22C55E' : '#78716C', flexShrink: 0 }}/>
-                  <span style={{ flex: 1, fontSize: 13, color: '#E7E5E4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: 'var(--bg-base)', borderRadius: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: v.online ? '#22C55E' : 'var(--offline)', flexShrink: 0 }}/>
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--fg-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
                   {v.online && v.speed_kmh != null && (
                     <span style={{ fontSize: 11, color: 'var(--cmg-teal)', fontWeight: 600, flexShrink: 0 }}>{Math.round(v.speed_kmh)} km/h</span>
                   )}
                 </div>
               ))}
               {vehicles.length === 0 && (
-                <div style={{ fontSize: 13, color: '#78716C', padding: '8px 0' }}>Sin vehículos asignados</div>
+                <div style={{ fontSize: 13, color: 'var(--offline)', padding: '8px 0' }}>Sin vehículos asignados</div>
               )}
             </div>
           </div>
 
           {/* Orders list */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#78716C', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--offline)', marginBottom: 10 }}>
               Órdenes recientes
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {orders.map(o => (
-                <div key={o.id} style={{ background: '#1C1917', borderRadius: 8, padding: '10px 12px', border: '1px solid #3C3330' }}>
+                <div key={o.id} style={{ background: 'var(--bg-base)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 99,
@@ -275,22 +275,22 @@ export default function ClientPortalPage() {
                       {STATUS_LABEL[o.status] ?? o.status}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#E7E5E4', marginBottom: 4 }}>{o.title}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)', marginBottom: 4 }}>{o.title}</div>
                   {o.vehicle_name && (
-                    <div style={{ fontSize: 11, color: '#78716C' }}>Vehículo: {o.vehicle_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--offline)' }}>Vehículo: {o.vehicle_name}</div>
                   )}
                   {o.location_address && (
-                    <div style={{ fontSize: 11, color: '#78716C' }}>{o.location_address}</div>
+                    <div style={{ fontSize: 11, color: 'var(--offline)' }}>{o.location_address}</div>
                   )}
                   {o.completed_at && (
-                    <div style={{ fontSize: 11, color: '#78716C' }}>
+                    <div style={{ fontSize: 11, color: 'var(--offline)' }}>
                       Completada: {new Date(o.completed_at).toLocaleString('es-ES')}
                     </div>
                   )}
                 </div>
               ))}
               {orders.length === 0 && (
-                <div style={{ fontSize: 13, color: '#78716C' }}>Sin órdenes recientes</div>
+                <div style={{ fontSize: 13, color: 'var(--offline)' }}>Sin órdenes recientes</div>
               )}
             </div>
           </div>
