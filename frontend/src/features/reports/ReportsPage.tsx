@@ -297,8 +297,8 @@ function HistoricoTab({
     unit: m.unit,
   })).filter(d => d.value > 0)
 
-  const pieColors1 = ['#78716C', 'var(--energy-orange)']
-  const pieColors2 = ['var(--energy-orange)', '#22C55E', '#3C3330']
+  const pieColors1 = ['var(--offline)', 'var(--energy-orange)']
+  const pieColors2 = ['var(--energy-orange)', '#22C55E', '#1E2532']
 
   function handleCsvExport() {
     const rows = kpis.map(h => ({
@@ -650,8 +650,8 @@ function StatusBadge({ status }: { status: MaintenancePlanOut['progress']['statu
   return (
     <span style={{
       fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-      background: `${colors[status] ?? '#78716C'}22`,
-      color: colors[status] ?? '#78716C',
+      background: `${colors[status] ?? '#64748B'}22`,
+      color: colors[status] ?? 'var(--offline)',
     }}>
       {labels[status] ?? status.toUpperCase()}
     </span>
@@ -1096,7 +1096,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                     <td style={tdStyle}>
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                        background: `${severityColors[sev] ?? '#78716C'}22`,
+                        background: `${severityColors[sev] ?? '#64748B'}22`,
                         color: severityColors[sev] ?? 'var(--fg-muted)',
                       }}>
                         {severityLabels[sev] ?? sev.toUpperCase()}
@@ -1105,7 +1105,7 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
                     <td style={tdStyle}>
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                        background: `${statusColors[a.status] ?? '#78716C'}22`,
+                        background: `${statusColors[a.status] ?? '#64748B'}22`,
                         color: statusColors[a.status] ?? 'var(--fg-muted)',
                       }}>
                         {statusLabels[a.status] ?? a.status.toUpperCase()}
