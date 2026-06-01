@@ -31,7 +31,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
       const isChunk = msg.includes('Failed to fetch dynamically imported module')
         || msg.includes('Importing a module script failed')
       if (isChunk) return (
-        <div style={{ padding: 24, background: '#1C1917', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div style={{ padding: 24, background: 'var(--bg-base)', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{ fontSize: 15 }}>Actualizando la aplicación…</div>
           <button
             onClick={() => { sessionStorage.removeItem('chunk_reload'); window.location.reload() }}
@@ -42,7 +42,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
         </div>
       )
       return (
-        <div style={{ padding: 24, background: '#1C1917', color: '#ef4444', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
+        <div style={{ padding: 24, background: 'var(--bg-base)', color: '#ef4444', fontFamily: 'monospace', whiteSpace: 'pre-wrap', minHeight: '100vh' }}>
           <b>ERROR (ErrorBoundary):</b>{'\n'}{msg}{'\n'}{(this.state.error as Error).stack}
         </div>
       )

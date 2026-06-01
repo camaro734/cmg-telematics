@@ -94,7 +94,7 @@ function ToastItem({ toast }: { toast: ToastItem }) {
         boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
         fontFamily: 'var(--font-sans)',
         fontSize: 13,
-        color: 'var(--fg-primary, #E7E5E4)',
+        color: 'var(--fg-primary)',
         maxWidth: 360,
         animation: 'cmg-toast-in 0.18s ease-out',
       }}

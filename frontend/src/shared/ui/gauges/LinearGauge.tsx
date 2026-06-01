@@ -67,7 +67,7 @@ function VerticalBar({
         position: 'relative' as const,
         width: 32,
         height: 100,
-        background: 'var(--border, #3C3330)',
+        background: 'var(--border)',
         borderRadius: 4,
         border: '1px solid var(--border)',
         overflow: 'hidden' as const,
@@ -108,7 +108,7 @@ function HorizontalBar({
         position: 'relative' as const,
         width: '100%',
         height: barHeight,
-        background: 'var(--border, #3C3330)',
+        background: 'var(--border)',
         borderRadius: 4,
         overflow: 'hidden' as const,
       }}

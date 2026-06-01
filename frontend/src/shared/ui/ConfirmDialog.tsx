@@ -86,7 +86,7 @@ export function ConfirmDialogHost() {
           padding: 20,
           boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
           fontFamily: 'var(--font-sans)',
-          color: 'var(--fg-primary, #E7E5E4)',
+          color: 'var(--fg-primary)',
         }}
       >
         {request.title && (
@@ -101,7 +101,7 @@ export function ConfirmDialogHost() {
           <button
             onClick={() => answer(false)}
             style={{
-              background: 'transparent', color: 'var(--fg-primary, #E7E5E4)',
+              background: 'transparent', color: 'var(--fg-primary)',
               border: '1px solid var(--border)', borderRadius: 6,
               padding: '7px 14px', fontSize: 13, cursor: 'pointer',
             }}

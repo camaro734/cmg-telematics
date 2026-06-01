@@ -228,7 +228,7 @@ export default function CircularGauge({
           textAnchor="middle"
           fontSize="30"
           fontWeight="700"
-          fill={safeValue != null ? '#FFFFFF' : '#4B5563'}
+          fill={safeValue != null ? '#FFFFFF' : 'var(--fg-dim)'}
           fontFamily="var(--font-mono)"
         >
           {displayValue}
@@ -271,7 +271,7 @@ export default function CircularGauge({
           const textProps = {
             textAnchor: 'middle' as const,
             fontSize: '8',
-            fill: '#A8A29E',
+            fill: 'var(--fg-muted)',
             fontFamily: 'var(--font-sans)',
             letterSpacing: '0.8',
           }

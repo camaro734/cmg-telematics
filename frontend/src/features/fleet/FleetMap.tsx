@@ -14,9 +14,9 @@ const T_WARN   = '#EAB308'  // var(--warn)
 const T_CRIT   = '#EF4444'  // var(--danger)
 const T_ORANGE = 'var(--energy-orange)'  // var(--cmg-teal)
 const T_INFO   = '#38BDF8'  // var(--info)
-const T_OFF    = '#57534E'  // --bg-border dark
+const T_OFF    = '#64748B'  // var(--offline)
 const T_ELEVATED = '#22263A' // var(--bg-elevated)
-const T_MUTED  = '#a8a29e'  // var(--fg-dim)
+const T_MUTED  = 'var(--fg-muted)'
 
 // CSS para efecto pulse — se inyecta una sola vez en el documento
 const PULSE_CSS = `
