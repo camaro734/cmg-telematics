@@ -355,38 +355,26 @@ Arrancar **Fase 1** (tokens + tipografía Inter) en la siguiente sesión.
 
 ## Deuda técnica menor identificada — 1 junio 2026
 
-1. **Hex literales con sufijo de opacidad en template strings** (4 sitios en ReportsPage.tsx: `#64748B22` en líneas 653, 1099, 1108 y `#64748B` en pieColors). Razón: `var()` no se puede concatenar con strings literales como `${color}22`. Solución futura: refactorizar a `color-mix()` o crear tokens de opacidad (`--offline-12`, `--offline-25`, etc.).
+1. **Hex literales con sufijo de opacidad en template strings** — ✅ RESUELTO 1 junio 2026 commit c912d48.
+   Creados `--danger-12`, `--danger-25`, `--warn-12`, `--info-12` en tokens.css. Refactorizados 9 hits
+   en FleetMap.tsx, ReportsPage.tsx (CartesianGrid + overlay Leaflet) usando los tokens nuevos y
+   `var(--border)` / `var(--bg-elevated)` según corresponda.
+   Hits residuales justificados (deuda permanente): pulse rings SVG en marcadores Leaflet (API no
+   acepta `var()`), BrandTokensEditor.tsx (input type=color exige hex).
 
 2. **Hex literal del marcador Leaflet** en ClientPortalPage.tsx:89 (`#64748B`). Razón: la API de Leaflet no acepta `var()` en atributos SVG. Solución futura: leer la variable CSS con `getComputedStyle()` al inicializar el mapa.
 
 3. **Hex literales en BrandTokensEditor.tsx** (valores default del color picker). Razón: `<input type="color">` exige hex literal por especificación HTML. Son correctos tal como están.
 
-Plan: sesión dedicada para crear `--offline-12`, `--offline-25` y otros tokens semánticos de opacidad, y revisar todos los hex literales del proyecto en un solo barrido.
+### Bug visual del tooltip de Recharts en Reportes — ✅ RESUELTO 1 junio 2026 commit c912d48
 
-### Bug visual del tooltip de Recharts en Reportes (detectado 1 junio 2026)
-
-Pantalla afectada: /reports
-Componentes afectados: tooltips de los gráficos de Recharts
-(al menos en "Motor vs PTO" — probable en todos los charts de
-la pantalla).
-
-Síntoma: el bocadillo (tooltip) que aparece al pasar el ratón
-por una serie de un gráfico tiene fondo oscuro y texto oscuro,
-resultando en contraste prácticamente nulo. El texto se intuye
-pero no se lee con comodidad.
-
-Causa probable: estilo por defecto del componente <Tooltip /> de
-Recharts que no se ha personalizado para la paleta oscura de la
-app. Solución técnica: añadir contentStyle y labelStyle a cada
-<Tooltip /> de la pantalla, o crear un componente Tooltip envuelto
-reutilizable con la configuración cromática del proyecto.
-
-No es bug introducido por el rediseño visual. Probablemente
-preexistente, hecho más evidente al limpiar la paleta cálida.
-
-Trabajo estimado: 20-30 minutos. NO bloquea el resto del rediseño.
-Apto para una sesión corta dedicada o para integrarlo en la
-Fase 8 (rediseño de Reportes).
+Pantallas afectadas: /reports, /dashboard, /vehicles/:id (KpiChart).
+Causa real: `contentStyle.color` aplica al contenedor externo del tooltip, pero los valores de
+cada serie se renderizan en `.recharts-tooltip-item` con CSS propio de Recharts que sobrescribe
+la herencia. Solución: añadir `itemStyle: { color: 'var(--fg-primary)' }` en cada `<Tooltip>`.
+Afectaba 10 tooltips en 3 archivos (ReportsPage 6, KpiChart 3, DashboardPage 1).
+Contraste resultante: `--fg-primary` (#F1F5F9) sobre `--bg-elevated` (#22263A) = 9.5:1.
+Verificado visualmente en /reports.
 
 ## Bug preexistente identificado — 1 junio 2026
 
