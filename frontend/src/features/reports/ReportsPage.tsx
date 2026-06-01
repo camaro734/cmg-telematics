@@ -298,7 +298,11 @@ function HistoricoTab({
   })).filter(d => d.value > 0)
 
   const pieColors1 = ['var(--offline)', 'var(--energy-orange)']
-  const pieColors2 = ['var(--energy-orange)', 'var(--ok)', '#1E2532']
+  const PIE_COLOR: Record<string, string> = {
+    'PTO':    'var(--energy-orange)',
+    'Motor':  'var(--ok)',
+    'Parado': 'var(--offline)',
+  }
 
   function handleCsvExport() {
     const rows = kpis.map(h => ({
@@ -480,8 +484,8 @@ function HistoricoTab({
                     dataKey="value"
                     paddingAngle={2}
                   >
-                    {pieDistribution.map((_, i) => (
-                      <Cell key={i} fill={pieColors2[i % pieColors2.length]} />
+                    {pieDistribution.map((entry) => (
+                      <Cell key={entry.name} fill={PIE_COLOR[entry.name] ?? 'var(--fg-dim)'} />
                     ))}
                   </Pie>
                   <Tooltip
