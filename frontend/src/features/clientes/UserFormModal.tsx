@@ -3,11 +3,18 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { UserOut, UserCreate, UserUpdate } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 interface Props {
   tenantId: string
   user?: UserOut
   onClose: () => void
+}
+
+const SELECT_STYLE: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', background: 'var(--bg-elevated)',
+  border: '1px solid var(--border)', borderRadius: 6,
+  color: 'var(--fg-primary)', fontSize: 13, boxSizing: 'border-box',
 }
 
 export default function UserFormModal({ tenantId, user, onClose }: Props) {
@@ -41,12 +48,6 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '7px 10px', background: 'var(--bg-base)',
-    border: '1px solid var(--border)', borderRadius: 6,
-    color: 'var(--fg-primary)', fontSize: 13, boxSizing: 'border-box',
-  }
-
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
@@ -62,41 +63,33 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {!isEdit && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Email</span>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={inputStyle} />
-            </label>
+            <Input label="Email" type="email" value={email}
+              onChange={e => setEmail(e.target.value)} required />
           )}
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Nombre completo</span>
-            <input value={fullName} onChange={e => setFullName(e.target.value)} required style={inputStyle} />
-          </label>
+          <Input label="Nombre completo" value={fullName}
+            onChange={e => setFullName(e.target.value)} required />
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Rol</span>
-            <select value={role} onChange={e => setRole(e.target.value as UserOut['role'])} style={inputStyle}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Rol</span>
+            <select value={role} onChange={e => setRole(e.target.value as UserOut['role'])} style={SELECT_STYLE}>
               <option value="admin">Admin</option>
               <option value="operator">Operador</option>
               <option value="viewer">Viewer</option>
               <option value="driver">Conductor</option>
             </select>
-          </label>
+          </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>
-              Contraseña{isEdit && <span style={{ color: 'var(--offline)', fontWeight: 400 }}> — dejar en blanco para no cambiar</span>}
-            </span>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required={!isEdit}
-              minLength={8}
-              placeholder={isEdit ? '••••••••' : ''}
-              style={inputStyle}
-            />
-          </label>
+          <Input
+            label="Contraseña"
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required={!isEdit}
+            minLength={8}
+            placeholder={isEdit ? '••••••••' : ''}
+            helperText={isEdit ? '— dejar en blanco para no cambiar' : undefined}
+          />
 
           {mutation.isError && (
             <p style={{ color: 'var(--danger)', fontSize: 12, margin: 0 }}>Error al guardar.</p>

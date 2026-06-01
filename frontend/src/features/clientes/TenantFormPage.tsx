@@ -6,6 +6,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
 import { toast } from '../../shared/ui/Toast'
+import { Input } from '../../shared/ui/Input'
 import type { TenantOut, TenantCreate, TenantUpdate } from '../../lib/types'
 
 const WIZARD_STEPS = [
@@ -233,9 +234,6 @@ export default function TenantFormPage() {
     border: '1px solid var(--border)', borderRadius: 6,
     color: 'var(--fg-primary)', fontSize: 14, boxSizing: 'border-box',
   }
-  const inputErrorStyle: React.CSSProperties = {
-    ...inputStyle, border: '1px solid var(--danger)',
-  }
 
   const mutationErrorMsg = (() => {
     if (!mutation.isError) return null
@@ -364,48 +362,35 @@ export default function TenantFormPage() {
                     : 'Esta persona podrá entrar a la app y gestionar el cliente.'}
                 </p>
 
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Nombre completo</span>
-                  <input
-                    type="text"
-                    value={adminFullName}
-                    onChange={e => { setAdminFullName(e.target.value); setFieldErrors(p => ({ ...p, adminFullName: '' })) }}
-                    placeholder="María García"
-                    style={fieldErrors.adminFullName ? inputErrorStyle : inputStyle}
-                  />
-                  {fieldErrors.adminFullName && (
-                    <span style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.adminFullName}</span>
-                  )}
-                </label>
+                <Input
+                  label="Nombre completo"
+                  type="text"
+                  value={adminFullName}
+                  onChange={e => { setAdminFullName(e.target.value); setFieldErrors(p => ({ ...p, adminFullName: '' })) }}
+                  placeholder="María García"
+                  error={fieldErrors.adminFullName || undefined}
+                  style={{ marginBottom: 10 }}
+                />
 
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Email del administrador</span>
-                  <input
-                    type="email"
-                    value={adminEmail}
-                    onChange={e => { setAdminEmail(e.target.value); setFieldErrors(p => ({ ...p, adminEmail: '' })) }}
-                    placeholder="admin@empresa.com"
-                    style={fieldErrors.adminEmail ? inputErrorStyle : inputStyle}
-                  />
-                  {fieldErrors.adminEmail && (
-                    <span style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.adminEmail}</span>
-                  )}
-                </label>
+                <Input
+                  label="Email del administrador"
+                  type="email"
+                  value={adminEmail}
+                  onChange={e => { setAdminEmail(e.target.value); setFieldErrors(p => ({ ...p, adminEmail: '' })) }}
+                  placeholder="admin@empresa.com"
+                  error={fieldErrors.adminEmail || undefined}
+                  style={{ marginBottom: 10 }}
+                />
 
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Contraseña inicial</span>
-                  <input
-                    type="text"
-                    value={adminPassword}
-                    onChange={e => { setAdminPassword(e.target.value); setFieldErrors(p => ({ ...p, adminPassword: '' })) }}
-                    placeholder="Mínimo 8 caracteres"
-                    style={fieldErrors.adminPassword ? inputErrorStyle : inputStyle}
-                  />
-                  {fieldErrors.adminPassword
-                    ? <span style={{ fontSize: 11, color: 'var(--danger)' }}>{fieldErrors.adminPassword}</span>
-                    : <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>El administrador deberá cambiarla en el primer acceso.</span>
-                  }
-                </label>
+                <Input
+                  label="Contraseña inicial"
+                  type="text"
+                  value={adminPassword}
+                  onChange={e => { setAdminPassword(e.target.value); setFieldErrors(p => ({ ...p, adminPassword: '' })) }}
+                  placeholder="Mínimo 8 caracteres"
+                  error={fieldErrors.adminPassword || undefined}
+                  helperText="El administrador deberá cambiarla en el primer acceso."
+                />
               </div>
             )}
 

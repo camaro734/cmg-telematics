@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react'
 import { Sparkline } from '../../shared/ui/Sparkline'
 import { Chip } from '../../shared/ui/Chip'
+import { Input } from '../../shared/ui/Input'
+
+const SearchIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="var(--fg-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
 
 type Filter = 'all' | 'online' | 'moving'
 
@@ -85,21 +93,14 @@ export function VehicleListPanel({ vehicles, selectedId, onSelect }: VehicleList
             ‹
           </button>
         </div>
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <svg style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-            width="12" height="12" viewBox="0 0 24 24" fill="none"
-            stroke="var(--fg-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar matrícula..."
-            style={{
-              width: '100%', padding: '5px 8px 5px 26px',
-              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-              borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)',
-              fontSize: 12, fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-        </div>
+        <Input
+          size="sm"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar matrícula..."
+          prefix={<SearchIcon />}
+          style={{ borderRadius: 'var(--r-md)', marginBottom: 8 }}
+        />
         <div style={{ display: 'flex', gap: 6 }}>
           {(['all', 'online', 'moving'] as Filter[]).map(f => (
             <Chip key={f} size="sm"
