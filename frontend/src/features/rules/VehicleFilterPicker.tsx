@@ -1,14 +1,8 @@
-import type { CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleFilter, VehicleTypeOut, VehicleOut } from '../../lib/types'
-
-const SELECT: CSSProperties = {
-  background: 'var(--bg-card)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 13, padding: '6px 8px', width: '100%', boxSizing: 'border-box' as const,
-}
+import { Select } from '../../shared/ui/Select'
 
 interface Props {
   value: VehicleFilter
@@ -32,39 +26,31 @@ export default function VehicleFilterPicker({ value, onChange }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <select
-        value={value.scope}
+      <Select value={value.scope} style={{ background: 'var(--bg-card)' }}
         onChange={e => {
           const scope = e.target.value as VehicleFilter['scope']
           onChange({ scope })
-        }}
-        style={SELECT}
-      >
+        }}>
         <option value="all">Todos los vehículos</option>
         <option value="type">Por tipo de vehículo</option>
         <option value="vehicle">Vehículo específico</option>
-      </select>
+      </Select>
 
       {value.scope === 'type' && (
-        <select
-          value={value.vehicle_type_id ?? ''}
-          onChange={e => onChange({ scope: 'type', vehicle_type_id: e.target.value })}
-          style={SELECT}
-        >
+        <Select value={value.vehicle_type_id ?? ''} style={{ background: 'var(--bg-card)' }}
+          onChange={e => onChange({ scope: 'type', vehicle_type_id: e.target.value })}>
           <option value="">Selecciona un tipo…</option>
           {vehicleTypes.map(vt => <option key={vt.id} value={vt.id}>{vt.name}</option>)}
-        </select>
+        </Select>
       )}
 
       {value.scope === 'vehicle' && (
-        <select
-          value={value.vehicle_id ?? ''}
-          onChange={e => onChange({ scope: 'vehicle', vehicle_id: e.target.value })}
-          style={SELECT}
-        >
+        <Select value={value.vehicle_id ?? ''} style={{ background: 'var(--bg-card)' }}
+          onChange={e => onChange({ scope: 'vehicle', vehicle_id: e.target.value })}>
+
           <option value="">Selecciona un vehículo…</option>
           {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
+        </Select>
       )}
     </div>
   )

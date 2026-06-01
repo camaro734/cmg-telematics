@@ -5,6 +5,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 type HistoryStatus = 'all' | 'acknowledged' | 'resolved'
 
@@ -15,11 +16,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   resolved:     { label: 'RESUELTA',   color: 'var(--ok)'   },
 }
 
-const SELECT: CSSProperties = {
-  background: 'var(--bg-base)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 12, padding: '4px 8px',
-}
+
 
 const TH: CSSProperties = { padding: '6px 8px', textAlign: 'left', fontWeight: 600 }
 const TD: CSSProperties = { padding: '6px 8px' }
@@ -66,15 +63,15 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <select value={status} onChange={e => setStatus(e.target.value as HistoryStatus)} style={SELECT}>
+        <Select size="sm" value={status} onChange={e => setStatus(e.target.value as HistoryStatus)}>
           <option value="all">Todos los estados</option>
           <option value="acknowledged">Reconocidas</option>
           <option value="resolved">Resueltas</option>
-        </select>
-        <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={SELECT} aria-label="Filtrar por vehículo">
+        </Select>
+        <Select size="sm" value={vehicleId} onChange={e => setVehicleId(e.target.value)} aria-label="Filtrar por vehículo">
           <option value="">Todos los vehículos</option>
           {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
+        </Select>
         <Input type="date" size="sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" />
         <Input type="date" size="sm" value={dateTo}   onChange={e => setDateTo(e.target.value)}   title="Hasta" />
       </div>

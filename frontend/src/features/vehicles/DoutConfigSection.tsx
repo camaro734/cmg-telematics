@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, DoutSlot } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -10,27 +12,6 @@ type DoutFormState = { slot: string; label: string; enabled: boolean }
 
 const emptyDoutForm: DoutFormState = { slot: '1', label: '', enabled: true }
 
-// ── Shared styles ──────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box',
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--offline)',
-  fontWeight: 600,
-  letterSpacing: '0.04em',
-  marginBottom: 4,
-  display: 'block',
-}
 
 const btnPrimary: React.CSSProperties = {
   background: 'var(--cmg-teal)',
@@ -166,18 +147,12 @@ export default function DoutConfigSection({ typeId, selectedType }: Props) {
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--fg-primary)' }}>
               {editingDoutIdx === null ? 'Nueva salida digital' : 'Editar salida digital'}
             </h3>
-            <div>
-              <label style={labelStyle}>DOUT (1–4)</label>
-              <select style={inputStyle} value={doutForm.slot}
-                onChange={e => setDoutForm(f => ({ ...f, slot: e.target.value }))}>
-                {[1, 2, 3, 4].map(n => <option key={n} value={n}>DOUT{n}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>ETIQUETA (acción)</label>
-              <input style={inputStyle} value={doutForm.label} placeholder="Parar motor"
-                onChange={e => setDoutForm(f => ({ ...f, label: e.target.value }))} />
-            </div>
+            <Select label="DOUT (1–4)" value={doutForm.slot}
+              onChange={e => setDoutForm(f => ({ ...f, slot: e.target.value }))}>
+              {[1, 2, 3, 4].map(n => <option key={n} value={n}>DOUT{n}</option>)}
+            </Select>
+            <Input label="Etiqueta (acción)" value={doutForm.label} placeholder="Parar motor"
+              onChange={e => setDoutForm(f => ({ ...f, label: e.target.value }))} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input type="checkbox" id="dout-enabled" checked={doutForm.enabled}
                 onChange={e => setDoutForm(f => ({ ...f, enabled: e.target.checked }))} />

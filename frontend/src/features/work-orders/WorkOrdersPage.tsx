@@ -15,6 +15,7 @@ import { useAuthStore } from '../auth/useAuthStore'
 import { toast } from '../../shared/ui/Toast'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 async function downloadOrderPdf(order: WorkOrderOut) {
   const token = useAuthStore.getState().accessToken
@@ -653,7 +654,6 @@ const S = {
   modal: { background: 'var(--bg-surface)', borderRadius: 12, padding: 28, width: 500, display: 'flex', flexDirection: 'column' as const, gap: 14, maxHeight: '90vh', overflowY: 'auto' as const },
   field: { display: 'flex', flexDirection: 'column' as const, gap: 4 },
   input: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '8px 10px' } as const,
-  select: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '8px 10px' } as const,
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -791,30 +791,21 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           <textarea style={{ ...S.input, resize: 'vertical', minHeight: 48 }} value={form.description} onChange={e => u('description', e.target.value)}/>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div style={S.field}>
-            <span style={S.label}>Vehículo</span>
-            <select style={S.select} value={form.vehicle_id} onChange={e => u('vehicle_id', e.target.value)}>
-              <option value="">— Sin asignar —</option>
-              {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-          </div>
-          <div style={S.field}>
-            <span style={S.label}>Conductor</span>
-            <select style={S.select} value={form.driver_id} onChange={e => u('driver_id', e.target.value)}>
-              <option value="">— Sin asignar —</option>
-              {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-            </select>
-          </div>
+          <Select label="Vehículo" value={form.vehicle_id} onChange={e => u('vehicle_id', e.target.value)}>
+            <option value="">— Sin asignar —</option>
+            {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </Select>
+          <Select label="Conductor" value={form.driver_id} onChange={e => u('driver_id', e.target.value)}>
+            <option value="">— Sin asignar —</option>
+            {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+          </Select>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div style={S.field}>
-            <span style={S.label}>Prioridad</span>
-            <select style={S.select} value={form.priority} onChange={e => u('priority', e.target.value as WorkOrderPriority)}>
-              {(Object.entries(PRIORITY_LABELS) as [WorkOrderPriority, string][]).map(([k, l]) => (
-                <option key={k} value={k}>{l}</option>
-              ))}
-            </select>
-          </div>
+          <Select label="Prioridad" value={form.priority} onChange={e => u('priority', e.target.value as WorkOrderPriority)}>
+            {(Object.entries(PRIORITY_LABELS) as [WorkOrderPriority, string][]).map(([k, l]) => (
+              <option key={k} value={k}>{l}</option>
+            ))}
+          </Select>
           <div style={S.field}>
             <span style={S.label}>Fecha programada</span>
             <Input type="datetime-local" value={form.scheduled_at} onChange={e => u('scheduled_at', e.target.value)} />

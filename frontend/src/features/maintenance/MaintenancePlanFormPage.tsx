@@ -7,6 +7,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, MaintenancePlanOut, MaintenancePlanCreate, MaintenancePlanUpdate, MaintenanceThreshold } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 const DEFAULT_THRESHOLDS: MaintenanceThreshold[] = [{ type: 'pto_hours', value: 500 }]
 
@@ -81,7 +82,6 @@ export default function MaintenancePlanFormPage() {
   }
 
   const labelStyle = { fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }
-  const inputStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const }
 
   return (
     <Shell title={isEdit ? 'Editar plan' : 'Nuevo plan de mantenimiento'}>
@@ -98,12 +98,9 @@ export default function MaintenancePlanFormPage() {
             />
 
             {!isEdit && (
-              <div>
-                <div style={labelStyle}>VEHÍCULO</div>
-                <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={inputStyle}>
-                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </select>
-              </div>
+              <Select label="Vehículo" value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </Select>
             )}
 
             <div>

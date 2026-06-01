@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycleDefinitionCreate, VehicleTypeOut } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 const TRIGGER_OPTIONS = [
   { value: 'pto_change', label: 'PTO activo (cisterna, hidráulica)' },
@@ -17,16 +18,6 @@ const sectionStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
   borderRadius: 8,
   padding: 20,
-}
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  color: 'var(--fg-secondary)',
-  border: '1px solid var(--border)',
-  borderRadius: 5,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
 }
 
 export default function WorkCycleDefinitionsSection() {
@@ -149,16 +140,16 @@ export default function WorkCycleDefinitionsSection() {
               </div>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Tipo de vehículo *</label>
-                <select style={inputStyle} value={form.vehicle_type_id ?? ''} onChange={e => setForm(f => ({ ...f, vehicle_type_id: e.target.value }))} required>
+                <Select value={form.vehicle_type_id ?? ''} onChange={e => setForm(f => ({ ...f, vehicle_type_id: e.target.value }))} required>
                   <option value="">Seleccionar...</option>
                   {vehicleTypes.map(vt => <option key={vt.id} value={vt.id}>{vt.name}</option>)}
-                </select>
+                </Select>
               </div>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Tipo de trigger *</label>
-                <select style={inputStyle} value={form.trigger_type ?? 'pto_change'} onChange={e => setForm(f => ({ ...f, trigger_type: e.target.value }))}>
+                <Select value={form.trigger_type ?? 'pto_change'} onChange={e => setForm(f => ({ ...f, trigger_type: e.target.value }))}>
                   {TRIGGER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                </Select>
               </div>
               {(form.trigger_type === 'threshold_exceeded' || form.trigger_type === 'sensor_pulse') && (
                 <div>
@@ -173,12 +164,12 @@ export default function WorkCycleDefinitionsSection() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Operador</label>
-                    <select style={inputStyle} onChange={e => setForm(f => ({ ...f, trigger_config: { ...f.trigger_config, op: e.target.value } }))}>
+                    <Select onChange={e => setForm(f => ({ ...f, trigger_config: { ...f.trigger_config, op: e.target.value } }))}>
                       <option value=">">{'>'}</option>
                       <option value=">=">{'>='}</option>
                       <option value="<">{'<'}</option>
                       <option value="<=">{'<='}</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Umbral</label>

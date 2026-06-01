@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, MaintenanceTemplateItem } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -19,17 +20,6 @@ const emptyTemplateForm: TemplateFormState = {
 }
 
 // ── Shared styles ──────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box',
-}
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
@@ -218,13 +208,12 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
             <Input value={templateForm.name} style={{ marginBottom: 12 }}
               onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} />
             <label style={labelStyle}>Tipo de umbral</label>
-            <select style={{ ...inputStyle, marginBottom: 12 }}
-              value={templateForm.thresholdType}
+            <Select value={templateForm.thresholdType} style={{ marginBottom: 12 }}
               onChange={e => setTemplateForm(f => ({ ...f, thresholdType: e.target.value as TemplateFormState['thresholdType'] }))}>
               <option value="pto_hours">Horas PTO</option>
               <option value="engine_hours">Horas motor</option>
               <option value="calendar_days">Días naturales</option>
-            </select>
+            </Select>
             <label style={labelStyle}>Valor</label>
             <Input type="number" min="1" value={templateForm.value} style={{ marginBottom: 12 }}
               onChange={e => setTemplateForm(f => ({ ...f, value: e.target.value }))} />

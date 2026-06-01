@@ -7,6 +7,7 @@ import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { useAuthStore } from '../auth/useAuthStore'
 import type { DeviceOut, TenantOut, DeviceCreate } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 // Formatea last_seen como tiempo relativo (aprox) o fecha local
 function formatLastSeen(last_seen: string | null): string {
@@ -116,25 +117,6 @@ export default function DevicesPage() {
   // Lookup rápido de tenant por id
   const tenantMap = new Map(tenants.map(t => [t.id, t.name]))
 
-  // Estilos reutilizables
-  const inputStyle = {
-    background: 'var(--bg-elevated)',
-    border: '1px solid var(--border)',
-    color: 'var(--fg-primary)',
-    borderRadius: 6,
-    padding: '7px 10px',
-    fontSize: 13,
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  } as const
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: 11,
-    color: 'var(--fg-muted)',
-    marginBottom: 4,
-  } as const
-
   const thStyle = {
     textAlign: 'left' as const,
     fontSize: 11,
@@ -158,18 +140,13 @@ export default function DevicesPage() {
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
         {/* Cabecera: filtro + botón nuevo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <div style={{ flex: 1, maxWidth: 280 }}>
-            <select
-              value={filterTenantId}
-              onChange={e => setFilterTenantId(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">— Todos los clientes —</option>
-              {clientTenants.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+          <Select value={filterTenantId} onChange={e => setFilterTenantId(e.target.value)}
+            style={{ flex: 1, maxWidth: 280 }}>
+            <option value="">— Todos los clientes —</option>
+            {clientTenants.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </Select>
           {isAdmin && <button
             onClick={() => setShowModal(true)}
             style={{
@@ -367,20 +344,12 @@ export default function DevicesPage() {
               />
 
               {/* Tenant */}
-              <div>
-                <label style={labelStyle}>Cliente</label>
-                <select
-                  value={newTenantId}
-                  onChange={e => setNewTenantId(e.target.value)}
-                  required
-                  style={inputStyle}
-                >
-                  <option value="">— Selecciona un cliente —</option>
-                  {clientTenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
+              <Select label="Cliente" value={newTenantId} onChange={e => setNewTenantId(e.target.value)} required>
+                <option value="">— Selecciona un cliente —</option>
+                {clientTenants.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </Select>
 
               {/* Error inline */}
               {modalError && (

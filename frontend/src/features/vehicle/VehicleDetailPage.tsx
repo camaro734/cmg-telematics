@@ -27,6 +27,7 @@ import { toast } from '../../shared/ui/Toast'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useFleetStore } from '../fleet/useFleetStore'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 const BASE_TABS = [
   { id: 'live', label: 'EN VIVO' },
@@ -863,11 +864,6 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
     }
   }
 
-  const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-elevated)',
-    border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--fg-primary)',
-  }
 
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -897,12 +893,12 @@ function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>Selecciona período</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selStyle, flex: 1 }}>
+            <Select size="sm" value={month} onChange={e => setMonth(Number(e.target.value))} style={{ flex: 1 }}>
               {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-            </select>
-            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selStyle}>
+            </Select>
+            <Select size="sm" value={year} onChange={e => setYear(Number(e.target.value))}>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            </Select>
           </div>
           <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Vehículo: {vehicleName}</div>
           <button

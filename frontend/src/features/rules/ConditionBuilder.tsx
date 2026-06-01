@@ -2,12 +2,8 @@ import type { CSSProperties } from 'react'
 import type { ConditionDef, SensorDef } from '../../lib/types'
 import GeofenceMapEditor from '../../shared/ui/GeofenceMapEditor'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
-const SELECT: CSSProperties = {
-  background: 'var(--bg-card)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 13, padding: '6px 8px',
-}
 const LABEL: CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)',
 }
@@ -79,16 +75,16 @@ function SimpleCondition({ condition, sensors, onChange }: {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {/* Selector de sensor — muestra el key como valor de opción (necesario para tests y compatibilidad con el modelo de datos) */}
-      <select value={condition.field ?? ''} onChange={e => update({ field: e.target.value })} style={SELECT}>
+      <Select value={condition.field ?? ''} onChange={e => update({ field: e.target.value })} style={{ background: 'var(--bg-card)' }}>
         {sensorList.map(s => <option key={s.key} value={sensorFieldKey(s)}>{s.label || s.key}</option>)}
-      </select>
+      </Select>
 
       {/* Campos threshold y threshold_sustained */}
       {(t === 'threshold' || t === 'threshold_sustained') && (
         <>
-          <select value={condition.op ?? '>'} onChange={e => update({ op: e.target.value as ConditionDef['op'] })} style={{ ...SELECT, width: 60 }}>
+          <Select value={condition.op ?? '>'} onChange={e => update({ op: e.target.value as ConditionDef['op'] })} style={{ background: 'var(--bg-card)', width: 60 }}>
             {OPS.map(op => <option key={op} value={op}>{op}</option>)}
-          </select>
+          </Select>
           <Input type="number" value={condition.value ?? 0} onChange={e => update({ value: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
           {unitLabel && <span style={LABEL}>{unitLabel}</span>}
         </>
@@ -219,13 +215,10 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Selector del tipo de condición */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select
-          value={condition.type}
-          onChange={e => handleTypeChange(e.target.value as ConditionDef['type'])}
-          style={SELECT}
-        >
+        <Select value={condition.type} style={{ background: 'var(--bg-card)' }}
+          onChange={e => handleTypeChange(e.target.value as ConditionDef['type'])}>
           {CONDITION_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
-        </select>
+        </Select>
       </div>
 
       {/* Vista geofence: selector de acción + mapa con editor de polígono */}
@@ -233,14 +226,11 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={LABEL}>Disparar al</span>
-            <select
-              value={condition.action ?? 'enter'}
-              onChange={e => onChange({ ...condition, action: e.target.value as 'enter' | 'exit' })}
-              style={SELECT}
-            >
+            <Select value={condition.action ?? 'enter'} style={{ background: 'var(--bg-card)' }}
+              onChange={e => onChange({ ...condition, action: e.target.value as 'enter' | 'exit' })}>
               <option value="enter">entrar en la zona</option>
               <option value="exit">salir de la zona</option>
-            </select>
+            </Select>
           </div>
           <GeofenceMapEditor
             polygon={condition.polygon ?? []}

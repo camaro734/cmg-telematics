@@ -9,6 +9,7 @@ import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useTenantContext } from '../../lib/useTenantContext'
 import type { MaintenancePlanOut, VehicleOut } from '../../lib/types'
+import { Select } from '../../shared/ui/Select'
 
 const STATUS_LABEL: Record<string, string> = { ok: 'OK', 'próximo': 'PRÓXIMO', vencido: 'VENCIDO' }
 const STATUS_COLOR: Record<string, string> = {
@@ -118,21 +119,10 @@ export default function MaintenancePage() {
     <Shell title="Mantenimiento">
       <div style={{ padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <select
-            value={vehicleFilter}
-            onChange={e => setVehicleFilter(e.target.value)}
-            style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              color: 'var(--fg-primary)',
-              borderRadius: 6,
-              padding: '6px 10px',
-              fontSize: 12,
-            }}
-          >
+          <Select size="sm" value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}>
             <option value="">Todos los vehículos</option>
             {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+          </Select>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={handleExportCsv}

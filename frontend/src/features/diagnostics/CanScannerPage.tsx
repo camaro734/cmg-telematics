@@ -7,6 +7,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, VehicleTypeOut, SensorDef, VehicleStatus } from '../../lib/types'
 import { AVL_NAMES } from '../../lib/avlNames'
 import { wsClient } from '../../lib/wsClient'
+import { Select } from '../../shared/ui/Select'
 
 type ResolvedSensor = {
   label: string
@@ -284,14 +285,6 @@ export default function CanScannerPage() {
     exportToCsv(`can_scan_${vehicleId}_${date}.csv`, rows)
   }
 
-  const inputStyle = {
-    background: 'var(--bg-elevated)',
-    border: '1px solid var(--border)',
-    color: 'var(--fg-primary)',
-    borderRadius: 6,
-    padding: '6px 10px',
-    fontSize: 13,
-  } as const
 
   return (
     <Shell title="CAN Scanner">
@@ -299,10 +292,10 @@ export default function CanScannerPage() {
 
         {/* Controls */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={inputStyle}>
+          <Select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
             <option value="">— Selecciona vehículo —</option>
             {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} {v.license_plate ? `(${v.license_plate})` : ''}</option>)}
-          </select>
+          </Select>
 
           <button
             onClick={() => setRefreshCount(c => c + 1)}

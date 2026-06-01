@@ -7,28 +7,9 @@ import type { VehicleOut, VehicleTypeOut, TenantOut, DeviceOut } from '../../lib
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
-// ─── Estilos compartidos ────────────────────────────────────────────────────
 
-const inputStyle = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '7px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box' as const,
-} as const
-
-const labelStyle = {
-  display: 'block',
-  fontSize: 11,
-  color: 'var(--fg-muted)',
-  marginBottom: 4,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.05em',
-} as const
 
 const thStyle = {
   textAlign: 'left' as const,
@@ -458,21 +439,13 @@ export default function VehiclesPage() {
                 placeholder="Nombre del conductor habitual"
               />
 
-              {/* Tipo */}
-              <div>
-                <label style={labelStyle}>Tipo de vehículo *</label>
-                <select
-                  value={form.vehicle_type_id}
-                  onChange={e => setField('vehicle_type_id', e.target.value)}
-                  required
-                  style={inputStyle}
-                >
-                  <option value="">— Selecciona un tipo —</option>
-                  {vehicleTypes.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
+              <Select label="Tipo de vehículo *" value={form.vehicle_type_id}
+                onChange={e => setField('vehicle_type_id', e.target.value)} required>
+                <option value="">— Selecciona un tipo —</option>
+                {vehicleTypes.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </Select>
 
               {/* Separador opcionales */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -500,23 +473,15 @@ export default function VehiclesPage() {
 
                 {/* Cliente */}
                 <div>
-                  <label style={labelStyle}>Cliente</label>
-                  <select
-                    value={form.tenant_id}
+                  <Select label="Cliente" value={form.tenant_id}
                     onChange={e => setField('tenant_id', e.target.value)}
-                    style={inputStyle}
                     disabled={modal === 'edit'}
-                  >
+                    helperText={modal === 'edit' ? 'El cliente no se puede cambiar una vez asignado.' : undefined}>
                     <option value="">— CMG (sin cliente) —</option>
                     {clientTenants.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
-                  </select>
-                  {modal === 'edit' && (
-                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 4 }}>
-                      El cliente no se puede cambiar una vez asignado.
-                    </div>
-                  )}
+                  </Select>
                 </div>
               </div>
 

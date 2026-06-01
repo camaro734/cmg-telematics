@@ -6,6 +6,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, SensorDef } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
 import WorkCycleDefsSection from './WorkCycleDefsSection'
 import MaintenanceTemplatesSection from './MaintenanceTemplatesSection'
@@ -99,17 +100,6 @@ async function uploadIcon(typeId: string, file: File): Promise<VehicleTypeOut> {
 }
 
 // ── Shared styles ──────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box',
-}
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
@@ -566,9 +556,7 @@ export default function VehicleTypesPage() {
             {/* Canal CAN */}
             <div>
               <label style={labelStyle}>CANAL CAN</label>
-              <select
-                style={inputStyle}
-                value={AVL_OPTIONS.some(o => String(o.id) === sensorForm.avl_id) ? sensorForm.avl_id : '__custom__'}
+              <Select value={AVL_OPTIONS.some(o => String(o.id) === sensorForm.avl_id) ? sensorForm.avl_id : '__custom__'}
                 onChange={e => {
                   const val = e.target.value
                   if (val === '__custom__') {
@@ -582,8 +570,7 @@ export default function VehicleTypesPage() {
                       unit: f.unit || (info?.unit ?? ''),
                     }))
                   }
-                }}
-              >
+                }}>
                 <option value="">— Selecciona canal —</option>
                 {AVL_OPTIONS.map(opt => (
                   <option key={opt.id} value={String(opt.id)}>
@@ -591,7 +578,7 @@ export default function VehicleTypesPage() {
                   </option>
                 ))}
                 <option value="__custom__">Otro AVL ID...</option>
-              </select>
+              </Select>
               {/* Input manual si el ID no está en la lista */}
               {!AVL_OPTIONS.some(o => String(o.id) === sensorForm.avl_id) && (
                 <Input type="number" min="1" max="65535" style={{ marginTop: 6 }}
@@ -696,10 +683,10 @@ export default function VehicleTypesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>TIPO DE GAUGE</label>
-                  <select style={inputStyle} value={sensorForm.gauge_type}
+                  <Select value={sensorForm.gauge_type}
                     onChange={e => setSensorForm(f => ({ ...f, gauge_type: e.target.value as SensorDef['gauge_type'] }))}>
                     {GAUGE_TYPES.filter(g => g !== 'led').map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label style={labelStyle}>MULTIPLICADOR (scale)</label>

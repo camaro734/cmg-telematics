@@ -1,22 +1,12 @@
-import type { CSSProperties } from 'react'
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 import type { SettingsOut, TenantOut } from '../../lib/types'
 
-const INPUT: CSSProperties = {
-  background: 'var(--bg-base)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 13, padding: '8px 10px', width: '100%', boxSizing: 'border-box',
-}
-
-const LABEL: CSSProperties = {
-  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)',
-  display: 'block', marginBottom: 4, letterSpacing: '0.05em',
-}
 
 export default function NotificationSettings() {
   const user = useAuthStore(s => s.user)
@@ -70,15 +60,11 @@ export default function NotificationSettings() {
 
       {isCmg && (
         <div style={{ marginBottom: 16 }}>
-          <label style={LABEL}>TENANT</label>
-          <select
-            value={selectedTenantId}
-            onChange={e => { setSelectedTenantId(e.target.value); setEmail(''); setSaved(false) }}
-            style={INPUT}
-          >
+          <Select label="Tenant" value={selectedTenantId}
+            onChange={e => { setSelectedTenantId(e.target.value); setEmail(''); setSaved(false) }}>
             <option value="">Selecciona un tenant…</option>
             {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          </Select>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import type { MaintenanceThreshold } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 const TYPE_OPTIONS = [
   { value: 'pto_hours', label: 'Horas PTO' },
@@ -34,26 +35,14 @@ export default function ThresholdBuilder({ thresholds, onChange }: Props) {
     onChange(next)
   }
 
-  const inputStyle = {
-    background: 'var(--bg-base)',
-    border: '1px solid var(--border)',
-    color: 'var(--fg-primary)',
-    borderRadius: 6,
-    padding: '6px 10px',
-    fontSize: 13,
-  }
 
   return (
     <div>
       {thresholds.map((t, i) => (
         <div key={`${t.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-          <select
-            value={t.type}
-            onChange={e => update(i, 'type', e.target.value)}
-            style={inputStyle}
-          >
+          <Select value={t.type} onChange={e => update(i, 'type', e.target.value)}>
             {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          </Select>
           <Input
             type="number"
             value={t.value}

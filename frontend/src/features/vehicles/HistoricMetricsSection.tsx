@@ -5,6 +5,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, HistoricMetricItem } from '../../lib/types'
 import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,17 +35,6 @@ const KPI_OPTIONS = [
 ]
 
 // ── Shared styles ──────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box',
-}
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
@@ -245,9 +235,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
 
             <div>
               <label style={labelStyle}>MÉTRICA (KPI)</label>
-              <select
-                style={inputStyle}
-                value={metricForm.key}
+              <Select value={metricForm.key}
                 onChange={e => {
                   const opt = KPI_OPTIONS.find(o => o.key === e.target.value)
                   setMetricForm(f => ({
@@ -258,13 +246,12 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                     color: opt ? opt.color : f.color,
                     transform: opt ? opt.transform.toString() : f.transform,
                   }))
-                }}
-              >
+                }}>
                 <option value="">— Selecciona —</option>
                 {KPI_OPTIONS.map(o => (
                   <option key={o.key} value={o.key}>{o.label} ({o.key})</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -278,9 +265,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
               </div>
               <div>
                 <label style={labelStyle}>SEÑAL FMC650</label>
-                <select
-                  style={inputStyle}
-                  value={AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) ? metricForm.avl_id : metricForm.avl_id ? '__custom__' : ''}
+                <Select value={AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) ? metricForm.avl_id : metricForm.avl_id ? '__custom__' : ''}
                   onChange={e => {
                     if (e.target.value === '__custom__') {
                       setMetricForm(f => ({ ...f, avl_id: '' }))
@@ -295,8 +280,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                         unit: f.unit || (info?.unit ?? ''),
                       }))
                     }
-                  }}
-                >
+                  }}>
                   <option value="">-- Selecciona señal --</option>
                   {AVL_OPTIONS.map(opt => (
                     <option key={opt.id} value={String(opt.id)}>
@@ -304,7 +288,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                     </option>
                   ))}
                   <option value="__custom__">Otro AVL ID personalizado...</option>
-                </select>
+                </Select>
                 {!AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) && (
                   <Input type="number" min="1" max="65535" style={{ marginTop: 6 }}
                     value={metricForm.avl_id}

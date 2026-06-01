@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycleDefinitionCreate, SensorDef } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 const TRIGGER_OPTIONS = [
   { value: 'pto_change', label: 'PTO activo' },
@@ -11,17 +12,6 @@ const TRIGGER_OPTIONS = [
   { value: 'threshold_exceeded', label: 'Umbral superado' },
   { value: 'sensor_pulse', label: 'Pulso de sensor' },
 ]
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box',
-}
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
@@ -340,28 +330,20 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
 
               <div>
                 <label style={labelStyle} id="trigger-label">TIPO DE TRIGGER *</label>
-                <select
-                  aria-labelledby="trigger-label"
-                  style={inputStyle}
-                  value={form.trigger_type}
-                  onChange={e => setForm(f => ({ ...f, trigger_type: e.target.value, sensor: '', sensorCustom: '' }))}
-                >
+                <Select aria-labelledby="trigger-label" value={form.trigger_type}
+                  onChange={e => setForm(f => ({ ...f, trigger_type: e.target.value, sensor: '', sensorCustom: '' }))}>
                   {TRIGGER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                </Select>
               </div>
 
               {needsSensor && (
                 <div>
                   <label style={labelStyle}>SENSOR (CLAVE EN can_data)</label>
-                  <select
-                    style={inputStyle}
-                    value={form.sensor}
-                    onChange={e => setForm(f => ({ ...f, sensor: e.target.value, sensorCustom: '' }))}
-                  >
+                  <Select value={form.sensor} onChange={e => setForm(f => ({ ...f, sensor: e.target.value, sensorCustom: '' }))}>
                     <option value="">— Selecciona —</option>
                     {schemaKeys.map(k => <option key={k} value={k}>{k}</option>)}
                     <option value="__custom__">Otro…</option>
-                  </select>
+                  </Select>
                   {form.sensor === '__custom__' && (
                     <Input
                       style={{ marginTop: 6 }}
@@ -378,9 +360,9 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
                   <div>
                     <label style={labelStyle}>OPERADOR</label>
-                    <select style={inputStyle} value={form.op} onChange={e => setForm(f => ({ ...f, op: e.target.value }))}>
+                    <Select value={form.op} onChange={e => setForm(f => ({ ...f, op: e.target.value }))}>
                       {['>', '>=', '<', '<='].map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label style={labelStyle}>UMBRAL</label>

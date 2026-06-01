@@ -5,6 +5,7 @@ import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycle } from '../../lib/types'
 import { exportToCsv } from '../../lib/csvExport'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 interface Props {
   vehicleId: string
@@ -119,16 +120,13 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
       <div style={{ ...cardStyle, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>DEFINICIÓN</div>
-          <select
-            value={selectedDefinitionId}
-            onChange={e => setSelectedDefinitionId(e.target.value)}
-            style={{ background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }}
-          >
+          <Select value={selectedDefinitionId} onChange={e => setSelectedDefinitionId(e.target.value)}
+            style={{ background: 'var(--bg-card)' }}>
             <option value="">Todas</option>
             {activeDefinitions.map(d => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>DESDE</div>

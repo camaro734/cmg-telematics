@@ -5,6 +5,7 @@ import { keys } from '../../lib/queryKeys'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { PdfMetricItem, PdfMetricKey, PdfMetricFormat, VehicleTypeOut } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 interface CatalogEntry {
   key: PdfMetricKey
@@ -38,17 +39,6 @@ function formatSample(v: number, fmt: PdfMetricFormat, unit: string): string {
   if (fmt === 'decimal1') return `${v.toFixed(1)} ${unit}`
   if (fmt === 'decimal2') return `${v.toFixed(2)} ${unit}`
   return `${v} ${unit}`
-}
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  color: 'var(--fg-primary)',
-  borderRadius: 6,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
-  boxSizing: 'border-box',
 }
 
 const buttonStyle: React.CSSProperties = {
@@ -254,11 +244,11 @@ function EditMetricModal({ metric, onSave, onCancel }: {
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
           <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Formato</span>
-          <select value={format} onChange={e => setFormat(e.target.value as PdfMetricFormat)} style={inputStyle}>
+          <Select value={format} onChange={e => setFormat(e.target.value as PdfMetricFormat)}>
             <option value="integer">Entero</option>
             <option value="decimal1">1 decimal</option>
             <option value="decimal2">2 decimales</option>
-          </select>
+          </Select>
         </label>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={buttonStyle}>Cancelar</button>

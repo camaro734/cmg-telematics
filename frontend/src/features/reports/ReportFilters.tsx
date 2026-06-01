@@ -4,6 +4,7 @@ import { toast } from '../../shared/ui/Toast'
 import type { TenantOut, VehicleOut } from '../../lib/types'
 import type { Period } from './useReportData'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 // ── Style constants (compartidos con ReportsPage) ─────────────────────────────
 
@@ -62,11 +63,6 @@ export function PdfDownloadBtn({
     }
   }
 
-  const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-card)',
-    border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--fg-primary)',
-  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -85,12 +81,12 @@ export function PdfDownloadBtn({
         }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>Selecciona período</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...selStyle, flex: 1 }}>
+            <Select size="sm" value={month} onChange={e => setMonth(Number(e.target.value))} style={{ background: 'var(--bg-card)', flex: 1 }}>
               {months.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-            </select>
-            <select value={year} onChange={e => setYear(Number(e.target.value))} style={selStyle}>
+            </Select>
+            <Select size="sm" value={year} onChange={e => setYear(Number(e.target.value))} style={{ background: 'var(--bg-card)' }}>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            </Select>
           </div>
           <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
             {vehicleId
@@ -139,11 +135,6 @@ export function SelectorBar({
   pdfSlot?: React.ReactNode
   onBack?: () => void
 }) {
-  const selStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-card)',
-    border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px',
-    color: 'var(--fg-primary)',
-  }
   const periodBtn = (p: Period): React.CSSProperties => ({
     padding: '5px 14px', fontSize: 12, fontWeight: 600,
     fontFamily: 'var(--font-sans)', border: '1px solid var(--border)',
@@ -185,16 +176,13 @@ export function SelectorBar({
         </button>
       )}
 
-      <select
-        value={vehicleId}
-        onChange={e => setVehicleId(e.target.value)}
-        style={{ ...selStyle, color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}
-      >
+      <Select size="sm" value={vehicleId} onChange={e => setVehicleId(e.target.value)}
+        style={{ background: 'var(--bg-card)', color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}>
         <option value="">— Selecciona un vehículo —</option>
         {vehicles.map(v => (
           <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
         ))}
-      </select>
+      </Select>
 
       <div style={{ display: 'flex', gap: 4, marginLeft: 4, flexWrap: 'wrap', alignItems: 'center' }}>
         {(['dia', 'semana', 'mes', 'custom'] as Period[]).map(p => (

@@ -6,6 +6,7 @@ import type { VehicleTypeOut, SensorDef, SensorIcon } from '../../lib/types'
 import { AVL_CATALOG, GROUP_LABELS, avlParamToSensorDef } from '../../lib/avlCatalog'
 import { SensorIconComponent, SENSOR_ICONS } from '../../shared/ui/gauges/SensorIconSet'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'counter', 'led']
 
@@ -14,16 +15,6 @@ const sectionStyle: React.CSSProperties = {
   border: '1px solid var(--border)',
   borderRadius: 8,
   padding: 20,
-}
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--bg-elevated)',
-  color: 'var(--fg-secondary)',
-  border: '1px solid var(--border)',
-  borderRadius: 5,
-  padding: '6px 10px',
-  fontSize: 13,
-  width: '100%',
 }
 
 interface AddSensorForm {
@@ -146,16 +137,13 @@ export default function VehicleTypeSensorsSection() {
             <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
               Tipo de vehículo
             </label>
-            <select
-              style={{ ...inputStyle, maxWidth: 300 }}
-              value={selectedTypeId}
-              onChange={e => { setSelectedTypeId(e.target.value); setModalError(null); setRemoveError(null) }}
-            >
+            <Select value={selectedTypeId} style={{ maxWidth: 300 }}
+              onChange={e => { setSelectedTypeId(e.target.value); setModalError(null); setRemoveError(null) }}>
               <option value="">Seleccionar tipo…</option>
               {vehicleTypes.map(vt => (
                 <option key={vt.id} value={vt.id}>{vt.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {selectedType && (
@@ -332,12 +320,7 @@ export default function VehicleTypeSensorsSection() {
                 <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                   Parámetro del catálogo *
                 </label>
-                <select
-                  style={inputStyle}
-                  value={form.avl_id ?? ''}
-                  onChange={e => handleCatalogChange(Number(e.target.value))}
-                  required
-                >
+                <Select value={form.avl_id ?? ''} onChange={e => handleCatalogChange(Number(e.target.value))} required>
                   <option value="">Seleccionar parámetro…</option>
                   {Object.entries(GROUP_LABELS).map(([groupKey, groupLabel]) => {
                     const params = AVL_CATALOG.filter(p => p.group === groupKey && !activeAvlIds.has(p.avl_id))
@@ -352,7 +335,7 @@ export default function VehicleTypeSensorsSection() {
                       </optgroup>
                     )
                   })}
-                </select>
+                </Select>
               </div>
 
               {form.avl_id != null && (
@@ -372,13 +355,10 @@ export default function VehicleTypeSensorsSection() {
                     <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                       Tipo de gauge *
                     </label>
-                    <select
-                      style={inputStyle}
-                      value={form.gauge_type ?? 'numeric'}
-                      onChange={e => setForm(f => ({ ...f, gauge_type: e.target.value as SensorDef['gauge_type'] }))}
-                    >
+                    <Select value={form.gauge_type ?? 'numeric'}
+                      onChange={e => setForm(f => ({ ...f, gauge_type: e.target.value as SensorDef['gauge_type'] }))}>
                       {GAUGE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
+                    </Select>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

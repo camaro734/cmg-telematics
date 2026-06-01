@@ -4,17 +4,12 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { UserOut, UserCreate, UserUpdate } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 
 interface Props {
   tenantId: string
   user?: UserOut
   onClose: () => void
-}
-
-const SELECT_STYLE: React.CSSProperties = {
-  width: '100%', padding: '8px 10px', background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)', borderRadius: 6,
-  color: 'var(--fg-primary)', fontSize: 13, boxSizing: 'border-box',
 }
 
 export default function UserFormModal({ tenantId, user, onClose }: Props) {
@@ -70,15 +65,12 @@ export default function UserFormModal({ tenantId, user, onClose }: Props) {
           <Input label="Nombre completo" value={fullName}
             onChange={e => setFullName(e.target.value)} required />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Rol</span>
-            <select value={role} onChange={e => setRole(e.target.value as UserOut['role'])} style={SELECT_STYLE}>
-              <option value="admin">Admin</option>
-              <option value="operator">Operador</option>
-              <option value="viewer">Viewer</option>
-              <option value="driver">Conductor</option>
-            </select>
-          </div>
+          <Select label="Rol" value={role} onChange={e => setRole(e.target.value as UserOut['role'])}>
+            <option value="admin">Admin</option>
+            <option value="operator">Operador</option>
+            <option value="viewer">Viewer</option>
+            <option value="driver">Conductor</option>
+          </Select>
 
           <Input
             label="Contraseña"

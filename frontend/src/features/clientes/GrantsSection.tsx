@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { GrantOut, GrantCreate } from '../../lib/types'
+import { Select } from '../../shared/ui/Select'
 
 const GRANT_TYPES = [
   { resource_type: 'maintenance', label: 'Registrar intervenciones de mantenimiento', allowed_actions: ['log'] },
@@ -65,17 +66,9 @@ export default function GrantsSection({ tenantId }: Props) {
       </table>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select
-          value={selectedIdx}
-          onChange={e => setSelectedIdx(Number(e.target.value))}
-          style={{
-            flex: 1, padding: '7px 10px', background: 'var(--bg-elevated)',
-            border: '1px solid var(--border)', borderRadius: 6,
-            color: 'var(--fg-primary)', fontSize: 13,
-          }}
-        >
+        <Select value={selectedIdx} onChange={e => setSelectedIdx(Number(e.target.value))} style={{ flex: 1 }}>
           {GRANT_TYPES.map((g, i) => <option key={i} value={i}>{g.label}</option>)}
-        </select>
+        </Select>
         <button
           onClick={() => createMutation.mutate({
             grantee_id: tenantId,

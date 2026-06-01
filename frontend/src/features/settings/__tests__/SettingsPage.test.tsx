@@ -76,7 +76,7 @@ describe('SettingsPage', () => {
       return Promise.resolve([]) as never
     })
     renderPage()
-    expect(screen.getByText('TENANT')).toBeInTheDocument()
+    expect(screen.getByText('Tenant')).toBeInTheDocument()
   })
 
   it('llama apiClient.patch al guardar', async () => {
