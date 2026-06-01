@@ -5,7 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { useNavigate } from 'react-router-dom'
 import { useFleetStore } from './useFleetStore'
-import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut, VehicleTypeOut, SensorDef } from '../../lib/types'
 
 
 // ── Design token mirrors (CSS vars can't be used in SVG strings) ────────────
@@ -127,47 +127,118 @@ function makeVehicleIcon(status: VehicleStatus, hasAlert: boolean): L.DivIcon {
   return makeStoppedIcon(status.ignition)
 }
 
-function formatStoppedTime(lastSeen: string | null): string {
-  if (!lastSeen) return 'Sin señal'
-  const mins = Math.round((Date.now() - new Date(lastSeen).getTime()) / 60000)
-  if (mins < 1) return 'Ahora mismo'
-  if (mins < 60) return `Parado ${mins} min`
-  const hrs = Math.floor(mins / 60)
-  const rem = mins % 60
-  return rem > 0 ? `Parado ${hrs}h ${rem}min` : `Parado ${hrs}h`
-}
-
 function formatLastSeen(lastSeen: string | null): string {
   if (!lastSeen) return 'Sin datos'
   const d = new Date(lastSeen)
   return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
-function buildPopupHtml(vehicle: VehicleOut, status: VehicleStatus, hasAlert: boolean): string {
+function buildPopupHtml(
+  vehicle: VehicleOut,
+  status: VehicleStatus,
+  vehicleAlerts: AlertInstanceOut[],
+  tenantNames: Map<string, string>,
+  rulesById: Map<string, RuleOut>,
+  vehicleType: VehicleTypeOut | undefined
+): string {
+  const clientName = tenantNames.get(vehicle.tenant_id) ?? '—'
   const online = isEffectivelyOnline(status)
-  const moving = online && (status.speed_kmh ?? 0) > 2
-  let statusText: string
-  if (!online) {
-    statusText = `⚫ Sin señal`
-  } else if (hasAlert) {
-    statusText = `🔴 Alerta activa`
-  } else if (moving) {
-    statusText = `🟢 En movimiento — <strong>${Math.round(status.speed_kmh ?? 0)} km/h</strong>`
-  } else {
-    statusText = `🟡 ${formatStoppedTime(status.last_seen)}`
+
+  // Severidad peor de las alertas activas del vehículo
+  let worstSev: '' | 'warning' | 'critical' = ''
+  for (const a of vehicleAlerts) {
+    const sev = rulesById.get(a.rule_id)?.severity
+    if (sev === 'critical') { worstSev = 'critical'; break }
+    if (sev === 'warning') worstSev = 'warning'
   }
-  const plateLine = vehicle.license_plate
-    ? `<div style="color:${T_MUTED};font-size:11px;margin-bottom:4px">${vehicle.license_plate}</div>`
+  const borderColor = worstSev === 'critical' ? 'var(--danger)' : worstSev === 'warning' ? 'var(--warn)' : 'transparent'
+
+  // Banda offline (2 rgba hardcoded — ver deuda técnica opacidad)
+  const offlineBand = !online
+    ? `<div style="background:rgba(239,68,68,0.12);color:var(--danger);padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(239,68,68,0.25)">Datos desactualizados desde ${formatLastSeen(status.last_seen)}</div>`
     : ''
+
+  // Chips de alertas (3 rgba hardcoded — ver deuda técnica opacidad)
+  const chips = vehicleAlerts.map(a => {
+    const rule = rulesById.get(a.rule_id)
+    const name = rule?.name ?? 'Alerta'
+    const sev = rule?.severity ?? 'info'
+    const bg = sev === 'critical' ? 'rgba(239,68,68,0.12)' : sev === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)'
+    const color = sev === 'critical' ? 'var(--danger)' : sev === 'warning' ? 'var(--warn)' : 'var(--info)'
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${bg};color:${color};font-size:10px;font-weight:600">⚠ ${name}</span>`
+  }).join('')
+  const chipsRow = chips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${chips}</div>` : ''
+
+  // Tabla compacta — fondo blanco del popup nativo de Leaflet: usar colores oscuros para contraste
+  const driverCell = vehicle.driver_name
+    ? `<span style="color:#111827;font-size:12px">${vehicle.driver_name}</span>`
+    : `<span style="color:${T_MUTED};font-style:italic;font-size:12px">Sin conductor asignado</span>`
+  const stateCell = online
+    ? `<span style="color:var(--ok);font-size:12px;font-weight:500">En línea</span>`
+    : `<span style="color:${T_MUTED};font-size:12px">Offline</span>`
+
+  // Equipo industrial (Bloque 4)
+  const ledSensors: SensorDef[] = (vehicleType?.sensor_schema ?? []).filter(
+    s => s.gauge_type === 'led' && (s.category ?? 'maquina') === 'maquina'
+  )
+  const equipRows: string[] = []
+  if (status.pto_active != null) {
+    const a = status.pto_active
+    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">PTO</td><td style="padding:3px 0;font-size:12px;color:${a ? 'var(--ok)' : T_MUTED};font-weight:${a ? 500 : 400}">${a ? 'Activo' : 'Inactivo'}</td></tr>`)
+  }
+  for (const s of ledSensors) {
+    const raw = status.can_data?.[s.key]
+    const a: boolean | null = raw == null ? null : s.bit_index !== undefined ? ((Number(raw) >> s.bit_index) & 1) === 1 : Boolean(raw)
+    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">${s.label}</td><td style="padding:3px 0;font-size:12px;color:${a === true ? 'var(--ok)' : T_MUTED};font-weight:${a === true ? 500 : 400}">${a === null ? '—' : a ? 'Activo' : 'Inactivo'}</td></tr>`)
+  }
+  const equipHtml = equipRows.length === 0
+    ? `<div style="font-size:11px;color:${T_MUTED};font-style:italic">Sin equipo configurado</div>`
+    : `<table style="width:100%;border-collapse:collapse">${equipRows.join('')}</table>`
+  const equipSection = `<div style="font-size:10px;color:${T_MUTED};font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px">Equipo industrial</div>${equipHtml}`
+
   return `
-    <div style="font-family:sans-serif;min-width:160px;padding:2px 0">
-      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${vehicle.name}</div>
-      ${plateLine}
-      <div style="font-size:12px;margin-bottom:4px">${statusText}</div>
-      <div style="font-size:11px;color:${T_MUTED};margin-bottom:6px">
-        Ultima señal: ${formatLastSeen(status.last_seen)}
+    <div data-popup-root style="min-width:280px;max-width:340px;font-family:var(--font-sans,sans-serif);border-left:3px solid ${borderColor};overflow:hidden">
+      ${offlineBand}
+      <div style="padding:12px 14px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+          <span style="font-weight:500;font-size:13px;color:#111827">${vehicle.name}</span>
+          <span style="font-size:11px;color:${T_MUTED};margin-left:8px">${vehicle.license_plate ?? ''}</span>
+        </div>
+        <div style="font-size:11px;color:${T_MUTED};margin-bottom:${chips ? '8px' : '10px'}">${clientName}</div>
+        ${chipsRow}
+        <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+          <tr>
+            <td style="padding:2px 8px 2px 0;color:${T_MUTED}">👤</td>
+            <td style="padding:2px 8px 2px 0;font-size:12px;color:${T_MUTED};white-space:nowrap">Conductor</td>
+            <td style="padding:2px 0">${driverCell}</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 8px 2px 0;color:${T_MUTED}">●</td>
+            <td style="padding:2px 8px 2px 0;font-size:12px;color:${T_MUTED};white-space:nowrap">Estado</td>
+            <td style="padding:2px 0">${stateCell}</td>
+          </tr>
+          <tr>
+            <td style="padding:2px 8px 2px 0;color:${T_MUTED}">🕐</td>
+            <td style="padding:2px 8px 2px 0;font-size:12px;color:${T_MUTED};white-space:nowrap">Última señal</td>
+            <td style="padding:2px 0;font-size:12px;color:${T_MUTED}">${formatLastSeen(status.last_seen)}</td>
+          </tr>
+        </table>
+        <div style="display:flex;gap:8px">
+          <button
+            data-popup-action="toggle-more"
+            data-vehicle-id="${vehicle.id}"
+            style="flex:1;padding:6px 0;border:1px solid #d1d5db;background:transparent;border-radius:6px;font-size:12px;cursor:pointer;color:#374151">
+            Ver más ↓
+          </button>
+          <a href="/vehicles/${vehicle.id}"
+            style="flex:1;padding:6px 0;text-align:center;background:var(--cmg-teal,#1D9E75);color:#000;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;display:inline-block">
+            Detalle →
+          </a>
+        </div>
+        <div data-popup-section="more" style="display:none;border-top:1px solid #e2e8f0;margin-top:10px;padding-top:10px">
+          ${equipSection}
+        </div>
       </div>
-      <a href="/vehicles/${vehicle.id}" style="color:${T_ORANGE};font-size:12px;text-decoration:none">Ver detalle →</a>
     </div>
   `
 }
@@ -175,13 +246,14 @@ function buildPopupHtml(vehicle: VehicleOut, status: VehicleStatus, hasAlert: bo
 interface FleetMapProps {
   vehicles: VehicleOut[]
   statuses: Map<string, VehicleStatus>
-  vehicleTypes?: unknown[]
+  vehicleTypes?: VehicleTypeOut[]
   firingAlerts?: AlertInstanceOut[]
   rules?: RuleOut[]
   workOrders?: WorkOrderOut[]
+  tenantNames?: Map<string, string>
 }
 
-export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules = [], workOrders = [] }: FleetMapProps) {
+export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules = [], workOrders = [], tenantNames = new Map(), vehicleTypes = [] }: FleetMapProps) {
   const navigate = useNavigate()
   const { selectedId } = useFleetStore()
   const mapRef = useRef<L.Map | null>(null)
@@ -279,6 +351,7 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
     }
 
     const alertVehicleIds = new Set(firingAlerts.map(a => a.vehicle_id))
+    const rulesById = new Map(rules.map(r => [r.id, r]))
 
     // Add/update markers and GPS accuracy circles
     for (const vehicle of validVehicles) {
@@ -289,7 +362,9 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
       const hasAlert = alertVehicleIds.has(vehicle.id)
       const online = isEffectivelyOnline(status)
       const icon = makeVehicleIcon(status, hasAlert)
-      const popupHtml = buildPopupHtml(vehicle, status, hasAlert)
+      const vehicleAlerts = firingAlerts.filter(a => a.vehicle_id === vehicle.id)
+      const vehicleType = vehicleTypes.find(vt => vt.id === vehicle.vehicle_type_id)
+      const popupHtml = buildPopupHtml(vehicle, status, vehicleAlerts, tenantNames, rulesById, vehicleType)
 
       if (markersRef.current.has(vehicle.id)) {
         const marker = markersRef.current.get(vehicle.id)!
@@ -397,13 +472,27 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrders])
 
-  // Handle popup link clicks (SPA navigation)
+  // Handle popup link clicks (SPA navigation) + toggle "Ver más"
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const target = e.target as HTMLElement
+
+      // SPA navigation
       if (target.tagName === 'A' && target.getAttribute('href')?.startsWith('/vehicles/')) {
         e.preventDefault()
         navigate(target.getAttribute('href')!)
+        return
+      }
+
+      // Toggle equipo industrial
+      const btn = target.closest('button[data-popup-action="toggle-more"]') as HTMLButtonElement | null
+      if (btn) {
+        const root = btn.closest('[data-popup-root]')
+        const section = root?.querySelector('[data-popup-section="more"]') as HTMLElement | null
+        if (!section) return
+        const expanded = section.style.display !== 'none'
+        section.style.display = expanded ? 'none' : 'block'
+        btn.textContent = expanded ? 'Ver más ↓' : 'Ver menos ↑'
       }
     }
     document.addEventListener('click', onClick)
