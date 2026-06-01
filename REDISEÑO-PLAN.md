@@ -376,18 +376,12 @@ Afectaba 10 tooltips en 3 archivos (ReportsPage 6, KpiChart 3, DashboardPage 1).
 Contraste resultante: `--fg-primary` (#F1F5F9) sobre `--bg-elevated` (#22263A) = 9.5:1.
 Verificado visualmente en /reports.
 
-## Bug preexistente identificado — 1 junio 2026
+## Bug preexistente identificado — ✅ RESUELTO 1 junio 2026 commit 90f9aa8
 
-Pie chart "Distribución del tiempo" en ReportsPage.tsx asigna colores por índice del array filtrado, no por nombre del segmento. Cuando un segmento (PTO, Motor o Parado) tiene valor cero, los índices restantes "se deslizan" y los segmentos visibles reciben colores que no les corresponden.
+Pie chart "Distribución del tiempo" en ReportsPage.tsx asignaba colores por índice del array
+filtrado. Cuando un segmento tenía valor 0 y era eliminado por `.filter(d => d.value > 0)`,
+los índices se deslizaban y los segmentos visibles recibían colores incorrectos.
 
-**Solución:** cambiar de mapeo por índice a mapeo por nombre semántico:
-```tsx
-const PIE_COLOR: Record<string, string> = {
-  'PTO':    'var(--energy-orange)',
-  'Motor':  '#22C55E',
-  'Parado': 'var(--offline)',
-}
-// <Cell fill={PIE_COLOR[entry.name] ?? 'var(--fg-dim)'} />
-```
-
-Trabajo estimado: 10 minutos. Se aborda cuando se trate el componente Reportes en la Fase 8 del rediseño.
+Solución aplicada: `pieColors2` (array indexado) sustituido por `PIE_COLOR: Record<string, string>`
+mapeado por nombre semántico. `<Cell>` cambiado de `(_, i)` a `(entry)`. Color de 'Parado'
+mejorado de `#1E2532` (bg-card, casi invisible) a `var(--offline)` (#64748B). Verificado visualmente.
