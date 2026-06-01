@@ -163,6 +163,105 @@ Tras Fase 1.5, abrir CUALQUIER pantalla de la app y los modales, botones, badges
 - Marcador con pin azul Leaflet + halo verde teal.
 - TopNav (que es el componente más complejo del repo) se ajusta aquí si hace falta. Tratar con cuidado.
 
+### Revisión 1 junio 2026 — cambio de scope
+
+Tras verificación visual en vivo de /fleet, Carlos confirma que el
+layout actual (lista de vehículos a la izquierda + mapa a ancho
+completo a la derecha) FUNCIONA y NO debe rediseñarse. El plan
+original ("eliminar banda lateral + panel flotante en esquina")
+queda DESCARTADO.
+
+El scope real de Fase 2 pasa a ser:
+
+**Rediseñar el popup del marcador del vehículo en el mapa.**
+
+El popup actual muestra solo nombre + matrícula + estado + última
+señal + enlace al detalle. Carlos lo considera "simple visualmente
+y pobre en información". Decisión: enriquecerlo en información y
+rediseñarlo visualmente.
+
+Estimación revisada: 1 sesión de implementación (no 3-4 días). Pasa
+de "rediseño estructural de pantalla" a "rediseño de un componente
+acotado".
+
+---
+
+## Especificación del popup rediseñado
+
+### Información en nivel esencial (siempre visible)
+
+- Cabecera: nombre del vehículo (izquierda, font-weight 500) +
+  matrícula (derecha, color secundario).
+- Cliente al que pertenece el vehículo, debajo del nombre, en
+  color secundario.
+- Si vehículo OFFLINE: banda roja arriba con texto
+  "Datos desactualizados desde [hora]".
+- Si vehículo tiene alerta crítica: borde IZQUIERDO de 3px en
+  color de severidad (rojo crítico, ámbar aviso). Solo border-left,
+  no borde completo (criterio: sutil pero presente).
+- Chip de alertas activas: icono + texto + fondo en color de
+  severidad. Una alerta por chip. Habitual 0-2 alertas.
+- Tabla compacta con iconos de Tabler:
+  - Conductor (icono ti-user). Si no hay conductor: mostrar
+    "Sin conductor asignado" en color tertiary itálico.
+  - Estado (icono según estado): "En línea" en verde teal /
+    "Offline" en gris secundario.
+  - Última señal: hora.
+- Dos botones al pie:
+  - "Ver más ↓" — despliega sección expandida (sub-nivel).
+  - "Detalle →" — navega a /vehicles/:id.
+
+### Información en nivel "Ver más" (al desplegar, crece hacia abajo)
+
+- Label "EQUIPO INDUSTRIAL" en mayúsculas pequeñas, color tertiary.
+- Tabla compacta con estado de cada elemento del equipo:
+  - PTO
+  - Depresor
+  - Bomba (de agua si aplica)
+  - Otros relevantes según vehículo
+- VALORES VISUALMENTE DIFERENCIADOS:
+  - "Activo" en verde teal (var(--ok) o equivalente coherente).
+  - "Inactivo" en gris secundario.
+- Botón cambia a "Ver menos ↑".
+
+### Estilo visual
+
+- Fondo claro (mantener nativo de Leaflet, NO oscurecer).
+- Tipografía cuidada, jerarquía con dos pesos (400 y 500).
+- Sombra suave, esquinas redondeadas (border-radius-md).
+- Ancho: min 280px, max 340px.
+- Padding interno: 14px-16px.
+- Separadores entre secciones: 0.5px solid var(--color-border-tertiary).
+
+### Estados especiales documentados
+
+- Sin conductor → "Sin conductor asignado" en gris dim itálico
+  (campo visible, dato vacío).
+- Sin cliente → mostrar "—" en lugar del nombre del cliente
+  (decisión técnica futura, falta confirmar).
+- Offline + alerta → ambos elementos visibles al mismo tiempo
+  (banda roja arriba + borde izquierdo rojo + chip de alerta).
+- Sin alertas → no se muestra ni chip ni borde, popup limpio.
+
+### Decisiones de diseño tomadas explícitamente
+
+1. Información a mostrar: nombre, matrícula, cliente, conductor,
+   estado online/offline, última señal, alertas activas, estado
+   del equipo industrial (en nivel "Ver más").
+2. Tipo de despliegue: "Ver más" CRECE hacia abajo dentro del
+   mismo popup. NO abre popup secundario ni navega.
+3. Aviso de offline: ROJO (tratar como problema, no como warning).
+4. Borde de severidad: SOLO border-left, 3px, sutil.
+5. Equipo activo: en VERDE TEAL (destaca).
+6. Fondo: claro (estilo Leaflet nativo, NO oscuro).
+
+### Mockup de referencia
+
+Hay un mockup HTML/SVG aprobado en la conversación de Claude del
+1 junio 2026, sesión de tarde. Si se pierde el contexto, regenerar
+mockup pidiendo a Claude reproducir desde la especificación
+anterior, indicando "popup_marcador_flota_v1".
+
 ### Fase 3 — Eliminar Dashboard (medio día)
 - Quitar el enlace "Dashboard" del menú principal.
 - Cambiar la pantalla por defecto tras login a `/fleet`.
