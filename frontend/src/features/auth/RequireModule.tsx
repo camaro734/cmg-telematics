@@ -12,7 +12,7 @@ export default function RequireModule({ module, children }: Props) {
     return <>{children}</>
   }
   if (!enabledModules.includes(module)) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/fleet" replace />
   }
   return <>{children}</>
 }

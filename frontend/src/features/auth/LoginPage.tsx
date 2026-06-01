@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [logoOk, setLogoOk] = useState(true)
 
   useEffect(() => {
-    if (user) navigate('/dashboard', { replace: true })
+    if (user) navigate('/fleet', { replace: true })
   }, [user, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,7 +39,7 @@ export default function LoginPage() {
           // brand tokens are optional — ignore failures
         }
       }
-      navigate('/dashboard', { replace: true })
+      navigate('/fleet', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
     } finally {

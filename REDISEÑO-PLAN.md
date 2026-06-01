@@ -262,10 +262,13 @@ Hay un mockup HTML/SVG aprobado en la conversación de Claude del
 mockup pidiendo a Claude reproducir desde la especificación
 anterior, indicando "popup_marcador_flota_v1".
 
-### Fase 3 — Eliminar Dashboard (medio día)
-- Quitar el enlace "Dashboard" del menú principal.
-- Cambiar la pantalla por defecto tras login a `/fleet`.
-- Redirigir URLs antiguas del Dashboard a Flota.
+### Fase 3 — Eliminar Dashboard ✅ COMPLETADA 1 junio 2026
+- Enlace "Dashboard" eliminado del TopNav (array MODULES).
+- Logo del TopNav ahora navega a `/fleet` (antes `/dashboard`).
+- Login y RequireModule redirigen a `/fleet`.
+- Ruta `/dashboard` convertida en `<Navigate to="/fleet">` para compatibilidad con URLs antiguas.
+- `DashboardPage.tsx` eliminado (413 líneas, 6 subcomponentes privados, ninguno rescatable).
+- Pantalla por defecto tras login: `/fleet`.
 
 ### Fase 4 — Detalle de vehículo (3-4 días, la más larga)
 - Cabecera densa con KPI integrados.
@@ -365,6 +368,15 @@ Arrancar **Fase 1** (tokens + tipografía Inter) en la siguiente sesión.
 2. **Hex literal del marcador Leaflet** en ClientPortalPage.tsx:89 (`#64748B`). Razón: la API de Leaflet no acepta `var()` en atributos SVG. Solución futura: leer la variable CSS con `getComputedStyle()` al inicializar el mapa.
 
 3. **Hex literales en BrandTokensEditor.tsx** (valores default del color picker). Razón: `<input type="color">` exige hex literal por especificación HTML. Son correctos tal como están.
+
+4. **Tiempo relativo (formatRelative) — sin urgencia** — detectado al analizar subcomponentes de DashboardPage antes de eliminarla (Fase 3, 1 junio 2026).
+   Existen 4 implementaciones distintas en el proyecto:
+   - `VehicleRow.tsx`: acepta segundos, distingue "hace un momento" < 1 min.
+   - `DevicesPage.tsx`: acepta minutos.
+   - `VehiclesPage.tsx`: acepta minutos, otra granularidad.
+   - `DashboardPage.tsx`: aceptaba ISO string (borrada en Fase 3).
+   Para unificar: decidir interfaz única (segundos vs minutos vs ISO), granularidad y strings.
+   Sesión propia cuando aparezca el 5º caso o se quiera limpiar de un tirón.
 
 ### Bug visual del tooltip de Recharts en Reportes — ✅ RESUELTO 1 junio 2026 commit c912d48
 

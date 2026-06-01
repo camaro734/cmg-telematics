@@ -10,7 +10,6 @@ import { useTenantContext } from '../../lib/useTenantContext'
 import { apiClient } from '../../lib/apiClient'
 import type { TenantOut } from '../../lib/types'
 import {
-  IconDashboard,
   IconFlota,
   IconAlertas,
   IconMantenimiento,
@@ -31,7 +30,6 @@ import type { VehicleStatus } from '../../lib/types'
 // ── Module nav items ─────────────────────────────────────────────────────────
 
 const MODULES = [
-  { key: 'dashboard',   label: 'Dashboard',     Icon: IconDashboard,    to: '/dashboard' },
   { key: 'fleet',       label: 'Flota',          Icon: IconFlota,        to: '/fleet' },
   { key: 'alerts',      label: 'Alertas',        Icon: IconAlertas,      to: '/alerts' },
   { key: 'maintenance', label: 'Mantenimiento',  Icon: IconMantenimiento, to: '/maintenance' },
@@ -547,7 +545,7 @@ export default function TopNav() {
 
       {/* ── Logo ──────────────────────────────────────────────────────── */}
       <button
-        onClick={() => navigate('/dashboard')}
+        onClick={() => navigate('/fleet')}
         title={brandName ?? 'CMG Telematic'}
         style={{
           background: 'none',

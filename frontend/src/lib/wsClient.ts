@@ -83,7 +83,7 @@ class WsClientImpl {
             keys.vehicleStatus(data.vehicle_id),
             (old: VehicleStatus | undefined) => old ? { ...old, ...data } : data,
           )
-          // Cache bulk — lo leen FleetMap, FleetDashboard y DashboardPage.
+          // Cache bulk — lo leen FleetMap y FleetDashboard.
           // Sin este patch, el bulk queda congelado (staleTime: Infinity) y
           // el mapa muestra "sin señal" mientras el detalle se ve online.
           this.queryClient?.setQueriesData<VehicleStatus[]>(
