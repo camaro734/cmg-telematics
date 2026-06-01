@@ -142,11 +142,12 @@ Tres sub-tareas:
 - Si no se usa, eliminarlo (es duplicado funcional de TopNav.tsx).
 - Si se usa en algún sitio puntual, decidir si se migra al TopNav o se mantiene.
 
-**(b) Crear componentes de formulario compartidos**
-- Crear desde cero: `Input.tsx`, `Select.tsx`, `Checkbox.tsx`, `Textarea.tsx` en `frontend/src/shared/ui/`.
-- Diseño coherente con la paleta fría y los Button/ConfirmDialog existentes.
-- NO migrar los formularios existentes en este paso — solo crear los componentes y un Storybook/ejemplo mínimo.
-- Justificación: hoy cada pantalla tiene sus `<input style={...}>` inline. Migrar a componentes compartidos se hace en cada pantalla cuando le toque, no de golpe.
+**(b) Crear componentes de formulario compartidos** ✅ COMPLETADA 1 junio 2026 commits b39642d + 856c05c + 1a46be4
+- `Input.tsx` creado (label, error, helperText, prefix, suffix, size, mono, forwardRef) + 21 tests.
+- `Select.tsx` creado (label, error, helperText, size, children, forwardRef) + 19 tests.
+- Migración masiva completada: ~110 inputs + ~47 selects = **~157 elementos migrados en ~57 archivos**.
+- ~18 constantes locales (`inputStyle`, `SELECT`, `selStyle`, etc.) eliminadas.
+- `Textarea.tsx` y `Checkbox.tsx` diferidos — YAGNI: menos de 8 instancias cada uno, sin divergencias que justifiquen encapsular ahora.
 
 **(c) Rediseñar componentes existentes con la paleta nueva**
 - Aplicar paleta fría a: `Button.tsx`, `ConfirmDialog.tsx`, `Toast.tsx`, `Chip.tsx`, `StatusBadge.tsx`, `Sparkline.tsx`, todos los `gauges/*.tsx`, `SkeletonCard.tsx`, `SectionErrorBoundary.tsx`.
