@@ -26,6 +26,7 @@ import WorkCyclesTab from './WorkCyclesTab'
 import { toast } from '../../shared/ui/Toast'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useFleetStore } from '../fleet/useFleetStore'
+import { Input } from '../../shared/ui/Input'
 
 const BASE_TABS = [
   { id: 'live', label: 'EN VIVO' },
@@ -668,17 +669,11 @@ export default function VehicleDetailPage() {
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
                   <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--border)' }}>
                     <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600 }}>Editar umbrales</h3>
-                    <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre</label>
-                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 12 }}
-                      value={editPlanForm.name}
+                    <Input label="Nombre" value={editPlanForm.name} style={{ marginBottom: 12 }}
                       onChange={e => setEditPlanForm(f => ({ ...f, name: e.target.value }))} />
-                    <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor umbral</label>
-                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 12 }}
-                      type="number" min="1" value={editPlanForm.value}
+                    <Input label="Valor umbral" type="number" min="1" value={editPlanForm.value} style={{ marginBottom: 12 }}
                       onChange={e => setEditPlanForm(f => ({ ...f, value: e.target.value }))} />
-                    <label style={{ fontSize: 11, color: 'var(--offline)', fontWeight: 600, display: 'block', marginBottom: 4 }}>% aviso previo</label>
-                    <input style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-primary)', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const, marginBottom: 20 }}
-                      type="number" min="1" max="50" value={editPlanForm.warnPct}
+                    <Input label="% aviso previo" type="number" min="1" max="50" value={editPlanForm.warnPct} style={{ marginBottom: 20 }}
                       onChange={e => setEditPlanForm(f => ({ ...f, warnPct: e.target.value }))} />
                     {editPlanError && <p style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 12 }}>{editPlanError}</p>}
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ActionDef } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
-const INPUT: CSSProperties = {
-  background: 'var(--bg-card)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 13, padding: '6px 8px', flex: 1,
-}
 const BTN: CSSProperties = {
   padding: '4px 10px', fontSize: 12, fontFamily: 'var(--font-sans)',
   background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -86,13 +82,12 @@ export default function ActionsList({ value, onChange }: Props) {
               </div>
             ))}
             <div style={{ display: 'flex', gap: 8 }}>
-              <input
+              <Input
                 type="email"
                 value={emailDraft}
                 onChange={e => setEmailDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEmail() } }}
                 placeholder="destinatario@empresa.com"
-                style={INPUT}
               />
               <button type="button" onClick={addEmail} style={BTN}>+</button>
             </div>
@@ -107,12 +102,11 @@ export default function ActionsList({ value, onChange }: Props) {
         </label>
         {webhookAction && (
           <div style={{ marginTop: 8, paddingLeft: 24 }}>
-            <input
+            <Input
               type="url"
               value={webhookAction.url ?? ''}
               onChange={e => setWebhook(e.target.value)}
               placeholder="https://erp.empresa.com/api/alerts"
-              style={{ ...INPUT, width: '100%', boxSizing: 'border-box' as const }}
             />
           </div>
         )}

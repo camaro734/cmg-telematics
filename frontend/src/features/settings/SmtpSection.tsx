@@ -4,12 +4,8 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { toast } from '../../shared/ui/Toast'
 import type { SmtpConfig, SmtpConfigUpdate } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
-const INPUT: React.CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 13, padding: '8px 10px', width: '100%', boxSizing: 'border-box' as const,
-}
 const LBL: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)',
   letterSpacing: '0.05em', display: 'block', marginBottom: 5,
@@ -74,37 +70,36 @@ export default function SmtpSection() {
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '12px 16px', marginBottom: 12 }}>
-        <div>
-          <label style={LBL}>SERVIDOR SMTP</label>
-          <input value={draft.host} onChange={set('host')} placeholder="smtp.gmail.com" style={INPUT} />
-        </div>
-        <div>
-          <label style={LBL}>PUERTO</label>
-          <input type="number" value={draft.port} onChange={set('port')} style={INPUT} min={1} max={65535} />
-        </div>
-        <div>
-          <label style={LBL}>USUARIO</label>
-          <input value={draft.user} onChange={set('user')} placeholder="usuario@empresa.com" autoComplete="off" style={INPUT} />
-        </div>
+        <Input label="Servidor SMTP" value={draft.host} onChange={set('host')} placeholder="smtp.gmail.com" />
+        <Input label="Puerto" type="number" value={draft.port} onChange={set('port')} min={1} max={65535} />
+        <Input label="Usuario" value={draft.user} onChange={set('user')} placeholder="usuario@empresa.com" autoComplete="off" />
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={LBL}>
             CONTRASEÑA
             {config?.password_set && <span style={{ color: 'var(--ok)', fontWeight: 400, letterSpacing: 0 }}> · configurada</span>}
           </label>
-          <div style={{ position: 'relative' }}>
-            <input type={showPwd ? 'text' : 'password'} value={draft.password} onChange={set('password')}
-              placeholder={config?.password_set ? 'Dejar vacío para mantener la actual' : 'Contraseña SMTP'}
-              autoComplete="new-password" style={{ ...INPUT, paddingRight: 80 }} />
-            <button type="button" onClick={() => setShowPwd(p => !p)}
-              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', fontSize: 11 }}>
-              {showPwd ? 'Ocultar' : 'Ver'}
-            </button>
-          </div>
+          <Input
+            type={showPwd ? 'text' : 'password'}
+            value={draft.password}
+            onChange={set('password')}
+            placeholder={config?.password_set ? 'Dejar vacío para mantener la actual' : 'Contraseña SMTP'}
+            autoComplete="new-password"
+            suffix={
+              <button type="button" onClick={() => setShowPwd(p => !p)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', fontSize: 11 }}>
+                {showPwd ? 'Ocultar' : 'Ver'}
+              </button>
+            }
+          />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={LBL}>DIRECCIÓN REMITENTE</label>
-          <input value={draft.from_addr} onChange={set('from_addr')} placeholder="alertas@cmg.es" style={INPUT} />
-          <p style={HELP}>Esta dirección aparece como remitente en los emails de alerta.</p>
+          <Input
+            label="Dirección remitente"
+            value={draft.from_addr}
+            onChange={set('from_addr')}
+            placeholder="alertas@cmg.es"
+            helperText="Esta dirección aparece como remitente en los emails de alerta."
+          />
         </div>
       </div>
 
@@ -125,8 +120,8 @@ export default function SmtpSection() {
       <div style={{ marginBottom: 16 }}>
         <label style={LBL}>ENVIAR EMAIL DE PRUEBA</label>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)}
-            placeholder="destino@empresa.com" style={{ ...INPUT, flex: 1 }} />
+          <Input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)}
+            placeholder="destino@empresa.com" style={{ flex: 1 }} />
           <button type="button" onClick={handleTest} disabled={isTesting || !testEmail}
             style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-tertiary)', cursor: isTesting ? 'wait' : 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' as const }}>
             {isTesting ? 'Enviando…' : 'Enviar prueba →'}

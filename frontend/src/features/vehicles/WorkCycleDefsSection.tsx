@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycleDefinitionCreate, SensorDef } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 const TRIGGER_OPTIONS = [
   { value: 'pto_change', label: 'PTO activo' },
@@ -163,11 +164,11 @@ function FieldPicker({ label, schemaKeys, checked, custom, onCheckedChange, onCu
           ))}
         </div>
       )}
-      <input
-        style={inputStyle}
+      <Input
         value={custom}
         onChange={e => onCustomChange(e.target.value)}
         placeholder="Otras claves separadas por coma: temp_aceite, presion_entrada"
+        mono
       />
     </div>
   )
@@ -329,8 +330,7 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={labelStyle}>NOMBRE *</label>
-                <input
-                  style={inputStyle}
+                <Input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="ej. Ciclo bomba agua"
@@ -363,11 +363,12 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                     <option value="__custom__">Otro…</option>
                   </select>
                   {form.sensor === '__custom__' && (
-                    <input
-                      style={{ ...inputStyle, marginTop: 6 }}
+                    <Input
+                      style={{ marginTop: 6 }}
                       value={form.sensorCustom}
                       onChange={e => setForm(f => ({ ...f, sensorCustom: e.target.value }))}
                       placeholder="clave_manual"
+                      mono
                     />
                   )}
                 </div>
@@ -383,11 +384,9 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                   </div>
                   <div>
                     <label style={labelStyle}>UMBRAL</label>
-                    <input
-                      type="number" step="any" style={inputStyle} value={form.threshold}
+                    <Input type="number" step="any" value={form.threshold}
                       onChange={e => setForm(f => ({ ...f, threshold: e.target.value }))}
-                      placeholder="ej. 280"
-                    />
+                      placeholder="ej. 280" />
                   </div>
                 </div>
               )}
@@ -395,10 +394,8 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
               {form.trigger_type === 'sensor_pulse' && (
                 <div>
                   <label style={labelStyle}>SEPARACIÓN MÍNIMA ENTRE PULSOS (segundos)</label>
-                  <input
-                    type="number" min="1" style={inputStyle} value={form.min_gap}
-                    onChange={e => setForm(f => ({ ...f, min_gap: e.target.value }))}
-                  />
+                  <Input type="number" min="1" value={form.min_gap}
+                    onChange={e => setForm(f => ({ ...f, min_gap: e.target.value }))} />
                 </div>
               )}
 

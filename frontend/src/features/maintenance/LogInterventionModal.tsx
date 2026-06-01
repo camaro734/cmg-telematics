@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { MaintenanceThreshold, MaintenanceLogCreate } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 const THRESHOLD_LABEL: Record<string, string> = {
   pto_hours: 'Horas PTO',
@@ -92,14 +93,14 @@ export default function LogInterventionModal({ planId, thresholds, onClose }: Pr
 
             <div>
               <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>COSTE (€)</div>
-              <input
+              <Input
                 type="number"
                 value={costEur}
                 onChange={e => setCostEur(e.target.value)}
                 placeholder="0.00"
                 min={0}
                 step={0.01}
-                style={{ ...inputStyle, width: 120 }}
+                style={{ width: 120 }}
               />
             </div>
 

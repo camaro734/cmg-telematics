@@ -5,6 +5,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, SensorDef } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
+import { Input } from '../../shared/ui/Input'
 import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
 import WorkCycleDefsSection from './WorkCycleDefsSection'
 import MaintenanceTemplatesSection from './MaintenanceTemplatesSection'
@@ -535,11 +536,11 @@ export default function VehicleTypesPage() {
             </div>
             <div>
               <label style={labelStyle}>NOMBRE</label>
-              <input style={inputStyle} value={typeForm.name} onChange={e => setTypeForm(f => ({ ...f, name: e.target.value }))} placeholder="Barredora Municipal" />
+              <Input value={typeForm.name} onChange={e => setTypeForm(f => ({ ...f, name: e.target.value }))} placeholder="Barredora Municipal" />
             </div>
             <div>
               <label style={labelStyle}>SLUG (identificador interno)</label>
-              <input style={inputStyle} value={typeForm.slug} onChange={e => setTypeForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, '_') }))} placeholder="barredora_municipal" />
+              <Input value={typeForm.slug} mono onChange={e => setTypeForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, '_') }))} placeholder="barredora_municipal" />
             </div>
             {typeError && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{typeError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -593,9 +594,7 @@ export default function VehicleTypesPage() {
               </select>
               {/* Input manual si el ID no está en la lista */}
               {!AVL_OPTIONS.some(o => String(o.id) === sensorForm.avl_id) && (
-                <input
-                  type="number" min="1" max="65535"
-                  style={{ ...inputStyle, marginTop: 6 }}
+                <Input type="number" min="1" max="65535" style={{ marginTop: 6 }}
                   value={sensorForm.avl_id}
                   onChange={e => setSensorForm(f => ({ ...f, avl_id: e.target.value }))}
                   placeholder="AVL ID personalizado (1–65535)"
@@ -675,12 +674,12 @@ export default function VehicleTypesPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={labelStyle}>NOMBRE</label>
-                <input style={inputStyle} value={sensorForm.label}
+                <Input value={sensorForm.label}
                   onChange={e => setSensorForm(f => ({ ...f, label: e.target.value }))} placeholder="Presión Hidráulica" />
               </div>
               <div>
                 <label style={labelStyle}>UNIDAD</label>
-                <input style={inputStyle} value={sensorForm.unit}
+                <Input value={sensorForm.unit}
                   onChange={e => setSensorForm(f => ({ ...f, unit: e.target.value }))} placeholder="bar" />
               </div>
             </div>
@@ -688,7 +687,7 @@ export default function VehicleTypesPage() {
             {/* Key */}
             <div>
               <label style={labelStyle}>KEY (interno — se genera del nombre si se deja vacío)</label>
-              <input style={inputStyle} value={sensorForm.key}
+              <Input mono value={sensorForm.key}
                 onChange={e => setSensorForm(f => ({ ...f, key: e.target.value }))} placeholder="hydraulic_pressure" />
             </div>
 
@@ -704,12 +703,12 @@ export default function VehicleTypesPage() {
                 </div>
                 <div>
                   <label style={labelStyle}>MULTIPLICADOR (scale)</label>
-                  <input type="number" step="any" style={inputStyle} value={sensorForm.scale}
+                  <Input type="number" step="any" value={sensorForm.scale}
                     onChange={e => setSensorForm(f => ({ ...f, scale: e.target.value }))} placeholder="1" />
                 </div>
                 <div>
                   <label style={labelStyle}>OFFSET (suma/resta)</label>
-                  <input type="number" step="any" style={inputStyle} value={sensorForm.offset}
+                  <Input type="number" step="any" value={sensorForm.offset}
                     onChange={e => setSensorForm(f => ({ ...f, offset: e.target.value }))} placeholder="0" />
                 </div>
               </div>
@@ -718,12 +717,12 @@ export default function VehicleTypesPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={labelStyle}>MÍNIMO</label>
-                    <input type="number" step="any" style={inputStyle} value={sensorForm.min}
+                    <Input type="number" step="any" value={sensorForm.min}
                       onChange={e => setSensorForm(f => ({ ...f, min: e.target.value }))} placeholder="0" />
                   </div>
                   <div>
                     <label style={labelStyle}>MÁXIMO</label>
-                    <input type="number" step="any" style={inputStyle} value={sensorForm.max}
+                    <Input type="number" step="any" value={sensorForm.max}
                       onChange={e => setSensorForm(f => ({ ...f, max: e.target.value }))} placeholder="300" />
                   </div>
                 </div>
@@ -738,7 +737,7 @@ export default function VehicleTypesPage() {
                 ].map(({ key, label }) => (
                   <div key={key}>
                     <label style={{ ...labelStyle, fontSize: 10 }}>{label}</label>
-                    <input type="number" step="any" style={{ ...inputStyle, fontSize: 12 }}
+                    <Input type="number" step="any" size="sm"
                       value={(sensorForm as unknown as Record<string, string>)[key]}
                       onChange={e => setSensorForm(f => ({ ...f, [key]: e.target.value }))}
                       placeholder="—" />

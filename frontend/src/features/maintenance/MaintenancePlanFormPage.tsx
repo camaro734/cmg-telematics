@@ -6,6 +6,7 @@ import ThresholdBuilder from './ThresholdBuilder'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, MaintenancePlanOut, MaintenancePlanCreate, MaintenancePlanUpdate, MaintenanceThreshold } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 const DEFAULT_THRESHOLDS: MaintenanceThreshold[] = [{ type: 'pto_hours', value: 500 }]
 
@@ -88,16 +89,13 @@ export default function MaintenancePlanFormPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-            <div>
-              <div style={labelStyle}>NOMBRE DEL PLAN</div>
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Nombre del plan"
-                required
-                style={inputStyle}
-              />
-            </div>
+            <Input
+              label="Nombre del plan"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Nombre del plan"
+              required
+            />
 
             {!isEdit && (
               <div>
@@ -115,13 +113,13 @@ export default function MaintenancePlanFormPage() {
 
             <div>
               <div style={labelStyle}>AVISAR CUANDO QUEDE (%)</div>
-              <input
+              <Input
                 type="number"
                 value={warnPct}
                 min={1}
                 max={50}
                 onChange={e => setWarnPct(Number(e.target.value))}
-                style={{ ...inputStyle, width: 100 }}
+                style={{ width: 100 }}
               />
             </div>
 

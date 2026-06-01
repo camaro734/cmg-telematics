@@ -14,6 +14,7 @@ import { useTenantContext } from '../../lib/useTenantContext'
 import { useAuthStore } from '../auth/useAuthStore'
 import { toast } from '../../shared/ui/Toast'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { Input } from '../../shared/ui/Input'
 
 async function downloadOrderPdf(order: WorkOrderOut) {
   const token = useAuthStore.getState().accessToken
@@ -783,7 +784,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
         {/* ── Datos generales ── */}
         <div style={S.field}>
           <span style={S.label}>Título *</span>
-          <input style={S.input} value={form.title} onChange={e => u('title', e.target.value)} placeholder="Ej: Limpieza alcantarilla Calle Mayor 5"/>
+          <Input value={form.title} onChange={e => u('title', e.target.value)} placeholder="Ej: Limpieza alcantarilla Calle Mayor 5" />
         </div>
         <div style={S.field}>
           <span style={S.label}>Descripción</span>
@@ -816,7 +817,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           </div>
           <div style={S.field}>
             <span style={S.label}>Fecha programada</span>
-            <input style={S.input} type="datetime-local" value={form.scheduled_at} onChange={e => u('scheduled_at', e.target.value)}/>
+            <Input type="datetime-local" value={form.scheduled_at} onChange={e => u('scheduled_at', e.target.value)} />
           </div>
         </div>
         <div style={S.field}>
@@ -835,8 +836,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={S.field}>
               <span style={S.label}>Nombre / Razón social</span>
-              <input
-                style={S.input}
+              <Input
                 value={form.final_client_name}
                 maxLength={200}
                 placeholder="Comunidad El Pinar"
@@ -845,8 +845,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
             </div>
             <div style={S.field}>
               <span style={S.label}>Dirección</span>
-              <input
-                style={S.input}
+              <Input
                 value={form.final_client_address}
                 maxLength={300}
                 placeholder="C/ Mayor 12, Valencia"
@@ -900,8 +899,9 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
                   }}>
                     {idx + 1}
                   </span>
-                  <input
-                    style={{ ...S.input, flex: 1, padding: '5px 8px', fontSize: 13, fontWeight: 600 }}
+                  <Input
+                    size="sm"
+                    style={{ flex: 1 }}
                     placeholder="Título de la parada *"
                     value={stop.title}
                     onChange={e => updateStop(stop._id, 'title', e.target.value)}
@@ -918,27 +918,16 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
 
                 {/* Row 2: cliente + dirección */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <input
-                    style={{ ...S.input, padding: '5px 8px', fontSize: 12 }}
-                    placeholder="Cliente / empresa"
-                    value={stop.client_name}
-                    onChange={e => updateStop(stop._id, 'client_name', e.target.value)}
-                  />
-                  <input
-                    style={{ ...S.input, padding: '5px 8px', fontSize: 12 }}
-                    placeholder="Dirección"
-                    value={stop.address}
-                    onChange={e => updateStop(stop._id, 'address', e.target.value)}
-                  />
+                  <Input size="sm" placeholder="Cliente / empresa" value={stop.client_name}
+                    onChange={e => updateStop(stop._id, 'client_name', e.target.value)} />
+                  <Input size="sm" placeholder="Dirección" value={stop.address}
+                    onChange={e => updateStop(stop._id, 'address', e.target.value)} />
                 </div>
 
                 {/* Row 3: notas */}
-                <input
-                  style={{ ...S.input, width: '100%', boxSizing: 'border-box', padding: '5px 8px', fontSize: 12, marginBottom: 8 }}
-                  placeholder="Instrucciones para el conductor"
-                  value={stop.notes}
+                <Input size="sm" placeholder="Instrucciones para el conductor" value={stop.notes}
                   onChange={e => updateStop(stop._id, 'notes', e.target.value)}
-                />
+                  style={{ marginBottom: 8 }} />
 
                 {/* Toggle mapa + radio de llegada */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

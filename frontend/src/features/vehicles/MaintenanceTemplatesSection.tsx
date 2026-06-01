@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, MaintenanceTemplateItem } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
               {editingTemplateIdx === null ? 'Nueva plantilla' : 'Editar plantilla'}
             </h3>
             <label style={labelStyle}>Nombre</label>
-            <input style={{ ...inputStyle, marginBottom: 12 }} value={templateForm.name}
+            <Input value={templateForm.name} style={{ marginBottom: 12 }}
               onChange={e => setTemplateForm(f => ({ ...f, name: e.target.value }))} />
             <label style={labelStyle}>Tipo de umbral</label>
             <select style={{ ...inputStyle, marginBottom: 12 }}
@@ -225,10 +226,10 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
               <option value="calendar_days">Días naturales</option>
             </select>
             <label style={labelStyle}>Valor</label>
-            <input style={{ ...inputStyle, marginBottom: 12 }} type="number" min="1" value={templateForm.value}
+            <Input type="number" min="1" value={templateForm.value} style={{ marginBottom: 12 }}
               onChange={e => setTemplateForm(f => ({ ...f, value: e.target.value }))} />
             <label style={labelStyle}>% aviso previo</label>
-            <input style={{ ...inputStyle, marginBottom: 20 }} type="number" min="1" max="50" value={templateForm.warn_before_pct}
+            <Input type="number" min="1" max="50" value={templateForm.warn_before_pct} style={{ marginBottom: 20 }}
               onChange={e => setTemplateForm(f => ({ ...f, warn_before_pct: e.target.value }))} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button style={btnSecondary} onClick={() => setShowTemplateModal(false)}>Cancelar</button>

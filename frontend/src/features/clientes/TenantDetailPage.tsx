@@ -6,6 +6,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import UserFormModal from './UserFormModal'
 import GrantsSection from './GrantsSection'
+import { Input } from '../../shared/ui/Input'
 import BrandTokensEditor from './BrandTokensEditor'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { TenantOut, UserOut, VehicleOut } from '../../lib/types'
@@ -52,14 +53,12 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
       {token ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
+            <Input
               readOnly
               value={portalUrl!}
-              style={{
-                flex: 1, background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: 6, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)',
-                fontSize: 12, padding: '7px 10px',
-              }}
+              mono
+              size="sm"
+              style={{ background: 'var(--bg-card)', flex: 1 }}
             />
             <button
               onClick={copyUrl}

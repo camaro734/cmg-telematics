@@ -12,6 +12,7 @@ import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, VehicleStatus, RuleO
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { VehicleListPanel, type VehicleEntry } from './VehicleListPanel'
 import { VehicleDetailPanel } from './VehicleDetailPanel'
+import { Input } from '../../shared/ui/Input'
 
 function isEffectivelyOnline(status: VehicleStatus | undefined): boolean {
   if (!status?.online || !status.last_seen) return false
@@ -187,9 +188,13 @@ export default function FleetDashboard() {
             <span style={{ fontSize: 11, color: 'var(--warn)' }}>◑ {idleCount}</span>
             <span style={{ fontSize: 11, color: 'var(--offline)' }}>○ {offlineCount}</span>
           </div>
-          <input type="search" placeholder="Buscar vehículo o matrícula…" value={search}
+          <Input
+            type="search"
+            placeholder="Buscar vehículo o matrícula…"
+            value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', color: 'var(--fg-primary)', fontSize: 13, outline: 'none' }} />
+            style={{ background: 'var(--bg-card)' }}
+          />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px' }}>

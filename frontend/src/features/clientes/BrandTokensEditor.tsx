@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
 import type { BrandTokens } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 interface Props { tenantId: string }
 
@@ -39,19 +40,10 @@ export default function BrandTokensEditor({ tenantId }: Props) {
     },
   })
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '7px 10px', background: 'var(--bg-elevated)',
-    border: '1px solid var(--border)', borderRadius: 6,
-    color: 'var(--fg-primary)', fontSize: 13, boxSizing: 'border-box',
-  }
-
   return (
     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
       <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Nombre de marca</span>
-          <input value={brandName} onChange={e => setBrandName(e.target.value)} style={inputStyle} />
-        </label>
+        <Input label="Nombre de marca" value={brandName} onChange={e => setBrandName(e.target.value)} />
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Color de acento</span>
@@ -62,21 +54,19 @@ export default function BrandTokensEditor({ tenantId }: Props) {
               onChange={e => { setBrandColor(e.target.value); setPreviewColor(e.target.value) }}
               style={{ width: 36, height: 36, padding: 2, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
             />
-            <input
+            <Input
               value={brandColor}
+              mono
               onChange={e => {
                 setBrandColor(e.target.value)
                 if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) setPreviewColor(e.target.value)
               }}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)', flex: 1 }}
+              style={{ flex: 1 }}
             />
           </div>
         </label>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>URL del logo</span>
-          <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
-        </label>
+        <Input label="URL del logo" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." />
 
         <button
           onClick={() => mutation.mutate({ brand_color: brandColor, logo_url: logoUrl, brand_name: brandName })}

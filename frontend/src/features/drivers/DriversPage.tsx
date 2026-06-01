@@ -7,6 +7,7 @@ import Shell from '../../shared/ui/Shell'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { useAuthStore } from '../auth/useAuthStore'
+import { Input } from '../../shared/ui/Input'
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const S = {
@@ -93,23 +94,11 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
           {initial ? 'Editar conductor' : 'Nuevo conductor'}
         </h2>
 
-        <div style={S.field}>
-          <span style={S.label}>Nombre completo *</span>
-          <input style={S.input} value={form.full_name} onChange={e => update('full_name', e.target.value)} placeholder="Ej: Juan García López"/>
-        </div>
-        <div style={S.field}>
-          <span style={S.label}>Teléfono</span>
-          <input style={S.input} value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+34 600 000 000"/>
-        </div>
+        <Input label="Nombre completo *" value={form.full_name} onChange={e => update('full_name', e.target.value)} placeholder="Ej: Juan García López" />
+        <Input label="Teléfono" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+34 600 000 000" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div style={S.field}>
-            <span style={S.label}>Nº licencia</span>
-            <input style={S.input} value={form.license_number} onChange={e => update('license_number', e.target.value)} placeholder="B-123456"/>
-          </div>
-          <div style={S.field}>
-            <span style={S.label}>Vencimiento licencia</span>
-            <input style={{ ...S.input }} type="date" value={form.license_expiry} onChange={e => update('license_expiry', e.target.value)}/>
-          </div>
+          <Input label="Nº licencia" value={form.license_number} onChange={e => update('license_number', e.target.value)} placeholder="B-123456" />
+          <Input label="Vencimiento licencia" type="date" value={form.license_expiry} onChange={e => update('license_expiry', e.target.value)} />
         </div>
         <div style={S.field}>
           <span style={S.label}>Notas</span>
@@ -165,17 +154,12 @@ export default function DriversPage() {
         </button>}
       </div>
 
-      <input
+      <Input
         type="search"
         placeholder="Buscar conductor…"
         value={search}
         onChange={e => setSearch(e.target.value)}
-        style={{
-          width: '100%', maxWidth: 320, padding: '7px 12px',
-          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-          borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-          fontSize: 13, marginBottom: 16, boxSizing: 'border-box',
-        }}
+        style={{ maxWidth: 320, marginBottom: 16 }}
       />
 
       {isLoading && (

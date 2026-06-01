@@ -1,14 +1,12 @@
 import type { CSSProperties } from 'react'
 import type { ConditionDef, SensorDef } from '../../lib/types'
 import GeofenceMapEditor from '../../shared/ui/GeofenceMapEditor'
+import { Input } from '../../shared/ui/Input'
 
 const SELECT: CSSProperties = {
   background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
   fontSize: 13, padding: '6px 8px',
-}
-const INPUT: CSSProperties = {
-  ...SELECT, width: 80,
 }
 const LABEL: CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)',
@@ -91,7 +89,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
           <select value={condition.op ?? '>'} onChange={e => update({ op: e.target.value as ConditionDef['op'] })} style={{ ...SELECT, width: 60 }}>
             {OPS.map(op => <option key={op} value={op}>{op}</option>)}
           </select>
-          <input type="number" value={condition.value ?? 0} onChange={e => update({ value: parseFloat(e.target.value) || 0 })} style={INPUT} />
+          <Input type="number" value={condition.value ?? 0} onChange={e => update({ value: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
           {unitLabel && <span style={LABEL}>{unitLabel}</span>}
         </>
       )}
@@ -100,7 +98,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
       {t === 'threshold_sustained' && (
         <>
           <span style={LABEL}>durante</span>
-          <input type="number" value={condition.minutes ?? 5} onChange={e => update({ minutes: parseInt(e.target.value) || 1 })} style={INPUT} min={1} />
+          <Input type="number" value={condition.minutes ?? 5} onChange={e => update({ minutes: parseInt(e.target.value) || 1 })} style={{ background: 'var(--bg-card)', width: 80 }} min={1} />
           <span style={LABEL}>minutos</span>
         </>
       )}
@@ -109,7 +107,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
       {t === 'accumulation' && (
         <>
           <span style={LABEL}>alcanza</span>
-          <input type="number" value={condition.limit ?? 100} onChange={e => update({ limit: parseFloat(e.target.value) || 0 })} style={INPUT} />
+          <Input type="number" value={condition.limit ?? 100} onChange={e => update({ limit: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
           {unitLabel && <span style={LABEL}>{unitLabel}</span>}
         </>
       )}
@@ -118,9 +116,9 @@ function SimpleCondition({ condition, sensors, onChange }: {
       {t === 'trend_rising' && (
         <>
           <span style={LABEL}>pendiente &gt;</span>
-          <input type="number" value={condition.threshold ?? 1} onChange={e => update({ threshold: parseFloat(e.target.value) || 0 })} style={INPUT} />
+          <Input type="number" value={condition.threshold ?? 1} onChange={e => update({ threshold: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
           <span style={LABEL}>en</span>
-          <input type="number" value={condition.window_minutes ?? 60} onChange={e => update({ window_minutes: parseInt(e.target.value) || 1 })} style={INPUT} />
+          <Input type="number" value={condition.window_minutes ?? 60} onChange={e => update({ window_minutes: parseInt(e.target.value) || 1 })} style={{ background: 'var(--bg-card)', width: 80 }} />
           <span style={LABEL}>min</span>
         </>
       )}
@@ -161,7 +159,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
           </div>
           {condition.schedule && 'start' in condition.schedule && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
+              <Input
                 type="time"
                 value={condition.schedule.start}
                 onChange={e => update({
@@ -170,10 +168,10 @@ function SimpleCondition({ condition, sensors, onChange }: {
                     start: e.target.value,
                   },
                 })}
-                style={{ ...SELECT, width: 110 }}
+                style={{ background: 'var(--bg-card)', width: 110 }}
               />
               <span style={LABEL}>—</span>
-              <input
+              <Input
                 type="time"
                 value={condition.schedule.end}
                 onChange={e => update({
@@ -182,7 +180,7 @@ function SimpleCondition({ condition, sensors, onChange }: {
                     end: e.target.value,
                   },
                 })}
-                style={{ ...SELECT, width: 110 }}
+                style={{ background: 'var(--bg-card)', width: 110 }}
               />
             </div>
           )}

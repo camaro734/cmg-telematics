@@ -5,6 +5,7 @@ import { keys } from '../../lib/queryKeys'
 import type { WorkOrderOut, WorkOrderStopOut, WorkReportOut, MaterialItem, WorkOrderTelemetryDetail } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { Input } from '../../shared/ui/Input'
 
 const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   pto_minutes:   { label: 'Tiempo PTO',   unit: 'min' },
@@ -380,14 +381,8 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
         <div style={S.section}>
           <div style={S.sectionTitle}>Duración</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={S.label}>Horas</span>
-              <input style={{ ...S.input, width: 80 }} type="number" min="0" max="99" value={durationH} onChange={e => setDurationH(e.target.value)}/>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={S.label}>Minutos</span>
-              <input style={{ ...S.input, width: 80 }} type="number" min="0" max="59" value={durationM} onChange={e => setDurationM(e.target.value)}/>
-            </div>
+            <Input label="Horas" type="number" min="0" max="99" value={durationH} onChange={e => setDurationH(e.target.value)} style={{ width: 80 }} />
+            <Input label="Minutos" type="number" min="0" max="59" value={durationM} onChange={e => setDurationM(e.target.value)} style={{ width: 80 }} />
           </div>
         </div>
 
@@ -401,9 +396,9 @@ export default function WorkReportModal({ order, onClose, stop }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {materials.map((m, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
-                  <input style={S.input} placeholder="Material" value={m.name} onChange={e => updateMaterial(i, 'name', e.target.value)}/>
-                  <input style={S.input} placeholder="Cantidad" type="number" min="0" step="0.1" value={m.quantity} onChange={e => updateMaterial(i, 'quantity', parseFloat(e.target.value) || 0)}/>
-                  <input style={S.input} placeholder="Unidad" value={m.unit} onChange={e => updateMaterial(i, 'unit', e.target.value)}/>
+                  <Input placeholder="Material" value={m.name} onChange={e => updateMaterial(i, 'name', e.target.value)} />
+                  <Input placeholder="Cantidad" type="number" min="0" step="0.1" value={m.quantity} onChange={e => updateMaterial(i, 'quantity', parseFloat(e.target.value) || 0)} />
+                  <Input placeholder="Unidad" value={m.unit} onChange={e => updateMaterial(i, 'unit', e.target.value)} />
                   <button style={{ ...S.btnSm, color: 'var(--danger)', padding: '5px 8px' }} onClick={() => removeMaterial(i)}>×</button>
                 </div>
               ))}

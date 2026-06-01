@@ -4,6 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 import { CmgMark } from './CmgLogo'
 import { Chip } from './Chip'
+import { Input } from './Input'
+
+const SearchIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="var(--fg-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
 import {
   IconFlota, IconAlertas, IconReglas, IconMantenimiento, IconAjustes,
   IconClientes, IconReportes, IconDispositivos, IconCanScanner,
@@ -210,25 +218,14 @@ export default function Sidebar() {
       {/* Search */}
       {expanded && (
         <div style={{ padding: '10px 12px 6px', flexShrink: 0 }}>
-          <div style={{ position: 'relative' }}>
-            <svg style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-              width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="var(--fg-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar..."
-              style={{
-                width: '100%', padding: '6px 10px 6px 30px',
-                background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)',
-                fontSize: 12, fontFamily: 'var(--font-sans)', outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
+          <Input
+            size="sm"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar..."
+            prefix={<SearchIcon />}
+            style={{ borderRadius: 'var(--r-md)' }}
+          />
         </div>
       )}
 

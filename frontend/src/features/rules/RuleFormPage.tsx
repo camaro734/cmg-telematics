@@ -11,16 +11,12 @@ import ActionsList from './ActionsList'
 import EscalationBuilder from './EscalationBuilder'
 import { Chip } from '../../shared/ui/Chip'
 import { useAuthStore } from '../auth/useAuthStore'
+import { Input } from '../../shared/ui/Input'
 import type { RuleOut, RuleCreate, ConditionDef, VehicleTypeOut, VehicleOut, SensorDef } from '../../lib/types'
 
 const LABEL: CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
   color: 'var(--fg-muted)', letterSpacing: '0.05em', display: 'block', marginBottom: 6,
-}
-const INPUT: CSSProperties = {
-  background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-  borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-  fontSize: 13, padding: '8px 10px', width: '100%', boxSizing: 'border-box' as const,
 }
 const HELP: CSSProperties = {
   fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)', marginTop: 5, lineHeight: 1.5,
@@ -239,17 +235,17 @@ export default function RuleFormPage() {
                 </p>
                 <div style={{ marginBottom: 16 }}>
                   <label style={LABEL}>NOMBRE *</label>
-                  <input type="text" value={form.name} onChange={e => { update('name', e.target.value); setNameError('') }}
+                  <Input type="text" value={form.name} onChange={e => { update('name', e.target.value); setNameError('') }}
                     placeholder="Ej: Presión bomba alta, Temperatura aceite, Parada fuera de zona"
-                    style={{ ...INPUT, borderColor: nameError ? 'var(--danger)' : 'var(--border)' }} autoFocus />
-                  {nameError && <div style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{nameError}</div>}
-                  <p style={HELP}>Ej: "Presión bomba vacuum alta", "Motor en marcha fuera de horario", "Batería baja"</p>
+                    error={nameError || undefined}
+                    helperText={'Ej: "Presión bomba vacuum alta", "Motor en marcha fuera de horario", "Batería baja"'}
+                    autoFocus />
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={LABEL}>DESCRIPCIÓN (opcional)</label>
-                  <input type="text" value={form.description ?? ''} onChange={e => update('description', e.target.value || null)}
-                    placeholder="Nota interna sobre esta regla" style={INPUT} />
-                  <p style={HELP}>Nota interna. No se muestra en las notificaciones al operario.</p>
+                  <Input type="text" value={form.description ?? ''} onChange={e => update('description', e.target.value || null)}
+                    placeholder="Nota interna sobre esta regla"
+                    helperText="Nota interna. No se muestra en las notificaciones al operario." />
                 </div>
                 <div>
                   <label style={LABEL}>SEVERIDAD</label>
@@ -317,9 +313,9 @@ export default function RuleFormPage() {
                 <div>
                   <label style={LABEL}>COOLDOWN — NO REPETIR ANTES DE</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input type="number" value={form.cooldown_minutes}
+                    <Input type="number" value={form.cooldown_minutes}
                       onChange={e => update('cooldown_minutes', parseInt(e.target.value) || 1)}
-                      style={{ ...INPUT, width: 80 }} min={1} />
+                      style={{ width: 80 }} min={1} />
                     <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>minutos</span>
                   </div>
                   <p style={HELP}>Tiempo mínimo entre dos disparos de la misma regla para el mismo vehículo. Evita el spam de notificaciones. Recomendado: 30 min para avisos, 5–10 min para críticos.</p>

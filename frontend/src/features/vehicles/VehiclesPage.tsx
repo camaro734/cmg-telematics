@@ -6,6 +6,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleOut, VehicleTypeOut, TenantOut, DeviceOut } from '../../lib/types'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useAuthStore } from '../auth/useAuthStore'
+import { Input } from '../../shared/ui/Input'
 
 // ─── Estilos compartidos ────────────────────────────────────────────────────
 
@@ -429,43 +430,33 @@ export default function VehiclesPage() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
               {/* Matrícula */}
-              <div>
-                <label style={labelStyle}>Matrícula *</label>
-                <input
-                  type="text"
-                  value={form.license_plate}
-                  onChange={e => setField('license_plate', e.target.value.toUpperCase())}
-                  placeholder="Ej. 1234-ABC"
-                  required
-                  style={inputStyle}
-                />
-              </div>
+              <Input
+                label="Matrícula *"
+                type="text"
+                value={form.license_plate}
+                onChange={e => setField('license_plate', e.target.value.toUpperCase())}
+                placeholder="Ej. 1234-ABC"
+                required
+              />
 
-              {/* VIN */}
-              <div>
-                <label style={labelStyle}>VIN *</label>
-                <input
-                  type="text"
-                  value={form.vin}
-                  onChange={e => setField('vin', e.target.value.toUpperCase())}
-                  placeholder="17 caracteres"
-                  maxLength={17}
-                  required
-                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
-                />
-              </div>
+              <Input
+                label="VIN *"
+                type="text"
+                value={form.vin}
+                onChange={e => setField('vin', e.target.value.toUpperCase())}
+                placeholder="17 caracteres"
+                maxLength={17}
+                required
+                mono
+              />
 
-              {/* Conductor */}
-              <div>
-                <label style={labelStyle}>Conductor (nombre)</label>
-                <input
-                  type="text"
-                  value={form.driver_name}
-                  onChange={e => setField('driver_name', e.target.value)}
-                  placeholder="Nombre del conductor habitual"
-                  style={inputStyle}
-                />
-              </div>
+              <Input
+                label="Conductor (nombre)"
+                type="text"
+                value={form.driver_name}
+                onChange={e => setField('driver_name', e.target.value)}
+                placeholder="Nombre del conductor habitual"
+              />
 
               {/* Tipo */}
               <div>
@@ -489,31 +480,23 @@ export default function VehiclesPage() {
                   Opcional
                 </div>
 
-                {/* Nombre */}
-                <div>
-                  <label style={labelStyle}>Nombre descriptivo</label>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={e => setField('name', e.target.value)}
-                    placeholder={form.license_plate || 'Si vacío, se usa la matrícula'}
-                    style={inputStyle}
-                  />
-                </div>
+                <Input
+                  label="Nombre descriptivo"
+                  type="text"
+                  value={form.name}
+                  onChange={e => setField('name', e.target.value)}
+                  placeholder={form.license_plate || 'Si vacío, se usa la matrícula'}
+                />
 
-                {/* Año */}
-                <div>
-                  <label style={labelStyle}>Año</label>
-                  <input
-                    type="number"
-                    value={form.year}
-                    onChange={e => setField('year', e.target.value)}
-                    placeholder="Ej. 2022"
-                    min={1990}
-                    max={new Date().getFullYear() + 1}
-                    style={inputStyle}
-                  />
-                </div>
+                <Input
+                  label="Año"
+                  type="number"
+                  value={form.year}
+                  onChange={e => setField('year', e.target.value)}
+                  placeholder="Ej. 2022"
+                  min={1990}
+                  max={new Date().getFullYear() + 1}
+                />
 
                 {/* Cliente */}
                 <div>
@@ -562,20 +545,16 @@ export default function VehiclesPage() {
                   </div>
                 ) : (
                   /* Sin dispositivo — campo para asignar */
-                  <div>
-                    <label style={labelStyle}>IMEI del FMC650</label>
-                    <input
-                      type="text"
-                      value={form.imei}
-                      onChange={e => setField('imei', e.target.value.replace(/\D/g, ''))}
-                      placeholder="15 dígitos (opcional)"
-                      maxLength={15}
-                      style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
-                    />
-                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 4 }}>
-                      El dispositivo quedará vinculado automáticamente al guardar.
-                    </div>
-                  </div>
+                  <Input
+                    label="IMEI del FMC650"
+                    type="text"
+                    value={form.imei}
+                    onChange={e => setField('imei', e.target.value.replace(/\D/g, ''))}
+                    placeholder="15 dígitos (opcional)"
+                    maxLength={15}
+                    mono
+                    helperText="El dispositivo quedará vinculado automáticamente al guardar."
+                  />
                 )}
               </div>
 

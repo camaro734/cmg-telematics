@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import type { PdfMetricItem, PdfMetricKey, PdfMetricFormat, VehicleTypeOut } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 interface CatalogEntry {
   key: PdfMetricKey
@@ -245,11 +246,11 @@ function EditMetricModal({ metric, onSave, onCancel }: {
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
           <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Etiqueta a mostrar</span>
-          <input value={label} maxLength={60} onChange={e => setLabel(e.target.value)} style={inputStyle} />
+          <Input value={label} maxLength={60} onChange={e => setLabel(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
           <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Unidad</span>
-          <input value={unit} maxLength={10} onChange={e => setUnit(e.target.value)} style={inputStyle} />
+          <Input value={unit} maxLength={10} onChange={e => setUnit(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
           <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Formato</span>

@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, HistoricMetricItem } from '../../lib/types'
 import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
+import { Input } from '../../shared/ui/Input'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -269,8 +270,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={labelStyle}>ETIQUETA</label>
-                <input
-                  style={inputStyle}
+                <Input
                   value={metricForm.label}
                   onChange={e => setMetricForm(f => ({ ...f, label: e.target.value }))}
                   placeholder="Nombre visible en el histórico"
@@ -306,15 +306,10 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                   <option value="__custom__">Otro AVL ID personalizado...</option>
                 </select>
                 {!AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) && (
-                  <input
-                    type="number"
-                    min="1"
-                    max="65535"
-                    style={{ ...inputStyle, marginTop: 6 }}
+                  <Input type="number" min="1" max="65535" style={{ marginTop: 6 }}
                     value={metricForm.avl_id}
                     onChange={e => setMetricForm(f => ({ ...f, avl_id: e.target.value }))}
-                    placeholder="AVL ID numérico (1–65535)"
-                  />
+                    placeholder="AVL ID numérico (1–65535)" />
                 )}
               </div>
             </div>
@@ -334,8 +329,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
               </div>
               <div>
                 <label style={labelStyle}>UNIDAD</label>
-                <input
-                  style={inputStyle}
+                <Input
                   value={metricForm.unit}
                   onChange={e => setMetricForm(f => ({ ...f, unit: e.target.value }))}
                   placeholder="h, km, km/h, …"
@@ -345,15 +339,9 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
 
             <div>
               <label style={labelStyle}>MULTIPLICADOR (transform) — ej: 0.01667 para convertir minutos a horas</label>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                style={inputStyle}
-                value={metricForm.transform}
+              <Input type="number" step="any" min="0" value={metricForm.transform}
                 onChange={e => setMetricForm(f => ({ ...f, transform: e.target.value }))}
-                placeholder="1"
-              />
+                placeholder="1" />
             </div>
 
             <div>
@@ -383,15 +371,12 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
 
             <div>
               <label style={labelStyle}>AGRUPAR CON (opcional)</label>
-              <input
-                style={inputStyle}
+              <Input
                 value={metricForm.group}
                 onChange={e => setMetricForm(f => ({ ...f, group: e.target.value }))}
                 placeholder="ej: presiones, horas (opcional)"
+                helperText="Métricas con el mismo grupo se mostrarán en un solo gráfico multi-serie"
               />
-              <div style={{ fontSize: 11, color: 'var(--offline)', marginTop: 4 }}>
-                Métricas con el mismo grupo se mostrarán en un solo gráfico multi-serie
-              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

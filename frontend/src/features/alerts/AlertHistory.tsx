@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 type HistoryStatus = 'all' | 'acknowledged' | 'resolved'
 
@@ -74,8 +75,8 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
           <option value="">Todos los vehículos</option>
           {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={SELECT} title="Desde" />
-        <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   style={SELECT} title="Hasta" />
+        <Input type="date" size="sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" />
+        <Input type="date" size="sm" value={dateTo}   onChange={e => setDateTo(e.target.value)}   title="Hasta" />
       </div>
 
       {rows.length === 0 ? (

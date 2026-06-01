@@ -1,4 +1,5 @@
 import type { MaintenanceThreshold } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 const TYPE_OPTIONS = [
   { value: 'pto_hours', label: 'Horas PTO' },
@@ -53,12 +54,12 @@ export default function ThresholdBuilder({ thresholds, onChange }: Props) {
           >
             {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <input
+          <Input
             type="number"
             value={t.value}
             min={1}
             onChange={e => update(i, 'value', e.target.value)}
-            style={{ ...inputStyle, width: 90 }}
+            style={{ width: 90 }}
           />
           <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{TYPE_UNIT[t.type]}</span>
           {thresholds.length > 1 && (

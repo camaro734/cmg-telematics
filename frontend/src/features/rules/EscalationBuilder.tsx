@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { EscalationStep } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 const INPUT: CSSProperties = {
   background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -60,11 +61,11 @@ export default function EscalationBuilder({ value, onChange }: Props) {
           <div key={i} style={{ background: 'var(--bg-card)', borderRadius: 8, padding: 12, border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>Si no reconocida en</span>
-              <input
+              <Input
                 type="number"
                 value={step.delay_minutes}
                 onChange={e => updateDelay(i, parseInt(e.target.value) || 1)}
-                style={{ ...INPUT, width: 70 }}
+                style={{ width: 70 }}
                 min={1}
               />
               <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>minutos, enviar email a:</span>
@@ -78,13 +79,13 @@ export default function EscalationBuilder({ value, onChange }: Props) {
                 </div>
               ))}
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
+                <Input
                   type="email"
                   value={drafts[i] ?? ''}
                   onChange={e => setDrafts(prev => prev.map((d, idx) => idx === i ? e.target.value : d))}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEmailToStep(i, drafts[i] ?? '') } }}
                   placeholder="supervisor@empresa.com"
-                  style={{ ...INPUT, flex: 1 }}
+                  style={{ flex: 1 }}
                 />
                 <button type="button" onClick={() => addEmailToStep(i, drafts[i] ?? '')} style={{ ...INPUT, cursor: 'pointer' }}>+</button>
               </div>

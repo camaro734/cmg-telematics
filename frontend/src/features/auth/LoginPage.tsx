@@ -4,6 +4,7 @@ import { useAuthStore } from './useAuthStore'
 import { apiClient } from '../../lib/apiClient'
 import type { BrandTokens } from '../../lib/types'
 import { CmgLogoFull } from '../../shared/ui/CmgLogo'
+import { Input } from '../../shared/ui/Input'
 
 const LOGO_URL = '/static/logos/cmgtrack.png'
 
@@ -98,52 +99,26 @@ export default function LoginPage() {
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor="email" style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoFocus
-              autoComplete="email"
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                padding: '8px 12px',
-                color: 'var(--fg-primary)',
-                outline: 'none',
-                fontSize: 14,
-              }}
-            />
-          </div>
+          <Input
+            id="email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            autoFocus
+            autoComplete="email"
+          />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label htmlFor="password" style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                padding: '8px 12px',
-                color: 'var(--fg-primary)',
-                outline: 'none',
-                fontSize: 14,
-              }}
-            />
-          </div>
+          <Input
+            id="password"
+            label="Contraseña"
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
 
           {error && (
             <p style={{ color: 'var(--danger)', fontSize: 13, marginTop: -4 }}>{error}</p>

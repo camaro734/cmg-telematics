@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycleDefinitionCreate, VehicleTypeOut } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 const TRIGGER_OPTIONS = [
   { value: 'pto_change', label: 'PTO activo (cisterna, hidráulica)' },
@@ -144,7 +145,7 @@ export default function WorkCycleDefinitionsSection() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Nombre *</label>
-                <input style={inputStyle} value={form.name ?? ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ej. Ciclo bomba agua" required />
+                <Input value={form.name ?? ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ej. Ciclo bomba agua" required />
               </div>
               <div>
                 <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Tipo de vehículo *</label>
@@ -164,7 +165,7 @@ export default function WorkCycleDefinitionsSection() {
                   <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                     {form.trigger_type === 'threshold_exceeded' ? 'Sensor (clave en can_data)' : 'Sensor / pin (clave en can_data)'}
                   </label>
-                  <input style={inputStyle} placeholder="ej. hydraulic_pressure"
+                  <Input placeholder="ej. hydraulic_pressure" mono
                     onChange={e => setForm(f => ({ ...f, trigger_config: { ...f.trigger_config, sensor: e.target.value } }))} />
                 </div>
               )}
@@ -181,7 +182,7 @@ export default function WorkCycleDefinitionsSection() {
                   </div>
                   <div>
                     <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Umbral</label>
-                    <input type="number" style={inputStyle} placeholder="ej. 280"
+                    <Input type="number" placeholder="ej. 280"
                       onChange={e => setForm(f => ({ ...f, trigger_config: { ...f.trigger_config, threshold: Number(e.target.value) } }))} />
                   </div>
                 </div>

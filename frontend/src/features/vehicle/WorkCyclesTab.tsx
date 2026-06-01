@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { WorkCycleDefinition, WorkCycle } from '../../lib/types'
 import { exportToCsv } from '../../lib/csvExport'
+import { Input } from '../../shared/ui/Input'
 
 interface Props {
   vehicleId: string
@@ -131,13 +132,11 @@ export default function WorkCyclesTab({ vehicleId, vehicleTypeId }: Props) {
         </div>
         <div>
           <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>DESDE</div>
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-            style={{ background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }} />
+          <Input type="date" size="sm" value={fromDate} onChange={e => setFromDate(e.target.value)} />
         </div>
         <div>
           <div style={{ fontSize: 10, color: 'var(--offline)', marginBottom: 4 }}>HASTA</div>
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-            style={{ background: 'var(--bg-card)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px', fontSize: 13 }} />
+          <Input type="date" size="sm" value={toDate} onChange={e => setToDate(e.target.value)} />
         </div>
         {selectedDefinitionId && (
           <button

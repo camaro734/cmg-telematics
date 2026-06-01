@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
+import { Input } from '../../shared/ui/Input'
 import type { SettingsOut, TenantOut } from '../../lib/types'
 
 const INPUT: CSSProperties = {
@@ -84,17 +85,14 @@ export default function NotificationSettings() {
       {(!isCmg || selectedTenantId) && (
         <>
           <div style={{ marginBottom: 12 }}>
-            <label style={LABEL}>EMAIL DE ALERTAS</label>
-            <input
+            <Input
+              label="Email de alertas"
               type="email"
               value={email}
               onChange={e => { setEmail(e.target.value); setSaved(false) }}
               placeholder="operaciones@empresa.com"
-              style={INPUT}
+              helperText="Cuando se dispare una alerta, se enviará un aviso a esta dirección. Cada regla puede además tener su propio email específico."
             />
-            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', marginTop: 6 }}>
-              Cuando se dispare una alerta, se enviará un aviso a esta dirección. Cada regla puede además tener su propio email específico.
-            </div>
           </div>
 
           {error && (

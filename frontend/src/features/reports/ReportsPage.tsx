@@ -14,6 +14,7 @@ import { keys } from '../../lib/queryKeys'
 import { exportToCsv } from '../../lib/csvExport'
 import { useReportData, periodToHours, PERIOD_LABELS } from './useReportData'
 import { SelectorBar, PdfDownloadBtn } from './ReportFilters'
+import { Input } from '../../shared/ui/Input'
 import type { Period } from './useReportData'
 import type {
   VehicleTypeOut, KpiHour,
@@ -900,17 +901,7 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <label style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Fecha</label>
-        <input
-          type="date"
-          value={date}
-          max={today}
-          onChange={e => setDate(e.target.value)}
-          style={{
-            fontSize: 12, background: 'var(--bg-card)',
-            border: '1px solid var(--border)', borderRadius: 5,
-            padding: '5px 8px', color: 'var(--fg-primary)',
-          }}
-        />
+        <Input type="date" size="sm" value={date} max={today} onChange={e => setDate(e.target.value)} />
         {isFetching && <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Cargando…</span>}
         {stats && (
           <div style={{ display: 'flex', gap: 16, marginLeft: 8 }}>

@@ -5,6 +5,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, SensorDef, SensorIcon } from '../../lib/types'
 import { AVL_CATALOG, GROUP_LABELS, avlParamToSensorDef } from '../../lib/avlCatalog'
 import { SensorIconComponent, SENSOR_ICONS } from '../../shared/ui/gauges/SensorIconSet'
+import { Input } from '../../shared/ui/Input'
 
 const GAUGE_OPTIONS: SensorDef['gauge_type'][] = ['circular', 'gauge_arc', 'linear', 'tank', 'battery', 'numeric', 'counter', 'led']
 
@@ -360,8 +361,7 @@ export default function VehicleTypeSensorsSection() {
                     <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>
                       Label mostrado *
                     </label>
-                    <input
-                      style={inputStyle}
+                    <Input
                       value={form.label ?? ''}
                       onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
                       required
@@ -384,21 +384,13 @@ export default function VehicleTypeSensorsSection() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <div>
                       <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Mín</label>
-                      <input
-                        type="number"
-                        style={inputStyle}
-                        value={form.min ?? 0}
-                        onChange={e => setForm(f => ({ ...f, min: Number(e.target.value) }))}
-                      />
+                      <Input type="number" value={form.min ?? 0}
+                        onChange={e => setForm(f => ({ ...f, min: Number(e.target.value) }))} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11, color: 'var(--offline)', display: 'block', marginBottom: 4 }}>Máx</label>
-                      <input
-                        type="number"
-                        style={inputStyle}
-                        value={form.max ?? 100}
-                        onChange={e => setForm(f => ({ ...f, max: Number(e.target.value) }))}
-                      />
+                      <Input type="number" value={form.max ?? 100}
+                        onChange={e => setForm(f => ({ ...f, max: Number(e.target.value) }))} />
                     </div>
                   </div>
 

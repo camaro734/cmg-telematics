@@ -6,6 +6,7 @@ import { keys } from '../../lib/queryKeys'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { useAuthStore } from '../auth/useAuthStore'
 import type { DeviceOut, TenantOut, DeviceCreate } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 
 // Formatea last_seen como tiempo relativo (aprox) o fecha local
 function formatLastSeen(last_seen: string | null): string {
@@ -335,44 +336,35 @@ export default function DevicesPage() {
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* IMEI */}
-              <div>
-                <label style={labelStyle}>IMEI</label>
-                <input
-                  type="text"
-                  value={newImei}
-                  onChange={e => setNewImei(e.target.value)}
-                  placeholder="14 o 15 dígitos"
-                  pattern="\d{14,15}"
-                  required
-                  title="El IMEI debe tener 14 o 15 dígitos numéricos"
-                  style={inputStyle}
-                />
-              </div>
+              <Input
+                label="IMEI"
+                type="text"
+                value={newImei}
+                onChange={e => setNewImei(e.target.value)}
+                placeholder="14 o 15 dígitos"
+                pattern="\d{14,15}"
+                required
+                title="El IMEI debe tener 14 o 15 dígitos numéricos"
+                mono
+              />
 
-              {/* Modelo */}
-              <div>
-                <label style={labelStyle}>Modelo</label>
-                <input
-                  type="text"
-                  value={newModel}
-                  onChange={e => setNewModel(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-              </div>
+              <Input
+                label="Modelo"
+                type="text"
+                value={newModel}
+                onChange={e => setNewModel(e.target.value)}
+                required
+              />
 
-              {/* Teléfono SIM */}
-              <div>
-                <label style={labelStyle}>Teléfono SIM <span style={{ color: 'var(--fg-muted)' }}>(opcional)</span></label>
-                <input
-                  type="tel"
-                  value={newSimPhone}
-                  onChange={e => setNewSimPhone(e.target.value)}
-                  placeholder="+34 6XX XXX XXX"
-                  maxLength={20}
-                  style={inputStyle}
-                />
-              </div>
+              <Input
+                label="Teléfono SIM"
+                type="tel"
+                value={newSimPhone}
+                onChange={e => setNewSimPhone(e.target.value)}
+                placeholder="+34 6XX XXX XXX"
+                maxLength={20}
+                helperText="Opcional"
+              />
 
               {/* Tenant */}
               <div>

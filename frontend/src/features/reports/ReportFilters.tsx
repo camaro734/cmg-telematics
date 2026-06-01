@@ -3,6 +3,7 @@ import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
 import type { TenantOut, VehicleOut } from '../../lib/types'
 import type { Period } from './useReportData'
+import { Input } from '../../shared/ui/Input'
 
 // ── Style constants (compartidos con ReportsPage) ─────────────────────────────
 
@@ -143,11 +144,6 @@ export function SelectorBar({
     border: '1px solid var(--border)', borderRadius: 5, padding: '5px 8px',
     color: 'var(--fg-primary)',
   }
-  const dateInputStyle: React.CSSProperties = {
-    fontSize: 12, background: 'var(--bg-card)',
-    border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px',
-    color: 'var(--fg-primary)',
-  }
   const periodBtn = (p: Period): React.CSSProperties => ({
     padding: '5px 14px', fontSize: 12, fontWeight: 600,
     fontFamily: 'var(--font-sans)', border: '1px solid var(--border)',
@@ -211,8 +207,9 @@ export function SelectorBar({
       {period === 'custom' && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Desde</label>
-          <input
+          <Input
             type="date"
+            size="sm"
             value={customFrom}
             max={customTo}
             onChange={e => {
@@ -220,11 +217,11 @@ export function SelectorBar({
               const minAllowed = new Date(new Date(customTo).getTime() - 90 * 86_400_000).toISOString().slice(0, 10)
               setCustomFrom(val < minAllowed ? minAllowed : val)
             }}
-            style={dateInputStyle}
           />
           <label style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Hasta</label>
-          <input
+          <Input
             type="date"
+            size="sm"
             value={customTo}
             max={today}
             onChange={e => {
@@ -233,7 +230,6 @@ export function SelectorBar({
               const minFrom = new Date(new Date(val).getTime() - 90 * 86_400_000).toISOString().slice(0, 10)
               if (customFrom < minFrom) setCustomFrom(minFrom)
             }}
-            style={dateInputStyle}
           />
         </div>
       )}
