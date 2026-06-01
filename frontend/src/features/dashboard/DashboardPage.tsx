@@ -306,7 +306,9 @@ export default function DashboardPage() {
                       border: '1px solid var(--border)',
                       borderRadius: 6,
                       fontSize: 12,
+                      color: 'var(--fg-primary)',
                     }}
+                    itemStyle={{ color: 'var(--fg-primary)' }}
                     formatter={(v: number) => `${v} h`}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />

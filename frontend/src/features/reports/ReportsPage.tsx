@@ -366,8 +366,10 @@ function HistoricoTab({
       border: '1px solid var(--border)',
       borderRadius: 6,
       fontSize: 11,
+      color: 'var(--fg-primary)',
     },
     labelStyle: { color: 'var(--fg-muted)' },
+    itemStyle: { color: 'var(--fg-primary)' },
   }
 
   return (
@@ -409,7 +411,7 @@ function HistoricoTab({
           <div style={{ height: isMobile ? 160 : 240 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData} margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                 <Tooltip {...tooltipStyle} />
@@ -517,7 +519,7 @@ function HistoricoTab({
               <div style={{ height: isMobile ? 160 : 240 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={mergedData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                     <YAxis
                       tick={{ fontSize: 10, fill: 'var(--offline)' }}
@@ -567,7 +569,7 @@ function HistoricoTab({
             <div style={{ height: isMobile ? 160 : 220 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(87,83,78,0.3)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--offline)' }} />
                   <Tooltip
@@ -934,7 +936,7 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
           <div ref={containerRef} style={{ width: '100%', height: isMobile ? 280 : 440, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }} />
           <div style={{
             position: 'absolute', bottom: 12, right: 12, zIndex: 1000,
-            background: 'rgba(28,25,23,0.92)', border: '1px solid var(--border)',
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
             borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'var(--fg-muted)',
             display: 'flex', flexDirection: 'column', gap: 4, backdropFilter: 'blur(4px)',
           }}>

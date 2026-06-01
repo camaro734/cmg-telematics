@@ -122,7 +122,7 @@ const chartTitle: React.CSSProperties = {
 
 const tooltipStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-  borderRadius: 6, fontSize: 12,
+  borderRadius: 6, fontSize: 12, color: 'var(--fg-primary)',
 }
 
 export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: string; vehicleTypeId?: string }) {
@@ -233,7 +233,7 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit="h" />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}h`]} />
+              <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'var(--fg-primary)' }} formatter={(v: number) => [`${v}h`]} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="motor" name="Motor" stroke="var(--info)" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pto" name="PTO" stroke="var(--energy-orange)" strokeWidth={2} dot={false} />
@@ -254,7 +254,7 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'var(--fg-primary)' }} />
                 <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? 'var(--energy-orange)'} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -275,7 +275,7 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} unit={metric.unit ? ` ${metric.unit}` : ''} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: 'var(--fg-primary)' }} />
                 <Line type="monotone" dataKey="value" name={metric.label} stroke={metric.color ?? 'var(--info)'} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>

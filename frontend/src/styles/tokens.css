@@ -50,6 +50,10 @@
   --info-soft:       rgba(59, 130, 246, 0.15);
   --offline:         #64748B;
   --offline-soft:    rgba(100, 116, 139, 0.15);
+  --danger-12:       rgba(239, 68, 68, 0.12);
+  --danger-25:       rgba(239, 68, 68, 0.25);
+  --warn-12:         rgba(245, 158, 11, 0.12);
+  --info-12:         rgba(59, 130, 246, 0.12);
 
   /* ---------- Role chips ---------- */
   --role-superadmin: #F87171;

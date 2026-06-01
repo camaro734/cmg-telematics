@@ -155,7 +155,7 @@ function buildPopupHtml(
 
   // Banda offline (2 rgba hardcoded — ver deuda técnica opacidad)
   const offlineBand = !online
-    ? `<div style="background:rgba(239,68,68,0.12);color:var(--danger);padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(239,68,68,0.25)">Datos desactualizados desde ${formatLastSeen(status.last_seen)}</div>`
+    ? `<div style="background:var(--danger-12);color:var(--danger);padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid var(--danger-25)">Datos desactualizados desde ${formatLastSeen(status.last_seen)}</div>`
     : ''
 
   // Chips de alertas (3 rgba hardcoded — ver deuda técnica opacidad)
@@ -163,7 +163,7 @@ function buildPopupHtml(
     const rule = rulesById.get(a.rule_id)
     const name = rule?.name ?? 'Alerta'
     const sev = rule?.severity ?? 'info'
-    const bg = sev === 'critical' ? 'rgba(239,68,68,0.12)' : sev === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)'
+    const bg = sev === 'critical' ? 'var(--danger-12)' : sev === 'warning' ? 'var(--warn-12)' : 'var(--info-12)'
     const color = sev === 'critical' ? 'var(--danger)' : sev === 'warning' ? 'var(--warn)' : 'var(--info)'
     return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${bg};color:${color};font-size:10px;font-weight:600">⚠ ${name}</span>`
   }).join('')
