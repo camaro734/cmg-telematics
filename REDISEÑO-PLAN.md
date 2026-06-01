@@ -1,7 +1,7 @@
 # Plan del rediseño visual de CMG Track
 
 **Fecha de cierre del plan:** 30 mayo 2026
-**Estado:** decisiones de diseño cerradas, ejecución pendiente
+**Estado:** Fases 1, 1.5 y 2 (popup marcador) completadas — próxima: Fase 3 (eliminar Dashboard)
 
 ## Paleta y estética
 
@@ -137,10 +137,9 @@ Fin del plan. Estado: cerrado en lo conceptual, listo para discutir ejecución.
 ### Fase 1.5 — Componentes compartidos (3-4 días)
 Tres sub-tareas:
 
-**(a) Decidir Topbar.tsx**
-- Confirmar si `frontend/src/shared/ui/Topbar.tsx` se usa todavía en alguna pantalla.
-- Si no se usa, eliminarlo (es duplicado funcional de TopNav.tsx).
-- Si se usa en algún sitio puntual, decidir si se migra al TopNav o se mantiene.
+**(a) Decidir Topbar.tsx** ✅ COMPLETADA 31 mayo 2026 commit 6da0a73
+- Confirmado: `Topbar.tsx` no se importaba en ningún archivo del frontend.
+- Eliminado como código muerto (duplicado funcional simplificado de TopNav.tsx).
 
 **(b) Crear componentes de formulario compartidos** ✅ COMPLETADA 1 junio 2026 commits b39642d + 856c05c + 1a46be4
 - `Input.tsx` creado (label, error, helperText, prefix, suffix, size, mono, forwardRef) + 21 tests.
@@ -149,11 +148,11 @@ Tres sub-tareas:
 - ~18 constantes locales (`inputStyle`, `SELECT`, `selStyle`, etc.) eliminadas.
 - `Textarea.tsx` y `Checkbox.tsx` diferidos — YAGNI: menos de 8 instancias cada uno, sin divergencias que justifiquen encapsular ahora.
 
-**(c) Rediseñar componentes existentes con la paleta nueva**
-- Aplicar paleta fría a: `Button.tsx`, `ConfirmDialog.tsx`, `Toast.tsx`, `Chip.tsx`, `StatusBadge.tsx`, `Sparkline.tsx`, todos los `gauges/*.tsx`, `SkeletonCard.tsx`, `SectionErrorBoundary.tsx`.
-- NO tocar estructura, solo estilos.
-- NO tocar `TopNav.tsx` (alto riesgo, se hace en Fase 2 dentro de Flota).
-- NO tocar `GeofenceMapEditor.tsx` (mal ubicado, se reubica cuando toque geocercas).
+**(c) Rediseñar componentes existentes con la paleta nueva** ✅ COMPLETADA mayo-junio 2026 commits d9f8a33 + 322e3c1 + 33cff02 + d060466
+- Paleta fría cold-dark aplicada a tokens CSS + Button.tsx + gauges + componentes shared.
+- Categorías A, B y C de tokenización completadas (warm-palette → cold-palette).
+- Deuda técnica de opacidad (9 hits rgba → tokens) resuelta en commit c912d48.
+- TopNav.tsx y GeofenceMapEditor.tsx NO tocados (conforme a lo planeado).
 
 Tras Fase 1.5, abrir CUALQUIER pantalla de la app y los modales, botones, badges, toasts deben tener look frío nuevo. Aunque las pantallas en sí sigan estructuradas como hoy.
 
@@ -164,7 +163,7 @@ Tras Fase 1.5, abrir CUALQUIER pantalla de la app y los modales, botones, badges
 - Marcador con pin azul Leaflet + halo verde teal.
 - TopNav (que es el componente más complejo del repo) se ajusta aquí si hace falta. Tratar con cuidado.
 
-### Revisión 1 junio 2026 — cambio de scope
+### Revisión 1 junio 2026 — cambio de scope ✅ COMPLETADA 1 junio 2026 commit df0fdcf
 
 Tras verificación visual en vivo de /fleet, Carlos confirma que el
 layout actual (lista de vehículos a la izquierda + mapa a ancho
