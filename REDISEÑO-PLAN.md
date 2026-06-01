@@ -229,3 +229,31 @@ Tras Fase 1.5, abrir CUALQUIER pantalla de la app y los modales, botones, badges
 ## Próximo paso
 
 Arrancar **Fase 1** (tokens + tipografía Inter) en la siguiente sesión.
+
+---
+
+## Deuda técnica menor identificada — 1 junio 2026
+
+1. **Hex literales con sufijo de opacidad en template strings** (4 sitios en ReportsPage.tsx: `#64748B22` en líneas 653, 1099, 1108 y `#64748B` en pieColors). Razón: `var()` no se puede concatenar con strings literales como `${color}22`. Solución futura: refactorizar a `color-mix()` o crear tokens de opacidad (`--offline-12`, `--offline-25`, etc.).
+
+2. **Hex literal del marcador Leaflet** en ClientPortalPage.tsx:89 (`#64748B`). Razón: la API de Leaflet no acepta `var()` en atributos SVG. Solución futura: leer la variable CSS con `getComputedStyle()` al inicializar el mapa.
+
+3. **Hex literales en BrandTokensEditor.tsx** (valores default del color picker). Razón: `<input type="color">` exige hex literal por especificación HTML. Son correctos tal como están.
+
+Plan: sesión dedicada para crear `--offline-12`, `--offline-25` y otros tokens semánticos de opacidad, y revisar todos los hex literales del proyecto en un solo barrido.
+
+## Bug preexistente identificado — 1 junio 2026
+
+Pie chart "Distribución del tiempo" en ReportsPage.tsx asigna colores por índice del array filtrado, no por nombre del segmento. Cuando un segmento (PTO, Motor o Parado) tiene valor cero, los índices restantes "se deslizan" y los segmentos visibles reciben colores que no les corresponden.
+
+**Solución:** cambiar de mapeo por índice a mapeo por nombre semántico:
+```tsx
+const PIE_COLOR: Record<string, string> = {
+  'PTO':    'var(--energy-orange)',
+  'Motor':  '#22C55E',
+  'Parado': 'var(--offline)',
+}
+// <Cell fill={PIE_COLOR[entry.name] ?? 'var(--fg-dim)'} />
+```
+
+Trabajo estimado: 10 minutos. Se aborda cuando se trate el componente Reportes en la Fase 8 del rediseño.

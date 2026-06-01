@@ -739,3 +739,25 @@ PARAR. En este servidor "local" y "producción" son lo mismo.
 Avisar a Carlos antes de ejecutar el comando.
 
 ### Identificación rápida de contenedores de producción
+
+### ⚠️ Despliegue del frontend — procedimiento obligatorio
+
+`docker compose up -d frontend` **NO funciona** (bug docker-compose v1.29.2 + nginx:alpine).
+Cada vez que se reconstruya el frontend usar siempre este procedimiento:
+
+```bash
+docker-compose build frontend
+OLD=$(docker ps -q --filter "name=cmg-telematic1_frontend_1")
+docker stop $OLD && docker rm $OLD
+docker run -d --name cmg-telematic1_frontend_1 \
+  --network cmg-telematic1_default \
+  --network-alias frontend \
+  --restart unless-stopped \
+  cmg-telematic1_frontend
+```
+
+Verificar que el nuevo build está servido:
+```bash
+docker exec cmg-telematic1_frontend_1 sh -c \
+  "grep -rl 'TOKEN_O_STRING_NUEVO' /usr/share/nginx/html/assets/ | head -3"
+```
