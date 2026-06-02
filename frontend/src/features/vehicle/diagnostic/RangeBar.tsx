@@ -1,3 +1,5 @@
+import { zoneForValue } from '../../../lib/sensorSeverity'
+
 interface RangeBarProps {
   value: number | null
   min: number
@@ -10,15 +12,18 @@ interface RangeBarProps {
   alertBelow?: number
 }
 
+const ZONE_COLOR: Record<string, string> = {
+  crit: 'var(--danger)',
+  warn: 'var(--warn)',
+  ok: 'var(--ok)',
+}
+
 function severityColor(
   value: number,
   opts: Pick<RangeBarProps, 'warnAbove' | 'alertAbove' | 'warnBelow' | 'alertBelow'>
 ): string {
-  if (opts.alertAbove !== undefined && value >= opts.alertAbove) return 'var(--danger)'
-  if (opts.alertBelow !== undefined && value <= opts.alertBelow) return 'var(--danger)'
-  if (opts.warnAbove !== undefined && value >= opts.warnAbove) return 'var(--warn)'
-  if (opts.warnBelow !== undefined && value <= opts.warnBelow) return 'var(--warn)'
-  return 'var(--ok)'
+  const zone = zoneForValue(value, opts)
+  return zone ? ZONE_COLOR[zone] : 'var(--ok)'
 }
 
 export function RangeBar({
