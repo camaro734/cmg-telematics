@@ -16,8 +16,9 @@ from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
     TelemetryPoint, TrackPoint, KpiHour, VehicleTypeSensorSchemaUpdate,
     VehicleTypeCreate, VehicleTypeUpdate, HistoricMetricItem, DoutSlot,
-    VehicleTypeReportMetricsUpdate,
+    VehicleTypeReportMetricsUpdate, VehicleTypeSystemBlocksUpdate, SystemBlock,
 )
+from app.seeds.system_block_templates import SYSTEM_BLOCK_TEMPLATES
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.maintenance import MaintenancePlan
@@ -332,6 +333,77 @@ async def upload_vehicle_type_icon(
     await db.commit()
     await db.refresh(vehicle_type)
     return vehicle_type
+
+
+@router.get("/vehicle-types/system-blocks/templates")
+async def list_system_block_templates(
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Lista las plantillas de bloques disponibles (constante en código, no en BD)."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+    return SYSTEM_BLOCK_TEMPLATES
+
+
+@router.get("/vehicle-types/{type_id}/system-blocks", response_model=list[SystemBlock])
+async def get_vehicle_type_system_blocks(
+    type_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve los bloques del panel de diagnóstico configurados para este tipo."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+    result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
+    vtype = result.scalar_one_or_none()
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo no encontrado")
+    return vtype.system_blocks or []
+
+
+@router.patch("/vehicle-types/{type_id}/system-blocks", response_model=VehicleTypeOut)
+async def update_vehicle_type_system_blocks(
+    type_id: uuid.UUID,
+    body: VehicleTypeSystemBlocksUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reemplaza completamente los bloques del panel de diagnóstico del tipo."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+    result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
+    vtype = result.scalar_one_or_none()
+    if not vtype:
+        raise HTTPException(status_code=404)
+    vtype.system_blocks = [b.model_dump() for b in body.system_blocks]
+    flag_modified(vtype, "system_blocks")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
+@router.post("/vehicle-types/{type_id}/apply-template", response_model=VehicleTypeOut)
+async def apply_system_block_template(
+    type_id: uuid.UUID,
+    body: dict,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aplica una plantilla de bloques al tipo, reemplazando los bloques actuales."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+    template_id = body.get("template_id", "")
+    if template_id not in SYSTEM_BLOCK_TEMPLATES:
+        raise HTTPException(status_code=400, detail=f"Plantilla '{template_id}' no existe")
+    result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
+    vtype = result.scalar_one_or_none()
+    if not vtype:
+        raise HTTPException(status_code=404)
+    vtype.system_blocks = SYSTEM_BLOCK_TEMPLATES[template_id]["blocks"]
+    flag_modified(vtype, "system_blocks")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
 
 
 @router.get("/vehicles", response_model=list[VehicleOut])

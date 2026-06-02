@@ -44,6 +44,20 @@ class VehicleTypeReportMetricsUpdate(BaseModel):
     report_metrics: list[HistoricMetricItem]
 
 
+class SystemBlock(BaseModel):
+    """Bloque del panel de diagnóstico de un tipo de vehículo."""
+    id: str = Field(min_length=1, max_length=100)        # slug, e.g. "block_motor"
+    name: str = Field(min_length=1, max_length=100)      # editable por admin, e.g. "Motor"
+    icon: str = Field(min_length=1, max_length=60)       # clave Tabler/Lucide, e.g. "ti-engine"
+    sensor_keys: list[str] = []                          # sensores asignados al bloque
+    key_sensor_keys: list[str] = []                      # subset que aparece en el resumen
+    key_count: int = 2                                   # cuántos valores clave mostrar
+
+
+class VehicleTypeSystemBlocksUpdate(BaseModel):
+    system_blocks: list[SystemBlock]
+
+
 class VehicleTypeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -55,6 +69,7 @@ class VehicleTypeOut(BaseModel):
     historic_metrics: list[HistoricMetricItem] = []
     dout_config: list[DoutSlot] = []
     pdf_metrics: list[PdfMetric] = []
+    system_blocks: list[SystemBlock] = []
 
 
 class VehicleOut(BaseModel):
