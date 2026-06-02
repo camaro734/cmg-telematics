@@ -1,7 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import StatusBadge from '../../shared/ui/StatusBadge'
+import { Chip } from '../../shared/ui/Chip'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
-import type { VehicleOut, VehicleStatus } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, AlertInstanceEnrichedOut } from '../../lib/types'
+
+function alertSeverityColor(alerts: AlertInstanceEnrichedOut[]): string | null {
+  if (alerts.length === 0) return null
+  if (alerts.some(a => a.severity === 'critical')) return 'var(--danger)'
+  if (alerts.some(a => a.severity === 'warning')) return 'var(--warn)'
+  return 'var(--info)'
+}
 
 function batteryColor(mv: number): string {
   const v = mv / 1000
@@ -23,13 +31,17 @@ interface VehicleHeaderProps {
   status: VehicleStatus | undefined
   iconUrl?: string
   vehicleTypeSlug?: string
+  activeAlerts?: AlertInstanceEnrichedOut[]
+  tenantName?: string
+  onOpenActivity?: () => void
 }
 
-export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlug }: VehicleHeaderProps) {
+export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlug, activeAlerts = [], tenantName, onOpenActivity }: VehicleHeaderProps) {
   const navigate = useNavigate()
   const online = status?.online ?? false
   const ignition = status?.ignition ?? false
   const VehicleTypeIcon = getVehicleIconForSlug(vehicleTypeSlug ?? '')
+  const alertColor = alertSeverityColor(activeAlerts)
 
   return (
     <div style={{
@@ -77,8 +89,14 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
           <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{vehicle.name}</h1>
           <StatusBadge variant={online ? 'online' : 'offline'} size="md" />
           {status?.pto_active && <StatusBadge variant="pto" size="md" />}
+          {alertColor && (
+            <Chip color={alertColor} soft dot size="sm">
+              {activeAlerts.length} alerta{activeAlerts.length !== 1 ? 's' : ''}
+            </Chip>
+          )}
         </div>
         <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {tenantName && <span style={{ color: 'var(--fg-secondary)', fontWeight: 500 }}>{tenantName}</span>}
           {vehicle.license_plate && <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--fg-primary)', letterSpacing: '0.05em' }}>{vehicle.license_plate}</span>}
           {status?.ext_voltage_mv != null && (
             <span style={{ color: batteryColor(status.ext_voltage_mv) }}>
@@ -90,6 +108,21 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
           )}
         </div>
       </div>
+
+      {/* Botón Actividad */}
+      {onOpenActivity && (
+        <button
+          onClick={onOpenActivity}
+          style={{
+            background: 'var(--bg-card)', color: 'var(--fg-muted)',
+            border: '1px solid var(--border)', borderRadius: 6,
+            padding: '5px 12px', fontSize: 12, cursor: 'pointer',
+            flexShrink: 0, fontWeight: 500,
+          }}
+        >
+          Actividad
+        </button>
+      )}
 
       {/* Ignición — indicador prominente a la derecha */}
       {status && (

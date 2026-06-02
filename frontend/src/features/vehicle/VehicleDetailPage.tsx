@@ -21,7 +21,8 @@ import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
-import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceOut, TenantOut, CommandLogEntry } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry } from '../../lib/types'
+import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
 import { toast } from '../../shared/ui/Toast'
 import { useAuthStore } from '../auth/useAuthStore'
@@ -169,9 +170,11 @@ export default function VehicleDetailPage() {
   ).length
 
 
-  const { data: firingAlerts = [] } = useQuery<AlertInstanceOut[]>({
+  const [activityOpen, setActivityOpen] = useState(false)
+
+  const { data: firingAlerts = [] } = useQuery<AlertInstanceEnrichedOut[]>({
     queryKey: [...keys.alerts(), 'firing', id],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>('/api/v1/alerts?status=firing'),
+    queryFn: () => apiClient.get<AlertInstanceEnrichedOut[]>('/api/v1/alerts?status=firing'),
     refetchInterval: 30_000,
     enabled: !!vehicle,
   })
@@ -207,7 +210,8 @@ export default function VehicleDetailPage() {
   }), [kpis, status?.ext_voltage_mv])
 
 
-  const activeAlertsCount = firingAlerts.filter(a => a.vehicle_id === id).length
+  const activeAlerts = firingAlerts.filter(a => a.vehicle_id === id)
+  const activeAlertsCount = activeAlerts.length
 
   if (!id) return <Navigate to="/fleet" replace />
 
@@ -243,7 +247,15 @@ export default function VehicleDetailPage() {
         </div>
       )}
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <VehicleHeader vehicle={vehicle} status={status} iconUrl={vehicleType?.icon_url ?? undefined} vehicleTypeSlug={vehicleType?.slug} />
+        <VehicleHeader
+          vehicle={vehicle}
+          status={status}
+          iconUrl={vehicleType?.icon_url ?? undefined}
+          vehicleTypeSlug={vehicleType?.slug}
+          activeAlerts={activeAlerts}
+          tenantName={vehicleTenant?.name}
+          onOpenActivity={() => setActivityOpen(true)}
+        />
         <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
             <Tabs tabs={PAGE_TABS} activeTab={tab} onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles' | 'maintenance')} />
@@ -698,6 +710,11 @@ export default function VehicleDetailPage() {
           onClose={() => setShowFullTelemetry(false)}
         />
       )}
+      <ActivityDrawer
+        isOpen={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        commands={commandHistory}
+      />
     </Shell>
   )
 }

@@ -195,6 +195,12 @@ export interface AlertInstanceOut {
   ack_note: string | null
 }
 
+export interface AlertInstanceEnrichedOut extends AlertInstanceOut {
+  rule_name: string
+  vehicle_name: string
+  severity: RuleSeverity
+}
+
 export interface SettingsOut {
   tenant_id: string
   notification_email: string | null
