@@ -14,6 +14,7 @@ import HistoricMetricsSection from './HistoricMetricsSection'
 import PdfMetricsSection from './PdfMetricsSection'
 import DoutConfigSection from './DoutConfigSection'
 import AlertRulesSection from './AlertRulesSection'
+import SystemBlocksSection from './SystemBlocksSection'
 
 // ── Form state types ───────────────────────────────────────────────────────
 
@@ -508,6 +509,9 @@ export default function VehicleTypesPage() {
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <AlertRulesSection typeId={selectedType.id} selectedType={selectedType} />
+                )}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <SystemBlocksSection typeId={selectedType.id} selectedType={selectedType} />
                 )}
               </div>
             </>

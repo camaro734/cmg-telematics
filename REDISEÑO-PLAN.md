@@ -365,8 +365,8 @@ Campo nuevo `system_blocks: JSON` que contiene array de bloques:
 
 #### UI nueva en `/vehicle-types`
 - Sección "Bloques del panel" con CRUD completo.
-- Drag&drop para reordenar bloques.
-- Por cada bloque: nombre editable, selector de icono (grid con ~30 iconos Tabler/Lucide), multi-select de sensores del schema, multi-select para marcar valores clave.
+- Reordenado con botones ▲▼ (sin drag&drop, YAGNI).
+- Por cada bloque: editor en modal con nombre editable, selector de icono (grid con ~30 iconos Tabler/Lucide), multi-select de sensores del schema, multi-select para marcar valores clave.
 - Botón "Aplicar plantilla" con 3-4 plantillas iniciales: VPS (cuba), MAX (barredora), basura (recolectora), genérico.
 - Plantillas hardcodeadas en seed/código, pero el admin puede editarlas tras aplicar.
 

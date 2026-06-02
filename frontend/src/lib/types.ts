@@ -159,6 +159,15 @@ export interface PdfMetricItem {
   format: PdfMetricFormat
 }
 
+export interface SystemBlock {
+  id: string
+  name: string
+  icon: string
+  sensor_keys: string[]
+  key_sensor_keys: string[]
+  key_count: number
+}
+
 export interface VehicleTypeOut {
   id: string
   slug: string
@@ -169,6 +178,7 @@ export interface VehicleTypeOut {
   historic_metrics: HistoricMetricItem[]
   dout_config: DoutSlot[]
   pdf_metrics: PdfMetricItem[]
+  system_blocks: SystemBlock[]
 }
 
 export interface AlertInstanceOut {
