@@ -18,6 +18,7 @@ node_modules/
 frontend/dist/
 frontend/build/
 .next/
+*.tsbuildinfo
 
 # IDE
 .DS_Store
