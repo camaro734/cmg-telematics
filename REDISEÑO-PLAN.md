@@ -270,34 +270,186 @@ anterior, indicando "popup_marcador_flota_v1".
 - `DashboardPage.tsx` eliminado (413 líneas, 6 subcomponentes privados, ninguno rescatable).
 - Pantalla por defecto tras login: `/fleet`.
 
-### Fase 4 — Detalle de vehículo (3-4 días, la más larga)
-- Cabecera densa con KPI integrados.
-- Mapa horizontal grande debajo de pestañas (Voyager, reutilizar de Flota).
-- Estado del equipo en tarjetas compactas DEBAJO del mapa.
-- Etiquetas de gauges en dos líneas fijas.
-- Banner expandible rojo si hay alertas activas.
+## Fase 4 — Detalle de vehículo `/vehicles/:id` (rediseño completo, 4 tabs)
 
-### Notas de verificación visual del 1 junio 2026
+**Estado**: Planificada el 1 junio 2026. Pendiente de implementación.
+**Estimación honesta**: 10-16 días de trabajo (~2-3 semanas).
+**Justificación del alcance**: `/vehicles/:id` es la pantalla donde los clientes ven el valor real del producto (diagnóstico + operación). Inversión de producto, no solo cosmética. Diferencia Track de competencia (Wecove, Cleveapp).
 
-Durante la sesión de cierre de Fase 1.5 (tokenización de paleta cálida)
-se verificó visualmente la pantalla del Detalle de vehículo y se
-confirmaron en vivo los problemas estructurales ya documentados arriba:
+### Filosofía del rediseño
 
-- Etiquetas de gauges largas rompen en 4-5 líneas dentro de tarjetas
-  estrechas ("PICO MÁXIMO DE PRESIÓN DE AGUA", "PICO MÁXIMO DEPRESOR
-  SOPLANDO", etc.). La tipografía es legible pero la cuadrícula queda
-  descompensada.
-- Cuando muchos gauges no tienen dato (vehículo de prueba parado), la
-  pantalla muestra muchas tarjetas vacías con solo el dash "—".
-  Esperado en vehículo de prueba.
-- El gauge RPM motor tiene su semicírculo y su número distanciados
-  visualmente; falta cohesión.
-- Layout general: los gauges no respiran, hay sensación de
-  amontonamiento.
+Cambio conceptual respecto al diseño actual:
+- De "muestra todos los datos crudos" → a "diagnostica el estado del vehículo".
+- El técnico abre `/vehicles/:id` en el 70% de los casos para **diagnóstico rápido** (¿está OK / NO OK?), no para análisis profundo.
+- La pantalla debe responder "¿está bien?" en menos de 3 segundos a la vista.
 
-Cualquier rediseño de Fase 4 debe resolver estos puntos. La paleta
-fría está aplicada correctamente — el problema es estructural, no
-cromático.
+### Estructura general de la pantalla
+
+#### Cabecera unificada (fija arriba)
+- Botón "← Flota" para volver.
+- Línea 1 (identidad): icono vehículo + nombre + matrícula + chip "EN LÍNEA"/"OFFLINE" + contador alertas activas con icono ⚠ + número + color (rojo crítica, ámbar aviso).
+- Línea 2 (contexto operativo): cliente · ignición · voltaje · última señal.
+- Botón "Actividad" en cabecera abre panel desplegable lateral con historial de comandos e incidencias (drawer estilo lateral derecho, lista paginada con filtros simples por tipo y fecha).
+
+#### Tabs principales
+1. **EN VIVO** (rediseño completo en Fase 4).
+2. **HISTÓRICO** (rediseño completo en Fase 4, incluye selector de fecha del mapa de rutas que antes vivía en EN VIVO).
+3. **CICLOS** (rediseño completo en Fase 4).
+4. **MANTENIMIENTO** (rediseño completo en Fase 4).
+
+### Tab EN VIVO
+
+#### Layout (Layout 3 con preferencia recordada)
+1. Cabecera de página (descrita arriba).
+2. Fila de tabs (EN VIVO / HISTÓRICO / CICLOS / MANTENIMIENTO).
+3. **Mapa colapsable**: barra "Ver mapa ↓" plegada por defecto. Estado abierto/cerrado se guarda por usuario (tabla `user_dashboard_prefs`, no solo localStorage para persistir entre dispositivos).
+4. **Panel de diagnóstico** a todo el ancho — grid responsive (4 columnas desktop, 2 columnas móvil) con 8+ tarjetas de bloques de sistema.
+5. **Sección de detalle por bloque**, debajo del panel. Cada bloque tiene su zona de detalle, accesible vía "Ver detalle ↓" en su tarjeta (scroll suave).
+6. Al pie: footer estándar.
+
+#### Panel de diagnóstico — Tarjetas
+Cada tarjeta representa un sistema físico del vehículo:
+- Border-left 3px de color de severidad (rojo crítica, ámbar aviso, verde OK).
+- Icono del sistema (Tabler/Lucide).
+- Nombre del bloque.
+- Frase corta de estado:
+  - 0 alertas activas → "Funcionando normal" o equivalente.
+  - 1 alerta activa → nombre de la regla/alerta.
+  - 2+ alertas activas → "N alertas activas".
+- 2-3 valores clave del sistema (configurable por admin en cantidad y selección).
+- Click en la tarjeta → scroll suave a sección de detalle correspondiente.
+
+#### Lógica del color del semáforo
+Prioridad en orden:
+1. Alerta crítica activa para algún sensor del bloque → rojo.
+2. Alerta de aviso activa → ámbar.
+3. Umbral `critical_max/min` del `sensor_schema` cruzado → rojo.
+4. Umbral `warn_max/min` cruzado → ámbar.
+5. Si nada → verde por defecto.
+
+#### Sección de detalle por bloque
+Al hacer scroll desde una tarjeta:
+- Cabecera con nombre del bloque + estado actual.
+- **Todos los sensores del bloque** (no solo los "valores clave" del resumen).
+- Cada sensor visualizado según su **tipo** (definido por admin, ver sección "Tipos de visualización" abajo).
+- **Mini-gráfico de últimas 24h** del sensor más crítico del bloque.
+- **Alertas activas relacionadas con el bloque**, listadas con descripción (sin acción directa — la acción "Reconocer" vive en `/alerts`).
+
+### Tipos de visualización de sensores
+Catálogo cerrado de 5 tipos. Admin elige el tipo por sensor en `/vehicle-types`:
+
+1. **RangeBar** — Barra horizontal con rango, valor actual y línea de umbral crítico. Para sensores numéricos con min/max conocidos. Ejemplos: RPM (0-3000), Presión hidráulica (0-250 bar).
+2. **BigNumber** — Número grande con unidad pequeña. Para valores numéricos sin rango específico. Ejemplos: Kilómetros totales, Horas motor, Temperatura ambiente.
+3. **LevelTank** — Rectángulo vertical relleno con %, color verde/ámbar/rojo según nivel. Para valores de nivel/porcentaje. Ejemplos: Combustible, Adblue, Cisterna, Nivel de agua.
+4. **BinaryIndicator** — Chip con punto + texto "Activo"/"Inactivo" en verde/gris. Para valores ON/OFF. Ejemplos: PTO, Depresor, Pedal freno, Setas, Bomba.
+5. **StatusText** — Chip con texto y color contextual. Para valores categóricos. Ejemplos: Estado del motor ("ralentí"/"trabajo"/"apagado"), Modo operación.
+
+**Eliminado del catálogo**: gauge circular con aguja (`CircularGauge`, `GaugeArc`). Causa raíz del bug visual de la captura inicial (etiquetas largas comprimidas). Los 5 tipos cubren todos los casos sin pérdida funcional.
+
+### Sistema de bloques configurable por admin (en `/vehicle-types`)
+
+Filosofía: el admin de CMG controla todo el catálogo desde `/vehicle-types`. Nuevos clientes con tipos de vehículo distintos (cosechadoras, cisternas, etc.) se añaden sin tocar código.
+
+#### Extensión del modelo `vehicle_types`
+Campo nuevo `system_blocks: JSON` que contiene array de bloques:
+```json
+{
+  "id": "block_motor_xyz",
+  "name": "Motor",
+  "icon": "ti-engine",
+  "sensor_keys": ["rpm", "engine_temp", "engine_hours"],
+  "key_sensor_keys": ["rpm", "engine_temp"],
+  "key_count": 2
+}
+```
+
+#### UI nueva en `/vehicle-types`
+- Sección "Bloques del panel" con CRUD completo.
+- Drag&drop para reordenar bloques.
+- Por cada bloque: nombre editable, selector de icono (grid con ~30 iconos Tabler/Lucide), multi-select de sensores del schema, multi-select para marcar valores clave.
+- Botón "Aplicar plantilla" con 3-4 plantillas iniciales: VPS (cuba), MAX (barredora), basura (recolectora), genérico.
+- Plantillas hardcodeadas en seed/código, pero el admin puede editarlas tras aplicar.
+
+#### Endpoints backend nuevos
+- `GET /api/v1/vehicle-types/:id/system-blocks`
+- `PUT /api/v1/vehicle-types/:id/system-blocks` (full replace del array).
+
+### Configurabilidad personal del usuario final (Nivel Medio)
+
+El usuario final puede personalizar **su** vista de `/vehicles/:id`:
+1. **Reordenar bloques** (drag&drop, sobreescribe el orden definido por admin).
+2. **Ocultar bloques** que no le interesan (toggle).
+3. **Pinned**: marcar 1-2 bloques como fijos arriba siempre.
+
+#### Persistencia
+Tabla nueva `user_dashboard_prefs`:
+- `user_id`, `vehicle_type_id`, `block_order: JSON`, `hidden_blocks: string[]`, `pinned_blocks: string[]`, `map_collapsed: boolean`.
+
+#### UI
+- Botón "Personalizar" arriba a la derecha del panel.
+- Click → panel lateral con drag&drop de bloques + toggles para ocultar + estrellitas para pinned.
+- Cambios persisten al guardar.
+
+### DOUT (control de salidas digitales)
+- DOUT pasa a ser **una tarjeta más del panel** ("Control remoto" o nombre que decida el admin).
+- Lógica del semáforo distinta: gris/neutro si todas OFF, azul/info si alguna activada, rojo si problema con DOUT.
+- Botones de control en la sección de detalle del bloque (al hacer scroll).
+- **NO se toca lógica de DOUT** — funcionalidad crítica en producción.
+
+### Tabs HISTÓRICO / CICLOS / MANTENIMIENTO
+Planificación específica de cada una **diferida a sesiones propias antes de implementar**. Hoy solo se decide:
+- Las 3 tabs entran en alcance de Fase 4 (decisión del 1 junio 2026).
+- Selector de fecha del mapa de rutas se mueve de EN VIVO a HISTÓRICO.
+- Cromática y componentes compartidos (Input, Select, Chip, etc.) ya aplicados en Fase 1.5 valen para estas tabs.
+
+### Componentes obsoletos tras Fase 4
+- `CircularGauge.tsx` (eliminar tras migración).
+- `GaugeArc.tsx` (eliminar tras migración).
+- `LinearGauge.tsx` y `TankGauge.tsx` (revisar si se adaptan o se reemplazan por LevelTank).
+- `NumericDisplay.tsx` (revisar si se adapta o se reemplaza por BigNumber).
+- `SensorWidget.tsx` (probablemente refactor profundo o reemplazo).
+
+### Componentes nuevos a crear
+- `RangeBar.tsx`, `BigNumber.tsx`, `LevelTank.tsx`, `BinaryIndicator.tsx`, `StatusText.tsx` (los 5 tipos de visualización).
+- `SystemBlockCard.tsx` (la tarjeta del panel).
+- `SystemBlockDetail.tsx` (la sección de detalle por bloque).
+- `DashboardCustomizer.tsx` (el panel lateral de personalización del usuario).
+- `ActivityDrawer.tsx` (el panel lateral del historial de comandos/incidencias).
+- `VehicleTypeSystemBlocks.tsx` (la sección de admin en `/vehicle-types`).
+
+### Bloques de implementación (orden sugerido)
+Fase 4 se ejecuta en bloques. Cada bloque cierra con commit propio.
+
+1. **Backend modelo `system_blocks`** + endpoints + plantillas seed.
+2. **UI admin en `/vehicle-types`**: editor de bloques + selector iconos + plantillas.
+3. **Cabecera unificada** + drawer de actividad.
+4. **Los 5 componentes nuevos de visualización** (RangeBar, BigNumber, LevelTank, BinaryIndicator, StatusText) + tests.
+5. **Panel de diagnóstico** (SystemBlockCard) + lógica del semáforo.
+6. **Secciones de detalle por bloque** (SystemBlockDetail) + mini-gráficos.
+7. **Mapa colapsable** con preferencia recordada.
+8. **Configurabilidad usuario** (DashboardCustomizer + persistencia).
+9. **DOUT como tarjeta del panel** + adaptación de los botones de control.
+10. **Eliminación de componentes obsoletos** (CircularGauge, etc.).
+11. **Rediseño tab HISTÓRICO** (planificación específica antes de arrancar).
+12. **Rediseño tab CICLOS** (planificación específica antes de arrancar).
+13. **Rediseño tab MANTENIMIENTO** (planificación específica antes de arrancar).
+14. **Verificación visual completa de las 4 tabs en desktop + móvil**.
+15. **Commit final + push + cierre de Fase 4**.
+
+### Hitos clave
+- Hito 1 (~5 días): admin puede definir bloques en `/vehicle-types`. Modelo backend funcional.
+- Hito 2 (~9 días): tab EN VIVO funcional con panel + detalles + personalización usuario. Apto para mostrar a cliente.
+- Hito 3 (~14 días): las 4 tabs rediseñadas. Fase 4 cerrada.
+
+### Riesgos identificados
+- **Riesgo alto**: cambio masivo de componentes de visualización. Mitigar con tests por componente nuevo + verificación visual por cliente real.
+- **Riesgo medio**: configuración admin compleja puede ser difícil de usar sin onboarding. Mitigar con plantillas y tooltips claros.
+- **Riesgo bajo**: persistencia de prefs de usuario. Patrón estándar, sin sorpresas técnicas.
+- **Riesgo bajo**: DOUT como tarjeta — UX nuevo. Si no funciona, fallback a sección al pie como hoy.
+
+### Decisiones aplazadas (no urgentes)
+- Vistas guardadas configurables (Nivel Total de personalización): aplazado, evaluar tras ver uso real del Nivel Medio.
+- Unificación de `relativeTime` en 4 archivos del proyecto (deuda apuntada): aplazado, sesión propia futura.
 
 ### Fase 5 — Pantalla Alertas (1-2 días)
 - Barra de gravedad por color (crítica/aviso/info).
