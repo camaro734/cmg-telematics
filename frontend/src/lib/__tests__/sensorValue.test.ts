@@ -52,6 +52,44 @@ describe('resolveRawValue', () => {
   })
 })
 
+describe('resolveRawValue — status_field', () => {
+  const statusFull: VehicleStatus = {
+    ...baseStatus,
+    ext_voltage_mv: 12400,
+    ignition: true,
+    can_data: null,
+  }
+
+  it('resuelve número desde status_field (ext_voltage_mv)', () => {
+    const sensor: SensorDef = { ...baseSensor, status_field: 'ext_voltage_mv' }
+    expect(resolveRawValue(sensor, statusFull, {})).toBe(12400)
+  })
+
+  it('resuelve boolean true → 1 (ignition)', () => {
+    const sensor: SensorDef = { ...baseSensor, status_field: 'ignition' }
+    expect(resolveRawValue(sensor, statusFull, {})).toBe(1)
+  })
+
+  it('resuelve boolean false → 0', () => {
+    const sensor: SensorDef = { ...baseSensor, status_field: 'ignition' }
+    const statusOff = { ...statusFull, ignition: false }
+    expect(resolveRawValue(sensor, statusOff, {})).toBe(0)
+  })
+
+  it('devuelve null si el status_field es null', () => {
+    const sensor: SensorDef = { ...baseSensor, status_field: 'ext_voltage_mv' }
+    const statusNoVolt = { ...statusFull, ext_voltage_mv: null }
+    expect(resolveRawValue(sensor, statusNoVolt, {})).toBeNull()
+  })
+
+  it('status_field tiene prioridad sobre avl_id', () => {
+    const sensor: SensorDef = { ...baseSensor, status_field: 'ext_voltage_mv', avl_id: 145 }
+    // avl_145 = 250 en can_data, ext_voltage_mv = 12400 → debe ganar status_field
+    const status = { ...statusFull, can_data: { avl_145: 250 } }
+    expect(resolveRawValue(sensor, status, {})).toBe(12400)
+  })
+})
+
 describe('applyScaleOffset', () => {
   it('aplica escala y offset', () => {
     expect(applyScaleOffset(100, 0.1, 5)).toBeCloseTo(15)

@@ -116,6 +116,7 @@ export interface SensorDef {
   scale?: number
   offset?: number
   kpi_key?: string
+  status_field?: string
   bit_index?: number
   visible_in_detail?: boolean
   icon?: SensorIcon

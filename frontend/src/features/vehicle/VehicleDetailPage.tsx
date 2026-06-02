@@ -15,8 +15,7 @@ import Shell from '../../shared/ui/Shell'
 import Tabs from '../../shared/ui/Tabs'
 import VehicleHeader from './VehicleHeader'
 import TrackMap from './TrackMap'
-import { SensorWidget } from './SensorWidget'
-import { SensorIconComponent } from '../../shared/ui/gauges/SensorIconSet'
+import { DiagnosticPanel } from './diagnostic/DiagnosticPanel'
 import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
@@ -54,7 +53,18 @@ export default function VehicleDetailPage() {
   const [showFullTelemetry, setShowFullTelemetry] = useState(false)
   const [doutLoading, setDoutLoading] = useState<Record<number, boolean>>({})
   const [showBottomPanel, setShowBottomPanel] = useState(false)
-  const [trackDate, setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [mapExpanded, setMapExpanded] = useState<boolean>(() => {
+    try { return localStorage.getItem('vd_map_expanded') === 'true' } catch { return false }
+  })
+  function toggleMap() {
+    setMapExpanded(prev => {
+      const next = !prev
+      try { localStorage.setItem('vd_map_expanded', String(next)) } catch {}
+      return next
+    })
+  }
+  // trackDate/setTrackDate reservados para la tab HISTÓRICO
+  const [trackDate, _setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const isTrackToday = trackDate === new Date().toISOString().slice(0, 10)
 
   const [editingPlan, setEditingPlan] = useState<MaintenancePlanOut | null>(null)
@@ -137,7 +147,8 @@ export default function VehicleDetailPage() {
     enabled: !!vehicle,
   })
 
-  const { data: track = [] } = useQuery({
+  // track reservado para la tab HISTÓRICO — en EN VIVO se pasa track=[]
+  const { data: _track = [] } = useQuery({
     queryKey: [...keys.vehicleTrack(id ?? ''), trackDate],
     queryFn: () => {
       if (isTrackToday) {
@@ -264,325 +275,193 @@ export default function VehicleDetailPage() {
             <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
           </div>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflow: (tab === 'live' && !isMobile) ? 'hidden' : 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 
           {tab === 'live' && (
-            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* MAIN GRID: 55% mapa + 45% panel */}
-              <div style={isMobile
-                ? { display: 'flex', flexDirection: 'column' }
-                : { flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '55% 45%' }
-              }>
-                {/* ── MAPA ── */}
-                <div style={{
-                  borderRight: isMobile ? 'none' : '1px solid var(--border)',
-                  borderBottom: isMobile ? '1px solid var(--border)' : 'none',
-                  position: 'relative',
-                  height: isMobile ? 260 : '100%',
-                }}>
-                  <TrackMap track={track} status={status} />
+            <div style={{ padding: isMobile ? 10 : 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-                  {/* Selector de fecha del recorrido — esquina superior derecha */}
-                  <div style={{
-                    position: 'absolute', top: 10, right: 10, zIndex: 500,
-                    background: 'rgba(28,25,23,0.92)', backdropFilter: 'blur(6px)',
-                    borderRadius: 8, padding: '6px 10px',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    border: '1px solid var(--border)', fontSize: 12,
-                  }}>
-                    <span style={{ color: 'var(--fg-muted)', fontWeight: 600 }}>Recorrido</span>
-                    <input
-                      type="date"
-                      value={trackDate}
-                      max={new Date().toISOString().slice(0, 10)}
-                      onChange={e => setTrackDate(e.target.value || new Date().toISOString().slice(0, 10))}
-                      style={{
-                        background: 'var(--bg-card)', color: 'var(--fg-secondary)',
-                        border: '1px solid var(--border)', borderRadius: 4,
-                        padding: '3px 6px', fontSize: 12, fontFamily: 'inherit',
-                      }}
-                    />
-                    {!isTrackToday && (
-                      <button
-                        onClick={() => setTrackDate(new Date().toISOString().slice(0, 10))}
-                        style={{
-                          background: 'var(--cmg-teal)', color: '#fff', border: 'none',
-                          borderRadius: 4, padding: '3px 8px', fontSize: 11, fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                        title="Volver al día de hoy"
-                      >Hoy</button>
-                    )}
+                {/* ALERTAS ACTIVAS */}
+                {activeAlertsCount > 0 && (
+                  <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--danger)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--danger)', marginBottom: firingAlerts.filter(a => a.vehicle_id === id).length > 0 ? 6 : 0 }}>
+                      🚨 {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''}
+                    </div>
+                    {firingAlerts.filter(a => a.vehicle_id === id).slice(0, 3).map(a => (
+                      <div key={a.id} style={{ fontSize: 11, color: 'var(--fg-muted)', paddingLeft: 6, borderLeft: '2px solid rgba(239,68,68,0.25)', marginTop: 3, fontFamily: 'var(--font-sans)' }}>
+                        {a.rule_id.slice(0, 28)}… · {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    ))}
                   </div>
+                )}
 
-                  {/* Badge de conexión superpuesto en el mapa */}
-                  <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 500, pointerEvents: 'none' }}>
-                    {isVehicleOnline(status)
-                      ? <div style={{ background: 'rgba(34,197,94,0.92)', color: '#fff', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />
-                          En directo
-                        </div>
-                      : status
-                        ? <div style={{ background: 'rgba(239,68,68,0.92)', color: '#fff', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
-                            ⚠ Sin señal
-                          </div>
-                        : null
-                    }
-                  </div>
-
-                  {/* Tira inferior semitransparente sobre el mapa */}
+                {/* MANTENIMIENTO URGENTE */}
+                {maintenancePlans.some(p => p.progress.status !== 'ok') && (
                   <div style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 400,
-                    background: 'rgba(28,25,23,0.82)', backdropFilter: 'blur(6px)',
-                    padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 11,
+                    background: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.07)' : 'rgba(234,179,8,0.07)',
+                    border: `1px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)'}`,
+                    borderLeft: `3px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--danger)' : 'var(--warn)'}`,
+                    borderRadius: 8, padding: '10px 12px',
                   }}>
-                    {vehicle.driver_name && (
-                      <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Conductor </span><span style={{ color: '#fff', fontWeight: 600 }}>{vehicle.driver_name}</span></span>
-                    )}
-                    {vehicleTenant && (
-                      <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Cliente </span><span style={{ color: 'rgba(255,255,255,0.8)' }}>{vehicleTenant.name}</span></span>
-                    )}
+                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--danger)' : 'var(--warn)' }}>
+                      🔧 {maintenancePlans.filter(p => p.progress.status !== 'ok').length} plan{maintenancePlans.filter(p => p.progress.status !== 'ok').length > 1 ? 'es' : ''} de mantenimiento {maintenancePlans.some(p => p.progress.status === 'vencido') ? 'vencido' : 'próximo'}
+                    </div>
+                  </div>
+                )}
+
+                {/* MAPA COLAPSABLE — plegado por defecto, solo se monta al expandir */}
+                <div style={{ borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                  {/* Barra de cabecera — NUNCA condicionada, siempre visible */}
+                  <div style={{ background: 'var(--bg-surface)', borderBottom: mapExpanded ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', minHeight: 36 }}>
                     <button
-                      onClick={() => { setFleetSelected(id); navigate('/fleet') }}
-                      style={{ color: 'var(--info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11, pointerEvents: 'auto' }}
+                      onClick={toggleMap}
+                      style={{ flex: 1, background: 'transparent', border: 'none', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 12, fontWeight: 600, textAlign: 'left' }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      Ver en mapa de flota
+                      <span style={{ transform: mapExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
+                      <span>{mapExpanded ? 'Ocultar mapa' : 'Ver mapa'}</span>
                     </button>
                   </div>
+                  {mapExpanded && (
+                    <div style={{ height: 300, position: 'relative' }}>
+                      <TrackMap track={[]} status={status} />
+                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 400, background: 'rgba(28,25,23,0.82)', backdropFilter: 'blur(6px)', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 11 }}>
+                        {vehicle.driver_name && (
+                          <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Conductor </span><span style={{ color: '#fff', fontWeight: 600 }}>{vehicle.driver_name}</span></span>
+                        )}
+                        {vehicleTenant && !isCmg && (
+                          <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Cliente </span><span style={{ color: 'rgba(255,255,255,0.8)' }}>{vehicleTenant.name}</span></span>
+                        )}
+                        <button
+                          onClick={() => { setFleetSelected(id); navigate('/fleet') }}
+                          style={{ color: 'var(--info)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11 }}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          Ver en mapa de flota
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* ── PANEL DERECHO ── */}
-                <div style={{ height: isMobile ? 'auto' : '100%', overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
-
-                  {/* ALERTAS ACTIVAS — siempre visible si las hay */}
-                  {activeAlertsCount > 0 && (
-                    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--danger)', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--danger)', marginBottom: firingAlerts.filter(a => a.vehicle_id === id).length > 0 ? 6 : 0 }}>
-                        🚨 {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''}
-                      </div>
-                      {firingAlerts.filter(a => a.vehicle_id === id).slice(0, 3).map(a => (
-                        <div key={a.id} style={{ fontSize: 11, color: 'var(--fg-muted)', paddingLeft: 6, borderLeft: '2px solid rgba(239,68,68,0.25)', marginTop: 3, fontFamily: 'var(--font-sans)' }}>
-                          {a.rule_id.slice(0, 28)}… · {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* MANTENIMIENTO URGENTE */}
-                  {maintenancePlans.some(p => p.progress.status !== 'ok') && (
-                    <div style={{
-                      background: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.07)' : 'rgba(234,179,8,0.07)',
-                      border: `1px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'rgba(239,68,68,0.3)' : 'rgba(234,179,8,0.3)'}`,
-                      borderLeft: `3px solid ${maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--danger)' : 'var(--warn)'}`,
-                      borderRadius: 8, padding: '10px 12px',
-                    }}>
-                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: maintenancePlans.some(p => p.progress.status === 'vencido') ? 'var(--danger)' : 'var(--warn)' }}>
-                        🔧 {maintenancePlans.filter(p => p.progress.status !== 'ok').length} plan{maintenancePlans.filter(p => p.progress.status !== 'ok').length > 1 ? 'es' : ''} de mantenimiento {maintenancePlans.some(p => p.progress.status === 'vencido') ? 'vencido' : 'próximo'}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* KPIs PRINCIPALES — 3 grandes */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
-                    <VDKpiCard
-                      title="Velocidad"
-                      value={isVehicleOnline(status) && status?.speed_kmh != null ? `${Math.round(status.speed_kmh)}` : '—'}
-                      unit={isVehicleOnline(status) && status?.speed_kmh != null ? 'km/h' : undefined}
-                      color={isVehicleOnline(status) && (status?.speed_kmh ?? 0) > 0 ? 'var(--info)' : 'var(--fg-muted)'}
-                    />
-                    <VDKpiCard
-                      title="PTO hoy"
-                      value={derivedValues.pto_hours_today != null ? `${derivedValues.pto_hours_today}` : '—'}
-                      unit={derivedValues.pto_hours_today != null ? 'h' : undefined}
-                      color={derivedValues.pto_hours_today != null && derivedValues.pto_hours_today > 0 ? 'var(--cmg-teal)' : 'var(--fg-muted)'}
-                    />
-                    <VDKpiCard
-                      title="Voltaje"
-                      value={status?.ext_voltage_mv != null ? `${(status.ext_voltage_mv / 1000).toFixed(1)}` : '—'}
-                      unit={status?.ext_voltage_mv != null ? 'V' : undefined}
-                      color={status?.ext_voltage_mv != null ? (status.ext_voltage_mv < 11500 ? 'var(--danger)' : status.ext_voltage_mv < 12000 ? 'var(--warn)' : 'var(--ok)') : 'var(--fg-muted)'}
-                    />
+                {/* BARRA DE ESTADO TELEMETRÍA + PANEL DE DIAGNÓSTICO */}
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
+                      Telemetría
+                    </span>
+                    {isVehicleOnline(status)
+                      ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span className="live-dot" style={{ width: 5, height: 5 }}/> En directo
+                        </span>
+                      : status?.last_seen
+                        ? <span style={{ color: 'var(--danger)', fontSize: 10, fontWeight: 700 }}>
+                            ⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h` })()}
+                          </span>
+                        : <span style={{ color: 'var(--danger)', fontSize: 10 }}>⚠ Sin señal</span>
+                    }
+                    {status && (
+                      <>
+                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: status.ignition ? 'var(--ok)' : 'var(--offline)', padding: '1px 6px', borderRadius: 4, background: status.ignition ? 'var(--ok-soft)' : 'rgba(100,116,139,0.15)' }}>
+                          IGN {status.ignition ? 'ON' : 'OFF'}
+                        </span>
+                        {(status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--cmg-teal)', padding: '1px 6px', borderRadius: 4, background: 'var(--cmg-teal-soft)' }}>PTO ON</span>
+                        )}
+                        {status.speed_kmh != null && status.speed_kmh > 0 && (
+                          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--fg-tertiary)' }}>{status.speed_kmh.toFixed(0)} km/h</span>
+                        )}
+                        {status.can_data && Object.keys(status.can_data).length > 0 && (
+                          <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 600 }}>
+                            📡 Completa
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
 
-                  {/* TELEMETRÍA */}
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '10px 12px' }}>
-                    {/* Barra de estado compacta */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
-                        Telemetría
-                      </span>
-                      {isVehicleOnline(status)
-                        ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span className="live-dot" style={{ width: 5, height: 5 }}/> En directo
-                          </span>
-                        : status?.last_seen
-                          ? <span style={{ color: 'var(--danger)', fontSize: 10, fontWeight: 700 }}>
-                              ⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h` })()}
-                            </span>
-                          : <span style={{ color: 'var(--danger)', fontSize: 10 }}>⚠ Sin señal</span>
-                      }
-                      {status && (
-                        <>
-                          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: status.ignition ? 'var(--ok)' : 'var(--offline)', padding: '1px 6px', borderRadius: 4, background: status.ignition ? 'var(--ok-soft)' : 'rgba(100,116,139,0.15)' }}>
-                            IGN {status.ignition ? 'ON' : 'OFF'}
-                          </span>
-                          {(status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--cmg-teal)', padding: '1px 6px', borderRadius: 4, background: 'var(--cmg-teal-soft)' }}>PTO ON</span>
-                          )}
-                          {status.speed_kmh != null && status.speed_kmh > 0 && (
-                            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--fg-tertiary)' }}>{status.speed_kmh.toFixed(0)} km/h</span>
-                          )}
-                          {status.can_data && Object.keys(status.can_data).length > 0 && (
-                            <button onClick={() => setShowFullTelemetry(true)} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 7px', fontSize: 10, color: 'var(--fg-muted)', cursor: 'pointer', fontWeight: 600 }}>
-                              📡 Completa
-                            </button>
-                          )}
-                        </>
-                      )}
+                  {status && vehicleType ? (
+                    <DiagnosticPanel
+                      vehicleType={vehicleType}
+                      status={status}
+                      derived={derivedValues as Record<string, number | null>}
+                      alerts={activeAlerts}
+                      isMobile={isMobile}
+                    />
+                  ) : (
+                    <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
+                  )}
+
+                  {status?.last_seen && (
+                    <div style={{ fontSize: 9, color: 'var(--fg-dim)', marginTop: 8 }}>
+                      Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </div>
+                  )}
+                </div>
 
-                    {/* Widget grid */}
-                    {status ? (() => {
-                      const getRawVal = (s: typeof sensorSchema[number]): number | null =>
-                        s.avl_id != null
-                          ? ((status.can_data?.[`avl_${s.avl_id}`] as number | undefined) ?? null)
-                          : s.kpi_key ? ((derivedValues as Record<string, number | null>)[s.kpi_key] ?? null) : null
-
-                      const machineSensors = sensorSchema.filter(s =>
-                        s.visible_in_detail !== false && (!s.category || s.category === 'maquina')
-                      )
-                      const chassisSensors = sensorSchema.filter(s =>
-                        s.visible_in_detail !== false && s.category === 'chasis'
-                      )
-                      const chassisHasData = chassisSensors.some(s => getRawVal(s) != null)
-
-                      return (
-                        <>
-                          {machineSensors.length > 0 && (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10 }}>
-                              {machineSensors.map(s => (
-                                <SensorWidget key={s.key} sensor={s} value={getRawVal(s)} />
-                              ))}
+                {/* CONTROLES DOUT */}
+                {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
+                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                      {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
+                        const active = !!doutState[d.slot]
+                        const loading = !!doutLoading[d.slot]
+                        const assocSensor = d.sensor_key ? sensorSchema.find(s => s.key === d.sensor_key) : null
+                        const assocRawVal: number | null = assocSensor?.avl_id != null
+                          ? ((status?.can_data?.[`avl_${assocSensor.avl_id}`] as number | undefined) ?? null)
+                          : null
+                        const assocVal = assocRawVal != null && assocSensor
+                          ? (assocRawVal * (assocSensor.scale ?? 1) + (assocSensor.offset ?? 0)).toFixed(1)
+                          : null
+                        return (
+                          <div key={d.slot} style={{
+                            background: active ? 'var(--ok-soft)' : 'var(--bg-card)',
+                            border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
+                            borderRadius: 8, padding: '10px 12px',
+                            display: 'flex', flexDirection: 'column', gap: 6,
+                            transition: 'background 0.2s, border-color 0.2s',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)' }}>{d.label}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: active ? 'var(--ok)' : 'var(--offline)' }}>
+                                {active ? '● ON' : '○ OFF'}
+                              </span>
                             </div>
-                          )}
-                          {chassisHasData && chassisSensors.length > 0 && (
-                            <div style={{ marginTop: 14, borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
-                              <p style={{
-                                fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)',
-                                letterSpacing: '0.07em', textTransform: 'uppercase' as const, margin: '0 0 8px',
+                            {assocVal != null && assocSensor && (
+                              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                                {assocVal} {assocSensor.unit}
+                              </div>
+                            )}
+                            <button onClick={() => sendDout(d.slot)} disabled={loading}
+                              style={{
+                                background: active ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
+                                border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
+                                borderRadius: 6, padding: '5px 0', fontSize: 11, fontWeight: 600,
+                                cursor: loading ? 'wait' : 'pointer', color: active ? 'var(--ok)' : 'var(--fg-tertiary)',
+                                opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
+                                transition: 'all 0.15s',
                               }}>
-                                Estado del chasis
-                              </p>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                {chassisSensors.map(s => {
-                                  const raw = getRawVal(s)
-                                  const val = raw != null ? raw * (s.scale ?? 1) + (s.offset ?? 0) : null
-                                  const display = val != null
-                                    ? (val % 1 === 0 ? val.toLocaleString('es-ES') : val.toFixed(1))
-                                    : '—'
-                                  return (
-                                    <div key={s.key}
-                                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderRadius: 6, background: 'transparent', transition: 'background 0.1s' }}
-                                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)' }}
-                                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        {s.icon && <SensorIconComponent icon={s.icon} size={13} color="var(--fg-dim)"/>}
-                                        <span style={{ fontSize: 12, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-sans)' }}>
-                                          {s.label}
-                                        </span>
-                                      </div>
-                                      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: val != null ? 'var(--fg-primary)' : 'var(--fg-dim)' }}>
-                                        {display}
-                                        {s.unit && val != null && <span style={{ fontSize: 10, color: 'var(--fg-muted)', marginLeft: 4 }}>{s.unit}</span>}
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )
-                    })() : (
-                      <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
-                    )}
-
-                    {status?.last_seen && (
-                      <div style={{ fontSize: 9, color: 'var(--fg-dim)', marginTop: 8 }}>
-                        Último dato: {new Date(status.last_seen).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CONTROLES DOUT */}
-                  {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
-                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
-                      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-                        {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
-                          const active = !!doutState[d.slot]
-                          const loading = !!doutLoading[d.slot]
-                          const assocSensor = d.sensor_key ? sensorSchema.find(s => s.key === d.sensor_key) : null
-                          const assocRawVal: number | null = assocSensor?.avl_id != null
-                            ? ((status?.can_data?.[`avl_${assocSensor.avl_id}`] as number | undefined) ?? null)
-                            : null
-                          const assocVal = assocRawVal != null && assocSensor
-                            ? (assocRawVal * (assocSensor.scale ?? 1) + (assocSensor.offset ?? 0)).toFixed(1)
-                            : null
-                          return (
-                            <div key={d.slot} style={{
-                              background: active ? 'var(--ok-soft)' : 'var(--bg-card)',
-                              border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
-                              borderRadius: 8, padding: '10px 12px',
-                              display: 'flex', flexDirection: 'column', gap: 6,
-                              transition: 'background 0.2s, border-color 0.2s',
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)' }}>{d.label}</span>
-                                <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: active ? 'var(--ok)' : 'var(--offline)' }}>
-                                  {active ? '● ON' : '○ OFF'}
-                                </span>
-                              </div>
-                              {assocVal != null && assocSensor && (
-                                <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                                  {assocVal} {assocSensor.unit}
-                                </div>
-                              )}
-                              <button onClick={() => sendDout(d.slot)} disabled={loading}
-                                style={{
-                                  background: active ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
-                                  border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
-                                  borderRadius: 6, padding: '5px 0', fontSize: 11, fontWeight: 600,
-                                  cursor: loading ? 'wait' : 'pointer', color: active ? 'var(--ok)' : 'var(--fg-tertiary)',
-                                  opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
-                                  transition: 'all 0.15s',
-                                }}>
-                                {loading ? '…' : active ? 'Desactivar' : 'Activar'}
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
+                              {loading ? '…' : active ? 'Desactivar' : 'Activar'}
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* VER REPORTES */}
-                  <button
-                    onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico' } })}
-                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--fg-muted)', fontWeight: 600, textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--info)'; el.style.color = 'var(--info)' }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--border)'; el.style.color = 'var(--fg-muted)' }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    Ver reportes de este vehículo
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}><polyline points="9 18 15 12 9 6"/></svg>
-                  </button>
-                </div>
-              </div>
+                {/* VER REPORTES */}
+                <button
+                  onClick={() => navigate('/reports', { state: { vehicleId: id, tab: 'historico' } })}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--fg-muted)', fontWeight: 600, textAlign: 'left', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--info)'; el.style.color = 'var(--info)' }}
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'var(--border)'; el.style.color = 'var(--fg-muted)' }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  Ver reportes de este vehículo
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
 
-              {/* PANEL TÉCNICO COLAPSABLE */}
+              {/* HISTORIAL DE COMANDOS */}
               <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0 }}>
                 <button onClick={() => setShowBottomPanel(v => !v)}
                   style={{ width: '100%', background: 'var(--bg-surface)', border: 'none', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 11 }}>
@@ -811,19 +690,6 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
     </div>
   )
 }
-
-function VDKpiCard({ title, value, unit, color }: { title: string; value: string; unit?: string; color: string }) {
-  return (
-    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px' }}>
-      <div style={{ fontSize: 9, color: 'var(--fg-muted)', marginBottom: 2, lineHeight: 1.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-        <span style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-mono)', color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{unit}</span>}
-      </div>
-    </div>
-  )
-}
-
 
 function CommandStatusBadge({ status }: { status: CommandLogEntry['status'] }) {
   const map: Record<CommandLogEntry['status'], { label: string; color: string }> = {

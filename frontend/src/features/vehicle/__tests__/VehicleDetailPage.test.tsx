@@ -27,6 +27,12 @@ function renderPage(vehicleId = 'v-test') {
     slug: 'wasterent-vacuum',
     name: 'Wasterent — Sistema vacío-presión',
     sensor_schema: [],
+    system_blocks: [],
+    maintenance_templates: [],
+    historic_metrics: [],
+    dout_config: [],
+    pdf_metrics: [],
+    icon_url: null,
   }
   const status = {
     vehicle_id: vehicleId,
@@ -61,9 +67,9 @@ describe('VehicleDetailPage', () => {
     expect(tab).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('muestra el mapa en la pestaña EN VIVO', () => {
-    const { getByTestId } = renderPage()
-    expect(getByTestId('track-map')).toBeInTheDocument()
+  it('muestra el botón de mapa colapsable en la pestaña EN VIVO', () => {
+    const { getByText } = renderPage()
+    expect(getByText('Ver mapa')).toBeInTheDocument()
   })
 
   it('cambia a la pestaña HISTÓRICO al hacer clic', async () => {

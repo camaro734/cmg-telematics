@@ -1,4 +1,5 @@
 import { zoneForValue } from '../../../lib/sensorSeverity'
+import { formatSensorValue } from '../../../lib/sensorValue'
 
 interface LevelTankProps {
   value: number | null
@@ -67,7 +68,7 @@ export function LevelTank({
       </div>
 
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: value !== null ? color : 'var(--offline)' }}>
-        {value !== null ? `${value}${unit ? ' ' + unit : ''}` : '—'}
+        {value !== null ? `${formatSensorValue(value) ?? value}${unit ? ' ' + unit : ''}` : '—'}
       </span>
     </div>
   )

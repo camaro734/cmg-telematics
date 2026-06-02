@@ -1,4 +1,5 @@
 import { zoneForValue } from '../../../lib/sensorSeverity'
+import { formatSensorValue } from '../../../lib/sensorValue'
 
 interface RangeBarProps {
   value: number | null
@@ -44,7 +45,7 @@ export function RangeBar({
           {label}
         </span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', fontWeight: 600, color: value !== null ? color : 'var(--offline)' }}>
-          {value !== null ? `${value}${unit ? ' ' + unit : ''}` : '—'}
+          {value !== null ? `${formatSensorValue(value) ?? value}${unit ? ' ' + unit : ''}` : '—'}
         </span>
       </div>
 

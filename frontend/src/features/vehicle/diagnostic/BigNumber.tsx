@@ -1,3 +1,5 @@
+import { formatSensorValue } from '../../../lib/sensorValue'
+
 interface BigNumberProps {
   value: number | null
   unit: string | null
@@ -16,7 +18,7 @@ export function BigNumber({ value, unit, label }: BigNumberProps) {
           letterSpacing: '-0.02em',
           color: value !== null ? 'var(--fg-primary)' : 'var(--offline)',
         }}>
-          {value !== null ? value : '—'}
+          {value !== null ? (formatSensorValue(value) ?? value) : '—'}
         </span>
         {value !== null && unit !== null && (
           <span
