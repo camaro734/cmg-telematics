@@ -67,7 +67,7 @@ export default function IconPicker({ value, onChange }: Props) {
           color: 'var(--fg-primary)', fontSize: 13, width: '100%',
         }}
       >
-        <i className={value} style={{ fontSize: 16, color: 'var(--cmg-teal)' }} />
+        <i className={`ti ${value}`} style={{ fontSize: 16, color: 'var(--cmg-teal)' }} />
         <span style={{ flex: 1, textAlign: 'left' }}>{selected?.label ?? value}</span>
         <span style={{ color: 'var(--offline)', fontSize: 11 }}>{open ? '▲' : '▼'}</span>
       </button>
@@ -108,7 +108,7 @@ export default function IconPicker({ value, onChange }: Props) {
                   color: 'var(--fg-primary)',
                 }}
               >
-                <i className={icon.key} style={{ fontSize: 18 }} />
+                <i className={`ti ${icon.key}`} style={{ fontSize: 18 }} />
                 <span style={{ fontSize: 9, color: 'var(--offline)', lineHeight: 1.2, textAlign: 'center' }}>
                   {icon.label}
                 </span>

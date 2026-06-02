@@ -118,6 +118,7 @@ export interface SensorDef {
   kpi_key?: string
   status_field?: string
   bit_index?: number
+  invalid_values?: number[]
   visible_in_detail?: boolean
   icon?: SensorIcon
   color?: string

@@ -52,7 +52,7 @@ export function SystemBlockCard({ block, schema, status, derived, alerts }: Syst
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <i
           data-testid="block-icon"
-          className={block.icon}
+          className={`ti ${block.icon}`}
           style={{ fontSize: 16, color: borderColor, width: 18, textAlign: 'center', flexShrink: 0 }}
         />
         <div style={{ minWidth: 0 }}>

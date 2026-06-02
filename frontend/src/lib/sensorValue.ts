@@ -14,7 +14,9 @@ export function resolveRawValue(
   }
   if (sensor.avl_id != null) {
     const v = status.can_data?.[`avl_${sensor.avl_id}`]
-    return typeof v === 'number' ? v : null
+    const raw = typeof v === 'number' ? v : null
+    if (raw !== null && sensor.invalid_values?.includes(raw)) return null
+    return raw
   }
   if (sensor.kpi_key) {
     return derived[sensor.kpi_key] ?? null

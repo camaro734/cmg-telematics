@@ -50,6 +50,24 @@ describe('resolveRawValue', () => {
     const status = { ...baseStatus, can_data: null }
     expect(resolveRawValue(sensor, status, {})).toBeNull()
   })
+
+  it('invalid_values: raw en lista → null (centinela J1939)', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145, invalid_values: [0, 254, 255] }
+    const status = { ...baseStatus, can_data: { avl_145: 0 } }
+    expect(resolveRawValue(sensor, status, {})).toBeNull()
+  })
+
+  it('invalid_values: raw 255 filtrado', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145, invalid_values: [254, 255] }
+    const status = { ...baseStatus, can_data: { avl_145: 255 } }
+    expect(resolveRawValue(sensor, status, {})).toBeNull()
+  })
+
+  it('invalid_values: raw fuera de lista → pasa normal', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145, invalid_values: [0, 255] }
+    const status = { ...baseStatus, can_data: { avl_145: 80 } }
+    expect(resolveRawValue(sensor, status, {})).toBe(80)
+  })
 })
 
 describe('resolveRawValue — status_field', () => {
