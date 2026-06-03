@@ -1,7 +1,7 @@
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { alertSensorKey } from '../../../lib/blockDiagnostics'
-import { resolveRawValue } from '../../../lib/sensorValue'
-import { DiagnosticSensor } from './DiagnosticSensor'
+import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
+import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { SensorMiniChart } from './SensorMiniChart'
 
 interface BlockDetailSectionProps {
@@ -11,6 +11,13 @@ interface BlockDetailSectionProps {
   derived: Record<string, number | null>
   alerts: AlertInstanceEnrichedOut[]
   vehicleId: string
+}
+
+const ZONE_VALUE_COLOR: Record<string, string> = {
+  crit: 'var(--accent-crit)',
+  warn: 'var(--accent-warn)',
+  ok: 'var(--fg-primary)',
+  nodata: 'var(--fg-dim)',
 }
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -73,31 +80,52 @@ export function BlockDetailSection({
           gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
           gap: 12,
         }}>
-          {sensors.map(sensor => (
-            <div
-              key={sensor.key}
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                padding: '10px 12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              <DiagnosticSensor
-                sensor={sensor}
-                raw={resolveRawValue(sensor, status, derived)}
-              />
-              <SensorMiniChart
-                sensor={sensor}
-                vehicleId={vehicleId}
-                status={status}
-                derived={derived}
-              />
-            </div>
-          ))}
+          {sensors.map(sensor => {
+            const raw = resolveRawValue(sensor, status, derived)
+            const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
+            const zone = sensorSeverity(sensor, scaled) ?? 'nodata'
+            const valueColor = ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata
+            const formatted = formatSensorValue(scaled) ?? '—'
+            return (
+              <div
+                key={sensor.key}
+                data-testid="sensor-detail-card"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
+                  {sensor.label}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-mono)', color: valueColor, lineHeight: 1.1 }}>
+                  {formatted}
+                  {sensor.unit && (
+                    <span style={{ fontSize: 13, fontWeight: 600, marginLeft: 4, color: 'var(--fg-tertiary)' }}>
+                      {sensor.unit}
+                    </span>
+                  )}
+                </div>
+                {sensor.avl_id != null ? (
+                  <SensorMiniChart
+                    sensor={sensor}
+                    vehicleId={vehicleId}
+                    status={status}
+                    derived={derived}
+                  />
+                ) : (
+                  <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 4, fontStyle: 'italic' }}>
+                    Sin histórico
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 

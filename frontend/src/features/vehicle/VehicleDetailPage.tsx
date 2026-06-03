@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 
 // Threshold ignition-aware: 70 min con motor, 62 min parado.
 // Evita parpadeos de "sin señal" entre paquetes normales.
@@ -64,6 +64,10 @@ export default function VehicleDetailPage() {
       return next
     })
   }
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const liveScrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (selectedBlockId !== null) liveScrollRef.current?.scrollTo({ top: 0 }) }, [selectedBlockId])
+
   // trackDate/setTrackDate reservados para la tab HISTÓRICO
   const [trackDate, _setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const isTrackToday = trackDate === new Date().toISOString().slice(0, 10)
@@ -292,10 +296,11 @@ export default function VehicleDetailPage() {
             <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
           </div>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
+        <div ref={liveScrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 
           {tab === 'live' && (
             <div style={{ padding: isMobile ? 10 : 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {selectedBlockId === null ? (<>
 
                 {/* ALERTAS ACTIVAS */}
                 {activeAlertsCount > 0 && (
@@ -402,10 +407,7 @@ export default function VehicleDetailPage() {
                       derived={derivedValues as Record<string, number | null>}
                       alerts={activeAlerts}
                       isMobile={isMobile}
-                      onBlockClick={(blockId) =>
-                        document.getElementById(`block-detail-${blockId}`)
-                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                      }
+                      onBlockClick={setSelectedBlockId}
                     />
                   ) : (
                     <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
@@ -417,19 +419,6 @@ export default function VehicleDetailPage() {
                     </div>
                   )}
                 </div>
-
-                {/* SECCIONES DE DETALLE POR BLOQUE */}
-                {status && vehicleType && id && liveBlocks.map(block => (
-                  <BlockDetailSection
-                    key={block.id}
-                    block={block}
-                    schema={sensorSchema}
-                    status={status}
-                    derived={derivedValues as Record<string, number | null>}
-                    alerts={activeAlerts}
-                    vehicleId={id}
-                  />
-                ))}
 
                 {/* CONTROLES DOUT */}
                 {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
@@ -541,6 +530,30 @@ export default function VehicleDetailPage() {
                     )}
                   </div>
                 </div>
+              )}
+              </>) : (
+              <>
+                <button
+                  onClick={() => setSelectedBlockId(null)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--cmg-teal)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontFamily: 'var(--font-sans)' }}
+                >
+                  ← Volver al panel
+                </button>
+                {(() => {
+                  const block = liveBlocks.find(b => b.id === selectedBlockId)
+                  if (!block || !status || !id) return null
+                  return (
+                    <BlockDetailSection
+                      block={block}
+                      schema={sensorSchema}
+                      status={status}
+                      derived={derivedValues as Record<string, number | null>}
+                      alerts={activeAlerts}
+                      vehicleId={id}
+                    />
+                  )
+                })()}
+              </>
               )}
             </div>
           )}
