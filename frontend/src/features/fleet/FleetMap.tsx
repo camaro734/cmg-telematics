@@ -6,6 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { useNavigate } from 'react-router-dom'
 import { useFleetStore } from './useFleetStore'
 import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
+import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../lib/sensorValue'
 import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut, VehicleTypeOut, SensorDef } from '../../lib/types'
 
 
@@ -121,32 +122,21 @@ function makeVehicleIcon(status: VehicleStatus, hasAlert: boolean): L.DivIcon {
   return makeStoppedIcon(status.ignition)
 }
 
-function sensorDisplayValue(s: SensorDef, canData: Record<string, unknown> | null): string {
-  const raw = canData?.[s.key]
+function sensorDisplayValue(s: SensorDef, status: VehicleStatus): string {
+  const raw = resolveRawValue(s, status, {})
   if (raw == null) return '—'
-  if (s.gauge_type === 'led') {
-    const active = s.bit_index !== undefined
-      ? ((Number(raw) >> s.bit_index) & 1) === 1
-      : Boolean(raw)
-    return active ? 'Activo' : 'Inactivo'
-  }
-  const num = Number(raw) * (s.scale ?? 1) + (s.offset ?? 0)
-  if (!isFinite(num)) return '—'
-  const formatted = Number.isInteger(num) ? String(num) : num.toFixed(1)
-  return s.unit ? `${formatted} ${s.unit}` : formatted
+  if (s.gauge_type === 'led') return raw !== 0 ? 'Activo' : 'Inactivo'
+  const scaled = applyScaleOffset(raw, s.scale, s.offset)
+  if (scaled == null || !isFinite(scaled)) return '—'
+  return (formatSensorValue(scaled) ?? '—') + (s.unit ? ` ${s.unit}` : '')
 }
 
-function sensorColor(s: SensorDef, canData: Record<string, unknown> | null): string {
-  const raw = canData?.[s.key]
+function sensorColor(s: SensorDef, status: VehicleStatus): string {
+  const raw = resolveRawValue(s, status, {})
   if (raw == null) return T_OFF
-  if (s.gauge_type === 'led') {
-    const active = s.bit_index !== undefined
-      ? ((Number(raw) >> s.bit_index) & 1) === 1
-      : Boolean(raw)
-    return active ? T_OK : T_OFF
-  }
-  const num = Number(raw) * (s.scale ?? 1) + (s.offset ?? 0)
-  if (!isFinite(num)) return T_OFF
+  if (s.gauge_type === 'led') return raw !== 0 ? T_OK : T_OFF
+  const num = applyScaleOffset(raw, s.scale, s.offset)
+  if (num == null || !isFinite(num)) return T_OFF
   if ((s.alert_above !== undefined && num >= s.alert_above) ||
       (s.alert_below !== undefined && num <= s.alert_below)) return T_CRIT
   if ((s.warn_above  !== undefined && num >= s.warn_above)  ||
@@ -195,8 +185,8 @@ function buildPopupHtml(
   // Sensores configurados para mostrar en popup — grises si datos no actuales
   const popupSensors = (vehicleType?.sensor_schema ?? []).filter(s => s.show_in_popup === true)
   const sensorRows = popupSensors.map(s => {
-    const val = sensorDisplayValue(s, status.can_data)
-    const col = stale ? T_OFF : sensorColor(s, status.can_data)
+    const val = sensorDisplayValue(s, status)
+    const col = stale ? T_OFF : sensorColor(s, status)
     return `<tr>
       <td style="padding:2px 0 2px 0;width:8px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;margin-top:1px"></span></td>
       <td style="padding:2px 8px 2px 6px;font-size:12px;color:#6b7280;white-space:nowrap">${s.label}</td>
@@ -226,7 +216,7 @@ function buildPopupHtml(
     equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">PTO</td><td style="padding:3px 0;font-size:12px;color:${ptoCol};font-weight:${(!stale && a) ? 500 : 400}">${a ? 'Activo' : 'Inactivo'}</td></tr>`)
   }
   for (const s of ledSensors) {
-    const raw = status.can_data?.[s.key]
+    const raw = resolveRawValue(s, status, {})
     const a: boolean | null = raw == null ? null : s.bit_index !== undefined ? ((Number(raw) >> s.bit_index) & 1) === 1 : Boolean(raw)
     const ledCol = stale ? T_MUTED : (a === true ? 'var(--ok)' : T_MUTED)
     equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">${s.label}</td><td style="padding:3px 0;font-size:12px;color:${ledCol};font-weight:${(!stale && a === true) ? 500 : 400}">${a === null ? '—' : a ? 'Activo' : 'Inactivo'}</td></tr>`)
