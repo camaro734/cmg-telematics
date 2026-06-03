@@ -17,7 +17,7 @@ function worstZone(a: Zone | null, b: Zone | null): Zone | null {
   return rank[a] >= rank[b] ? a : b
 }
 
-function alertSensorKey(
+export function alertSensorKey(
   alert: AlertInstanceEnrichedOut,
   schema: SensorDef[],
 ): string | null {

@@ -7,8 +7,8 @@ import {
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { KpiHour, VehicleTypeOut } from '../../lib/types'
+import { buildAvlSeries, type Period } from '../../lib/avlSeries'
 
-type Period = 'dia' | 'semana' | 'mes'
 const PERIOD_HOURS: Record<Period, number> = { dia: 24, semana: 168, mes: 720 }
 
 function fmtH(min: number) {
@@ -67,33 +67,6 @@ function buildKpiSeries(kpis: KpiHour[], key: string, transform: number, period:
     }))
 }
 
-function buildAvlSeries(
-  raw: { bucket: string; value: number | null }[],
-  transform: number,
-  period: Period,
-) {
-  if (period === 'dia') {
-    return raw
-      .filter(d => d.value !== null)
-      .map(d => ({
-        label: new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        value: Math.round(d.value! * transform * 100) / 100,
-      }))
-  }
-  const byDay = new Map<string, number[]>()
-  for (const d of raw) {
-    if (d.value === null) continue
-    const day = d.bucket.slice(0, 10)
-    if (!byDay.has(day)) byDay.set(day, [])
-    byDay.get(day)!.push(d.value * transform)
-  }
-  return Array.from(byDay.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, vals]) => ({
-      label: day.slice(5).replace('-', '/'),
-      value: Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100,
-    }))
-}
 
 function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (

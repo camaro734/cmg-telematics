@@ -16,11 +16,12 @@ import Tabs from '../../shared/ui/Tabs'
 import VehicleHeader from './VehicleHeader'
 import TrackMap from './TrackMap'
 import { DiagnosticPanel } from './diagnostic/DiagnosticPanel'
+import { BlockDetailSection } from './diagnostic/BlockDetailSection'
 import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
-import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry } from '../../lib/types'
+import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
 import { toast } from '../../shared/ui/Toast'
@@ -221,6 +222,22 @@ export default function VehicleDetailPage() {
   }), [kpis, status?.ext_voltage_mv])
 
 
+  const liveBlocks = useMemo((): SystemBlock[] => {
+    if (!vehicleType) return []
+    const s = vehicleType.sensor_schema
+    if (vehicleType.system_blocks.length > 0) {
+      const assignedKeys = new Set(vehicleType.system_blocks.flatMap(b => b.sensor_keys))
+      const orphans = s.filter(o => !assignedKeys.has(o.key))
+      const bs = [...vehicleType.system_blocks]
+      if (orphans.length > 0) {
+        bs.push({ id: '__orphans__', name: 'Otros', icon: 'ti-settings', sensor_keys: orphans.map(o => o.key), key_sensor_keys: orphans.map(o => o.key), key_count: orphans.length })
+      }
+      return bs
+    }
+    const allKeys = s.map(o => o.key)
+    return [{ id: '__all__', name: 'Sensores', icon: 'ti-dashboard', sensor_keys: allKeys, key_sensor_keys: allKeys, key_count: allKeys.length }]
+  }, [vehicleType])
+
   const activeAlerts = firingAlerts.filter(a => a.vehicle_id === id)
   const activeAlertsCount = activeAlerts.length
 
@@ -385,6 +402,10 @@ export default function VehicleDetailPage() {
                       derived={derivedValues as Record<string, number | null>}
                       alerts={activeAlerts}
                       isMobile={isMobile}
+                      onBlockClick={(blockId) =>
+                        document.getElementById(`block-detail-${blockId}`)
+                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
                     />
                   ) : (
                     <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
@@ -396,6 +417,19 @@ export default function VehicleDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {/* SECCIONES DE DETALLE POR BLOQUE */}
+                {status && vehicleType && id && liveBlocks.map(block => (
+                  <BlockDetailSection
+                    key={block.id}
+                    block={block}
+                    schema={sensorSchema}
+                    status={status}
+                    derived={derivedValues as Record<string, number | null>}
+                    alerts={activeAlerts}
+                    vehicleId={id}
+                  />
+                ))}
 
                 {/* CONTROLES DOUT */}
                 {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (

@@ -7,9 +7,10 @@ interface DiagnosticPanelProps {
   derived: Record<string, number | null>
   alerts: AlertInstanceEnrichedOut[]
   isMobile?: boolean
+  onBlockClick?: (blockId: string) => void
 }
 
-export function DiagnosticPanel({ vehicleType, status, derived, alerts, isMobile }: DiagnosticPanelProps) {
+export function DiagnosticPanel({ vehicleType, status, derived, alerts, isMobile, onBlockClick }: DiagnosticPanelProps) {
   const schema = vehicleType.sensor_schema
 
   let blocks: SystemBlock[]
@@ -61,6 +62,7 @@ export function DiagnosticPanel({ vehicleType, status, derived, alerts, isMobile
           status={status}
           derived={derived}
           alerts={alerts}
+          onDetailClick={onBlockClick ? () => onBlockClick(block.id) : undefined}
         />
       ))}
     </div>

@@ -23,9 +23,10 @@ interface SystemBlockCardProps {
   status: VehicleStatus
   derived: Record<string, number | null>
   alerts: AlertInstanceEnrichedOut[]
+  onDetailClick?: () => void
 }
 
-export function SystemBlockCard({ block, schema, status, derived, alerts }: SystemBlockCardProps) {
+export function SystemBlockCard({ block, schema, status, derived, alerts, onDetailClick }: SystemBlockCardProps) {
   const { zone, phrase } = blockDiagnostics(block, schema, status, derived, alerts)
   const borderColor = ZONE_BORDER[zone] ?? ZONE_BORDER.ok
   const phraseColor = ZONE_TEXT[zone] ?? ZONE_TEXT.ok
@@ -37,6 +38,10 @@ export function SystemBlockCard({ block, schema, status, derived, alerts }: Syst
   return (
     <div
       data-testid="system-block-card"
+      onClick={onDetailClick}
+      role={onDetailClick ? 'button' : undefined}
+      tabIndex={onDetailClick ? 0 : undefined}
+      onKeyDown={onDetailClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onDetailClick() } : undefined}
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
@@ -46,6 +51,8 @@ export function SystemBlockCard({ block, schema, status, derived, alerts }: Syst
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
+        cursor: onDetailClick ? 'pointer' : undefined,
+        transition: 'border-color 0.15s',
       }}
     >
       {/* Cabecera */}
