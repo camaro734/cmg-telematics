@@ -18,7 +18,7 @@ from app.schemas.vehicle import (
     VehicleTypeCreate, VehicleTypeUpdate, HistoricMetricItem, DoutSlot,
     VehicleTypeReportMetricsUpdate, VehicleTypeSystemBlocksUpdate, SystemBlock,
 )
-from app.seeds.system_block_templates import SYSTEM_BLOCK_TEMPLATES
+from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.maintenance import MaintenancePlan
@@ -338,11 +338,27 @@ async def upload_vehicle_type_icon(
 @router.get("/vehicle-types/system-blocks/templates")
 async def list_system_block_templates(
     user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Lista las plantillas de bloques disponibles (constante en código, no en BD)."""
+    """Lista las plantillas de bloques disponibles desde la base de datos."""
     if user.tenant_tier != "cmg" or user.role != "admin":
         raise HTTPException(status_code=403, detail="CMG admin only")
-    return SYSTEM_BLOCK_TEMPLATES
+    result = await db.execute(
+        select(SystemBlockTemplate).order_by(
+            SystemBlockTemplate.is_builtin.desc(), SystemBlockTemplate.name
+        )
+    )
+    rows = result.scalars().all()
+    # Mismo shape de respuesta que antes: dict keyed by slug
+    return {
+        row.slug: {
+            "id": row.slug,
+            "label": row.name,
+            "description": row.description or "",
+            "blocks": row.blocks,
+        }
+        for row in rows
+    }
 
 
 @router.get("/vehicle-types/{type_id}/system-blocks", response_model=list[SystemBlock])
@@ -393,13 +409,17 @@ async def apply_system_block_template(
     if user.tenant_tier != "cmg" or user.role != "admin":
         raise HTTPException(status_code=403, detail="CMG admin only")
     template_id = body.get("template_id", "")
-    if template_id not in SYSTEM_BLOCK_TEMPLATES:
+    tpl_result = await db.execute(
+        select(SystemBlockTemplate).where(SystemBlockTemplate.slug == template_id)
+    )
+    tpl = tpl_result.scalar_one_or_none()
+    if not tpl:
         raise HTTPException(status_code=400, detail=f"Plantilla '{template_id}' no existe")
     result = await db.execute(select(VehicleType).where(VehicleType.id == type_id))
     vtype = result.scalar_one_or_none()
     if not vtype:
         raise HTTPException(status_code=404)
-    vtype.system_blocks = SYSTEM_BLOCK_TEMPLATES[template_id]["blocks"]
+    vtype.system_blocks = tpl.blocks
     flag_modified(vtype, "system_blocks")
     await db.commit()
     await db.refresh(vtype)

@@ -219,9 +219,42 @@ def test_patch_system_blocks_404_unknown_type():
 # GET /vehicle-types/system-blocks/templates
 # ---------------------------------------------------------------------------
 
-def test_get_templates_returns_four():
-    """GET templates devuelve exactamente las 4 plantillas hardcodeadas."""
+_GENERICO_BLOCKS = [
+    {"id": "block_motor",        "name": "Motor",        "icon": "ti-engine",      "sensor_keys": [], "key_sensor_keys": [], "key_count": 2},
+    {"id": "block_electrico",    "name": "Eléctrico",    "icon": "ti-bolt",        "sensor_keys": [], "key_sensor_keys": [], "key_count": 2},
+    {"id": "block_combustible",  "name": "Combustible",  "icon": "ti-gas-station", "sensor_keys": [], "key_sensor_keys": [], "key_count": 2},
+    {"id": "block_localizacion", "name": "Localización", "icon": "ti-map-pin",     "sensor_keys": [], "key_sensor_keys": [], "key_count": 2},
+    {"id": "block_seguridad",    "name": "Seguridad",    "icon": "ti-shield",      "sensor_keys": [], "key_sensor_keys": [], "key_count": 2},
+    {"id": "block_mantenimiento","name": "Mantenimiento","icon": "ti-tool",        "sensor_keys": [], "key_sensor_keys": [], "key_count": 2},
+]
+
+
+def _make_tpl(slug: str, name: str, blocks: list | None = None) -> MagicMock:
+    """Crea un mock de SystemBlockTemplate para usar en tests."""
+    from app.models.system_block_template import SystemBlockTemplate
+    tpl = MagicMock(spec=SystemBlockTemplate)
+    tpl.slug = slug
+    tpl.name = name
+    tpl.description = f"Descripción de {name}"
+    tpl.is_builtin = True
+    tpl.blocks = blocks if blocks is not None else _GENERICO_BLOCKS
+    return tpl
+
+
+def _db_returning_templates(templates: list) -> AsyncMock:
+    """DB mock que devuelve una lista de plantillas en scalars().all()."""
     db = AsyncMock()
+    db.execute = AsyncMock(
+        return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=templates))))
+    )
+    return db
+
+
+def test_get_templates_returns_four():
+    """GET templates devuelve exactamente las 4 plantillas desde la BD."""
+    slugs = ["vps_cuba", "max_barredora", "basura_recolectora", "generico"]
+    rows = [_make_tpl(s, s.replace("_", " ").title()) for s in slugs]
+    db = _db_returning_templates(rows)
     _override_user(CMG_USER)
     _override_db(db)
 
@@ -245,14 +278,15 @@ def test_get_templates_403_client():
 
 def test_templates_blocks_have_required_fields():
     """Cada bloque de cada plantilla tiene los campos requeridos."""
-    db = AsyncMock()
+    rows = [_make_tpl("generico", "Genérico")]
+    db = _db_returning_templates(rows)
     _override_user(CMG_USER)
     _override_db(db)
 
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.get("/api/v1/vehicle-types/system-blocks/templates")
     assert resp.status_code == 200
-    for _template_id, tpl in resp.json().items():
+    for _slug, tpl in resp.json().items():
         for block in tpl["blocks"]:
             assert "id" in block
             assert "name" in block
@@ -267,14 +301,17 @@ def test_templates_blocks_have_required_fields():
 
 def test_apply_template_replaces_blocks():
     """POST apply-template reemplaza los bloques con los de la plantilla."""
-    from app.seeds.system_block_templates import SYSTEM_BLOCK_TEMPLATES
-    expected_blocks = SYSTEM_BLOCK_TEMPLATES["generico"]["blocks"]
+    tpl = _make_tpl("generico", "Genérico")
+    vt = _make_vtype()
 
     db = AsyncMock()
-    vt = _make_vtype()
-    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=vt)))
+    # Primera llamada: buscar la plantilla; segunda: buscar el vehicle_type
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalar_one_or_none=MagicMock(return_value=tpl)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=vt)),
+    ])
     db.commit = AsyncMock()
-    db.refresh = AsyncMock(side_effect=lambda obj: setattr(obj, "system_blocks", expected_blocks))
+    db.refresh = AsyncMock(side_effect=lambda obj: setattr(obj, "system_blocks", tpl.blocks))
     _override_user(CMG_USER)
     _override_db(db)
 
@@ -285,15 +322,17 @@ def test_apply_template_replaces_blocks():
             json={"template_id": "generico"},
         )
     assert resp.status_code == 200
-    assert resp.json()["system_blocks"] == expected_blocks
+    assert resp.json()["system_blocks"] == tpl.blocks
     db.commit.assert_awaited_once()
 
 
 def test_apply_template_400_unknown_template():
-    """Plantilla inexistente → 400."""
+    """Plantilla inexistente en BD → 400."""
     db = AsyncMock()
-    vt = _make_vtype()
-    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=vt)))
+    # La búsqueda de la plantilla devuelve None
+    db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    )
     _override_user(CMG_USER)
     _override_db(db)
 
@@ -307,8 +346,13 @@ def test_apply_template_400_unknown_template():
 
 def test_apply_template_404_unknown_type():
     """Tipo inexistente → 404."""
+    tpl = _make_tpl("generico", "Genérico")
     db = AsyncMock()
-    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+    # Primera llamada: plantilla encontrada; segunda: vehicle_type no existe
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalar_one_or_none=MagicMock(return_value=tpl)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+    ])
     _override_user(CMG_USER)
     _override_db(db)
 
