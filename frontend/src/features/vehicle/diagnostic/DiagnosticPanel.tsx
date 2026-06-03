@@ -27,8 +27,8 @@ export function DiagnosticPanel({ vehicleType, status, derived, alerts, isMobile
         name: 'Otros',
         icon: 'ti-settings',
         sensor_keys: orphans.map(s => s.key),
-        key_sensor_keys: orphans.map(s => s.key),
-        key_count: orphans.length,
+        key_sensor_keys: orphans.slice(0, 3).map(s => s.key),
+        key_count: Math.min(orphans.length, 3),
       })
     }
   } else {
@@ -39,8 +39,8 @@ export function DiagnosticPanel({ vehicleType, status, derived, alerts, isMobile
       name: 'Sensores',
       icon: 'ti-dashboard',
       sensor_keys: allKeys,
-      key_sensor_keys: allKeys,
-      key_count: allKeys.length,
+      key_sensor_keys: allKeys.slice(0, 3),
+      key_count: Math.min(allKeys.length, 3),
     }]
   }
 

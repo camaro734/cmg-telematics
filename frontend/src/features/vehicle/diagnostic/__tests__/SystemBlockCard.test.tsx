@@ -88,11 +88,14 @@ describe('SystemBlockCard', () => {
     expect(card.style.borderLeft).toContain('var(--accent-crit)')
   })
 
-  it('renderiza el sensor clave (RangeBar visible)', () => {
+  it('renderiza la fila compacta del sensor clave con etiqueta y valor', () => {
     const { container } = render(
       <SystemBlockCard block={block} schema={schema} status={statusOk} derived={{}} alerts={noAlerts} />
     )
-    expect(container.querySelector('[data-testid="rangebar-fill"]')).toBeTruthy()
+    expect(container.querySelector('[data-testid="sensor-compact-row"]')).toBeTruthy()
+    expect(container.querySelector('[data-testid="rangebar-fill"]')).toBeNull()
+    expect(screen.getByText(/Presión bomba/)).toBeInTheDocument()
+    expect(screen.getByText(/150/)).toBeInTheDocument()
   })
 
   it('aplica borde gris (--accent-off) y frase "Sin datos" cuando zone=nodata', () => {

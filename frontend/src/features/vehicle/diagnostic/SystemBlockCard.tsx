@@ -1,7 +1,7 @@
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
-import { resolveRawValue } from '../../../lib/sensorValue'
+import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
 import { blockDiagnostics } from '../../../lib/blockDiagnostics'
-import { DiagnosticSensor } from './DiagnosticSensor'
+import { sensorSeverity } from '../../../lib/sensorSeverity'
 
 const ZONE_BORDER: Record<string, string> = {
   crit: 'var(--accent-crit)',
@@ -31,7 +31,9 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
   const borderColor = ZONE_BORDER[zone] ?? ZONE_BORDER.ok
   const phraseColor = ZONE_TEXT[zone] ?? ZONE_TEXT.ok
 
+  const maxShow = Math.min(block.key_count ?? 2, 2)
   const keySensors = block.key_sensor_keys
+    .slice(0, maxShow)
     .map(k => schema.find(s => s.key === k))
     .filter((s): s is SensorDef => s != null)
 
@@ -75,16 +77,31 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
         </div>
       </div>
 
-      {/* Sensores clave */}
+      {/* Sensores clave — líneas compactas */}
       {keySensors.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {keySensors.map(sensor => (
-            <DiagnosticSensor
-              key={sensor.key}
-              sensor={sensor}
-              raw={resolveRawValue(sensor, status, derived)}
-            />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {keySensors.map(sensor => {
+            const raw = resolveRawValue(sensor, status, derived)
+            const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
+            const sz = sensorSeverity(sensor, scaled) ?? 'nodata'
+            const dotColor = ZONE_BORDER[sz] ?? ZONE_BORDER.nodata
+            const formatted = formatSensorValue(scaled) ?? '—'
+            return (
+              <div
+                key={sensor.key}
+                data-testid="sensor-compact-row"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)' }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sensor.label}:{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
+                    {formatted}{sensor.unit ? ` ${sensor.unit}` : ''}
+                  </span>
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
