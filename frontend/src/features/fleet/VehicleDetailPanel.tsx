@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
+import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
 import type { VehicleStatus } from '../../lib/types'
 
 interface VehicleDetailPanelProps {
@@ -34,9 +35,8 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
     refetchInterval: 5_000,
   })
 
-  const online = status
-    ? status.online && !!status.last_seen && (Date.now() - new Date(status.last_seen).getTime()) < 5 * 60_000
-    : false
+  const online = status ? isEffectivelyOnline(status) : false
+  const stale = !online
 
   const moving = online && (status?.speed_kmh ?? 0) > 2
 
@@ -97,8 +97,13 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
 
           {/* KPIs */}
           <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto' }}>
+            {stale && status?.last_seen && (
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 10, padding: '5px 0 8px', borderBottom: '1px solid var(--border-soft)' }}>
+                {staleStamp(status.last_seen)}
+              </div>
+            )}
             <KpiRow label="Ignición" value={
-              <span style={{ color: status?.ignition ? 'var(--ok)' : 'var(--offline)' }}>
+              <span style={{ color: stale ? 'var(--fg-muted)' : (status?.ignition ? 'var(--ok)' : 'var(--offline)') }}>
                 {status?.ignition ? 'ON' : 'OFF'}
               </span>
             } />
@@ -110,7 +115,7 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
             )}
             {status?.pto_active != null && (
               <KpiRow label="PTO" value={
-                <span style={{ color: status.pto_active ? 'var(--cmg-teal)' : 'var(--fg-dim)' }}>
+                <span style={{ color: stale ? 'var(--fg-muted)' : (status.pto_active ? 'var(--cmg-teal)' : 'var(--fg-dim)') }}>
                   {status.pto_active ? 'Activo' : 'Inactivo'}
                 </span>
               } />

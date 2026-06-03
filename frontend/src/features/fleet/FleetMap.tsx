@@ -5,6 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { useNavigate } from 'react-router-dom'
 import { useFleetStore } from './useFleetStore'
+import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
 import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut, VehicleTypeOut, SensorDef } from '../../lib/types'
 
 
@@ -51,13 +52,6 @@ function injectPulseCSS() {
   style.id = 'cmg-pulse-css'
   style.textContent = PULSE_CSS
   document.head.appendChild(style)
-}
-
-function isEffectivelyOnline(status: VehicleStatus): boolean {
-  if (!status.last_seen) return false
-  const ms = Date.now() - new Date(status.last_seen).getTime()
-  const threshold = status.ignition ? 70 * 60_000 : 62 * 60_000
-  return ms < threshold
 }
 
 // Icono EN MOVIMIENTO — punto pulsante verde
@@ -176,6 +170,7 @@ function buildPopupHtml(
 ): string {
   const clientName = tenantNames.get(vehicle.tenant_id) ?? '—'
   const online = isEffectivelyOnline(status)
+  const stale = !online
 
   // Severidad peor de las alertas activas del vehículo
   let worstSev: '' | 'warning' | 'critical' = ''
@@ -186,9 +181,9 @@ function buildPopupHtml(
   }
   const borderColor = worstSev === 'critical' ? 'var(--danger)' : worstSev === 'warning' ? 'var(--warn)' : 'transparent'
 
-  // Banda sin señal — gris neutro, no rojo de alerta
-  const offlineBand = !online
-    ? `<div style="background:rgba(100,116,139,0.1);color:#9ca3af;padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)"><i class="ti ti-antenna-bars-off" style="margin-right:4px"></i>Sin señal desde ${formatLastSeen(status.last_seen)}</div>`
+  // Banda stale — sustituye la banda "Sin señal" anterior, cubre mismo umbral
+  const staleBand = stale
+    ? `<div style="background:rgba(100,116,139,0.1);color:#9ca3af;padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)">${staleStamp(status.last_seen)}</div>`
     : ''
 
   // Contador de alertas — enlace a la página de Alertas
@@ -197,11 +192,11 @@ function buildPopupHtml(
     ? `<a href="/alerts?vehicle=${vehicle.id}" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;font-weight:600;color:var(--danger);text-decoration:none">⚠ ${alertCount} alerta${alertCount > 1 ? 's' : ''} — Ver →</a>`
     : ''
 
-  // Sensores configurados para mostrar en popup
+  // Sensores configurados para mostrar en popup — grises si datos no actuales
   const popupSensors = (vehicleType?.sensor_schema ?? []).filter(s => s.show_in_popup === true)
   const sensorRows = popupSensors.map(s => {
     const val = sensorDisplayValue(s, status.can_data)
-    const col = sensorColor(s, status.can_data)
+    const col = stale ? T_OFF : sensorColor(s, status.can_data)
     return `<tr>
       <td style="padding:2px 0 2px 0;width:8px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;margin-top:1px"></span></td>
       <td style="padding:2px 8px 2px 6px;font-size:12px;color:#6b7280;white-space:nowrap">${s.label}</td>
@@ -220,19 +215,21 @@ function buildPopupHtml(
     ? `<span style="color:var(--ok);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-antenna-bars-5" style="font-size:13px"></i>En línea</span>`
     : `<span style="color:#9ca3af;font-size:12px;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-antenna-bars-off" style="font-size:13px"></i>Sin señal</span>`
 
-  // Equipo industrial (Bloque 4)
+  // Equipo industrial (Bloque 4) — sin color "activo" si datos no actuales
   const ledSensors: SensorDef[] = (vehicleType?.sensor_schema ?? []).filter(
     s => s.gauge_type === 'led' && (s.category ?? 'maquina') === 'maquina'
   )
   const equipRows: string[] = []
   if (status.pto_active != null) {
     const a = status.pto_active
-    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">PTO</td><td style="padding:3px 0;font-size:12px;color:${a ? 'var(--ok)' : T_MUTED};font-weight:${a ? 500 : 400}">${a ? 'Activo' : 'Inactivo'}</td></tr>`)
+    const ptoCol = stale ? T_MUTED : (a ? 'var(--ok)' : T_MUTED)
+    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">PTO</td><td style="padding:3px 0;font-size:12px;color:${ptoCol};font-weight:${(!stale && a) ? 500 : 400}">${a ? 'Activo' : 'Inactivo'}</td></tr>`)
   }
   for (const s of ledSensors) {
     const raw = status.can_data?.[s.key]
     const a: boolean | null = raw == null ? null : s.bit_index !== undefined ? ((Number(raw) >> s.bit_index) & 1) === 1 : Boolean(raw)
-    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">${s.label}</td><td style="padding:3px 0;font-size:12px;color:${a === true ? 'var(--ok)' : T_MUTED};font-weight:${a === true ? 500 : 400}">${a === null ? '—' : a ? 'Activo' : 'Inactivo'}</td></tr>`)
+    const ledCol = stale ? T_MUTED : (a === true ? 'var(--ok)' : T_MUTED)
+    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">${s.label}</td><td style="padding:3px 0;font-size:12px;color:${ledCol};font-weight:${(!stale && a === true) ? 500 : 400}">${a === null ? '—' : a ? 'Activo' : 'Inactivo'}</td></tr>`)
   }
   const equipHtml = equipRows.length === 0
     ? `<div style="font-size:11px;color:${T_MUTED};font-style:italic">Sin equipo configurado</div>`
@@ -241,7 +238,7 @@ function buildPopupHtml(
 
   return `
     <div data-popup-root style="min-width:280px;max-width:340px;font-family:var(--font-sans,sans-serif);border-left:3px solid ${borderColor};overflow:hidden">
-      ${offlineBand}
+      ${staleBand}
       <div style="padding:12px 14px 10px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
           <span style="font-weight:500;font-size:13px;color:#111827">${vehicle.name}</span>
