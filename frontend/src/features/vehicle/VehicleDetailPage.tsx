@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
 import { SkeletonCard } from '../../shared/ui/SkeletonCard'
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import Tabs from '../../shared/ui/Tabs'
 import VehicleHeader from './VehicleHeader'
@@ -16,10 +16,10 @@ import { useIsMobile } from '../../lib/useIsMobile'
 import type { VehicleOut, VehicleStatus, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
+import MaintenanceTab from './MaintenanceTab'
 import { toast } from '../../shared/ui/Toast'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useFleetStore } from '../fleet/useFleetStore'
-import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 
 const BASE_TABS = [
@@ -63,32 +63,6 @@ export default function VehicleDetailPage() {
   const [trackDate, setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const isTrackToday = trackDate === new Date().toISOString().slice(0, 10)
 
-  const [editingPlan, setEditingPlan] = useState<MaintenancePlanOut | null>(null)
-  const [editPlanForm, setEditPlanForm] = useState({ name: '', value: '', warnPct: '10' })
-  const [editPlanError, setEditPlanError] = useState('')
-
-  function openEditPlan(plan: MaintenancePlanOut) {
-    const firstThreshold = plan.trigger_condition.thresholds[0]
-    setEditingPlan(plan)
-    setEditPlanForm({
-      name: plan.name,
-      value: firstThreshold?.value?.toString() ?? '',
-      warnPct: plan.warn_before_pct.toString(),
-    })
-    setEditPlanError('')
-  }
-
-  const editPlanMutation = useMutation({
-    mutationFn: ({ planId, body }: { planId: string; body: object }) =>
-      apiClient.put<MaintenancePlanOut>(`/api/v1/maintenance/plans/${planId}`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.vehicleMaintenance(id!) })
-      setEditingPlan(null)
-      setEditPlanError('')
-    },
-    onError: () => setEditPlanError('Error al guardar los cambios'),
-  })
-
   async function sendDout(slot: number) {
     if (!id || doutLoading[slot]) return
     const newState = !(doutState[slot] ?? false)
@@ -104,23 +78,6 @@ export default function VehicleDetailPage() {
     } finally {
       setDoutLoading(prev => ({ ...prev, [slot]: false }))
     }
-  }
-
-  function handleEditPlan() {
-    if (!editingPlan || !editPlanForm.value) return
-    const firstThreshold = editingPlan.trigger_condition.thresholds[0]
-    if (!firstThreshold) return
-    editPlanMutation.mutate({
-      planId: editingPlan.id,
-      body: {
-        name: editPlanForm.name,
-        trigger_condition: {
-          thresholds: [{ type: firstThreshold.type, value: parseFloat(editPlanForm.value) }],
-          op: 'OR',
-        },
-        warn_before_pct: parseInt(editPlanForm.warnPct) || 10,
-      },
-    })
   }
 
   const { data: vehicle, isLoading: loadingVehicle, error: vehicleError } = useQuery({
@@ -601,67 +558,8 @@ export default function VehicleDetailPage() {
             <WorkCyclesTab vehicleId={vehicle.id} vehicleTypeId={vehicle.vehicle_type_id} tenantId={vehicle.tenant_id} />
           )}
 
-          {tab === 'maintenance' && (
-            <div>
-              {maintenancePlans.length === 0 ? (
-                <p style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Sin planes de mantenimiento para este vehículo</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {maintenancePlans.map(plan => (
-                    <div key={plan.id} style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', padding: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{plan.name}</div>
-                          {plan.progress.thresholds.map(t => (
-                            <div key={t.type} style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-                              {t.current.toFixed(1)} / {t.limit} {{ pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días' }[t.type] ?? t.type}
-                              {' '}({t.pct.toFixed(0)}%)
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600,
-                            background: plan.progress.status === 'vencido' ? 'var(--danger)' : plan.progress.status === 'próximo' ? 'var(--warn)' : 'var(--ok)',
-                            color: '#fff'
-                          }}>
-                            {plan.progress.status.toUpperCase()}
-                          </span>
-                          {isCmg && (
-                            <button
-                              onClick={() => openEditPlan(plan)}
-                              style={{ fontSize: 11, padding: '3px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-primary)' }}
-                            >
-                              Editar umbrales
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {editingPlan && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
-                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 360, border: '1px solid var(--border)' }}>
-                    <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600 }}>Editar umbrales</h3>
-                    <Input label="Nombre" value={editPlanForm.name} style={{ marginBottom: 12 }}
-                      onChange={e => setEditPlanForm(f => ({ ...f, name: e.target.value }))} />
-                    <Input label="Valor umbral" type="number" min="1" value={editPlanForm.value} style={{ marginBottom: 12 }}
-                      onChange={e => setEditPlanForm(f => ({ ...f, value: e.target.value }))} />
-                    <Input label="% aviso previo" type="number" min="1" max="50" value={editPlanForm.warnPct} style={{ marginBottom: 20 }}
-                      onChange={e => setEditPlanForm(f => ({ ...f, warnPct: e.target.value }))} />
-                    {editPlanError && <p style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 12 }}>{editPlanError}</p>}
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button onClick={() => setEditingPlan(null)} style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
-                      <button onClick={handleEditPlan} disabled={editPlanMutation.isPending} style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
-                        {editPlanMutation.isPending ? 'Guardando…' : 'Guardar'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+          {tab === 'maintenance' && id && (
+            <MaintenanceTab vehicleId={id} isCmg={isCmg} />
           )}
 
         </div>
