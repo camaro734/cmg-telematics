@@ -177,7 +177,15 @@ export default function BlockTemplatesPage() {
         display: 'flex', flexDirection: 'column', overflowY: 'auto',
         background: 'var(--bg-surface)',
       }}>
-        <div style={{ padding: '16px 12px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '12px 12px 0' }}>
+          <a
+            href="/tipos-vehiculo"
+            style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            ← Volver a tipos de vehículo
+          </a>
+        </div>
+        <div style={{ padding: '12px 12px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Plantillas de bloques
           </span>

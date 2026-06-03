@@ -545,6 +545,16 @@ export default function VehicleTypesPage() {
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <SystemBlocksSection typeId={selectedType.id} selectedType={selectedType} />
                 )}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && (
+                  <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 20 }}>
+                    <a
+                      href="/plantillas-bloques"
+                      style={{ ...btnSecondary, display: 'inline-block', textDecoration: 'none', fontSize: 13 }}
+                    >
+                      Gestionar plantillas de bloques →
+                    </a>
+                  </div>
+                )}
               </div>
             </>
           )}
