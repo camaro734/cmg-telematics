@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { toast } from '../../shared/ui/Toast'
 import type { VehicleTypeOut, SensorDef } from '../../lib/types'
 import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
@@ -139,6 +141,7 @@ const GAUGE_TYPES: SensorDef['gauge_type'][] = ['circular', 'linear', 'battery',
 export default function VehicleTypesPage() {
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
+  const confirmAsk = useConfirm()
 
   const { data: vehicleTypes = [], isLoading } = useQuery<VehicleTypeOut[]>({
     queryKey: keys.vehicleTypes(),
@@ -217,12 +220,21 @@ export default function VehicleTypesPage() {
     mutationFn: (id: string) => apiClient.delete(`/api/v1/vehicle-types/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.vehicleTypes() })
+      setSelectedTypeId('')
+    },
+    onError: (err: Error) => {
+      // El backend devuelve 400 si hay vehículos que usan el tipo
+      toast.error(err.message || 'No se pudo eliminar el tipo de vehículo')
     },
   })
 
-  function handleDeleteType(e: React.MouseEvent, vt: VehicleTypeOut) {
-    e.stopPropagation()
-    if (!window.confirm(`¿Eliminar el tipo "${vt.name}"? Esta acción no se puede deshacer.`)) return
+  async function handleDeleteType(vt: VehicleTypeOut) {
+    const ok = await confirmAsk({
+      title: 'Borrar tipo de vehículo',
+      message: `¿Eliminar el tipo "${vt.name}"? Se borrarán también su configuración de sensores y bloques. Esta acción no se puede deshacer.`,
+      confirmLabel: 'Borrar', kind: 'danger',
+    })
+    if (!ok) return
     deleteTypeMutation.mutate(vt.id)
   }
 
@@ -332,7 +344,7 @@ export default function VehicleTypesPage() {
                 </div>
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && (
                   <button
-                    onClick={e => handleDeleteType(e, vt)}
+                    onClick={e => { e.stopPropagation(); handleDeleteType(vt) }}
                     title="Eliminar tipo"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', opacity: 0.4, fontSize: 14, padding: '2px 4px', flexShrink: 0, lineHeight: 1 }}
                     onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
@@ -421,6 +433,13 @@ export default function VehicleTypesPage() {
                     title="Duplicar este tipo con todos sus sensores y plantillas"
                   >
                     {duplicateTypeMutation.isPending ? 'Duplicando…' : '⎘ Duplicar'}
+                  </button>
+                  <button
+                    style={{ ...btnSecondary, fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                    onClick={() => handleDeleteType(selectedType)}
+                    disabled={deleteTypeMutation.isPending}
+                  >
+                    {deleteTypeMutation.isPending ? 'Borrando…' : 'Borrar tipo'}
                   </button>
                   <button style={btnPrimary} onClick={openNewSensor}>+ Añadir sensor</button>
                 </div>

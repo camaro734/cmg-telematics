@@ -31,7 +31,16 @@ async function request<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText || 'Error desconocido')
-    throw new Error(`${res.status}: ${text}`)
+    // Extraer "detail" del JSON de FastAPI si existe; si no, devolver el texto plano
+    try {
+      const json = JSON.parse(text)
+      if (json.detail) {
+        throw new Error(typeof json.detail === 'string' ? json.detail : JSON.stringify(json.detail))
+      }
+    } catch (parseErr) {
+      if (parseErr instanceof Error && parseErr.message !== text) throw parseErr
+    }
+    throw new Error(text || `Error ${res.status}`)
   }
 
   if (res.status === 204) return undefined as T

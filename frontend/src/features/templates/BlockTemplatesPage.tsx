@@ -137,9 +137,12 @@ export default function BlockTemplatesPage() {
 
   async function deleteTemplate() {
     if (!selected) return
+    const message = selected.is_builtin
+      ? `"${selected.label}" es una plantilla de fábrica. Borrarla eliminará la configuración original permanentemente. ¿Continuar?`
+      : `¿Eliminar la plantilla "${selected.label}"? Esta acción no se puede deshacer.`
     const ok = await confirmAsk({
       title: 'Eliminar plantilla',
-      message: `¿Eliminar la plantilla "${selected.label}"? Esta acción no se puede deshacer.`,
+      message,
       confirmLabel: 'Eliminar', kind: 'danger',
     })
     if (!ok) return
@@ -246,12 +249,10 @@ export default function BlockTemplatesPage() {
                   </span>
                 )}
               </h2>
-              {!selected.is_builtin && (
-                <button style={btnDanger} onClick={deleteTemplate}
-                  disabled={deleteMutation.isPending}>
-                  {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar plantilla'}
-                </button>
-              )}
+              <button style={btnDanger} onClick={deleteTemplate}
+                disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar plantilla'}
+              </button>
             </div>
 
             {/* Formulario nombre + descripción */}

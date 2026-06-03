@@ -622,17 +622,19 @@ def test_delete_template_ok():
     db.commit.assert_awaited_once()
 
 
-def test_delete_builtin_blocked():
-    """DELETE en plantilla de fábrica → 400."""
+def test_delete_builtin_allowed():
+    """DELETE en plantilla de fábrica ahora está permitido → 204."""
     tpl = _make_custom_tpl(is_builtin=True)
     db = _db_single_tpl(tpl)
+    db.delete = AsyncMock()
+    db.commit = AsyncMock()
     _override_user(CMG_USER)
     _override_db(db)
 
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.delete(f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}")
-    assert resp.status_code == 400
-    assert "fábrica" in resp.json()["detail"]
+    assert resp.status_code == 204
+    db.delete.assert_awaited_once_with(tpl)
 
 
 def test_delete_template_404():

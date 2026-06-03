@@ -332,6 +332,32 @@ async def update_vehicle_type(
     return vtype
 
 
+@router.delete("/vehicle-types/{type_id}", status_code=204)
+async def delete_vehicle_type(
+    type_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Elimina un tipo de vehículo. Bloqueado si hay vehículos que lo usan."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo CMG admin puede borrar tipos de vehículo")
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    count_result = await db.execute(
+        select(Vehicle).where(Vehicle.vehicle_type_id == type_id)
+    )
+    vehicles_using = count_result.scalars().all()
+    if vehicles_using:
+        n = len(vehicles_using)
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede borrar: {n} vehículo{'s' if n != 1 else ''} {'usan' if n != 1 else 'usa'} este tipo",
+        )
+    await db.delete(vtype)
+    await db.commit()
+
+
 @router.post("/vehicle-types/{type_id}/icon", response_model=VehicleTypeOut)
 async def upload_vehicle_type_icon(
     type_id: uuid.UUID,
@@ -485,15 +511,13 @@ async def delete_system_block_template(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Elimina una plantilla. Las plantillas de fábrica (is_builtin) no se pueden borrar."""
+    """Elimina una plantilla (cualquiera, incluyendo las de fábrica)."""
     _cmg_admin(user)
     tpl = (await db.execute(
         select(SystemBlockTemplate).where(SystemBlockTemplate.id == template_id)
     )).scalar_one_or_none()
     if not tpl:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
-    if tpl.is_builtin:
-        raise HTTPException(status_code=400, detail="Las plantillas de fábrica no se pueden eliminar")
     await db.delete(tpl)
     await db.commit()
 
