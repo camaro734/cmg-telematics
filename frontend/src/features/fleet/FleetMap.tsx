@@ -153,29 +153,24 @@ function buildPopupHtml(
   }
   const borderColor = worstSev === 'critical' ? 'var(--danger)' : worstSev === 'warning' ? 'var(--warn)' : 'transparent'
 
-  // Banda offline (2 rgba hardcoded — ver deuda técnica opacidad)
+  // Banda sin señal — gris neutro, no rojo de alerta
   const offlineBand = !online
-    ? `<div style="background:var(--danger-12);color:var(--danger);padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid var(--danger-25)">Datos desactualizados desde ${formatLastSeen(status.last_seen)}</div>`
+    ? `<div style="background:rgba(100,116,139,0.1);color:#9ca3af;padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)"><i class="ti ti-antenna-bars-off" style="margin-right:4px"></i>Sin señal desde ${formatLastSeen(status.last_seen)}</div>`
     : ''
 
-  // Chips de alertas (3 rgba hardcoded — ver deuda técnica opacidad)
-  const chips = vehicleAlerts.map(a => {
-    const rule = rulesById.get(a.rule_id)
-    const name = rule?.name ?? 'Alerta'
-    const sev = rule?.severity ?? 'info'
-    const bg = sev === 'critical' ? 'var(--danger-12)' : sev === 'warning' ? 'var(--warn-12)' : 'var(--info-12)'
-    const color = sev === 'critical' ? 'var(--danger)' : sev === 'warning' ? 'var(--warn)' : 'var(--info)'
-    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${bg};color:${color};font-size:10px;font-weight:600">⚠ ${name}</span>`
-  }).join('')
-  const chipsRow = chips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${chips}</div>` : ''
+  // Contador de alertas — enlace a la página de Alertas
+  const alertCount = vehicleAlerts.length
+  const alertRow = alertCount > 0
+    ? `<a href="/alerts" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;font-weight:600;color:var(--danger);text-decoration:none">⚠ ${alertCount} alerta${alertCount > 1 ? 's' : ''} — Ver →</a>`
+    : ''
 
   // Tabla compacta — fondo blanco del popup nativo de Leaflet: usar colores oscuros para contraste
   const driverCell = vehicle.driver_name
     ? `<span style="color:#111827;font-size:12px">${vehicle.driver_name}</span>`
     : `<span style="color:${T_MUTED};font-style:italic;font-size:12px">Sin conductor asignado</span>`
   const stateCell = online
-    ? `<span style="color:var(--ok);font-size:12px;font-weight:500">En línea</span>`
-    : `<span style="color:${T_MUTED};font-size:12px">Offline</span>`
+    ? `<span style="color:var(--ok);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-antenna-bars-5" style="font-size:13px"></i>En línea</span>`
+    : `<span style="color:#9ca3af;font-size:12px;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-antenna-bars-off" style="font-size:13px"></i>Sin señal</span>`
 
   // Equipo industrial (Bloque 4)
   const ledSensors: SensorDef[] = (vehicleType?.sensor_schema ?? []).filter(
@@ -204,8 +199,8 @@ function buildPopupHtml(
           <span style="font-weight:500;font-size:13px;color:#111827">${vehicle.name}</span>
           <span style="font-size:11px;color:${T_MUTED};margin-left:8px">${vehicle.license_plate ?? ''}</span>
         </div>
-        <div style="font-size:11px;color:${T_MUTED};margin-bottom:${chips ? '8px' : '10px'}">${clientName}</div>
-        ${chipsRow}
+        <div style="font-size:11px;color:${T_MUTED};margin-bottom:${alertCount > 0 ? '8px' : '10px'}">${clientName}</div>
+        ${alertRow}
         <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
           <tr>
             <td style="padding:2px 8px 2px 0;color:${T_MUTED}">👤</td>

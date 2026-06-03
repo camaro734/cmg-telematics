@@ -368,13 +368,18 @@ export default function VehicleDetailPage() {
                     </span>
                     {isVehicleOnline(status)
                       ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span className="live-dot" style={{ width: 5, height: 5 }}/> En directo
+                          <i className="ti ti-antenna-bars-5" style={{ fontSize: 12 }} />
+                          En directo
                         </span>
                       : status?.last_seen
-                        ? <span style={{ color: 'var(--danger)', fontSize: 10, fontWeight: 700 }}>
-                            ⚠ Sin señal {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h` })()}
+                        ? <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
+                            Sin señal · {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h` })()}
                           </span>
-                        : <span style={{ color: 'var(--danger)', fontSize: 10 }}>⚠ Sin señal</span>
+                        : <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
+                            Sin señal
+                          </span>
                     }
                     {status && (
                       <>

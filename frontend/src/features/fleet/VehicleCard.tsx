@@ -55,23 +55,23 @@ function StateDot({ state }: { state: VehicleState }) {
   )
 }
 
-function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { text: string; color: string } {
-  if (!status) return { text: 'Sin señal', color: 'var(--danger)' }
+function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { text: string; color: string; icon?: string } {
+  if (!status) return { text: 'Sin señal', color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
   switch (state) {
     case 'moving':
-      return { text: `${Math.round(status.speed_kmh ?? 0)} km/h`, color: 'var(--ok)' }
+      return { text: `${Math.round(status.speed_kmh ?? 0)} km/h`, color: 'var(--ok)', icon: 'ti-antenna-bars-5' }
     case 'idle':
-      return { text: 'Parado · motor ON', color: 'var(--warn)' }
+      return { text: 'Parado · motor ON', color: 'var(--warn)', icon: 'ti-antenna-bars-5' }
     case 'parked':
-      return { text: 'Parado', color: 'var(--info)' }
+      return { text: 'Parado', color: 'var(--info)', icon: 'ti-antenna-bars-5' }
     case 'alert':
       return { text: '⚠ Alerta', color: 'var(--danger)' }
     case 'offline': {
       const ls = status.last_seen
-      if (!ls) return { text: 'Sin señal', color: 'var(--danger)' }
+      if (!ls) return { text: 'Sin señal', color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
       const mins = Math.floor((Date.now() - new Date(ls).getTime()) / 60000)
-      if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--danger)' }
-      return { text: `Sin señal · ${Math.floor(mins / 60)}h`, color: 'var(--danger)' }
+      if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
+      return { text: `Sin señal · ${Math.floor(mins / 60)}h`, color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
     }
   }
 }
@@ -95,7 +95,7 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
   const online = vehicleState !== 'offline'
 
   const VehicleIcon = getVehicleIconForSlug(vehicleType?.slug ?? '')
-  const { text: labelText, color: labelColor } = stateLabel(vehicleState, status)
+  const { text: labelText, color: labelColor, icon: signalIcon } = stateLabel(vehicleState, status)
 
   const iconEl = vehicleType?.icon_url ? (
     <img src={vehicleType.icon_url} alt={vehicleType.name}
@@ -141,7 +141,8 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
         </div>
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <StateDot state={vehicleState} />
-          <span style={{ fontSize: 11, color: labelColor, fontWeight: 500, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 11, color: labelColor, fontWeight: 500, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
+            {signalIcon && <i className={`ti ${signalIcon}`} style={{ fontSize: 12, flexShrink: 0 }} />}
             {labelText}
           </span>
         </div>
@@ -207,7 +208,12 @@ export default function VehicleCard({ vehicle, vehicleType, status, isSelected, 
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
         paddingBottom: 2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 3,
       }}>
+        {signalIcon && <i className={`ti ${signalIcon}`} style={{ fontSize: 11, flexShrink: 0 }} />}
         {labelText}
       </div>
     </div>
