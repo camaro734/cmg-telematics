@@ -12,6 +12,7 @@ interface BlockDetailSectionProps {
   derived: Record<string, number | null>
   alerts: AlertInstanceEnrichedOut[]
   vehicleId: string
+  isStale?: boolean
 }
 
 const ZONE_VALUE_COLOR: Record<string, string> = {
@@ -23,7 +24,7 @@ const ZONE_VALUE_COLOR: Record<string, string> = {
 
 
 export function BlockDetailSection({
-  block, schema, status, derived, alerts, vehicleId,
+  block, schema, status, derived, alerts, vehicleId, isStale,
 }: BlockDetailSectionProps) {
   const sensors = block.sensor_keys
     .map(k => schema.find(s => s.key === k))
@@ -74,7 +75,7 @@ export function BlockDetailSection({
             const raw = resolveRawValue(sensor, status, derived)
             const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
             const zone = sensorSeverity(sensor, scaled) ?? 'nodata'
-            const valueColor = ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata
+            const valueColor = isStale ? ZONE_VALUE_COLOR.nodata : (ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata)
             const formatted = formatSensorValue(scaled) ?? '—'
             return (
               <div

@@ -34,9 +34,10 @@ interface VehicleHeaderProps {
   activeAlerts?: AlertInstanceEnrichedOut[]
   tenantName?: string
   onOpenActivity?: () => void
+  isStale?: boolean
 }
 
-export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlug, activeAlerts = [], tenantName, onOpenActivity }: VehicleHeaderProps) {
+export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlug, activeAlerts = [], tenantName, onOpenActivity, isStale }: VehicleHeaderProps) {
   const navigate = useNavigate()
   const online = status?.online ?? false
   const ignition = status?.ignition ?? false
@@ -88,7 +89,7 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{vehicle.name}</h1>
           <StatusBadge variant={online ? 'online' : 'offline'} size="md" />
-          {status?.pto_active && <StatusBadge variant="pto" size="md" />}
+          {status?.pto_active && !isStale && <StatusBadge variant="pto" size="md" />}
           {alertColor && (
             <Chip color={alertColor} soft dot size="sm">
               {activeAlerts.length} alerta{activeAlerts.length !== 1 ? 's' : ''}

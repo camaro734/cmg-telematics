@@ -1,13 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-
-// Threshold ignition-aware: 70 min con motor, 62 min parado.
-// Evita parpadeos de "sin señal" entre paquetes normales.
-function isVehicleOnline(status: { last_seen: string | null; ignition: boolean | null } | null | undefined): boolean {
-  if (!status?.last_seen) return false
-  const ms = Date.now() - new Date(status.last_seen).getTime()
-  const threshold = status.ignition ? 70 * 60_000 : 62 * 60_000
-  return ms < threshold
-}
+import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
 import { SkeletonCard } from '../../shared/ui/SkeletonCard'
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -151,6 +143,7 @@ export default function VehicleDetailPage() {
     refetchInterval: 5_000,
     enabled: !!vehicle,
   })
+  const isStale = !isEffectivelyOnline(status)
 
   // track reservado para la tab HISTÓRICO — en EN VIVO se pasa track=[]
   const { data: _track = [] } = useQuery({
@@ -287,6 +280,7 @@ export default function VehicleDetailPage() {
           activeAlerts={activeAlerts}
           tenantName={vehicleTenant?.name}
           onOpenActivity={() => setActivityOpen(true)}
+          isStale={isStale}
         />
         <div style={{ padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
@@ -366,28 +360,29 @@ export default function VehicleDetailPage() {
                     <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
                       Telemetría
                     </span>
-                    {isVehicleOnline(status)
+                    {isEffectivelyOnline(status)
                       ? <span style={{ color: 'var(--ok)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <i className="ti ti-antenna-bars-5" style={{ fontSize: 12 }} />
                           En directo
                         </span>
-                      : status?.last_seen
-                        ? <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
-                            Sin señal · {(() => { const m = Math.round((Date.now() - new Date(status.last_seen).getTime()) / 60000); return m < 60 ? `${m} min` : `${Math.round(m/60)} h` })()}
-                          </span>
-                        : <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
-                            Sin señal
-                          </span>
+                      : <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
+                          {staleStamp(status?.last_seen ?? null)}
+                        </span>
                     }
                     {status && (
                       <>
-                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: status.ignition ? 'var(--ok)' : 'var(--offline)', padding: '1px 6px', borderRadius: 4, background: status.ignition ? 'var(--ok-soft)' : 'rgba(100,116,139,0.15)' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', padding: '1px 6px', borderRadius: 4,
+                          color: isStale ? 'var(--fg-muted)' : (status.ignition ? 'var(--ok)' : 'var(--offline)'),
+                          background: isStale ? 'rgba(100,116,139,0.15)' : (status.ignition ? 'var(--ok-soft)' : 'rgba(100,116,139,0.15)'),
+                        }}>
                           IGN {status.ignition ? 'ON' : 'OFF'}
                         </span>
                         {(status.pto_active || status.can_data?.avl_2 === 1 || status.can_data?.avl_179 === 1) && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--cmg-teal)', padding: '1px 6px', borderRadius: 4, background: 'var(--cmg-teal-soft)' }}>PTO ON</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                            color: isStale ? 'var(--fg-muted)' : 'var(--cmg-teal)',
+                            background: isStale ? 'rgba(100,116,139,0.15)' : 'var(--cmg-teal-soft)',
+                          }}>PTO ON</span>
                         )}
                         {status.speed_kmh != null && status.speed_kmh > 0 && (
                           <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--fg-tertiary)' }}>{status.speed_kmh.toFixed(0)} km/h</span>
@@ -409,6 +404,7 @@ export default function VehicleDetailPage() {
                       alerts={activeAlerts}
                       isMobile={isMobile}
                       onBlockClick={setSelectedBlockId}
+                      isStale={isStale}
                     />
                   ) : (
                     <div style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Sin datos en vivo</div>
@@ -551,6 +547,7 @@ export default function VehicleDetailPage() {
                       derived={derivedValues as Record<string, number | null>}
                       alerts={activeAlerts}
                       vehicleId={id}
+                      isStale={isStale}
                     />
                   )
                 })()}

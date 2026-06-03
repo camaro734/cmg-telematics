@@ -24,12 +24,13 @@ interface SystemBlockCardProps {
   derived: Record<string, number | null>
   alerts: AlertInstanceEnrichedOut[]
   onDetailClick?: () => void
+  isStale?: boolean
 }
 
-export function SystemBlockCard({ block, schema, status, derived, alerts, onDetailClick }: SystemBlockCardProps) {
+export function SystemBlockCard({ block, schema, status, derived, alerts, onDetailClick, isStale }: SystemBlockCardProps) {
   const { zone, phrase } = blockDiagnostics(block, schema, status, derived, alerts)
-  const borderColor = ZONE_BORDER[zone] ?? ZONE_BORDER.ok
-  const phraseColor = ZONE_TEXT[zone] ?? ZONE_TEXT.ok
+  const borderColor = isStale ? ZONE_BORDER.nodata : (ZONE_BORDER[zone] ?? ZONE_BORDER.ok)
+  const phraseColor = isStale ? ZONE_TEXT.nodata : (ZONE_TEXT[zone] ?? ZONE_TEXT.ok)
 
   const maxShow = Math.min(block.key_count ?? 2, 2)
   const keySensors = block.key_sensor_keys
@@ -97,7 +98,7 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
             const raw = resolveRawValue(sensor, status, derived)
             const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
             const sz = sensorSeverity(sensor, scaled) ?? 'nodata'
-            const dotColor = ZONE_BORDER[sz] ?? ZONE_BORDER.nodata
+            const dotColor = isStale ? ZONE_BORDER.nodata : (ZONE_BORDER[sz] ?? ZONE_BORDER.nodata)
             const formatted = formatSensorValue(scaled) ?? '—'
             return (
               <div
@@ -108,7 +109,7 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {sensor.label}:{' '}
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: isStale ? 'var(--fg-muted)' : 'var(--fg-primary)' }}>
                     {formatted}{sensor.unit ? ` ${sensor.unit}` : ''}
                   </span>
                 </span>
