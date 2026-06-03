@@ -379,13 +379,15 @@ async def list_system_block_templates(
         )
     )
     rows = result.scalars().all()
-    # Mismo shape de respuesta que antes: dict keyed by slug
+    # Dict keyed by slug — campos aditivos (uuid, is_builtin) no rompen clientes existentes
     return {
         row.slug: {
             "id": row.slug,
+            "uuid": str(row.id),
             "label": row.name,
             "description": row.description or "",
             "blocks": row.blocks,
+            "is_builtin": row.is_builtin,
         }
         for row in rows
     }

@@ -67,7 +67,8 @@ const ReportsPage      = lazy(() => import('./features/reports/ReportsPage'))
 const DevicesPage      = lazy(() => import('./features/devices/DevicesPage'))
 const CanScannerPage   = lazy(() => import('./features/diagnostics/CanScannerPage'))
 const VehiclesPage     = lazy(() => import('./features/vehicles/VehiclesPage'))
-const VehicleTypesPage = lazy(() => import('./features/vehicles/VehicleTypesPage'))
+const VehicleTypesPage   = lazy(() => import('./features/vehicles/VehicleTypesPage'))
+const BlockTemplatesPage = lazy(() => import('./features/templates/BlockTemplatesPage'))
 const DriversPage      = lazy(() => import('./features/drivers/DriversPage'))
 const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPage'))
 const GeofencesPage    = lazy(() => import('./features/geofences/GeofencesPage'))
@@ -127,7 +128,8 @@ export default function App() {
                 <Route path="clientes/:id/edit" element={<SectionErrorBoundary label="ClienteForm"><TenantFormPage /></SectionErrorBoundary>} />
                 <Route path="reports"           element={<RequireModule module="reports"><SectionErrorBoundary label="Reports"><ReportsPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="vehiculos"         element={<SectionErrorBoundary label="Vehiculos"><VehiclesPage /></SectionErrorBoundary>} />
-                <Route path="tipos-vehiculo"   element={<SectionErrorBoundary label="TiposVehiculo"><VehicleTypesPage /></SectionErrorBoundary>} />
+                <Route path="tipos-vehiculo"      element={<SectionErrorBoundary label="TiposVehiculo"><VehicleTypesPage /></SectionErrorBoundary>} />
+                <Route path="plantillas-bloques" element={<SectionErrorBoundary label="BlockTemplates"><BlockTemplatesPage /></SectionErrorBoundary>} />
                 <Route path="devices"          element={<SectionErrorBoundary label="Devices"><DevicesPage /></SectionErrorBoundary>} />
                 <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
                 <Route path="drivers"          element={<SectionErrorBoundary label="Drivers"><DriversPage /></SectionErrorBoundary>} />

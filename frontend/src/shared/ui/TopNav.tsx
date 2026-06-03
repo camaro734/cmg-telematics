@@ -22,6 +22,7 @@ import {
   IconOrdenes,
   IconConductores,
   IconGeocercas,
+  IconReglas,
 } from './icons'
 import { Chip } from './Chip'
 import { wsClient } from '../../lib/wsClient'
@@ -53,8 +54,9 @@ const OPERATOR_ITEMS = OPERATOR_ITEMS_BASE
 const CMG_ADMIN_ITEMS = [
   { label: 'Clientes',            to: '/clientes',       Icon: IconClientes },
   { label: 'Flota (todos)',        to: '/vehiculos',      Icon: IconVehiculos },
-  { label: 'Plantillas',          to: '/tipos-vehiculo', Icon: IconVehiculos },
-  { label: 'Dispositivos',        to: '/devices',        Icon: IconDispositivos },
+  { label: 'Plantillas',           to: '/tipos-vehiculo',    Icon: IconVehiculos },
+  { label: 'Plantillas de bloques', to: '/plantillas-bloques', Icon: IconReglas },
+  { label: 'Dispositivos',         to: '/devices',            Icon: IconDispositivos },
   { label: 'CAN Scanner',         to: '/can-scanner',    Icon: IconCanScanner },
   { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
 ] as const
