@@ -58,6 +58,36 @@ class VehicleTypeSystemBlocksUpdate(BaseModel):
     system_blocks: list[SystemBlock]
 
 
+class SystemBlockTemplateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    slug: str
+    name: str
+    description: str | None = None
+    blocks: list[SystemBlock] = []
+    is_builtin: bool
+    created_by: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SystemBlockTemplateCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    blocks: list[SystemBlock] = []
+
+
+class SystemBlockTemplateUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    blocks: list[SystemBlock]
+
+
+class SaveAsTemplateBody(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+
+
 class VehicleTypeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

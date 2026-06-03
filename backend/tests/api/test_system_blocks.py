@@ -376,3 +376,375 @@ def test_apply_template_403_client():
         json={"template_id": "generico"},
     )
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Helpers para tests CRUD de plantillas
+# ---------------------------------------------------------------------------
+
+TPL_ID = uuid.UUID("b0000000-0000-0000-0000-000000000001")
+
+
+def _make_custom_tpl(
+    slug: str = "mi_plantilla",
+    name: str = "Mi Plantilla",
+    is_builtin: bool = False,
+    blocks: list | None = None,
+) -> MagicMock:
+    """Mock de SystemBlockTemplate con campos completos para serialización."""
+    from app.models.system_block_template import SystemBlockTemplate
+    tpl = MagicMock(spec=SystemBlockTemplate)
+    tpl.id = TPL_ID
+    tpl.slug = slug
+    tpl.name = name
+    tpl.description = "Desc de prueba"
+    tpl.blocks = blocks if blocks is not None else list(_GENERICO_BLOCKS)
+    tpl.is_builtin = is_builtin
+    tpl.created_by = None
+    tpl.created_at = "2026-06-03T12:00:00+00:00"
+    tpl.updated_at = "2026-06-03T12:00:00+00:00"
+    return tpl
+
+
+def _db_single_tpl(tpl) -> AsyncMock:
+    """DB mock que devuelve un único template en scalar_one_or_none."""
+    db = AsyncMock()
+    db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=tpl))
+    )
+    return db
+
+
+def _make_tpl_refresh():
+    """AsyncMock para db.refresh que inyecta id y timestamps en objetos nuevos.
+
+    SQLAlchemy aplica los default (uuid4, now()) solo en el flush real.
+    Con db mockeada nunca hay flush, así que hay que setearlos aquí.
+    """
+    from datetime import datetime, timezone
+
+    async def _refresh(obj):
+        if getattr(obj, "id", None) is None:
+            obj.id = TPL_ID
+        if getattr(obj, "created_at", None) is None:
+            obj.created_at = datetime(2026, 6, 3, 12, 0, 0, tzinfo=timezone.utc)
+        if getattr(obj, "updated_at", None) is None:
+            obj.updated_at = datetime(2026, 6, 3, 12, 0, 0, tzinfo=timezone.utc)
+
+    return AsyncMock(side_effect=_refresh)
+
+
+# ---------------------------------------------------------------------------
+# GET /vehicle-types/system-blocks/templates/{template_id}
+# ---------------------------------------------------------------------------
+
+def test_get_template_by_id_ok():
+    """GET por UUID devuelve la plantilla con sus campos."""
+    tpl = _make_custom_tpl()
+    db = _db_single_tpl(tpl)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["slug"] == "mi_plantilla"
+    assert data["name"] == "Mi Plantilla"
+    assert data["is_builtin"] is False
+    assert len(data["blocks"]) == len(_GENERICO_BLOCKS)
+
+
+def test_get_template_by_id_404():
+    """UUID inexistente → 404."""
+    db = _db_single_tpl(None)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/vehicle-types/system-blocks/templates/{uuid.uuid4()}")
+    assert resp.status_code == 404
+
+
+def test_get_template_by_id_403():
+    """Cliente no CMG → 403."""
+    db = AsyncMock()
+    _override_user(CLIENT_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}")
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# POST /vehicle-types/system-blocks/templates  (crear)
+# ---------------------------------------------------------------------------
+
+def test_create_template_ok():
+    """POST crea plantilla; slug autogenerado del name; is_builtin=false."""
+    db = AsyncMock()
+    # _unique_slug llama a db.execute una vez y no encuentra conflicto
+    db.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    )
+    db.commit = AsyncMock()
+    db.refresh = _make_tpl_refresh()
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post(
+        "/api/v1/vehicle-types/system-blocks/templates",
+        json={"name": "Test Plantilla", "description": "Desc", "blocks": []},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["slug"] == "test_plantilla"
+    assert data["is_builtin"] is False
+    db.commit.assert_awaited_once()
+
+
+def test_create_template_slug_collision_increments():
+    """Si 'mi_nombre' ya existe, el segundo se llama 'mi_nombre_2'."""
+    existing = _make_custom_tpl(slug="mi_nombre")
+    db = AsyncMock()
+    # Primera llamada (slug=mi_nombre): existe; segunda (slug=mi_nombre_2): libre
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalar_one_or_none=MagicMock(return_value=existing)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+    ])
+    db.commit = AsyncMock()
+    db.refresh = _make_tpl_refresh()
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post(
+        "/api/v1/vehicle-types/system-blocks/templates",
+        json={"name": "Mi Nombre", "blocks": []},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["slug"] == "mi_nombre_2"
+
+
+def test_create_template_403():
+    """Cliente no CMG → 403."""
+    db = AsyncMock()
+    _override_user(CLIENT_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post(
+        "/api/v1/vehicle-types/system-blocks/templates",
+        json={"name": "Test", "blocks": []},
+    )
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# PUT /vehicle-types/system-blocks/templates/{template_id}  (editar)
+# ---------------------------------------------------------------------------
+
+def test_update_template_ok():
+    """PUT actualiza name, description y blocks."""
+    tpl = _make_custom_tpl(is_builtin=False)
+    db = _db_single_tpl(tpl)
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    new_blocks = [{"id": "block_motor", "name": "Motor", "icon": "ti-engine",
+                   "sensor_keys": ["avl_30"], "key_sensor_keys": ["avl_30"], "key_count": 1}]
+    with patch("app.api.v1.vehicles.flag_modified"):
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.put(
+            f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}",
+            json={"name": "Nuevo Nombre", "description": "Nueva desc", "blocks": new_blocks},
+        )
+    assert resp.status_code == 200
+    assert tpl.name == "Nuevo Nombre"
+    assert tpl.description == "Nueva desc"
+    db.commit.assert_awaited_once()
+
+
+def test_update_builtin_template_ok():
+    """Las plantillas de fábrica también se pueden editar."""
+    tpl = _make_custom_tpl(is_builtin=True)
+    db = _db_single_tpl(tpl)
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    with patch("app.api.v1.vehicles.flag_modified"):
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.put(
+            f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}",
+            json={"name": "VPS Cuba v2", "description": None, "blocks": []},
+        )
+    assert resp.status_code == 200
+    db.commit.assert_awaited_once()
+
+
+def test_update_template_404():
+    """UUID inexistente → 404."""
+    db = _db_single_tpl(None)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.put(
+        f"/api/v1/vehicle-types/system-blocks/templates/{uuid.uuid4()}",
+        json={"name": "X", "description": None, "blocks": []},
+    )
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# DELETE /vehicle-types/system-blocks/templates/{template_id}
+# ---------------------------------------------------------------------------
+
+def test_delete_template_ok():
+    """DELETE elimina una plantilla no-builtin."""
+    tpl = _make_custom_tpl(is_builtin=False)
+    db = _db_single_tpl(tpl)
+    db.delete = AsyncMock()
+    db.commit = AsyncMock()
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.delete(f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}")
+    assert resp.status_code == 204
+    db.delete.assert_awaited_once_with(tpl)
+    db.commit.assert_awaited_once()
+
+
+def test_delete_builtin_blocked():
+    """DELETE en plantilla de fábrica → 400."""
+    tpl = _make_custom_tpl(is_builtin=True)
+    db = _db_single_tpl(tpl)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.delete(f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}")
+    assert resp.status_code == 400
+    assert "fábrica" in resp.json()["detail"]
+
+
+def test_delete_template_404():
+    """UUID inexistente → 404."""
+    db = _db_single_tpl(None)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.delete(f"/api/v1/vehicle-types/system-blocks/templates/{uuid.uuid4()}")
+    assert resp.status_code == 404
+
+
+def test_delete_template_403():
+    """Cliente no CMG → 403."""
+    db = AsyncMock()
+    _override_user(CLIENT_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.delete(f"/api/v1/vehicle-types/system-blocks/templates/{TPL_ID}")
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# POST /vehicle-types/{type_id}/save-as-template
+# ---------------------------------------------------------------------------
+
+_BLOCKS_WITH_SENSORS = [
+    {"id": "block_motor", "name": "Motor", "icon": "ti-engine",
+     "sensor_keys": ["avl_30", "avl_85"], "key_sensor_keys": ["avl_30"], "key_count": 2},
+    {"id": "block_hidraulico", "name": "Hidráulico", "icon": "ti-arrows-right-left",
+     "sensor_keys": ["can_presion_alta"], "key_sensor_keys": ["can_presion_alta"], "key_count": 1},
+]
+
+
+def test_save_as_template_ok():
+    """POST save-as crea plantilla nueva a partir del tipo de vehículo."""
+    vt = _make_vtype(system_blocks=_BLOCKS_WITH_SENSORS)
+    db = AsyncMock()
+    # Call 1: get vtype; Call 2: slug check (_unique_slug → sin conflicto)
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalar_one_or_none=MagicMock(return_value=vt)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+    ])
+    db.commit = AsyncMock()
+    db.refresh = _make_tpl_refresh()
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post(
+        f"/api/v1/vehicle-types/{VTYPE_ID}/save-as-template",
+        json={"name": "Cisterna Config Real", "description": "Con sensores reales"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["slug"] == "cisterna_config_real"
+    assert data["is_builtin"] is False
+    db.commit.assert_awaited_once()
+
+
+def test_save_as_template_copies_sensor_keys():
+    """Los bloques copiados conservan sensor_keys (no se vacían)."""
+    vt = _make_vtype(system_blocks=_BLOCKS_WITH_SENSORS)
+    db = AsyncMock()
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalar_one_or_none=MagicMock(return_value=vt)),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+    ])
+    db.commit = AsyncMock()
+    captured: dict = {}
+
+    async def _capture(obj):
+        if hasattr(obj, "blocks"):
+            captured["blocks"] = obj.blocks
+
+    db.refresh = AsyncMock(side_effect=_capture)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    client.post(
+        f"/api/v1/vehicle-types/{VTYPE_ID}/save-as-template",
+        json={"name": "Test Copia", "description": None},
+    )
+    assert captured["blocks"] == _BLOCKS_WITH_SENSORS
+
+
+def test_save_as_template_404_vtype():
+    """Tipo de vehículo inexistente → 404."""
+    db = _db_single_tpl(None)
+    _override_user(CMG_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post(
+        f"/api/v1/vehicle-types/{uuid.uuid4()}/save-as-template",
+        json={"name": "Test", "description": None},
+    )
+    assert resp.status_code == 404
+
+
+def test_save_as_template_403():
+    """Cliente no CMG → 403."""
+    db = AsyncMock()
+    _override_user(CLIENT_USER)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post(
+        f"/api/v1/vehicle-types/{VTYPE_ID}/save-as-template",
+        json={"name": "Test", "description": None},
+    )
+    assert resp.status_code == 403

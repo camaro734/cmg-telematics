@@ -1,4 +1,6 @@
 # backend/app/api/v1/vehicles.py
+import re
+import unicodedata
 import uuid
 import json
 import logging
@@ -17,6 +19,8 @@ from app.schemas.vehicle import (
     TelemetryPoint, TrackPoint, KpiHour, VehicleTypeSensorSchemaUpdate,
     VehicleTypeCreate, VehicleTypeUpdate, HistoricMetricItem, DoutSlot,
     VehicleTypeReportMetricsUpdate, VehicleTypeSystemBlocksUpdate, SystemBlock,
+    SystemBlockTemplateOut, SystemBlockTemplateCreate, SystemBlockTemplateUpdate,
+    SaveAsTemplateBody,
 )
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
@@ -359,6 +363,140 @@ async def list_system_block_templates(
         }
         for row in rows
     }
+
+
+def _slugify(name: str) -> str:
+    """'VPS Cuba' → 'vps_cuba'. Solo ASCII, minúsculas, guiones bajos."""
+    normalized = unicodedata.normalize("NFD", name).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "_", normalized.lower()).strip("_") or "plantilla"
+
+
+async def _unique_slug(db: AsyncSession, base: str) -> str:
+    """Garantiza unicidad añadiendo sufijo numérico si el slug ya existe."""
+    slug, suffix = base, 2
+    while True:
+        exists = (await db.execute(
+            select(SystemBlockTemplate).where(SystemBlockTemplate.slug == slug)
+        )).scalar_one_or_none()
+        if not exists:
+            return slug
+        slug = f"{base}_{suffix}"
+        suffix += 1
+
+
+def _cmg_admin(user: CurrentUser) -> None:
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=403, detail="CMG admin only")
+
+
+@router.get("/vehicle-types/system-blocks/templates/{template_id}", response_model=SystemBlockTemplateOut)
+async def get_system_block_template(
+    template_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve una plantilla de bloques por su ID."""
+    _cmg_admin(user)
+    tpl = (await db.execute(
+        select(SystemBlockTemplate).where(SystemBlockTemplate.id == template_id)
+    )).scalar_one_or_none()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    return tpl
+
+
+@router.post("/vehicle-types/system-blocks/templates", response_model=SystemBlockTemplateOut, status_code=201)
+async def create_system_block_template(
+    body: SystemBlockTemplateCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea una nueva plantilla de bloques. El slug se autogenera del nombre."""
+    _cmg_admin(user)
+    slug = await _unique_slug(db, _slugify(body.name))
+    tpl = SystemBlockTemplate(
+        slug=slug,
+        name=body.name,
+        description=body.description,
+        blocks=[b.model_dump() for b in body.blocks],
+        is_builtin=False,
+        created_by=user.user_id,
+    )
+    db.add(tpl)
+    await db.commit()
+    await db.refresh(tpl)
+    return tpl
+
+
+@router.put("/vehicle-types/system-blocks/templates/{template_id}", response_model=SystemBlockTemplateOut)
+async def update_system_block_template(
+    template_id: uuid.UUID,
+    body: SystemBlockTemplateUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita nombre, descripción y bloques de una plantilla (incluso las de fábrica)."""
+    _cmg_admin(user)
+    tpl = (await db.execute(
+        select(SystemBlockTemplate).where(SystemBlockTemplate.id == template_id)
+    )).scalar_one_or_none()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    tpl.name = body.name
+    tpl.description = body.description
+    tpl.blocks = [b.model_dump() for b in body.blocks]
+    flag_modified(tpl, "blocks")
+    await db.commit()
+    await db.refresh(tpl)
+    return tpl
+
+
+@router.delete("/vehicle-types/system-blocks/templates/{template_id}", status_code=204)
+async def delete_system_block_template(
+    template_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Elimina una plantilla. Las plantillas de fábrica (is_builtin) no se pueden borrar."""
+    _cmg_admin(user)
+    tpl = (await db.execute(
+        select(SystemBlockTemplate).where(SystemBlockTemplate.id == template_id)
+    )).scalar_one_or_none()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    if tpl.is_builtin:
+        raise HTTPException(status_code=400, detail="Las plantillas de fábrica no se pueden eliminar")
+    await db.delete(tpl)
+    await db.commit()
+
+
+@router.post("/vehicle-types/{type_id}/save-as-template", response_model=SystemBlockTemplateOut, status_code=201)
+async def save_vehicle_type_as_template(
+    type_id: uuid.UUID,
+    body: SaveAsTemplateBody,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Guarda los bloques actuales de un tipo de vehículo como nueva plantilla."""
+    _cmg_admin(user)
+    vtype = (await db.execute(
+        select(VehicleType).where(VehicleType.id == type_id)
+    )).scalar_one_or_none()
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+    slug = await _unique_slug(db, _slugify(body.name))
+    tpl = SystemBlockTemplate(
+        slug=slug,
+        name=body.name,
+        description=body.description,
+        blocks=list(vtype.system_blocks or []),
+        is_builtin=False,
+        created_by=user.user_id,
+    )
+    db.add(tpl)
+    await db.commit()
+    await db.refresh(tpl)
+    return tpl
 
 
 @router.get("/vehicle-types/{type_id}/system-blocks", response_model=list[SystemBlock])
