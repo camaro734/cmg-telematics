@@ -60,8 +60,7 @@ export default function VehicleDetailPage() {
   const liveScrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => { if (selectedBlockId !== null) liveScrollRef.current?.scrollTo({ top: 0 }) }, [selectedBlockId])
 
-  // trackDate/setTrackDate reservados para la tab HISTÓRICO
-  const [trackDate, _setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [trackDate, setTrackDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const isTrackToday = trackDate === new Date().toISOString().slice(0, 10)
 
   const [editingPlan, setEditingPlan] = useState<MaintenancePlanOut | null>(null)
@@ -145,8 +144,7 @@ export default function VehicleDetailPage() {
   })
   const isStale = !isEffectivelyOnline(status)
 
-  // track reservado para la tab HISTÓRICO — en EN VIVO se pasa track=[]
-  const { data: _track = [] } = useQuery({
+  const { data: track = [] } = useQuery({
     queryKey: [...keys.vehicleTrack(id ?? ''), trackDate],
     queryFn: () => {
       if (isTrackToday) {
@@ -556,7 +554,48 @@ export default function VehicleDetailPage() {
             </div>
           )}
 
-          {tab === 'historic' && <KpiChart vehicleId={id} />}
+          {tab === 'historic' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* ── Sección RECORRIDO ── */}
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
+                    Recorrido
+                  </span>
+                  <input
+                    type="date"
+                    value={trackDate}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={e => setTrackDate(e.target.value)}
+                    style={{ fontSize: 12, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 5, padding: '3px 8px', color: 'var(--fg-primary)', colorScheme: 'dark' }}
+                  />
+                  {isTrackToday && (
+                    <span style={{ fontSize: 10, color: 'var(--ok)', fontWeight: 600 }}>Hoy</span>
+                  )}
+                  {track.length > 0 && (
+                    <span style={{ fontSize: 10, color: 'var(--fg-muted)' }}>{track.length} puntos GPS</span>
+                  )}
+                </div>
+                <div style={{ height: 340, borderRadius: 6, overflow: 'hidden' }}>
+                  <TrackMap
+                    track={track}
+                    status={isTrackToday ? status : undefined}
+                    emptyMessage={isTrackToday ? 'Sin recorrido registrado hoy' : 'Sin recorrido registrado para esta fecha'}
+                  />
+                </div>
+              </div>
+
+              {/* ── Sección KPIs y Gráficas ── */}
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderTop: '2px solid var(--cmg-teal)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' as const, marginBottom: 12 }}>
+                  Estadísticas
+                </div>
+                <KpiChart vehicleId={id} vehicleTypeId={vehicle.vehicle_type_id} />
+              </div>
+
+            </div>
+          )}
 
           {tab === 'cycles' && vehicle.vehicle_type_id && (
             <WorkCyclesTab vehicleId={vehicle.id} vehicleTypeId={vehicle.vehicle_type_id} tenantId={vehicle.tenant_id} />

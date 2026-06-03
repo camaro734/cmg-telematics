@@ -80,9 +80,10 @@ function makeStoppedMarker(): L.DivIcon {
 interface TrackMapProps {
   track: TrackPoint[]
   status: VehicleStatus | undefined
+  emptyMessage?: string
 }
 
-export default function TrackMap({ track, status }: TrackMapProps) {
+export default function TrackMap({ track, status, emptyMessage = 'Sin recorrido registrado' }: TrackMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
 
@@ -146,6 +147,14 @@ export default function TrackMap({ track, status }: TrackMapProps) {
         radius: 5, fillColor: T_OK, color: '#fff',
         weight: 2, fillOpacity: 1,
       }).bindTooltip('Inicio').addTo(map)
+
+      // Marcador de fin (rojo) cuando hay recorrido de más de un punto
+      if (latlngs.length > 1) {
+        L.circleMarker(latlngs[latlngs.length - 1], {
+          radius: 5, fillColor: '#EF4444', color: '#fff',
+          weight: 2, fillOpacity: 1,
+        }).bindTooltip('Último punto').addTo(map)
+      }
     }
 
     // Marcador de posición actual según estado — always rendered regardless of track data
@@ -190,22 +199,22 @@ export default function TrackMap({ track, status }: TrackMapProps) {
     }
   }, [track, status])
 
-  if (track.length === 0 && (status?.lat == null)) {
-    return (
-      <div style={{
-        width: '100%', height: '100%', minHeight: 260,
-        background: 'var(--bg-card)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--fg-muted)',
-        fontSize: 13,
-        borderRadius: 8,
-      }}>
-        Sin actividad registrada hoy
-      </div>
-    )
-  }
+  const isEmpty = track.length === 0 && status?.lat == null
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 260, borderRadius: 8, overflow: 'hidden' }} />
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 260 }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 260, borderRadius: 8, overflow: 'hidden' }} />
+      {isEmpty && (
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 8,
+          background: 'var(--bg-card)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--fg-muted)', fontSize: 13,
+          pointerEvents: 'none',
+        }}>
+          {emptyMessage}
+        </div>
+      )}
+    </div>
+  )
 }
