@@ -68,6 +68,10 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             fields["payload"] if isinstance(fields, dict) and "payload" in fields
                             else fields[b"payload"]
                         )
+                        # Mapear received_at -> device_last_seen para que el frontend
+                        # pueda usar isOnline(device_last_seen ?? last_seen) < 60 min
+                        if "received_at" in payload:
+                            payload["device_last_seen"] = payload["received_at"]
                         # Calcular online usando received_at (hora servidor), no last_seen
                         # del dispositivo — así los paquetes del buffer offline no marcan offline
                         from datetime import datetime, timezone

@@ -1038,6 +1038,7 @@ async def get_vehicle_status(
     pto_str = _get("pto_active")
     ext_voltage_str = _get("ext_voltage_mv")
     can_str = _get("can_data")
+    received_at_str = _get("received_at")
 
     ext_voltage_mv = None
     if ext_voltage_str:
@@ -1092,6 +1093,7 @@ async def get_vehicle_status(
         vehicle_id=vehicle_id,
         online=effective_online,
         last_seen=last_seen_dt,
+        device_last_seen=_parse_datetime(received_at_str),
         lat=_parse_float(lat_str),
         lon=_lon,
         lng=_lon,

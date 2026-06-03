@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { isOnline } from '../../lib/staleStatus'
 import StatusBadge from '../../shared/ui/StatusBadge'
 import { Chip } from '../../shared/ui/Chip'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
@@ -39,7 +40,7 @@ interface VehicleHeaderProps {
 
 export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlug, activeAlerts = [], tenantName, onOpenActivity, isStale }: VehicleHeaderProps) {
   const navigate = useNavigate()
-  const online = status?.online ?? false
+  const online = isOnline(status)
   const ignition = status?.ignition ?? false
   const VehicleTypeIcon = getVehicleIconForSlug(vehicleTypeSlug ?? '')
   const alertColor = alertSeverityColor(activeAlerts)
@@ -105,7 +106,7 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
             </span>
           )}
           {status?.last_seen && (
-            <span>{online ? 'En directo' : `Última señal ${relativeTime(status.last_seen)}`}</span>
+            <span>{online ? 'En directo' : `Última señal ${relativeTime(status.device_last_seen ?? status.last_seen)}`}</span>
           )}
         </div>
       </div>
