@@ -151,6 +151,7 @@ class VehicleStatus(BaseModel):
     vehicle_id: uuid.UUID
     online: bool
     last_seen: datetime | None = None
+    device_last_seen: datetime | None = None
     lat: float | None = None
     lon: float | None = None
     speed_kmh: float | None = None

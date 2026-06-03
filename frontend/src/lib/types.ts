@@ -31,6 +31,7 @@ export interface VehicleStatus {
   vehicle_id: string
   online: boolean
   last_seen: string | null
+  device_last_seen: string | null
   lat: number | null
   lon: number | null
   speed_kmh: number | null

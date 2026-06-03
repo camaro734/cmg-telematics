@@ -81,7 +81,7 @@ async def publish_record(
         maxlen=settings.stream_maxlen,
         approximate=True,
     )
-    await _update_status_hash(redis, avl, vehicle_id, can_data)
+    await _update_status_hash(redis, avl, vehicle_id, can_data, _now.isoformat())
 
 
 async def _update_status_hash(
@@ -89,6 +89,7 @@ async def _update_status_hash(
     avl: AVLRecord,
     vehicle_id: str,
     can_data: dict,
+    received_at: str,
 ) -> None:
     """Escribe el hash vehicle:{vehicle_id}:status que lee el core-api."""
     lat = avl.latitude if avl.latitude and avl.latitude != 0 else None
@@ -100,6 +101,7 @@ async def _update_status_hash(
     mapping = {
         "online": "true",
         "last_seen": avl.datetime_utc.isoformat(),
+        "received_at": received_at,
         "speed_kmh": str(avl.speed_kmh) if avl.speed_kmh is not None else "",
         "ignition": "true" if ignition else "false",
         "pto_active": "true" if pto_active else "false",

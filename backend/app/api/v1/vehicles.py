@@ -933,6 +933,7 @@ async def get_vehicles_statuses_bulk(
 
         last_seen_str = _get(hash_data, "last_seen")
         last_seen_dt = _parse_datetime(last_seen_str)
+        received_at_dt = _parse_datetime(_get(hash_data, "received_at"))
         if last_seen_dt:
             age_minutes = (datetime.now(timezone.utc) - last_seen_dt).total_seconds() / 60
             effective_online = age_minutes < 5
@@ -943,6 +944,7 @@ async def get_vehicles_statuses_bulk(
             vehicle_id=vid,
             online=effective_online,
             last_seen=last_seen_dt,
+            device_last_seen=received_at_dt,
             lat=_parse_float(_get(hash_data, "lat")),
             lon=_parse_float(_get(hash_data, "lon")),
             speed_kmh=_parse_float(_get(hash_data, "speed_kmh")),
