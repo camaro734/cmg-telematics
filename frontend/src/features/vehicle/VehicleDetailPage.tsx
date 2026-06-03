@@ -305,7 +305,7 @@ export default function VehicleDetailPage() {
                 {/* ALERTAS ACTIVAS — enlace a página de Alertas */}
                 {activeAlertsCount > 0 && (
                   <Link
-                    to="/alerts"
+                    to={`/alerts?vehicle=${id}`}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--danger)', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: 'var(--danger)', textDecoration: 'none', fontFamily: 'var(--font-sans)' }}
                   >
                     ⚠ {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''} — Ver todas →

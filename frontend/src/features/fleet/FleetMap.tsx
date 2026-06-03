@@ -161,7 +161,7 @@ function buildPopupHtml(
   // Contador de alertas — enlace a la página de Alertas
   const alertCount = vehicleAlerts.length
   const alertRow = alertCount > 0
-    ? `<a href="/alerts" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;font-weight:600;color:var(--danger);text-decoration:none">⚠ ${alertCount} alerta${alertCount > 1 ? 's' : ''} — Ver →</a>`
+    ? `<a href="/alerts?vehicle=${vehicle.id}" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;font-weight:600;color:var(--danger);text-decoration:none">⚠ ${alertCount} alerta${alertCount > 1 ? 's' : ''} — Ver →</a>`
     : ''
 
   // Tabla compacta — fondo blanco del popup nativo de Leaflet: usar colores oscuros para contraste

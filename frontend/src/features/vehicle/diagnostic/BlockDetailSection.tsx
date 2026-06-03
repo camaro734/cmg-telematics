@@ -122,7 +122,7 @@ export function BlockDetailSection({
       {/* Alertas del bloque — contador clicable */}
       {blockAlerts.length > 0 ? (
         <Link
-          to="/alerts"
+          to={`/alerts?vehicle=${vehicleId}`}
           data-testid="block-alerts-link"
           style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-crit)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-sans)' }}
         >

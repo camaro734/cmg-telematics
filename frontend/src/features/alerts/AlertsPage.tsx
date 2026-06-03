@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
@@ -30,6 +30,10 @@ export default function AlertsPage() {
   type Tab = typeof tabs[number]
   const [tab, setTab] = useState<Tab>('activas')
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const vehicleParam = searchParams.get('vehicle') ?? undefined
+  const vehicleQ = vehicleParam ? `&vehicle_id=${vehicleParam}` : ''
+
   async function handleExportCsv() {
     const blob = await apiClient.getBlob(`/api/v1/alerts/export.csv${activeTenantId ? `?tenant_id=${activeTenantId}` : ''}`)
     const url = URL.createObjectURL(blob)
@@ -52,14 +56,14 @@ export default function AlertsPage() {
   })
 
   const { data: firing = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'firing', activeTenantId],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=firing${tenantQ}`),
+    queryKey: [...keys.alerts(), 'firing', activeTenantId, vehicleParam],
+    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=firing${tenantQ}${vehicleQ}`),
     refetchInterval: 30_000,
   })
 
   const { data: escalated = [] } = useQuery({
-    queryKey: [...keys.alerts(), 'escalated', activeTenantId],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=escalated${tenantQ}`),
+    queryKey: [...keys.alerts(), 'escalated', activeTenantId, vehicleParam],
+    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=escalated${tenantQ}${vehicleQ}`),
     refetchInterval: 30_000,
   })
 
@@ -127,6 +131,26 @@ export default function AlertsPage() {
             )}
           </div>
         </div>
+
+        {/* Filtro activo por vehículo */}
+        {vehicleParam && (
+          <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
+              Filtrado por vehículo:
+            </span>
+            <Chip color="var(--info)" soft size="sm">
+              {vehicles.find(v => v.id === vehicleParam)?.license_plate ??
+               vehicles.find(v => v.id === vehicleParam)?.name ??
+               vehicleParam.slice(0, 8) + '…'}
+            </Chip>
+            <button
+              onClick={() => setSearchParams({})}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', fontSize: 12, fontFamily: 'var(--font-sans)' }}
+            >
+              × Quitar filtro
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
