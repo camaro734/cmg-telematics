@@ -20,7 +20,7 @@ from app.schemas.vehicle import (
     VehicleTypeCreate, VehicleTypeUpdate, HistoricMetricItem, DoutSlot,
     VehicleTypeReportMetricsUpdate, VehicleTypeSystemBlocksUpdate, SystemBlock,
     SystemBlockTemplateOut, SystemBlockTemplateCreate, SystemBlockTemplateUpdate,
-    SaveAsTemplateBody,
+    SaveAsTemplateBody, SensorCatalogItem,
 )
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
@@ -88,6 +88,32 @@ def _check_vehicle_access(vehicle: Vehicle, user: CurrentUser) -> None:
         return
     if str(vehicle.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+
+
+@router.get("/sensors/catalog", response_model=list[SensorCatalogItem])
+async def get_sensor_catalog(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unión deduplicada de todos los sensores de todos los tipos de vehículo.
+
+    Devuelve {key, label, unit} ordenado por label. Si la misma key aparece en
+    varios tipos con labels distintos, prevalece la primera encontrada.
+    """
+    _cmg_admin(user)
+    result = await db.execute(select(VehicleType.sensor_schema))
+    schemas = result.scalars().all()
+    catalog: dict[str, SensorCatalogItem] = {}
+    for schema in schemas:
+        for s in (schema or []):
+            key = s.get("key", "")
+            if key and key not in catalog:
+                catalog[key] = SensorCatalogItem(
+                    key=key,
+                    label=s.get("label", key),
+                    unit=s.get("unit"),
+                )
+    return sorted(catalog.values(), key=lambda x: x.label.lower())
 
 
 @router.get("/vehicle-types", response_model=list[VehicleTypeOut])

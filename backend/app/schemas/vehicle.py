@@ -58,6 +58,13 @@ class VehicleTypeSystemBlocksUpdate(BaseModel):
     system_blocks: list[SystemBlock]
 
 
+class SensorCatalogItem(BaseModel):
+    """Entrada mínima del catálogo global de sensores para el editor de bloques."""
+    key: str
+    label: str
+    unit: str | None = None
+
+
 class SystemBlockTemplateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
