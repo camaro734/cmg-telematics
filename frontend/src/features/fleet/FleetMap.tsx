@@ -127,6 +127,39 @@ function makeVehicleIcon(status: VehicleStatus, hasAlert: boolean): L.DivIcon {
   return makeStoppedIcon(status.ignition)
 }
 
+function sensorDisplayValue(s: SensorDef, canData: Record<string, unknown> | null): string {
+  const raw = canData?.[s.key]
+  if (raw == null) return '—'
+  if (s.gauge_type === 'led') {
+    const active = s.bit_index !== undefined
+      ? ((Number(raw) >> s.bit_index) & 1) === 1
+      : Boolean(raw)
+    return active ? 'Activo' : 'Inactivo'
+  }
+  const num = Number(raw) * (s.scale ?? 1) + (s.offset ?? 0)
+  if (!isFinite(num)) return '—'
+  const formatted = Number.isInteger(num) ? String(num) : num.toFixed(1)
+  return s.unit ? `${formatted} ${s.unit}` : formatted
+}
+
+function sensorColor(s: SensorDef, canData: Record<string, unknown> | null): string {
+  const raw = canData?.[s.key]
+  if (raw == null) return T_OFF
+  if (s.gauge_type === 'led') {
+    const active = s.bit_index !== undefined
+      ? ((Number(raw) >> s.bit_index) & 1) === 1
+      : Boolean(raw)
+    return active ? T_OK : T_OFF
+  }
+  const num = Number(raw) * (s.scale ?? 1) + (s.offset ?? 0)
+  if (!isFinite(num)) return T_OFF
+  if ((s.alert_above !== undefined && num >= s.alert_above) ||
+      (s.alert_below !== undefined && num <= s.alert_below)) return T_CRIT
+  if ((s.warn_above  !== undefined && num >= s.warn_above)  ||
+      (s.warn_below  !== undefined && num <= s.warn_below))  return T_WARN
+  return T_OK
+}
+
 function formatLastSeen(lastSeen: string | null): string {
   if (!lastSeen) return 'Sin datos'
   const d = new Date(lastSeen)
@@ -162,6 +195,21 @@ function buildPopupHtml(
   const alertCount = vehicleAlerts.length
   const alertRow = alertCount > 0
     ? `<a href="/alerts?vehicle=${vehicle.id}" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;font-weight:600;color:var(--danger);text-decoration:none">⚠ ${alertCount} alerta${alertCount > 1 ? 's' : ''} — Ver →</a>`
+    : ''
+
+  // Sensores configurados para mostrar en popup
+  const popupSensors = (vehicleType?.sensor_schema ?? []).filter(s => s.show_in_popup === true)
+  const sensorRows = popupSensors.map(s => {
+    const val = sensorDisplayValue(s, status.can_data)
+    const col = sensorColor(s, status.can_data)
+    return `<tr>
+      <td style="padding:2px 0 2px 0;width:8px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;margin-top:1px"></span></td>
+      <td style="padding:2px 8px 2px 6px;font-size:12px;color:#6b7280;white-space:nowrap">${s.label}</td>
+      <td style="padding:2px 0;font-size:12px;font-family:var(--font-mono,monospace);font-weight:600;color:${col}">${val}</td>
+    </tr>`
+  }).join('')
+  const sensorBlock = sensorRows.length > 0
+    ? `<table style="width:100%;border-collapse:collapse;margin-bottom:10px">${sensorRows}</table>`
     : ''
 
   // Tabla compacta — fondo blanco del popup nativo de Leaflet: usar colores oscuros para contraste
@@ -201,6 +249,7 @@ function buildPopupHtml(
         </div>
         <div style="font-size:11px;color:${T_MUTED};margin-bottom:${alertCount > 0 ? '8px' : '10px'}">${clientName}</div>
         ${alertRow}
+        ${sensorBlock}
         <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
           <tr>
             <td style="padding:2px 8px 2px 0;color:${T_MUTED}">👤</td>

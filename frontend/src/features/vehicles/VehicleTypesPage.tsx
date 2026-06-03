@@ -30,12 +30,14 @@ type SensorFormState = {
   bit_index: string; scale: string; offset: string; min: string; max: string
   warn_above: string; alert_above: string; warn_below: string; alert_below: string
   visible_in_detail: boolean
+  show_in_popup: boolean
 }
 const emptySensorForm: SensorFormState = {
   avl_id: '', key: '', label: '', unit: '', mode: 'byte', gauge_type: 'numeric',
   bit_index: '', scale: '', offset: '', min: '', max: '',
   warn_above: '', alert_above: '', warn_below: '', alert_below: '',
   visible_in_detail: true,
+  show_in_popup: false,
 }
 
 function sensorDefToForm(def: SensorDef): SensorFormState {
@@ -57,6 +59,7 @@ function sensorDefToForm(def: SensorDef): SensorFormState {
     warn_below: def.warn_below?.toString() ?? '',
     alert_below: def.alert_below?.toString() ?? '',
     visible_in_detail: def.visible_in_detail !== false,
+    show_in_popup: def.show_in_popup === true,
   }
 }
 
@@ -83,6 +86,7 @@ function formToSensorDef(f: SensorFormState): SensorDef {
     if (f.alert_below !== '') def.alert_below = parseFloat(f.alert_below)
   }
   def.visible_in_detail = f.visible_in_detail
+  def.show_in_popup = f.show_in_popup
   return def
 }
 
@@ -455,7 +459,7 @@ export default function VehicleTypesPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-elevated)' }}>
-                        {['AVL ID', 'Nombre', 'Unidad', 'Gauge', 'Bit / Scale', 'Key', 'Visible', ''].map(h => (
+                        {['AVL ID', 'Nombre', 'Unidad', 'Gauge', 'Bit / Scale', 'Key', 'Detalle', 'Popup', ''].map(h => (
                           <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--offline)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -487,6 +491,15 @@ export default function VehicleTypesPage() {
                               border: `1px solid ${(def.visible_in_detail !== false) ? 'var(--ok)' : 'var(--border)'}`,
                             }}>
                               {(def.visible_in_detail !== false) ? 'Sí' : 'No'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '6px 10px' }}>
+                            <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+                              background: def.show_in_popup ? 'color-mix(in srgb, var(--info) 15%, transparent)' : 'transparent',
+                              color: def.show_in_popup ? 'var(--info)' : 'var(--fg-muted)',
+                              border: `1px solid ${def.show_in_popup ? 'var(--info)' : 'var(--border)'}`,
+                            }}>
+                              {def.show_in_popup ? 'Sí' : 'No'}
                             </span>
                           </td>
                           <td style={{ padding: '6px 10px', display: 'flex', gap: 6 }}>
@@ -756,16 +769,29 @@ export default function VehicleTypesPage() {
               </div>
             </>)}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input
-                type="checkbox"
-                id="sensor-visible"
-                checked={sensorForm.visible_in_detail}
-                onChange={e => setSensorForm(f => ({ ...f, visible_in_detail: e.target.checked }))}
-              />
-              <label htmlFor="sensor-visible" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
-                Visible en detalle del vehículo
-              </label>
+            <div style={{ display: 'flex', gap: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="checkbox"
+                  id="sensor-visible"
+                  checked={sensorForm.visible_in_detail}
+                  onChange={e => setSensorForm(f => ({ ...f, visible_in_detail: e.target.checked }))}
+                />
+                <label htmlFor="sensor-visible" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
+                  En detalle del vehículo
+                </label>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="checkbox"
+                  id="sensor-popup"
+                  checked={sensorForm.show_in_popup}
+                  onChange={e => setSensorForm(f => ({ ...f, show_in_popup: e.target.checked }))}
+                />
+                <label htmlFor="sensor-popup" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
+                  En popup de Flota
+                </label>
+              </div>
             </div>
             {sensorError && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{sensorError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

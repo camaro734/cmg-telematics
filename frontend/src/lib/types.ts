@@ -120,6 +120,7 @@ export interface SensorDef {
   bit_index?: number
   invalid_values?: number[]
   visible_in_detail?: boolean
+  show_in_popup?: boolean
   icon?: SensorIcon
   color?: string
   widget_size?: 'sm' | 'md' | 'lg'
