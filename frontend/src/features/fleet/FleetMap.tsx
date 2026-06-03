@@ -173,7 +173,7 @@ function buildPopupHtml(
 
   // Banda stale — sustituye la banda "Sin señal" anterior, cubre mismo umbral
   const staleBand = stale
-    ? `<div style="background:rgba(100,116,139,0.1);color:#9ca3af;padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)">${staleStamp(status.last_seen)}</div>`
+    ? `<div style="background:rgba(100,116,139,0.1);color:#9ca3af;padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)">${staleStamp(status.device_last_seen ?? status.last_seen)}</div>`
     : ''
 
   // Contador de alertas — enlace a la página de Alertas

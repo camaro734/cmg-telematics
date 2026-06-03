@@ -8,6 +8,7 @@ import type { ReportsTab } from '../../features/reports/useReportsTabStore'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { apiClient } from '../../lib/apiClient'
+import { isOnline } from '../../lib/staleStatus'
 import type { TenantOut } from '../../lib/types'
 import {
   IconFlota,
@@ -491,8 +492,8 @@ export default function TopNav() {
     staleTime: Infinity,
     refetchInterval: false,
   })
-  const onlineCount = kpiStatuses?.filter(s => s.online).length ?? 0
-  const movingCount = kpiStatuses?.filter(s => s.online && (s.speed_kmh ?? 0) > 2).length ?? 0
+  const onlineCount = kpiStatuses?.filter(s => isOnline(s)).length ?? 0
+  const movingCount = kpiStatuses?.filter(s => isOnline(s) && (s.speed_kmh ?? 0) > 2).length ?? 0
 
   // KPIs en vivo — active alert count
   const { data: alertKpiCount } = useQuery<number>({

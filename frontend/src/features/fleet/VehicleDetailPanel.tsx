@@ -99,7 +99,7 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
           <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto' }}>
             {stale && status?.last_seen && (
               <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 10, padding: '5px 0 8px', borderBottom: '1px solid var(--border-soft)' }}>
-                {staleStamp(status.last_seen)}
+                {staleStamp(status.device_last_seen ?? status.last_seen)}
               </div>
             )}
             <KpiRow label="Ignición" value={

@@ -13,11 +13,7 @@ import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { VehicleListPanel, type VehicleEntry } from './VehicleListPanel'
 import { VehicleDetailPanel } from './VehicleDetailPanel'
 import { Input } from '../../shared/ui/Input'
-
-function isEffectivelyOnline(status: VehicleStatus | undefined): boolean {
-  if (!status?.online || !status.last_seen) return false
-  return (Date.now() - new Date(status.last_seen).getTime()) < 5 * 60_000
-}
+import { isOnline } from '../../lib/staleStatus'
 
 type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert'
 const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, parked: 3, offline: 4 }
@@ -27,7 +23,7 @@ function getVehicleState(
   status: VehicleStatus | undefined,
   alerts: AlertInstanceOut[]
 ): VehicleState {
-  if (!isEffectivelyOnline(status)) return 'offline'
+  if (!isOnline(status)) return 'offline'
   if (alerts.some(a => a.vehicle_id === vehicle.id)) return 'alert'
   if ((status!.speed_kmh ?? 0) > 2) return 'moving'
   if (status!.ignition) return 'idle'
@@ -95,13 +91,13 @@ export default function FleetDashboard() {
 
   const movingCount = vehicles.filter(v => {
     const s = statuses.get(v.id)
-    return isEffectivelyOnline(s) && (s!.speed_kmh ?? 0) > 2
+    return isOnline(s) && (s!.speed_kmh ?? 0) > 2
   }).length
   const idleCount = vehicles.filter(v => {
     const s = statuses.get(v.id)
-    return isEffectivelyOnline(s) && (s!.speed_kmh ?? 0) <= 2
+    return isOnline(s) && (s!.speed_kmh ?? 0) <= 2
   }).length
-  const offlineCount = vehicles.filter(v => !isEffectivelyOnline(statuses.get(v.id))).length
+  const offlineCount = vehicles.filter(v => !isOnline(statuses.get(v.id))).length
 
   const sortedVehicles = [...vehicles].sort((a, b) =>
     STATE_ORDER[getVehicleState(a, statuses.get(a.id), firingAlerts)] -
@@ -125,7 +121,7 @@ export default function FleetDashboard() {
   const vehicleEntries: VehicleEntry[] = useMemo(() =>
     sortedVehicles.map(v => {
       const s = statuses.get(v.id)
-      const online = isEffectivelyOnline(s)
+      const online = isOnline(s)
       const moving = online && (s?.speed_kmh ?? 0) > 2
       return {
         id: v.id,
@@ -168,7 +164,7 @@ export default function FleetDashboard() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedVehicle.name}</div>
               <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-                {isEffectivelyOnline(selectedStatus) ? '● Online' : '○ Offline'}
+                {isOnline(selectedStatus) ? '● Online' : '○ Offline'}
                 {selectedStatus?.ignition ? ' · Ign. ON' : ''}
               </div>
             </div>

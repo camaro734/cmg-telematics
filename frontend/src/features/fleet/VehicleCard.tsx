@@ -67,7 +67,7 @@ function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { t
     case 'alert':
       return { text: '⚠ Alerta', color: 'var(--danger)' }
     case 'offline': {
-      const ls = status.last_seen
+      const ls = status.device_last_seen ?? status.last_seen
       if (!ls) return { text: 'Sin señal', color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
       const mins = Math.floor((Date.now() - new Date(ls).getTime()) / 60000)
       if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }

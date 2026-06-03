@@ -365,7 +365,7 @@ export default function VehicleDetailPage() {
                         </span>
                       : <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
-                          {staleStamp(status?.last_seen ?? null)}
+                          {staleStamp(status?.device_last_seen ?? status?.last_seen ?? null)}
                         </span>
                     }
                     {status && (
