@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { alertSensorKey } from '../../../lib/blockDiagnostics'
 import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
@@ -20,17 +21,6 @@ const ZONE_VALUE_COLOR: Record<string, string> = {
   nodata: 'var(--fg-dim)',
 }
 
-const SEVERITY_COLOR: Record<string, string> = {
-  critical: 'var(--accent-crit)',
-  warning: 'var(--warn)',
-  info: 'var(--info)',
-}
-
-const SEVERITY_LABEL: Record<string, string> = {
-  critical: 'Crítico',
-  warning: 'Aviso',
-  info: 'Info',
-}
 
 export function BlockDetailSection({
   block, schema, status, derived, alerts, vehicleId,
@@ -129,39 +119,21 @@ export function BlockDetailSection({
         </div>
       )}
 
-      {/* Alertas activas del bloque */}
-      {blockAlerts.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: 'var(--fg-muted)',
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-          }}>
-            Alertas activas
-          </div>
-          {blockAlerts.map(a => (
-            <div
-              key={a.id}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontFamily: 'var(--font-sans)' }}
-            >
-              <span style={{
-                fontSize: 10, fontWeight: 700, flexShrink: 0,
-                color: SEVERITY_COLOR[a.severity] ?? 'var(--fg-muted)',
-                background: `color-mix(in srgb, ${SEVERITY_COLOR[a.severity] ?? 'var(--fg-muted)'} 15%, transparent)`,
-                borderRadius: 4, padding: '2px 6px',
-              }}>
-                {SEVERITY_LABEL[a.severity] ?? a.severity}
-              </span>
-              <span style={{
-                flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap', color: 'var(--fg-primary)',
-              }}>
-                {a.rule_name}
-              </span>
-              <span style={{ fontSize: 10, color: 'var(--fg-dim)', flexShrink: 0 }}>
-                {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          ))}
+      {/* Alertas del bloque — contador clicable */}
+      {blockAlerts.length > 0 ? (
+        <Link
+          to="/alerts"
+          data-testid="block-alerts-link"
+          style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-crit)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-sans)' }}
+        >
+          ⚠ {blockAlerts.length} alerta{blockAlerts.length > 1 ? 's' : ''} en este bloque →
+        </Link>
+      ) : (
+        <div
+          data-testid="block-no-alerts"
+          style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)' }}
+        >
+          Sin alertas en este bloque
         </div>
       )}
     </div>

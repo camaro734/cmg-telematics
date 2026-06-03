@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BlockDetailSection } from '../BlockDetailSection'
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../../lib/types'
@@ -45,7 +46,11 @@ const alertFueraDeBloque: AlertInstanceEnrichedOut = {
 
 function renderWithQuery(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+    </MemoryRouter>
+  )
 }
 
 beforeEach(() => {
@@ -75,20 +80,21 @@ describe('BlockDetailSection', () => {
     expect(screen.queryByText('RPM')).not.toBeInTheDocument()
   })
 
-  it('muestra solo alertas que mapean a sensores del bloque', () => {
+  it('muestra contador de alertas mapeadas al bloque (filtra las de fuera)', () => {
     renderWithQuery(
       <BlockDetailSection block={block} schema={schema} status={baseStatus}
         derived={{}} alerts={[alertEnBloque, alertFueraDeBloque]} vehicleId="v1" />,
     )
-    expect(screen.getByText('Presión alta')).toBeInTheDocument()
-    expect(screen.queryByText('RPM alta')).not.toBeInTheDocument()
+    expect(screen.getByTestId('block-alerts-link')).toBeInTheDocument()
+    expect(screen.getByText(/1 alerta en este bloque/)).toBeInTheDocument()
   })
 
-  it('no muestra sección de alertas cuando no hay alertas del bloque', () => {
+  it('muestra "Sin alertas en este bloque" cuando no hay alertas del bloque', () => {
     renderWithQuery(
       <BlockDetailSection block={block} schema={schema} status={baseStatus}
         derived={{}} alerts={[alertFueraDeBloque]} vehicleId="v1" />,
     )
-    expect(screen.queryByText('Alertas activas')).not.toBeInTheDocument()
+    expect(screen.getByTestId('block-no-alerts')).toBeInTheDocument()
+    expect(screen.queryByTestId('block-alerts-link')).not.toBeInTheDocument()
   })
 })

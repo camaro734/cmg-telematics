@@ -1,6 +1,6 @@
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
-import { blockDiagnostics } from '../../../lib/blockDiagnostics'
+import { blockDiagnostics, alertSensorKey } from '../../../lib/blockDiagnostics'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 
 const ZONE_BORDER: Record<string, string> = {
@@ -37,6 +37,11 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
     .map(k => schema.find(s => s.key === k))
     .filter((s): s is SensorDef => s != null)
 
+  const blockAlertCount = alerts.filter(a => {
+    const k = alertSensorKey(a, schema)
+    return k !== null && block.sensor_keys.includes(k)
+  }).length
+
   return (
     <div
       data-testid="system-block-card"
@@ -64,7 +69,7 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
           className={`ti ${block.icon}`}
           style={{ fontSize: 16, color: borderColor, width: 18, textAlign: 'center', flexShrink: 0 }}
         />
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', lineHeight: 1.2, overflowWrap: 'break-word', minWidth: 0 }}>
             {block.name}
           </div>
@@ -75,11 +80,19 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
             {phrase}
           </div>
         </div>
+        {blockAlertCount > 0 && (
+          <span
+            data-testid="block-alert-badge"
+            style={{ fontSize: 9, fontWeight: 700, color: 'var(--accent-crit)', background: 'rgba(239,68,68,0.15)', borderRadius: 10, padding: '1px 5px', flexShrink: 0 }}
+          >
+            ⚠ {blockAlertCount}
+          </span>
+        )}
       </div>
 
-      {/* Sensores clave — líneas compactas */}
+      {/* Sensores clave — líneas compactas; minHeight reserva 2 filas para igualar altura de tarjetas */}
       {keySensors.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minHeight: 36 }}>
           {keySensors.map(sensor => {
             const raw = resolveRawValue(sensor, status, derived)
             const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)

@@ -302,18 +302,14 @@ export default function VehicleDetailPage() {
             <div style={{ padding: isMobile ? 10 : 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {selectedBlockId === null ? (<>
 
-                {/* ALERTAS ACTIVAS */}
+                {/* ALERTAS ACTIVAS — enlace a página de Alertas */}
                 {activeAlertsCount > 0 && (
-                  <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--danger)', borderRadius: 8, padding: '10px 12px' }}>
-                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--danger)', marginBottom: firingAlerts.filter(a => a.vehicle_id === id).length > 0 ? 6 : 0 }}>
-                      🚨 {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''}
-                    </div>
-                    {firingAlerts.filter(a => a.vehicle_id === id).slice(0, 3).map(a => (
-                      <div key={a.id} style={{ fontSize: 11, color: 'var(--fg-muted)', paddingLeft: 6, borderLeft: '2px solid rgba(239,68,68,0.25)', marginTop: 3, fontFamily: 'var(--font-sans)' }}>
-                        {a.rule_id.slice(0, 28)}… · {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    ))}
-                  </div>
+                  <Link
+                    to="/alerts"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderLeft: '3px solid var(--danger)', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: 'var(--danger)', textDecoration: 'none', fontFamily: 'var(--font-sans)' }}
+                  >
+                    ⚠ {activeAlertsCount} alerta{activeAlertsCount > 1 ? 's' : ''} activa{activeAlertsCount > 1 ? 's' : ''} — Ver todas →
+                  </Link>
                 )}
 
                 {/* MANTENIMIENTO URGENTE */}
