@@ -112,6 +112,8 @@ async def _update_status_hash(
     if lat is not None:
         mapping["lat"] = str(lat)
         mapping["lon"] = str(lon)
+    if avl.heading is not None:
+        mapping["heading"] = str(avl.heading)
 
     key = f"vehicle:{vehicle_id}:status"
     await redis.hset(key, mapping=mapping)

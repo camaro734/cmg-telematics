@@ -35,6 +35,7 @@ export interface VehicleStatus {
   lat: number | null
   lon: number | null
   speed_kmh: number | null
+  heading: number | null
   ignition: boolean | null
   pto_active: boolean | null
   ext_voltage_mv: number | null

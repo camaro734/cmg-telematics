@@ -911,6 +911,14 @@ async def get_vehicles_statuses_bulk(
             except (ValueError, TypeError):
                 pass
 
+        heading_str = _get(hash_data, "heading")
+        heading: int | None = None
+        if heading_str:
+            try:
+                heading = int(float(heading_str))
+            except (ValueError, TypeError):
+                pass
+
         dout_state: dict[int, bool] = {}
         if dout_raw:
             try:
@@ -948,6 +956,7 @@ async def get_vehicles_statuses_bulk(
             lat=_parse_float(_get(hash_data, "lat")),
             lon=_parse_float(_get(hash_data, "lon")),
             speed_kmh=_parse_float(_get(hash_data, "speed_kmh")),
+            heading=heading,
             ignition=ignition_val,
             pto_active=pto_active,
             ext_voltage_mv=ext_voltage_mv,
@@ -1037,6 +1046,7 @@ async def get_vehicle_status(
     ignition_str = _get("ignition")
     pto_str = _get("pto_active")
     ext_voltage_str = _get("ext_voltage_mv")
+    heading_str = _get("heading")
     can_str = _get("can_data")
     received_at_str = _get("received_at")
 
@@ -1044,6 +1054,13 @@ async def get_vehicle_status(
     if ext_voltage_str:
         try:
             ext_voltage_mv = int(float(ext_voltage_str))
+        except (ValueError, TypeError):
+            pass
+
+    heading: int | None = None
+    if heading_str:
+        try:
+            heading = int(float(heading_str))
         except (ValueError, TypeError):
             pass
 
@@ -1098,6 +1115,7 @@ async def get_vehicle_status(
         lon=_lon,
         lng=_lon,
         speed_kmh=_speed,
+        heading=heading,
         ignition=ignition_val,
         pto_active=pto_active,
         ext_voltage_mv=ext_voltage_mv,

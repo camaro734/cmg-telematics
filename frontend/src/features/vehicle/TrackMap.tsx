@@ -62,6 +62,22 @@ function makeMovingMarker(): L.DivIcon {
   })
 }
 
+// Flecha de navegación rotada al rumbo (0=norte, horario)
+function makeArrowMarker(heading: number): L.DivIcon {
+  return L.divIcon({
+    html: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" style="display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.55))">
+        <g transform="rotate(${heading},16,16)">
+          <path d="M16 4 L25 26 L16 19 L7 26 Z" fill="${T_INFO}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+        </g>
+      </svg>`,
+    className: '',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18],
+  })
+}
+
 // Chincheta estática naranja para vehículo parado
 function makeStoppedMarker(): L.DivIcon {
   return L.divIcon({
@@ -149,8 +165,8 @@ export default function TrackMap({ track, status, emptyMessage = 'Sin recorrido 
         weight: 2, fillOpacity: 1,
       }).bindTooltip('Inicio').addTo(map)
 
-      // Marcador de fin (rojo) cuando hay recorrido de más de un punto
-      if (latlngs.length > 1) {
+      // Marcador de fin (rojo): solo en HISTÓRICO de día pasado (sin posición actual)
+      if (latlngs.length > 1 && status?.lat == null) {
         L.circleMarker(latlngs[latlngs.length - 1], {
           radius: 5, fillColor: '#EF4444', color: '#fff',
           weight: 2, fillOpacity: 1,
@@ -163,8 +179,13 @@ export default function TrackMap({ track, status, emptyMessage = 'Sin recorrido 
       const latlng: [number, number] = [status.lat, status.lon]
       const moving = isMoving(status)
 
-      if (moving) {
-        // En movimiento: punto pulsante cyan
+      if (moving && status.heading != null) {
+        // En movimiento con rumbo: flecha de navegación rotada
+        L.marker(latlng, { icon: makeArrowMarker(status.heading) })
+          .bindTooltip('Posición actual')
+          .addTo(map)
+      } else if (moving) {
+        // En movimiento sin rumbo: punto pulsante cyan (fallback)
         L.marker(latlng, { icon: makeMovingMarker() })
           .bindTooltip('Posición actual')
           .addTo(map)

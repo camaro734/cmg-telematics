@@ -155,6 +155,7 @@ class VehicleStatus(BaseModel):
     lat: float | None = None
     lon: float | None = None
     speed_kmh: float | None = None
+    heading: int | None = None
     ignition: bool | None = None
     pto_active: bool | None = None
     ext_voltage_mv: int | None = None
