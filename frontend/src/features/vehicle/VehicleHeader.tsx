@@ -40,29 +40,30 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
 
   return (
     <div style={{
-      padding: '12px 20px',
       borderBottom: '1px solid var(--border)',
       background: 'var(--bg-surface)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 14,
     }}>
-      <button
-        onClick={() => navigate('/fleet')}
-        style={{
-          background: 'transparent',
-          color: 'var(--fg-muted)',
-          fontSize: 13,
-          padding: '4px 10px',
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          flexShrink: 0,
-          cursor: 'pointer',
-        }}
-      >
-        ← Flota
-      </button>
-
+      <div style={{ padding: '5px 20px 0' }}>
+        <button
+          onClick={() => navigate('/fleet')}
+          style={{
+            background: 'none', border: 'none', padding: 0,
+            cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 11,
+            fontFamily: 'var(--font-sans)',
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
+        >
+          ‹ Flota
+        </button>
+      </div>
+      <div style={{
+        padding: '6px 20px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+      }}>
       {/* Icono del tipo de vehículo — contenedor landscape para no deformar */}
       <div style={{
         width: 72, height: 40, borderRadius: 8, flexShrink: 0,
@@ -81,7 +82,7 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
       {/* Nombre + matrícula + señal */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{vehicle.name}</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{vehicle.name}</h1>
           <StatusBadge variant={online ? 'online' : 'offline'} size="md" />
           {alertColor && (
             <Chip color={alertColor} soft dot size="sm">
@@ -141,6 +142,7 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
           </span>
         </div>
       )}
+      </div>
     </div>
   )
 }
