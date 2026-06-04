@@ -16,6 +16,7 @@ import { useReportData, periodToHours, PERIOD_LABELS } from './useReportData'
 import { SelectorBar, PdfDownloadBtn } from './ReportFilters'
 import { Input } from '../../shared/ui/Input'
 import type { Period } from './useReportData'
+import type { ReportsTab } from './useReportsTabStore'
 import type {
   VehicleTypeOut, KpiHour,
   AlertInstanceOut, MaintenancePlanOut, MaintenanceLogOut,
@@ -1077,6 +1078,15 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
   )
 }
 
+// ── Configuración de pestañas ─────────────────────────────────────────────────
+
+const REPORT_TABS_CONFIG: { key: ReportsTab; label: string; icon: string }[] = [
+  { key: 'historico',     label: 'Actividad',             icon: 'ti-chart-bar' },
+  { key: 'mantenimiento', label: 'Intervenciones',         icon: 'ti-tool' },
+  { key: 'rutas',         label: 'Rutas',                  icon: 'ti-route' },
+  { key: 'alertas',       label: 'Historial de alertas',   icon: 'ti-bell' },
+]
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
@@ -1087,7 +1097,7 @@ export default function ReportsPage() {
     tenantId, setTenantId,
     customFrom, setCustomFrom,
     customTo, setCustomTo,
-    tab,
+    tab, setTab,
     tenants, vehicles, vehicleTypes,
     selectedVehicle,
   } = useReportData()
@@ -1095,6 +1105,53 @@ export default function ReportsPage() {
   return (
     <Shell title="Reportes">
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+
+        {/* Banda de contexto — control segmentado a todo el ancho */}
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg-card)',
+          flexShrink: 0,
+          padding: '8px 20px',
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            background: 'var(--bg-base)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            padding: 3,
+            gap: 2,
+          }}>
+            {REPORT_TABS_CONFIG.map(({ key, label, icon }) => {
+              const active = tab === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    borderRadius: 7,
+                    border: 'none',
+                    background: active ? 'var(--cmg-teal)' : 'transparent',
+                    color: active ? 'var(--bg-base)' : 'var(--fg-muted)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 12,
+                    fontWeight: active ? 600 : 400,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.15s, color 0.15s',
+                  }}
+                >
+                  <i className={`ti ${icon}`} style={{ fontSize: 13 }} />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <SelectorBar
           isCmg={isCmg}

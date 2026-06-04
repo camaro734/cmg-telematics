@@ -2,8 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
-import { useReportsTabStore, REPORTS_TABS } from '../../features/reports/useReportsTabStore'
-import type { ReportsTab } from '../../features/reports/useReportsTabStore'
 // CmgMark removed — fallback now uses the CMG Track PNG directly
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
@@ -180,15 +178,11 @@ interface MobileDrawerProps {
   userEmail: string | undefined
   onClose: () => void
   onLogout: () => void
-  reportsTab?: string
-  setReportsTab?: (tab: ReportsTab) => void
-  isOnReports?: boolean
 }
 
 function MobileDrawer({
   visibleModules, adminItems, adminLabel, operatorItems, showAdmin, showOperator,
   userEmail, onClose, onLogout,
-  reportsTab, setReportsTab, isOnReports,
 }: MobileDrawerProps) {
   return (
     <>
@@ -216,34 +210,6 @@ function MobileDrawer({
         maxHeight: 'calc(100vh - var(--topbar-h))',
         overflowY: 'auto',
       }}>
-        {/* Reports sub-tabs if on reports page */}
-        {isOnReports && setReportsTab && (
-          <div style={{ borderBottom: '1px solid var(--border)', padding: '8px 0' }}>
-            <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', padding: '4px 16px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sección de reportes</div>
-            {REPORTS_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => { setReportsTab(key as ReportsTab); onClose() }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  width: '100%',
-                  padding: '12px 16px',
-                  background: reportsTab === key ? 'color-mix(in srgb, var(--cmg-teal) 12%, transparent)' : 'transparent',
-                  borderLeft: `3px solid ${reportsTab === key ? 'var(--cmg-teal)' : 'transparent'}`,
-                  color: reportsTab === key ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 14,
-                  fontWeight: reportsTab === key ? 600 : 400,
-                  textAlign: 'left',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Main modules */}
         <div style={{ padding: '8px 0' }}>
           {visibleModules.map(({ key, label, Icon, to }) => (
@@ -439,14 +405,12 @@ export default function TopNav() {
   const { logoUrl, brandName, user, enabledModules, logout } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
-  const { tab: reportsTab, setTab: setReportsTab } = useReportsTabStore()
   const isMobile = useIsMobile()
 
   const isCmg          = user?.tenant_tier === 'cmg'
   const isManufacturer = user?.tenant_tier === 'manufacturer'
   const isAdmin        = user?.role === 'admin'
   const canManageClients = isCmg && isAdmin
-  const onReports = location.pathname === '/reports'
 
   const [adminOpen,    setAdminOpen]    = useState(false)
   const [operatorOpen, setOperatorOpen] = useState(false)
@@ -612,9 +576,6 @@ export default function TopNav() {
               userEmail={user?.email}
               onClose={() => setDrawerOpen(false)}
               onLogout={logout}
-              reportsTab={reportsTab}
-              setReportsTab={setReportsTab}
-              isOnReports={onReports}
             />
           )}
         </>
@@ -627,87 +588,31 @@ export default function TopNav() {
             gap: 2,
             flex: 1,
           }}>
-            {onReports ? (
-              <>
-                <NavLink
-                  to="/fleet"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '0 12px 0 4px',
-                    height: 'var(--topbar-h, 52px)',
-                    color: 'var(--fg-tertiary)',
-                    textDecoration: 'none',
-                    fontSize: 13,
-                    borderRight: '1px solid var(--border)',
-                    marginRight: 4,
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    transition: 'color 0.15s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--cmg-teal)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--fg-tertiary)')}
-                >
-                  ← Flota
-                </NavLink>
-                {REPORTS_TABS.map(({ key, label }) => (
-                  <button
-                  key={key}
-                  onClick={() => setReportsTab(key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0 14px',
-                    height: 'var(--topbar-h, 52px)',
-                    background: 'none',
-                    border: 'none',
-                    borderBottom: reportsTab === key
-                      ? '2px solid var(--cmg-teal)'
-                      : '2px solid transparent',
-                    color: reportsTab === key ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: 13,
-                    fontWeight: reportsTab === key ? 600 : 400,
-                    cursor: 'pointer',
-                    transition: 'color 0.15s, border-color 0.15s',
-                    whiteSpace: 'nowrap',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-              </>
-            ) : (
-              <>
-                {visibleModules.map(({ key, label, Icon, to }) => (
-                  <NavLink
-                    key={key}
-                    to={to}
-                    style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      padding: '0 12px',
-                      height: 'var(--topbar-h, 52px)',
-                      color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
-                      borderBottom: isActive
-                        ? '2px solid var(--cmg-teal)'
-                        : '2px solid transparent',
-                      textDecoration: 'none',
-                      fontSize: 13,
-                      fontWeight: isActive ? 500 : 400,
-                      transition: 'color 0.15s, border-color 0.15s',
-                      whiteSpace: 'nowrap',
-                    })}
-                  >
-                    <Icon width={16} height={16}/>
-                    {label}
-                  </NavLink>
-                ))}
-              </>
-            )}
+            {visibleModules.map(({ key, label, Icon, to }) => (
+              <NavLink
+                key={key}
+                to={to}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '0 12px',
+                  height: 'var(--topbar-h, 52px)',
+                  color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
+                  borderBottom: isActive
+                    ? '2px solid var(--cmg-teal)'
+                    : '2px solid transparent',
+                  textDecoration: 'none',
+                  fontSize: 13,
+                  fontWeight: isActive ? 500 : 400,
+                  transition: 'color 0.15s, border-color 0.15s',
+                  whiteSpace: 'nowrap',
+                })}
+              >
+                <Icon width={16} height={16}/>
+                {label}
+              </NavLink>
+            ))}
           </div>
 
           {/* ── Desktop: Right-side controls ──────────────────────────── */}
