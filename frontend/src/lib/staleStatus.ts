@@ -1,15 +1,19 @@
 import type { VehicleStatus } from './types'
 
-export const ONLINE_THRESHOLD_MIN = 60
+/** Ignición ON: el FMC650 reporta cada ~30 s — consideramos offline si pasan más de 5 min. */
+export const ONLINE_ACTIVE_MIN = 5
+/** Parado/sleep: el dispositivo puede silenciarse hasta 60 min y seguir siendo válido. */
+export const ONLINE_PARKED_MIN = 60
 
-/** Online si recibimos un paquete hace menos de 60 min.
- *  Usa device_last_seen (hora de recepción en servidor) con fallback a last_seen (fix GPS)
- *  para dispositivos que aún no han re-emitido con el publisher actualizado. */
+/** Online con umbral adaptativo según ignición.
+ *  ignition=true  → umbral 5 min  (detección rápida de corte de corriente)
+ *  ignition=false/undefined → umbral 60 min (vehículo aparcado en sleep mode) */
 export function isOnline(status: VehicleStatus | null | undefined): boolean {
   if (!status) return false
   const ts = status.device_last_seen ?? status.last_seen
   if (!ts) return false
-  return Date.now() - new Date(ts).getTime() < ONLINE_THRESHOLD_MIN * 60_000
+  const limitMin = status.ignition === true ? ONLINE_ACTIVE_MIN : ONLINE_PARKED_MIN
+  return Date.now() - new Date(ts).getTime() < limitMin * 60_000
 }
 
 /** Alias para compatibilidad con los consumidores existentes. */
