@@ -57,7 +57,7 @@ export function BlockDetailSection({
           style={{ fontSize: 16, color: 'var(--cmg-teal)', width: 18, textAlign: 'center', flexShrink: 0 }}
         />
         <span style={{
-          fontFamily: 'var(--font-sans)', fontSize: 13,
+          fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-sensor-name)',
           fontWeight: 700, color: 'var(--fg-primary)',
         }}>
           {block.name}
@@ -68,7 +68,7 @@ export function BlockDetailSection({
       {sensors.length > 0 && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
           gap: 12,
         }}>
           {sensors.map(sensor => {
@@ -91,13 +91,13 @@ export function BlockDetailSection({
                   gap: 6,
                 }}
               >
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ fontSize: 'var(--fs-sensor-name)', fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
                   {sensor.label}
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-mono)', color: valueColor, lineHeight: 1.1 }}>
+                <div style={{ fontSize: 'var(--fs-sensor-hero)', fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'], fontFamily: 'var(--font-mono)', color: valueColor, lineHeight: 1.1 }}>
                   {formatted}
                   {sensor.unit && (
-                    <span style={{ fontSize: 13, fontWeight: 600, marginLeft: 4, color: 'var(--fg-tertiary)' }}>
+                    <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, marginLeft: 4, color: 'var(--fg-tertiary)' }}>
                       {sensor.unit}
                     </span>
                   )}
@@ -110,7 +110,7 @@ export function BlockDetailSection({
                     derived={derived}
                   />
                 ) : (
-                  <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 4, fontStyle: 'italic' }}>
+                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', marginTop: 4, fontStyle: 'italic' }}>
                     Sin histórico
                   </div>
                 )}
@@ -125,14 +125,14 @@ export function BlockDetailSection({
         <Link
           to={`/alerts?vehicle=${vehicleId}`}
           data-testid="block-alerts-link"
-          style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-crit)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-sans)' }}
+          style={{ fontSize: 'var(--fs-meta)', fontWeight: 600, color: 'var(--accent-crit)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-sans)' }}
         >
           ⚠ {blockAlerts.length} alerta{blockAlerts.length > 1 ? 's' : ''} en este bloque →
         </Link>
       ) : (
         <div
           data-testid="block-no-alerts"
-          style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)' }}
+          style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)' }}
         >
           Sin alertas en este bloque
         </div>

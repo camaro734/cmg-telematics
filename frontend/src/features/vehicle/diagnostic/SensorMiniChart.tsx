@@ -114,7 +114,7 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived }: SensorMi
             alignItems: 'center',
             justifyContent: 'center',
             color: 'var(--fg-dim)',
-            fontSize: 11,
+            fontSize: 'var(--fs-meta)',
           }}
         >
           Sin histórico

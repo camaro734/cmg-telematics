@@ -71,12 +71,12 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
           style={{ fontSize: 16, color: borderColor, width: 18, textAlign: 'center', flexShrink: 0 }}
         />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', lineHeight: 1.2, overflowWrap: 'break-word', minWidth: 0 }}>
+          <div style={{ fontSize: 'var(--fs-sensor-name)', fontWeight: 700, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', lineHeight: 1.2, overflowWrap: 'break-word', minWidth: 0 }}>
             {block.name}
           </div>
           <div
             data-testid="block-phrase"
-            style={{ fontSize: 10, color: phraseColor, marginTop: 2, fontFamily: 'var(--font-sans)' }}
+            style={{ fontSize: 'var(--fs-2xs)', color: phraseColor, marginTop: 2, fontFamily: 'var(--font-sans)' }}
           >
             {phrase}
           </div>
@@ -104,12 +104,12 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
               <div
                 key={sensor.key}
                 data-testid="sensor-compact-row"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)' }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--fs-panel-label)' }}>
                   {sensor.label}:{' '}
-                  <span style={{ fontFamily: 'var(--font-mono)', color: isStale ? 'var(--fg-muted)' : 'var(--fg-primary)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-panel-value)', color: isStale ? 'var(--fg-muted)' : 'var(--fg-primary)' }}>
                     {formatted}{sensor.unit ? ` ${sensor.unit}` : ''}
                   </span>
                 </span>

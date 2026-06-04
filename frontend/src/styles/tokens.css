@@ -86,6 +86,16 @@
   --lh-snug:    1.35;
   --lh-normal:  1.5;
 
+  /* ---------- Typography roles — sensor panels / EN VIVO ---------- */
+  --fs-sensor-hero:  var(--fs-4xl);   /* 30px — valor principal sensor (héroe) */
+  --fw-sensor-hero:  var(--fw-bold);  /* 700 */
+  --fs-sensor-name:  var(--fs-base);  /* 14px — nombre sensor, cabecera bloque */
+  --fs-panel-value:  var(--fs-base);  /* 14px — valor en línea de panel compacto */
+  --fs-panel-label:  var(--fs-md);    /* 13px — label en línea de panel compacto */
+  --fs-section-hd:   var(--fs-sm);    /* 12px — cabeceras sección uppercase */
+  --fs-meta:         var(--fs-sm);    /* 12px — timestamps, "Sin histórico", texto meta */
+  --fs-table-dense:  var(--fs-xs);    /* 11px — tablas densas (tipos-vehículo, CICLOS) */
+
   /* ---------- Spacing — 4px base ---------- */
   --space-1:  4px;
   --space-2:  8px;
