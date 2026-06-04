@@ -11,29 +11,36 @@ import { useTenantContext } from '../../lib/useTenantContext'
 import type { MaintenancePlanOut, VehicleOut } from '../../lib/types'
 import { Select } from '../../shared/ui/Select'
 
-const STATUS_LABEL: Record<string, string> = { ok: 'OK', 'próximo': 'PRÓXIMO', vencido: 'VENCIDO' }
-const STATUS_COLOR: Record<string, string> = {
-  ok: 'var(--ok)',
-  'próximo': 'var(--warn)',
-  vencido: 'var(--danger)',
+type StatusFilter = 'all' | 'vencido' | 'próximo' | 'ok'
+
+const STATUS_COLORS: Record<string, { border: string; badge: string; text: string }> = {
+  vencido:  { border: 'var(--danger)', badge: 'var(--danger)', text: '#fff' },
+  'próximo':{ border: 'var(--warn)',   badge: 'var(--warn)',   text: '#fff' },
+  ok:       { border: 'var(--ok)',     badge: 'var(--ok)',     text: '#fff' },
 }
+
+const STATUS_BADGE_LABEL: Record<string, string> = {
+  ok: 'Al día', 'próximo': 'Próximo', vencido: 'Vencido',
+}
+
 const THRESHOLD_LABEL: Record<string, string> = {
-  pto_hours: 'h PTO',
-  engine_hours: 'h motor',
-  calendar_days: 'días',
+  pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días',
 }
+
 const STATUS_ORDER: Record<string, number> = { vencido: 0, 'próximo': 1, ok: 2 }
 
 export default function MaintenancePage() {
   const [vehicleFilter, setVehicleFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
-  // ── Complete maintenance state ────────────────────────────────────────────
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
   const isAdmin = user?.role === 'admin'
   const { activeTenantId } = useTenantContext()
 
+  // ── Modal "Realizar" ─────────────────────────────────────────────────────
   const [completingPlan, setCompletingPlan] = useState<MaintenancePlanOut | null>(null)
   const [completeFile, setCompleteFile] = useState<File | null>(null)
   const [completeDesc, setCompleteDesc] = useState('')
@@ -63,9 +70,7 @@ export default function MaintenancePage() {
       setCompleteDesc('')
       setCompleteError('')
     },
-    onError: (err: Error) => {
-      setCompleteError(err.message)
-    },
+    onError: (err: Error) => setCompleteError(err.message),
   })
 
   function openComplete(plan: MaintenancePlanOut) {
@@ -98,6 +103,7 @@ export default function MaintenancePage() {
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  // ── Queries ──────────────────────────────────────────────────────────────
   const tenantQ = activeTenantId ? `?tenant_id=${activeTenantId}` : ''
 
   const { data: plans = [], isLoading } = useQuery({
@@ -111,110 +117,300 @@ export default function MaintenancePage() {
     staleTime: 60_000,
   })
 
-  const sorted = [...plans]
-    .filter(p => !vehicleFilter || p.vehicle_id === vehicleFilter)
+  // ── Filtering ─────────────────────────────────────────────────────────────
+  const byVehicle = plans.filter(p => !vehicleFilter || p.vehicle_id === vehicleFilter)
+
+  const countVencido = byVehicle.filter(p => p.progress.status === 'vencido').length
+  const countProximo = byVehicle.filter(p => p.progress.status === 'próximo').length
+  const countOk      = byVehicle.filter(p => p.progress.status === 'ok').length
+  const uniqueVehicles = new Set(byVehicle.map(p => p.vehicle_id)).size
+
+  const searchLower = search.toLowerCase()
+
+  const visible = byVehicle
+    .filter(p => statusFilter === 'all' || p.progress.status === statusFilter)
+    .filter(p => !searchLower ||
+      p.vehicle_name.toLowerCase().includes(searchLower) ||
+      p.name.toLowerCase().includes(searchLower))
     .sort((a, b) => (STATUS_ORDER[a.progress.status] ?? 3) - (STATUS_ORDER[b.progress.status] ?? 3))
+
+  const pillDefs: Array<{ key: StatusFilter; label: string; count: number; color: string }> = [
+    { key: 'all',      label: 'Todos',   count: byVehicle.length, color: 'var(--fg-secondary)' },
+    { key: 'vencido',  label: 'Vencido', count: countVencido,     color: 'var(--danger)' },
+    { key: 'próximo',  label: 'Próximo', count: countProximo,     color: 'var(--warn)' },
+    { key: 'ok',       label: 'Al día',  count: countOk,          color: 'var(--ok)' },
+  ]
 
   return (
     <Shell title="Mantenimiento">
-      <div style={{ padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Select size="sm" value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}>
-            <option value="">Todos los vehículos</option>
-            {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </Select>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* ── Cabecera ─────────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--fg-primary)', lineHeight: 1.2 }}>
+              Mantenimiento
+            </div>
+            {!isLoading && (
+              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-muted)', marginTop: 3 }}>
+                {plans.length} {plans.length === 1 ? 'plan' : 'planes'} · {uniqueVehicles} vehículo{uniqueVehicles !== 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={handleExportCsv}
-              style={{ padding: '5px 12px', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}
+              style={{
+                padding: '7px 14px',
+                background: 'transparent',
+                color: 'var(--fg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                fontSize: 'var(--fs-sm)',
+                cursor: 'pointer',
+                fontWeight: 500,
+              }}
             >
               Exportar CSV
             </button>
-            {isAdmin && <Link
-              to="/maintenance/new"
-              style={{
-                background: 'var(--cmg-teal)',
-                color: '#fff',
-                borderRadius: 6,
-                padding: '8px 16px',
-                fontSize: 12,
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              + Nuevo plan
-            </Link>}
+            {isAdmin && (
+              <Link
+                to="/maintenance/new"
+                style={{
+                  background: 'var(--cmg-teal)',
+                  color: '#fff',
+                  borderRadius: 6,
+                  padding: '7px 16px',
+                  fontSize: 'var(--fs-sm)',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                + Nuevo plan
+              </Link>
+            )}
           </div>
         </div>
 
+        {/* ── Barra de filtros ─────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Select
+            size="sm"
+            value={vehicleFilter}
+            onChange={e => { setVehicleFilter(e.target.value); setStatusFilter('all') }}
+          >
+            <option value="">Todos los vehículos</option>
+            {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </Select>
+
+          <input
+            type="search"
+            placeholder="Buscar vehículo o plan…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              padding: '5px 10px',
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--fg-primary)',
+              colorScheme: 'dark',
+              outline: 'none',
+              width: 200,
+            }}
+          />
+
+          <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
+
+          {pillDefs.map(({ key, label, count, color }) => {
+            const active = statusFilter === key
+            return (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                style={{
+                  background: active ? 'var(--bg-elevated)' : 'transparent',
+                  border: active ? '1px solid var(--border-strong)' : '1px solid transparent',
+                  borderRadius: 20,
+                  padding: '3px 10px',
+                  fontSize: 'var(--fs-sm)',
+                  cursor: 'pointer',
+                  color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontWeight: active ? 600 : 400,
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+              >
+                {label}
+                <span style={{
+                  fontSize: 'var(--fs-2xs)',
+                  fontWeight: 700,
+                  color: count > 0 ? color : 'var(--fg-dim)',
+                }}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Tabla ────────────────────────────────────────────────────────── */}
         {isLoading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[0,1,2,3].map(i => <SkeletonRow key={i} height={44} />)}
+            {[0, 1, 2, 3].map(i => <SkeletonRow key={i} height={52} />)}
           </div>
-        ) : sorted.length === 0 ? (
-          <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Sin planes de mantenimiento configurados</div>
+        ) : visible.length === 0 ? (
+          <div style={{ color: 'var(--fg-muted)', fontSize: 'var(--fs-meta)', padding: '32px 0' }}>
+            {plans.length === 0
+              ? 'Sin planes de mantenimiento configurados'
+              : 'Sin planes que coincidan con los filtros'}
+          </div>
         ) : (
           <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
                   {['VEHÍCULO', 'PLAN', 'PROGRESO', 'ESTADO', ''].map(h => (
-                    <th key={h} style={{ padding: '8px 16px', fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textAlign: 'left' }}>
+                    <th
+                      key={h}
+                      style={{
+                        padding: '8px 14px',
+                        fontSize: 'var(--fs-2xs)',
+                        color: 'var(--fg-muted)',
+                        fontWeight: 600,
+                        letterSpacing: '0.06em',
+                        textAlign: 'left',
+                      }}
+                    >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((plan, i) => {
+                {visible.map((plan, i) => {
+                  const status = plan.progress.status
+                  const colors = STATUS_COLORS[status] ?? STATUS_COLORS.ok
                   const worst = plan.progress.thresholds.length > 0
                     ? plan.progress.thresholds.reduce((a, b) => a.pct > b.pct ? a : b)
                     : null
+                  const remaining = worst ? worst.limit - worst.current : null
+                  const pctCapped = worst ? Math.min(worst.pct, 999) : 0
+
                   return (
-                    <tr key={plan.id} style={{ borderBottom: i < sorted.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <td style={{ padding: '10px 16px', fontSize: 13 }}>{plan.vehicle_name}</td>
-                      <td style={{ padding: '10px 16px' }}>
-                        <Link to={`/maintenance/${plan.id}`} style={{ color: 'var(--fg-primary)', fontSize: 13 }}>
+                    <tr
+                      key={plan.id}
+                      style={{ borderBottom: i < visible.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    >
+
+                      {/* Vehículo — borde izquierdo de color por estado */}
+                      <td style={{
+                        padding: '10px 14px 10px 11px',
+                        borderLeft: `3px solid ${colors.border}`,
+                        minWidth: 140,
+                      }}>
+                        <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--fg-primary)' }}>
+                          {plan.vehicle_name}
+                        </div>
+                      </td>
+
+                      {/* Plan */}
+                      <td style={{ padding: '10px 14px', minWidth: 160 }}>
+                        <Link
+                          to={`/maintenance/${plan.id}`}
+                          style={{ fontSize: 'var(--fs-base)', color: 'var(--fg-secondary)', textDecoration: 'none' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg-primary)')}
+                          onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-secondary)')}
+                        >
                           {plan.name}
                         </Link>
                       </td>
-                      <td style={{ padding: '10px 16px', minWidth: 200 }}>
-                        {worst && (
-                          <div>
-                            <ProgressBar pct={worst.pct} status={plan.progress.status} />
-                            <div style={{ fontSize: 10, color: 'var(--fg-muted)', marginTop: 3 }}>
-                              {THRESHOLD_LABEL[worst.type] ?? worst.type}: {Math.round(worst.current)}/{worst.limit}
+
+                      {/* Progreso */}
+                      <td style={{ padding: '10px 14px', minWidth: 220 }}>
+                        {worst ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ flex: 1 }}>
+                                <ProgressBar pct={worst.pct} status={status} />
+                              </div>
+                              <span style={{
+                                fontSize: 'var(--fs-sm)',
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: colors.border,
+                                minWidth: 36,
+                                textAlign: 'right',
+                              }}>
+                                {pctCapped.toFixed(0)}%
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                              {Math.round(worst.current)}/{worst.limit} {THRESHOLD_LABEL[worst.type] ?? worst.type}
+                              {remaining !== null && (
+                                <span style={{ color: status === 'vencido' ? 'var(--danger)' : 'var(--fg-dim)', marginLeft: 4 }}>
+                                  · {remaining < 0
+                                    ? `excedido en ${Math.abs(remaining).toFixed(0)}`
+                                    : `quedan ${remaining.toFixed(0)}`
+                                  }
+                                </span>
+                              )}
                             </div>
                           </div>
+                        ) : (
+                          <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ padding: '10px 16px' }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: STATUS_COLOR[plan.progress.status] ?? 'var(--fg-muted)' }}>
-                          {STATUS_LABEL[plan.progress.status] ?? plan.progress.status.toUpperCase()}
+
+                      {/* Estado — badge */}
+                      <td style={{ padding: '10px 14px' }}>
+                        <span style={{
+                          fontSize: 'var(--fs-2xs)',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: colors.badge,
+                          color: colors.text,
+                          letterSpacing: '0.04em',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {(STATUS_BADGE_LABEL[status] ?? status).toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
-                        {isAdmin && <Link to={`/maintenance/${plan.id}/edit`} style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-                          Editar
-                        </Link>}
-                        {(plan.progress.status === 'próximo' || plan.progress.status === 'vencido') && (
-                          <button
-                            onClick={() => openComplete(plan)}
-                            style={{
-                              background: 'var(--cmg-teal)',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: 5,
-                              padding: '4px 10px',
-                              fontSize: 11,
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              marginLeft: 8,
-                            }}
-                          >
-                            Realizar
-                          </button>
-                        )}
+
+                      {/* Acciones */}
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {(status === 'próximo' || status === 'vencido') && (
+                            <button
+                              onClick={() => openComplete(plan)}
+                              style={{
+                                background: 'var(--cmg-teal)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 5,
+                                padding: '4px 10px',
+                                fontSize: 'var(--fs-xs)',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Realizar
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <Link
+                              to={`/maintenance/${plan.id}/edit`}
+                              title="Editar plan"
+                              style={{ color: 'var(--fg-muted)', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                            >
+                              <i className="ti ti-pencil" />
+                            </Link>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -225,7 +421,7 @@ export default function MaintenancePage() {
         )}
       </div>
 
-      {/* ── Complete maintenance modal ─────────────────────────────────────────── */}
+      {/* ── Modal "Realizar" — sin cambios en lógica ────────────────────────── */}
       {completingPlan && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
           <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 24, width: 400, border: '1px solid var(--border)' }}>
