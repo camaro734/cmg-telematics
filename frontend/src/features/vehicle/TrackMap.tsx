@@ -86,6 +86,7 @@ interface TrackMapProps {
 export default function TrackMap({ track, status, emptyMessage = 'Sin recorrido registrado' }: TrackMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
+  const initialPositionedRef = useRef(false)
 
   useEffect(() => {
     injectPulseCSS()
@@ -187,15 +188,28 @@ export default function TrackMap({ track, status, emptyMessage = 'Sin recorrido 
       }
     }
 
-    // Fit bounds
-    const allPoints: [number, number][] = filtered.map(p => [p.lat!, p.lon!])
-    if (status?.lat != null && status?.lon != null) {
-      allPoints.push([status.lat, status.lon])
-    }
-    if (allPoints.length > 0) {
-      try {
-        map.fitBounds(L.latLngBounds(allPoints).pad(0.2))
-      } catch { /* ignore */ }
+    // EN VIVO (track vacío): seguir al vehículo respetando el zoom del usuario
+    if (track.length === 0) {
+      if (status?.lat != null && status?.lon != null) {
+        const latlng: [number, number] = [status.lat, status.lon]
+        if (!initialPositionedRef.current) {
+          map.setView(latlng, 15)
+          initialPositionedRef.current = true
+        } else {
+          map.setView(latlng, map.getZoom())
+        }
+      }
+    } else {
+      // HISTÓRICO: fitBounds sobre toda la traza
+      const allPoints: [number, number][] = filtered.map(p => [p.lat!, p.lon!])
+      if (status?.lat != null && status?.lon != null) {
+        allPoints.push([status.lat, status.lon])
+      }
+      if (allPoints.length > 0) {
+        try {
+          map.fitBounds(L.latLngBounds(allPoints).pad(0.2))
+        } catch { /* ignore */ }
+      }
     }
   }, [track, status])
 
