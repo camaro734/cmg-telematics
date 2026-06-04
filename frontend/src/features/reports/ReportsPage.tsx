@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -7,8 +7,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
 } from 'recharts'
-import L from 'leaflet'
 import Shell from '../../shared/ui/Shell'
+import TrackMap from '../vehicle/TrackMap'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { exportToCsv } from '../../lib/csvExport'
@@ -837,41 +837,6 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
     staleTime: 120_000,
   })
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<L.Map | null>(null)
-
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
-    mapRef.current = L.map(containerRef.current, { center: [40.416775, -3.70379], zoom: 12 })
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(mapRef.current)
-    return () => { mapRef.current?.remove(); mapRef.current = null }
-  }, [])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    map.eachLayer(layer => { if (!(layer instanceof L.TileLayer)) map.removeLayer(layer) })
-
-    const valid = track.filter(p => p.lat != null && p.lon != null)
-    if (valid.length === 0) return
-
-    const latlngs = valid.map(p => [p.lat!, p.lon!] as [number, number])
-    L.polyline(latlngs, { color: '#10b981', weight: 4, opacity: 0.9 }).addTo(map)
-
-    L.circleMarker(latlngs[0], {
-      radius: 7, fillColor: 'var(--ok)', color: '#fff', weight: 2, fillOpacity: 1,
-    }).bindTooltip('Inicio').addTo(map)
-
-    L.circleMarker(latlngs[latlngs.length - 1], {
-      radius: 7, fillColor: 'var(--info)', color: '#fff', weight: 2, fillOpacity: 1,
-    }).bindTooltip('Fin').addTo(map)
-
-    try { map.fitBounds(L.latLngBounds(latlngs).pad(0.15)) } catch { /* ignorar */ }
-  }, [track])
-
   if (!vehicleId) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
@@ -927,18 +892,8 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
           <span style={{ fontSize: 11, opacity: 0.6 }}>El vehículo no registró posiciones GPS el {date}</span>
         </div>
       ) : (
-        <div style={{ position: 'relative' }}>
-          <div ref={containerRef} style={{ width: '100%', height: isMobile ? 280 : 440, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }} />
-          <div style={{
-            position: 'absolute', bottom: 12, right: 12, zIndex: 1000,
-            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-            borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'var(--fg-muted)',
-            display: 'flex', flexDirection: 'column', gap: 4, backdropFilter: 'blur(4px)',
-          }}>
-            <span style={{ color: 'var(--ok)' }}>● Inicio</span>
-            <span style={{ color: 'var(--info)' }}>● Fin</span>
-            <span style={{ color: 'var(--fg-muted)', marginTop: 2 }}>{validPoints.length} puntos GPS</span>
-          </div>
+        <div style={{ height: isMobile ? 280 : 440 }}>
+          <TrackMap track={track} status={undefined} emptyMessage="Sin recorrido para esta fecha" />
         </div>
       )}
     </div>
