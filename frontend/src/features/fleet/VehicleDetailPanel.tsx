@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
-import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
+import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import type { VehicleStatus } from '../../lib/types'
 
 interface VehicleDetailPanelProps {
@@ -98,8 +98,8 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
           {/* KPIs */}
           <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto' }}>
             {stale && status?.last_seen && (
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 10, padding: '5px 0 8px', borderBottom: '1px solid var(--border-soft)' }}>
-                {staleStamp(status.device_last_seen ?? status.last_seen)}
+              <div style={{ fontSize: 11, color: statusStamp(status).color, marginBottom: 10, padding: '5px 0 8px', borderBottom: '1px solid var(--border-soft)' }}>
+                {statusStamp(status).text}
               </div>
             )}
             <KpiRow label="Ignición" value={

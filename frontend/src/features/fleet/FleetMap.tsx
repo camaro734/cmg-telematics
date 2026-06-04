@@ -5,7 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { useNavigate } from 'react-router-dom'
 import { useFleetStore } from './useFleetStore'
-import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
+import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../lib/sensorValue'
 import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut, VehicleTypeOut, SensorDef } from '../../lib/types'
 
@@ -172,8 +172,9 @@ function buildPopupHtml(
   const borderColor = worstSev === 'critical' ? 'var(--danger)' : worstSev === 'warning' ? 'var(--warn)' : 'transparent'
 
   // Banda stale — sustituye la banda "Sin señal" anterior, cubre mismo umbral
-  const staleBand = stale
-    ? `<div style="background:rgba(100,116,139,0.1);color:#9ca3af;padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)">${staleStamp(status.device_last_seen ?? status.last_seen)}</div>`
+  const _stamp = stale ? statusStamp(status) : null
+  const staleBand = _stamp
+    ? `<div style="background:rgba(100,116,139,0.1);color:${_stamp.hexColor};padding:5px 14px;font-size:11px;font-weight:600;border-bottom:1px solid rgba(100,116,139,0.2)">${_stamp.text}</div>`
     : ''
 
   // Contador de alertas — enlace a la página de Alertas

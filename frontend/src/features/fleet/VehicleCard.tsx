@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFleetStore } from './useFleetStore'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
 import { useIsMobile } from '../../lib/useIsMobile'
+import { statusStamp } from '../../lib/staleStatus'
 import type { VehicleOut, VehicleTypeOut, VehicleStatus } from '../../lib/types'
 
 export type VehicleState = 'moving' | 'idle' | 'offline' | 'parked' | 'alert'
@@ -67,11 +68,8 @@ function stateLabel(state: VehicleState, status: VehicleStatus | undefined): { t
     case 'alert':
       return { text: '⚠ Alerta', color: 'var(--danger)' }
     case 'offline': {
-      const ls = status.device_last_seen ?? status.last_seen
-      if (!ls) return { text: 'Sin señal', color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
-      const mins = Math.floor((Date.now() - new Date(ls).getTime()) / 60000)
-      if (mins < 60) return { text: `Sin señal · ${mins}min`, color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
-      return { text: `Sin señal · ${Math.floor(mins / 60)}h`, color: 'var(--accent-off)', icon: 'ti-antenna-bars-off' }
+      const { text, color } = statusStamp(status)
+      return { text, color }
     }
   }
 }

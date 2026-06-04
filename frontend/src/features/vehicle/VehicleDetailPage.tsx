@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { isEffectivelyOnline, staleStamp } from '../../lib/staleStatus'
+import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { SkeletonCard } from '../../shared/ui/SkeletonCard'
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -320,9 +320,9 @@ export default function VehicleDetailPage() {
                           <i className="ti ti-antenna-bars-5" style={{ fontSize: 12 }} />
                           En directo
                         </span>
-                      : <span style={{ color: 'var(--accent-off)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      : <span style={{ color: statusStamp(status).color, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <i className="ti ti-antenna-bars-off" style={{ fontSize: 12 }} />
-                          {staleStamp(status?.device_last_seen ?? status?.last_seen ?? null)}
+                          {statusStamp(status).text}
                         </span>
                     }
                     {status && (

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { isOnline } from '../../lib/staleStatus'
+import { isOnline, statusStamp } from '../../lib/staleStatus'
 import StatusBadge from '../../shared/ui/StatusBadge'
 import { Chip } from '../../shared/ui/Chip'
 import { getVehicleIconForSlug } from '../../shared/ui/icons'
@@ -19,13 +19,6 @@ function batteryColor(mv: number): string {
   return 'var(--ok)'
 }
 
-function relativeTime(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000
-  if (diff < 60) return 'hace un momento'
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`
-  return `hace ${Math.floor(diff / 86400)} días`
-}
 
 interface VehicleHeaderProps {
   vehicle: VehicleOut
@@ -104,8 +97,10 @@ export default function VehicleHeader({ vehicle, status, iconUrl, vehicleTypeSlu
               ⚡ {(status.ext_voltage_mv / 1000).toFixed(2)} V
             </span>
           )}
-          {status?.last_seen && (
-            <span>{online ? 'En directo' : `Última señal ${relativeTime(status.device_last_seen ?? status.last_seen)}`}</span>
+          {status && (
+            online
+              ? status.last_seen && <span>En directo</span>
+              : <span style={{ color: statusStamp(status).color }}>{statusStamp(status).text}</span>
           )}
         </div>
       </div>
