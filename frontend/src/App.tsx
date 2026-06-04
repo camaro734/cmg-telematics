@@ -58,7 +58,6 @@ const SettingsPage      = lazy(() => import('./features/settings/SettingsPage'))
 const RulesPage                  = lazy(() => import('./features/rules/RulesPage'))
 const RuleFormPage               = lazy(() => import('./features/rules/RuleFormPage'))
 const MaintenancePage            = lazy(() => import('./features/maintenance/MaintenancePage'))
-const MaintenancePlanFormPage    = lazy(() => import('./features/maintenance/MaintenancePlanFormPage'))
 const MaintenancePlanDetailPage  = lazy(() => import('./features/maintenance/MaintenancePlanDetailPage'))
 const TenantsPage      = lazy(() => import('./features/clientes/TenantsPage'))
 const TenantFormPage   = lazy(() => import('./features/clientes/TenantFormPage'))
@@ -119,9 +118,7 @@ export default function App() {
                 <Route path="rules/new"          element={<RequireRules><SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary></RequireRules>} />
                 <Route path="rules/:id"          element={<RequireRules><SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary></RequireRules>} />
                 <Route path="maintenance"          element={<RequireModule module="maintenance"><SectionErrorBoundary label="Maintenance"><MaintenancePage /></SectionErrorBoundary></RequireModule>} />
-                <Route path="maintenance/new"      element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="maintenance/:id"      element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceDetail"><MaintenancePlanDetailPage /></SectionErrorBoundary></RequireModule>} />
-                <Route path="maintenance/:id/edit" element={<RequireModule module="maintenance"><SectionErrorBoundary label="MaintenanceForm"><MaintenancePlanFormPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="clientes"          element={<SectionErrorBoundary label="Clientes"><TenantsPage /></SectionErrorBoundary>} />
                 <Route path="clientes/new"      element={<SectionErrorBoundary label="ClienteForm"><TenantFormPage /></SectionErrorBoundary>} />
                 <Route path="clientes/:id"      element={<SectionErrorBoundary label="ClienteDetail"><TenantDetailPage /></SectionErrorBoundary>} />

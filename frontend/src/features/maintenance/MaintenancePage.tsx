@@ -4,11 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import ProgressBar from './ProgressBar'
+import ThresholdBuilder from './ThresholdBuilder'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useTenantContext } from '../../lib/useTenantContext'
-import type { MaintenancePlanOut, VehicleOut } from '../../lib/types'
+import type { MaintenancePlanOut, VehicleOut, MaintenancePlanCreate, MaintenancePlanUpdate, MaintenanceThreshold } from '../../lib/types'
+import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 
 type StatusFilter = 'all' | 'vencido' | 'próximo' | 'ok'
@@ -28,6 +30,7 @@ const THRESHOLD_LABEL: Record<string, string> = {
 }
 
 const STATUS_ORDER: Record<string, number> = { vencido: 0, 'próximo': 1, ok: 2 }
+const DEFAULT_THRESHOLDS: MaintenanceThreshold[] = [{ type: 'pto_hours', value: 500 }]
 
 export default function MaintenancePage() {
   const [vehicleFilter, setVehicleFilter] = useState('')
@@ -87,6 +90,74 @@ export default function MaintenancePage() {
       return
     }
     completeMutation.mutate({ planId: completingPlan.id, file: completeFile, description: completeDesc })
+  }
+
+  // ── Modal "Nuevo / Editar plan" ──────────────────────────────────────────
+  const [formTarget, setFormTarget] = useState<null | 'new' | MaintenancePlanOut>(null)
+  const [formName, setFormName] = useState('')
+  const [formVehicleId, setFormVehicleId] = useState('')
+  const [formThresholds, setFormThresholds] = useState<MaintenanceThreshold[]>(DEFAULT_THRESHOLDS)
+  const [formWarnPct, setFormWarnPct] = useState(10)
+  const [formActive, setFormActive] = useState(true)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  function openForm(target: 'new' | MaintenancePlanOut) {
+    if (target === 'new') {
+      setFormName('')
+      setFormVehicleId(vehicles[0]?.id ?? '')
+      setFormThresholds(DEFAULT_THRESHOLDS)
+      setFormWarnPct(10)
+      setFormActive(true)
+    } else {
+      setFormName(target.name)
+      setFormVehicleId(target.vehicle_id)
+      setFormThresholds(target.trigger_condition.thresholds ?? DEFAULT_THRESHOLDS)
+      setFormWarnPct(target.warn_before_pct)
+      setFormActive(target.active)
+    }
+    setFormError(null)
+    setFormTarget(target)
+  }
+
+  const formMutation = useMutation({
+    mutationFn: ({ isEdit, id, payload }: { isEdit: boolean; id?: string; payload: MaintenancePlanCreate | MaintenancePlanUpdate }) =>
+      isEdit && id
+        ? apiClient.put<MaintenancePlanOut>(`/api/v1/maintenance/plans/${id}`, payload)
+        : apiClient.post<MaintenancePlanOut>('/api/v1/maintenance/plans', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.maintenancePlans() })
+      setFormTarget(null)
+    },
+    onError: () => setFormError('Error al guardar el plan'),
+  })
+
+  function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!formName.trim()) return
+    const isEdit = formTarget !== 'new' && formTarget !== null
+    if (isEdit) {
+      formMutation.mutate({
+        isEdit: true,
+        id: (formTarget as MaintenancePlanOut).id,
+        payload: {
+          name: formName.trim(),
+          trigger_condition: { thresholds: formThresholds, op: 'OR' },
+          warn_before_pct: formWarnPct,
+          active: formActive,
+        } satisfies MaintenancePlanUpdate,
+      })
+    } else {
+      formMutation.mutate({
+        isEdit: false,
+        payload: {
+          vehicle_id: formVehicleId,
+          name: formName.trim(),
+          trigger_condition: { thresholds: formThresholds, op: 'OR' },
+          warn_before_pct: formWarnPct,
+          active: formActive,
+        } satisfies MaintenancePlanCreate,
+      })
+    }
   }
 
   async function handleExportCsv() {
@@ -174,20 +245,21 @@ export default function MaintenancePage() {
               Exportar CSV
             </button>
             {isAdmin && (
-              <Link
-                to="/maintenance/new"
+              <button
+                onClick={() => openForm('new')}
                 style={{
                   background: 'var(--cmg-teal)',
                   color: '#fff',
+                  border: 'none',
                   borderRadius: 6,
                   padding: '7px 16px',
                   fontSize: 'var(--fs-sm)',
                   fontWeight: 600,
-                  textDecoration: 'none',
+                  cursor: 'pointer',
                 }}
               >
                 + Nuevo plan
-              </Link>
+              </button>
             )}
           </div>
         </div>
@@ -402,13 +474,13 @@ export default function MaintenancePage() {
                             </button>
                           )}
                           {isAdmin && (
-                            <Link
-                              to={`/maintenance/${plan.id}/edit`}
+                            <button
+                              onClick={() => openForm(plan)}
                               title="Editar plan"
-                              style={{ color: 'var(--fg-muted)', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--fg-muted)', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
                             >
                               <i className="ti ti-pencil" />
-                            </Link>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -420,6 +492,73 @@ export default function MaintenancePage() {
           </div>
         )}
       </div>
+
+      {/* ── Modal "Nuevo / Editar plan" ────────────────────────────────────── */}
+      {formTarget !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 28, width: 520, maxWidth: 'calc(100vw - 32px)', border: '1px solid var(--border)', maxHeight: 'calc(100vh - 64px)', overflowY: 'auto' }}>
+            <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 700, color: 'var(--fg-primary)' }}>
+              {formTarget === 'new' ? 'Nuevo plan de mantenimiento' : 'Editar plan'}
+            </h3>
+            <form onSubmit={handleFormSubmit}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <Input
+                  label="Nombre del plan"
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
+                  placeholder="Nombre del plan"
+                  required
+                />
+                {formTarget === 'new' && (
+                  <Select label="Vehículo" value={formVehicleId} onChange={e => setFormVehicleId(e.target.value)}>
+                    {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </Select>
+                )}
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 8 }}>
+                    UMBRALES (se dispara al llegar al primero)
+                  </div>
+                  <ThresholdBuilder thresholds={formThresholds} onChange={setFormThresholds} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>
+                    AVISAR CUANDO QUEDE (%)
+                  </div>
+                  <Input
+                    type="number"
+                    value={formWarnPct}
+                    min={1}
+                    max={50}
+                    onChange={e => setFormWarnPct(Number(e.target.value))}
+                    style={{ width: 100 }}
+                  />
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={formActive} onChange={e => setFormActive(e.target.checked)} />
+                  <span style={{ fontSize: 13, color: 'var(--fg-primary)' }}>Plan activo</span>
+                </label>
+                {formError && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{formError}</div>}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFormTarget(null)}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={formMutation.isPending}
+                    style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 24px', fontSize: 13, fontWeight: 600, cursor: formMutation.isPending ? 'not-allowed' : 'pointer', opacity: formMutation.isPending ? 0.7 : 1 }}
+                  >
+                    {formMutation.isPending ? 'Guardando…' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal "Realizar" — sin cambios en lógica ────────────────────────── */}
       {completingPlan && (
