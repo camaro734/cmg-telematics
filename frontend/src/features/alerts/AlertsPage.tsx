@@ -90,7 +90,7 @@ export default function AlertsPage() {
 
   return (
     <Shell title="Alertas">
-      <div style={{ padding: 24, maxWidth: 1200, overflowY: 'auto', height: '100%' }}>
+      <div style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
