@@ -4,6 +4,7 @@ export const keys = {
   vehicle: (id: string) => ['vehicles', id] as const,
   vehicleStatus: (id: string) => ['vehicles', id, 'status'] as const,
   vehicleTrack: (id: string) => ['vehicles', id, 'track'] as const,
+  vehicleTrips: (id: string) => ['vehicles', id, 'trips'] as const,
   vehicleKpis: (id: string) => ['vehicles', id, 'kpis'] as const,
   vehicleMaintenance: (id: string) => ['vehicles', id, 'maintenance'] as const,
   vehicleTypes: () => ['vehicle-types'] as const,

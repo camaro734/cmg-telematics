@@ -621,6 +621,37 @@ export interface WorkReportOut {
   created_at: string
 }
 
+export interface TripPoint {
+  t: string
+  lat: number
+  lon: number
+}
+
+export interface Trip {
+  index: number
+  start: string
+  end: string
+  duration_s: number
+  distance_km: number
+  moving_time_s: number
+  avg_speed_kmh: number
+  max_speed_kmh: number
+  points: TripPoint[]
+}
+
+export interface DayTripTotals {
+  trips: number
+  distance_km: number
+  route_time_s: number
+  avg_speed_kmh: number
+}
+
+export interface DayTrips {
+  date: string
+  trips: Trip[]
+  totals: DayTripTotals
+}
+
 export interface SmtpConfig {
   host: string
   port: number

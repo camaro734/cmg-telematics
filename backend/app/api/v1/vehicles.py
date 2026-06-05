@@ -4,7 +4,9 @@ import unicodedata
 import uuid
 import json
 import logging
+from math import radians, sin, cos, sqrt, asin
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,7 @@ from app.schemas.vehicle import (
     VehicleTypeReportMetricsUpdate, VehicleTypeSystemBlocksUpdate, SystemBlock,
     SystemBlockTemplateOut, SystemBlockTemplateCreate, SystemBlockTemplateUpdate,
     SaveAsTemplateBody, SensorCatalogItem,
+    TripPoint, Trip, DayTripTotals, DayTrips,
 )
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
@@ -57,6 +60,95 @@ _RPM_AVL_IDS = (
 # en cualquiera de las escalas habituales (×0.125 J1939 → 25 rpm, ×0.25 OBD →
 # 50 rpm). Un motor real al ralentí está siempre muy por encima.
 _RPM_IGNITION_THRESHOLD = 200
+
+
+_TRIP_STOP_KMH = 3.0    # umbral de velocidad "en movimiento"
+_TRIP_GAP_S    = 300.0  # hueco > 5 min → no cuenta como movimiento
+_TRIP_MAX_KMH  = 150.0  # velocidad imposible → glitch GPS, se ignora
+
+_TZ_MADRID = ZoneInfo("Europe/Madrid")
+
+
+def _haversine_km(alat: float, alon: float, blat: float, blon: float) -> float:
+    R = 6371.0
+    dlat = radians(blat - alat)
+    dlon = radians(blon - alon)
+    h = sin(dlat / 2) ** 2 + cos(radians(alat)) * cos(radians(blat)) * sin(dlon / 2) ** 2
+    return 2.0 * R * asin(sqrt(max(0.0, min(1.0, h))))
+
+
+def _finalize_trip(pts: list[dict], idx: int) -> tuple[Trip, float]:
+    """Convierte un segmento de puntos con ignición ON en un Trip.
+
+    Retorna (Trip, mov_dist_km) — mov_dist se necesita para el avg global del día.
+    """
+    max_spd = max(
+        (p["speed_kmh"] for p in pts if p["speed_kmh"] is not None and p["speed_kmh"] <= _TRIP_MAX_KMH),
+        default=0.0,
+    )
+    dist = mov_dist = mov_time = 0.0
+    for i in range(1, len(pts)):
+        a, b = pts[i - 1], pts[i]
+        dt = (b["t"] - a["t"]).total_seconds()
+        dd = _haversine_km(a["lat"], a["lon"], b["lat"], b["lon"])
+        dist += dd
+        if dt <= 0:
+            continue
+        v = dd / (dt / 3600.0)
+        if v > _TRIP_MAX_KMH:
+            continue  # glitch GPS: no cuenta distancia ni tiempo
+        if v >= _TRIP_STOP_KMH and dt <= _TRIP_GAP_S:
+            mov_dist += dd
+            mov_time += dt
+    avg = (mov_dist / (mov_time / 3600.0)) if mov_time > 0.0 else 0.0
+    trip = Trip(
+        index=idx,
+        start=pts[0]["t"],
+        end=pts[-1]["t"],
+        duration_s=int((pts[-1]["t"] - pts[0]["t"]).total_seconds()),
+        distance_km=round(dist, 3),
+        moving_time_s=int(mov_time),
+        avg_speed_kmh=round(avg, 1),
+        max_speed_kmh=round(max_spd, 1),
+        points=[TripPoint(t=p["t"], lat=p["lat"], lon=p["lon"]) for p in pts],
+    )
+    return trip, mov_dist
+
+
+def _segment_trips(rows: list) -> tuple[list[Trip], DayTripTotals]:
+    """Segmenta puntos crudos en trayectos ON→OFF aplicando carry-forward en ignición."""
+    segments: list[list[dict]] = []
+    cur: list[dict] | None = None
+    prev_ign = False
+    for row in rows:
+        state: bool = row["ignition"] if row["ignition"] is not None else prev_ign
+        prev_ign = state
+        pt = {"t": row["time"], "lat": row["lat"], "lon": row["lon"], "speed_kmh": row["speed_kmh"]}
+        if state:
+            if cur is None:
+                cur = []
+            cur.append(pt)
+        else:
+            if cur is not None and len(cur) >= 2:
+                segments.append(cur)
+            cur = None
+    if cur is not None and len(cur) >= 2:
+        segments.append(cur)
+
+    pairs = [_finalize_trip(seg, i + 1) for i, seg in enumerate(segments)]
+    trips = [p[0] for p in pairs]
+    mov_dists = [p[1] for p in pairs]
+
+    total_mov_time = sum(t.moving_time_s for t in trips)
+    total_mov_dist = sum(mov_dists)
+    avg_total = (total_mov_dist / (total_mov_time / 3600.0)) if total_mov_time > 0.0 else 0.0
+    totals = DayTripTotals(
+        trips=len(trips),
+        distance_km=round(sum(t.distance_km for t in trips), 2),
+        route_time_s=sum(t.duration_s for t in trips),
+        avg_speed_kmh=round(avg_total, 1),
+    )
+    return trips, totals
 
 
 def _ignition_from_can(can_data: dict) -> bool:
@@ -1256,6 +1348,44 @@ async def get_vehicle_track(
     ).fetchall()
 
     return [TrackPoint(**dict(r._mapping)) for r in rows]
+
+
+@router.get("/vehicles/{vehicle_id}/trips", response_model=DayTrips)
+async def get_vehicle_trips(
+    vehicle_id: uuid.UUID,
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD (Europe/Madrid)"),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DayTrips:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+
+    try:
+        naive = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de fecha inválido")
+
+    day_start = naive.replace(tzinfo=_TZ_MADRID)
+    day_end   = (naive + timedelta(days=1)).replace(tzinfo=_TZ_MADRID)
+
+    rows = (
+        await db.execute(
+            text(
+                "SELECT time, lat, lon, ignition, speed_kmh "
+                "FROM telemetry_record "
+                "WHERE vehicle_id = :vid AND tenant_id = :tid "
+                "AND lat IS NOT NULL AND lon IS NOT NULL "
+                "AND time >= :day_start AND time < :day_end "
+                "ORDER BY time ASC "
+                "LIMIT 10000"
+            ),
+            {"vid": vehicle_id, "tid": vehicle.tenant_id, "day_start": day_start, "day_end": day_end},
+        )
+    ).fetchall()
+
+    trips, totals = _segment_trips([dict(r._mapping) for r in rows])
+    return DayTrips(date=date, trips=trips, totals=totals)
 
 
 @router.get("/vehicles/{vehicle_id}/avl-series")

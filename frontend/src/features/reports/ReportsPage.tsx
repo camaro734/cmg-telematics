@@ -20,7 +20,7 @@ import type { ReportsTab } from './useReportsTabStore'
 import type {
   VehicleTypeOut, KpiHour,
   AlertInstanceOut, MaintenancePlanOut, MaintenanceLogOut,
-  TrackPoint, RuleOut,
+  RuleOut, DayTrips, Trip,
 } from '../../lib/types'
 
 // ── Style constants ───────────────────────────────────────────────────────────
@@ -62,6 +62,9 @@ function fmtHours(min: number) {
   const m = Math.round(min % 60)
   return `${h}h ${String(m).padStart(2, '0')}m`
 }
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
 
 function groupByPeriod(
   kpis: KpiHour[],
@@ -155,15 +158,6 @@ function mergeSeriesByLabel(
   return Array.from(labelMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([label, vals]) => ({ label, ...vals } as Record<string, string | number>))
-}
-
-function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000
-  const toRad = (d: number) => d * Math.PI / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -824,16 +818,11 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
   const isMobile = useIsMobile()
   const today = new Date().toISOString().slice(0, 10)
   const [date, setDate] = useState(today)
+  const [selectedIdx, setSelectedIdx] = useState(1)
 
-  // Build local midnight timestamps to avoid off-by-one when user is not in UTC
-  const from = new Date(`${date}T00:00:00`).toISOString()
-  const to = new Date(`${date}T23:59:59`).toISOString()
-
-  const { data: track = [], isFetching } = useQuery<TrackPoint[]>({
-    queryKey: [...keys.vehicleTrack(vehicleId), date],
-    queryFn: () => apiClient.get<TrackPoint[]>(
-      `/api/v1/vehicles/${vehicleId}/track?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-    ),
+  const { data: dayTrips, isFetching } = useQuery<DayTrips>({
+    queryKey: [...keys.vehicleTrips(vehicleId), date],
+    queryFn: () => apiClient.get<DayTrips>(`/api/v1/vehicles/${vehicleId}/trips?date=${date}`),
     enabled: Boolean(vehicleId),
     staleTime: 120_000,
   })
@@ -846,37 +835,30 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
     )
   }
 
-  const validPoints = track.filter(p => p.lat != null && p.lon != null)
-  const noData = !isFetching && validPoints.length === 0
-
-  // Route stats
-  const stats = (() => {
-    if (validPoints.length < 2) return null
-    let distM = 0
-    for (let i = 1; i < validPoints.length; i++) {
-      distM += haversineM(validPoints[i - 1].lat!, validPoints[i - 1].lon!, validPoints[i].lat!, validPoints[i].lon!)
-    }
-    const durationMs = new Date(validPoints[validPoints.length - 1].time).getTime() - new Date(validPoints[0].time).getTime()
-    const durationMin = durationMs / 60000
-    const distKm = distM / 1000
-    const avgKmh = durationMin > 0 ? (distKm / durationMin) * 60 : 0
-    return { distKm, durationMin, avgKmh }
-  })()
+  const trips = dayTrips?.trips ?? []
+  const totals = dayTrips?.totals
+  const selectedTrip: Trip | null = trips.find(t => t.index === selectedIdx) ?? trips[0] ?? null
+  const noData = !isFetching && dayTrips !== undefined && trips.length === 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <label style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Fecha</label>
-        <Input type="date" size="sm" value={date} max={today} onChange={e => setDate(e.target.value)} />
+        <Input type="date" size="sm" value={date} max={today} onChange={e => { setDate(e.target.value); setSelectedIdx(1) }} />
         {isFetching && <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Cargando…</span>}
-        {stats && (
-          <div style={{ display: 'flex', gap: 16, marginLeft: 8 }}>
-            <StatChip icon="📍" label="Distancia" value={`${stats.distKm.toFixed(1)} km`} />
-            <StatChip icon="⚡" label="Vel. media" value={`${stats.avgKmh.toFixed(0)} km/h`} />
-            <StatChip icon="⏱" label="Duración" value={fmtHours(stats.durationMin)} />
-          </div>
-        )}
       </div>
+
+      {/* Resumen del día */}
+      {totals && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+          <DaySummaryCard label="RUTAS" value={String(totals.trips)} accent="var(--cmg-teal)" />
+          <DaySummaryCard label="DISTANCIA TOTAL" value={`${totals.distance_km.toFixed(1)} km`} />
+          <DaySummaryCard label="TIEMPO EN RUTA" value={fmtHours(totals.route_time_s / 60)} />
+          <DaySummaryCard label="VEL. MEDIA (MOV.)" value={`${totals.avg_speed_kmh.toFixed(0)} km/h`} />
+        </div>
+      )}
 
       {noData ? (
         <div style={{
@@ -889,29 +871,97 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
             <circle cx="8" cy="32" r="2.5" fill="currentColor" stroke="none"/>
             <circle cx="32" cy="8" r="2.5" fill="currentColor" stroke="none"/>
           </svg>
-          <span>Sin datos de ruta para este día</span>
-          <span style={{ fontSize: 11, opacity: 0.6 }}>El vehículo no registró posiciones GPS el {date}</span>
+          <span>Sin trayectos este día</span>
+          <span style={{ fontSize: 11, opacity: 0.6 }}>El vehículo no registró rutas GPS el {date}</span>
         </div>
-      ) : (
-        <div style={{ height: isMobile ? 280 : 440 }}>
-          <TrackMap track={track} status={undefined} emptyMessage="Sin recorrido para esta fecha" />
+      ) : trips.length > 0 && selectedTrip && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '340px 1fr', gap: 14 }}>
+
+          {/* Lista de trayectos */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+              Trayectos del día
+            </div>
+            {trips.map(trip => {
+              const active = trip.index === selectedTrip.index
+              return (
+                <div
+                  key={trip.index}
+                  onClick={() => setSelectedIdx(trip.index)}
+                  style={{
+                    background: active ? 'rgba(29,158,117,0.08)' : 'var(--bg-card)',
+                    border: active ? '1px solid var(--cmg-teal)' : '1px solid var(--border)',
+                    borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
+                    transition: 'border-color 0.15s, background 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+                      background: active ? 'var(--cmg-teal)' : 'var(--bg-elevated)',
+                      color: active ? '#fff' : 'var(--fg-muted)',
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      {trip.index}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)', flex: 1 }}>
+                      {fmtTime(trip.start)} → {fmtTime(trip.end)}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+                      {fmtHours(trip.duration_s / 60)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', paddingLeft: 28 }}>
+                    {trip.distance_km.toFixed(1)} km · media {trip.avg_speed_kmh.toFixed(0)} km/h · máx {trip.max_speed_kmh.toFixed(0)} km/h
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Panel de mapa */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                background: 'var(--cmg-teal)', color: '#fff', fontFamily: 'var(--font-mono)',
+              }}>
+                RUTA {selectedTrip.index}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
+                {fmtTime(selectedTrip.start)} → {fmtTime(selectedTrip.end)}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+                {selectedTrip.distance_km.toFixed(1)} km · {fmtHours(selectedTrip.duration_s / 60)} · media {selectedTrip.avg_speed_kmh.toFixed(0)} km/h
+              </span>
+            </div>
+            <div style={{ height: isMobile ? 280 : 420 }}>
+              <TrackMap
+                track={selectedTrip.points.map(p => ({ time: p.t, lat: p.lat, lon: p.lon }))}
+                status={undefined}
+                emptyMessage="Sin recorrido"
+              />
+            </div>
+          </div>
+
         </div>
       )}
+
     </div>
   )
 }
 
-function StatChip({ icon, label, value }: { icon: string; label: string; value: string }) {
+function DaySummaryCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      background: 'var(--bg-card)', border: '1px solid var(--border)',
-      borderRadius: 6, padding: '4px 10px',
+      background: 'var(--bg-surface)', border: '1px solid var(--border)',
+      borderRadius: 11, padding: '12px 14px',
     }}>
-      <span style={{ fontSize: 13 }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: 9, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{value}</div>
+      <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: accent ?? 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>
+        {value}
       </div>
     </div>
   )

@@ -184,6 +184,37 @@ class TrackPoint(BaseModel):
     lon: float | None = None
 
 
+class TripPoint(BaseModel):
+    t: datetime
+    lat: float
+    lon: float
+
+
+class Trip(BaseModel):
+    index: int
+    start: datetime
+    end: datetime
+    duration_s: int
+    distance_km: float
+    moving_time_s: int
+    avg_speed_kmh: float
+    max_speed_kmh: float
+    points: list[TripPoint]
+
+
+class DayTripTotals(BaseModel):
+    trips: int
+    distance_km: float
+    route_time_s: int
+    avg_speed_kmh: float
+
+
+class DayTrips(BaseModel):
+    date: str
+    trips: list[Trip]
+    totals: DayTripTotals
+
+
 class KpiHour(BaseModel):
     bucket: datetime
     avg_pressure_1: float | None = None
