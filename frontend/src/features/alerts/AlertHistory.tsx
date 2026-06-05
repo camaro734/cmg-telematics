@@ -1,13 +1,10 @@
 import type { CSSProperties } from 'react'
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
-import { Input } from '../../shared/ui/Input'
-import { Select } from '../../shared/ui/Select'
 
-type HistoryStatus = 'all' | 'acknowledged' | 'resolved'
+export type HistoryStatus = 'all' | 'acknowledged' | 'resolved'
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   firing:       { label: 'ACTIVA',     color: 'var(--danger)' },
@@ -16,22 +13,19 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   resolved:     { label: 'RESUELTA',   color: 'var(--ok)'   },
 }
 
-
-
 const TH: CSSProperties = { padding: '6px 8px', textAlign: 'left', fontWeight: 600 }
 const TD: CSSProperties = { padding: '6px 8px' }
 
 interface AlertHistoryProps {
   vehicles: VehicleOut[]
   rules: RuleOut[]
+  status: HistoryStatus
+  vehicleId: string
+  dateFrom: string
+  dateTo: string
 }
 
-export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
-  const [status, setStatus] = useState<HistoryStatus>('all')
-  const [vehicleId, setVehicleId] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-
+export default function AlertHistory({ vehicles, rules, status, vehicleId, dateFrom, dateTo }: AlertHistoryProps) {
   const vehicleMap = Object.fromEntries(vehicles.map(v => [v.id, v.name]))
   const ruleMap = Object.fromEntries(rules.map(r => [r.id, r.name]))
 
@@ -62,20 +56,6 @@ export default function AlertHistory({ vehicles, rules }: AlertHistoryProps) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <Select size="sm" value={status} onChange={e => setStatus(e.target.value as HistoryStatus)}>
-          <option value="all">Todos los estados</option>
-          <option value="acknowledged">Reconocidas</option>
-          <option value="resolved">Resueltas</option>
-        </Select>
-        <Select size="sm" value={vehicleId} onChange={e => setVehicleId(e.target.value)} aria-label="Filtrar por vehículo">
-          <option value="">Todos los vehículos</option>
-          {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </Select>
-        <Input type="date" size="sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Desde" />
-        <Input type="date" size="sm" value={dateTo}   onChange={e => setDateTo(e.target.value)}   title="Hasta" />
-      </div>
-
       {rows.length === 0 ? (
         <div style={{ color: 'var(--fg-muted)', fontSize: 13, padding: '20px 0' }}>
           Sin registros para el período seleccionado
