@@ -8,6 +8,8 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import Shell from '../../shared/ui/Shell'
+import ContextNavBand from '../../shared/ui/ContextNavBand'
+import type { ContextNavTab } from '../../shared/ui/ContextNavBand'
 import TrackMap from '../vehicle/TrackMap'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
@@ -1130,7 +1132,10 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
 
 // ── Configuración de pestañas ─────────────────────────────────────────────────
 
-const REPORT_TABS_CONFIG: { key: ReportsTab; label: string; icon: string }[] = [
+// px desde la izquierda — alinea el segmentado bajo "Reportes" en la topnav
+const REPORTS_SUBNAV_OFFSET_PX = 505
+
+const REPORT_TABS_CONFIG: ContextNavTab[] = [
   { key: 'historico',     label: 'Actividad',             icon: 'ti-chart-bar' },
   { key: 'mantenimiento', label: 'Intervenciones',         icon: 'ti-tool' },
   { key: 'rutas',         label: 'Rutas',                  icon: 'ti-route' },
@@ -1156,52 +1161,12 @@ export default function ReportsPage() {
     <Shell title="Reportes">
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-        {/* Banda de contexto — control segmentado a todo el ancho */}
-        <div style={{
-          borderTop: '1px solid var(--border)',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--bg-card)',
-          flexShrink: 0,
-          padding: '8px 20px',
-        }}>
-          <div style={{
-            display: 'inline-flex',
-            background: 'var(--bg-base)',
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            padding: 3,
-            gap: 2,
-          }}>
-            {REPORT_TABS_CONFIG.map(({ key, label, icon }) => {
-              const active = tab === key
-              return (
-                <button
-                  key={key}
-                  onClick={() => setTab(key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 14px',
-                    borderRadius: 7,
-                    border: 'none',
-                    background: active ? 'var(--cmg-teal)' : 'transparent',
-                    color: active ? 'var(--bg-base)' : 'var(--fg-muted)',
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: 12,
-                    fontWeight: active ? 600 : 400,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'background 0.15s, color 0.15s',
-                  }}
-                >
-                  <i className={`ti ${icon}`} style={{ fontSize: 13 }} />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        <ContextNavBand
+          tabs={REPORT_TABS_CONFIG}
+          activeKey={tab}
+          onChange={(k) => setTab(k as ReportsTab)}
+          offsetPx={REPORTS_SUBNAV_OFFSET_PX}
+        />
 
         <SelectorBar
           isCmg={isCmg}

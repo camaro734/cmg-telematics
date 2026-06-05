@@ -1,6 +1,20 @@
 # backend/app/api/v1/auth.py
+import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
+
+_STATIC_ROOT = Path("/app/static") if Path("/app/static").exists() else Path(__file__).parents[3] / "static"
+
+def _versioned_url(url: str | None) -> str | None:
+    """Añade ?v=<mtime_unix> a URLs /static/* locales para invalidar caché del navegador."""
+    if not url or not url.startswith("/static/"):
+        return url
+    try:
+        mtime = int(os.path.getmtime(_STATIC_ROOT / url[len("/static/"):]))
+        return f"{url}?v={mtime}"
+    except OSError:
+        return url
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,7 +86,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     return TokenResponse(
         access_token=create_access_token(payload),
         refresh_token=create_refresh_token(payload),
-        logo_url=tenant_row["logo_url"],
+        logo_url=_versioned_url(tenant_row["logo_url"]),
         brand_name=tenant_row["brand_name"],
         enabled_modules=tenant_row["enabled_modules"] or [],
     )
@@ -121,7 +135,7 @@ async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Dep
     return TokenResponse(
         access_token=create_access_token(new_payload),
         refresh_token=create_refresh_token(new_payload, expires_at=refresh_expires_at),
-        logo_url=tenant_row2["logo_url"],
+        logo_url=_versioned_url(tenant_row2["logo_url"]),
         brand_name=tenant_row2["brand_name"],
         enabled_modules=tenant_row2["enabled_modules"] or [],
     )

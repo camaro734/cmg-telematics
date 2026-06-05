@@ -68,9 +68,9 @@
 
   --fs-2xs: 10px;
   --fs-xs:  11px;
-  --fs-sm:  12px;
-  --fs-md:  13px;
-  --fs-base:14px;
+  --fs-sm:  13px;
+  --fs-md:  14px;
+  --fs-base:15px;
   --fs-lg:  16px;
   --fs-xl:  18px;
   --fs-2xl: 22px;
@@ -135,7 +135,7 @@
 
   /* ---------- Layout ---------- */
   --sidebar-w: 0px;
-  --topbar-h:  62px;
+  --topbar-h:  70px;
 
   /* ---------- Chart series (Recharts) ---------- */
   --chart-1: #1D9E75;

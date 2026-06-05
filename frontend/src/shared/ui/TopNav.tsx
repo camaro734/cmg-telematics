@@ -485,7 +485,7 @@ export default function TopNav() {
     background: 'transparent',
     color: 'var(--fg-tertiary)',
     fontFamily: 'var(--font-sans)',
-    fontSize: 13,
+    fontSize: 15,
     cursor: 'pointer',
     transition: 'background 0.12s, color 0.12s',
     whiteSpace: 'nowrap',
@@ -528,13 +528,13 @@ export default function TopNav() {
               src={logoUrl}
               alt="logo"
               onError={() => setLogoImgError(true)}
-              style={{ width: isMobile ? 130 : 160, height: isMobile ? 46 : 52, objectFit: 'contain', objectPosition: 'left center', display: 'block' }}
+              style={{ width: isMobile ? 140 : 200, height: isMobile ? 48 : 62, objectFit: 'contain', display: 'block' }}
             />
           : <img
               src="/static/logos/cmgtrack.png"
               alt="CMG Track"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-              style={{ width: isMobile ? 130 : 160, height: isMobile ? 46 : 52, objectFit: 'contain', objectPosition: 'left center', display: 'block' }}
+              style={{ width: isMobile ? 140 : 200, height: isMobile ? 48 : 62, objectFit: 'contain', display: 'block' }}
             />
         }
       </button>
@@ -603,13 +603,13 @@ export default function TopNav() {
                     ? '2px solid var(--cmg-teal)'
                     : '2px solid transparent',
                   textDecoration: 'none',
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: isActive ? 500 : 400,
                   transition: 'color 0.15s, border-color 0.15s',
                   whiteSpace: 'nowrap',
                 })}
               >
-                <Icon width={16} height={16}/>
+                <Icon width={18} height={18}/>
                 {label}
               </NavLink>
             ))}
