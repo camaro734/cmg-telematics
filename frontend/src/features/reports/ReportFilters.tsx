@@ -117,7 +117,7 @@ export function SelectorBar({
   vehicles, vehicleId, setVehicleId,
   period, setPeriod,
   customFrom, customTo, setCustomFrom, setCustomTo,
-  pdfSlot, onBack,
+  pdfSlot, onBack, hideVehicleSelect,
 }: {
   isCmg: boolean
   tenants: TenantOut[]
@@ -134,6 +134,7 @@ export function SelectorBar({
   setCustomTo: (v: string) => void
   pdfSlot?: React.ReactNode
   onBack?: () => void
+  hideVehicleSelect?: boolean
 }) {
   const periodBtn = (p: Period): React.CSSProperties => ({
     padding: '5px 14px', fontSize: 12, fontWeight: 600,
@@ -146,15 +147,7 @@ export function SelectorBar({
   const today = new Date().toISOString().slice(0, 10)
 
   return (
-    <div style={{
-      padding: '12px 20px',
-      borderBottom: '1px solid var(--border)',
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      flexWrap: 'wrap',
-    }}>
+    <>
       {onBack && (
         <button
           onClick={onBack}
@@ -176,13 +169,15 @@ export function SelectorBar({
         </button>
       )}
 
-      <Select size="sm" value={vehicleId} onChange={e => setVehicleId(e.target.value)}
-        style={{ background: 'var(--bg-card)', color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}>
-        <option value="">— Selecciona un vehículo —</option>
-        {vehicles.map(v => (
-          <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
-        ))}
-      </Select>
+      {!hideVehicleSelect && (
+        <Select size="sm" value={vehicleId} onChange={e => setVehicleId(e.target.value)}
+          style={{ background: 'var(--bg-card)', color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}>
+          <option value="">— Selecciona un vehículo —</option>
+          {vehicles.map(v => (
+            <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
+          ))}
+        </Select>
+      )}
 
       <div style={{ display: 'flex', gap: 4, marginLeft: 4, flexWrap: 'wrap', alignItems: 'center' }}>
         {(['dia', 'semana', 'mes', 'custom'] as Period[]).map(p => (
@@ -223,6 +218,6 @@ export function SelectorBar({
       )}
 
       <div style={{ marginLeft: 'auto' }}>{pdfSlot}</div>
-    </div>
+    </>
   )
 }

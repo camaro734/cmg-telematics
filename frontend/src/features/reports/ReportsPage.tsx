@@ -17,6 +17,7 @@ import { exportToCsv } from '../../lib/csvExport'
 import { useReportData, periodToHours, PERIOD_LABELS } from './useReportData'
 import { SelectorBar, PdfDownloadBtn } from './ReportFilters'
 import { Input } from '../../shared/ui/Input'
+import { Select } from '../../shared/ui/Select'
 import type { Period } from './useReportData'
 import type { ReportsTab } from './useReportsTabStore'
 import type {
@@ -1132,9 +1133,6 @@ function AlertasTab({ vehicleId }: { vehicleId: string }) {
 
 // ── Configuración de pestañas ─────────────────────────────────────────────────
 
-// px desde la izquierda — alinea el segmentado bajo "Reportes" en la topnav
-const REPORTS_SUBNAV_OFFSET_PX = 505
-
 const REPORT_TABS_CONFIG: ContextNavTab[] = [
   { key: 'historico',     label: 'Actividad',             icon: 'ti-chart-bar' },
   { key: 'mantenimiento', label: 'Intervenciones',         icon: 'ti-tool' },
@@ -1165,30 +1163,44 @@ export default function ReportsPage() {
           tabs={REPORT_TABS_CONFIG}
           activeKey={tab}
           onChange={(k) => setTab(k as ReportsTab)}
-          offsetPx={REPORTS_SUBNAV_OFFSET_PX}
-        />
-
-        <SelectorBar
-          isCmg={isCmg}
-          tenants={tenants}
-          tenantId={tenantId}
-          setTenantId={setTenantId}
-          vehicles={vehicles}
-          vehicleId={vehicleId}
-          setVehicleId={setVehicleId}
-          period={period}
-          setPeriod={setPeriod}
-          customFrom={customFrom}
-          customTo={customTo}
-          setCustomFrom={setCustomFrom}
-          setCustomTo={setCustomTo}
-          onBack={fromVehicleId ? () => navigate(-1) : undefined}
-          pdfSlot={
-            <PdfDownloadBtn
-              vehicleId={vehicleId}
-              vehicles={vehicles}
+          leftSlot={
+            <Select
+              size="sm"
+              value={vehicleId}
+              onChange={e => setVehicleId(e.target.value)}
+              style={{ background: 'var(--bg-card)', color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}
+            >
+              <option value="">— Selecciona un vehículo —</option>
+              {vehicles.map(v => (
+                <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
+              ))}
+            </Select>
+          }
+          rightSlot={
+            <SelectorBar
               isCmg={isCmg}
-              tenantId={tenantId || selectedVehicle?.tenant_id || ''}
+              tenants={tenants}
+              tenantId={tenantId}
+              setTenantId={setTenantId}
+              vehicles={vehicles}
+              vehicleId={vehicleId}
+              setVehicleId={setVehicleId}
+              period={period}
+              setPeriod={setPeriod}
+              customFrom={customFrom}
+              customTo={customTo}
+              setCustomFrom={setCustomFrom}
+              setCustomTo={setCustomTo}
+              onBack={fromVehicleId ? () => navigate(-1) : undefined}
+              hideVehicleSelect={true}
+              pdfSlot={
+                <PdfDownloadBtn
+                  vehicleId={vehicleId}
+                  vehicles={vehicles}
+                  isCmg={isCmg}
+                  tenantId={tenantId || selectedVehicle?.tenant_id || ''}
+                />
+              }
             />
           }
         />

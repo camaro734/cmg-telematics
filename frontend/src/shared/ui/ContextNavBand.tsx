@@ -1,24 +1,22 @@
-import type { ComponentType } from 'react'
-import { useIsMobile } from '../../lib/useIsMobile'
+import type { ComponentType, ReactNode } from 'react'
 
 export interface ContextNavTab {
   key: string
   label: string
-  icon?: string                                          // clase CSS, e.g. 'ti-chart-bar'
+  icon?: string                                               // clase CSS, e.g. 'ti-chart-bar'
   Icon?: ComponentType<{ width?: number; height?: number }>  // componente SVG (Mantenimiento, Alertas)
-  count?: number                                         // badge numérico opcional
+  count?: number                                              // badge numérico opcional
 }
 
 interface ContextNavBandProps {
   tabs: ContextNavTab[]
   activeKey: string
   onChange: (key: string) => void
-  offsetPx?: number  // desplazamiento izq. del segmentado en escritorio; 0 en móvil
+  leftSlot?: ReactNode   // control contextual antes del segmentado (extremo izquierdo)
+  rightSlot?: ReactNode  // controles contextuales alineados a la derecha de la barra
 }
 
-export default function ContextNavBand({ tabs, activeKey, onChange, offsetPx = 0 }: ContextNavBandProps) {
-  const isMobile = useIsMobile()
-
+export default function ContextNavBand({ tabs, activeKey, onChange, leftSlot, rightSlot }: ContextNavBandProps) {
   return (
     <div style={{
       borderTop: '1px solid var(--border)',
@@ -26,7 +24,16 @@ export default function ContextNavBand({ tabs, activeKey, onChange, offsetPx = 0
       background: 'var(--bg-card)',
       flexShrink: 0,
       padding: '8px 20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      flexWrap: 'wrap',
     }}>
+
+      {/* leftSlot — extremo izquierdo (selector de vehículo, etc.) */}
+      {leftSlot}
+
+      {/* Segmentado */}
       <div style={{
         display: 'inline-flex',
         background: 'var(--bg-base)',
@@ -34,7 +41,7 @@ export default function ContextNavBand({ tabs, activeKey, onChange, offsetPx = 0
         borderRadius: 10,
         padding: 3,
         gap: 2,
-        marginLeft: isMobile ? 0 : offsetPx,
+        flexShrink: 0,
       }}>
         {tabs.map(({ key, label, icon, Icon, count }) => {
           const active = key === activeKey
@@ -83,6 +90,21 @@ export default function ContextNavBand({ tabs, activeKey, onChange, offsetPx = 0
           )
         })}
       </div>
+
+      {/* rightSlot — toma el espacio restante; pdfSlot dentro usa marginLeft:auto para ir al extremo */}
+      {rightSlot && (
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap',
+          minWidth: 0,
+        }}>
+          {rightSlot}
+        </div>
+      )}
+
     </div>
   )
 }
