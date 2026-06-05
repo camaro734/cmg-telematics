@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -817,11 +817,11 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
 
 // ── RUTAS tab ─────────────────────────────────────────────────────────────────
 
-function RutasTab({ vehicleId }: { vehicleId: string }) {
+function RutasTab({ vehicleId, date }: { vehicleId: string; date: string }) {
   const isMobile = useIsMobile()
-  const today = new Date().toISOString().slice(0, 10)
-  const [date, setDate] = useState(today)
   const [selectedIdx, setSelectedIdx] = useState(1)
+
+  useEffect(() => { setSelectedIdx(1) }, [date])
 
   const { data: dayTrips, isFetching } = useQuery<DayTrips>({
     queryKey: [...keys.vehicleTrips(vehicleId), date],
@@ -846,12 +846,7 @@ function RutasTab({ vehicleId }: { vehicleId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <label style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Fecha</label>
-        <Input type="date" size="sm" value={date} max={today} onChange={e => { setDate(e.target.value); setSelectedIdx(1) }} />
-        {isFetching && <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Cargando…</span>}
-      </div>
+      {isFetching && <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Cargando…</span>}
 
       {/* Resumen del día */}
       {totals && (
@@ -974,12 +969,30 @@ function DaySummaryCard({ label, value, accent }: { label: string; value: string
 
 type Severity = 'all' | 'critical' | 'warning' | 'info'
 
-function AlertasTab({ vehicleId }: { vehicleId: string }) {
+function AlertasTab({ vehicleId, period, customFrom, customTo }: {
+  vehicleId: string
+  period: Period
+  customFrom: string
+  customTo: string
+}) {
   const [severityFilter, setSeverityFilter] = useState<Severity>('all')
 
+  const hours = periodToHours(period, customFrom, customTo)
+  const now = new Date()
+  const alertFrom = period === 'custom'
+    ? new Date(customFrom + 'T00:00:00').toISOString()
+    : new Date(now.getTime() - hours * 3_600_000).toISOString()
+  const alertTo = period === 'custom'
+    ? new Date(customTo + 'T23:59:59').toISOString()
+    : now.toISOString()
+
   const { data: alerts = [] } = useQuery<AlertInstanceOut[]>({
-    queryKey: [...keys.alerts(), 'reports', vehicleId],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?vehicle_id=${vehicleId}&limit=200`),
+    queryKey: [...keys.alerts(), 'reports', vehicleId, period, customFrom, customTo],
+    queryFn: () => apiClient.get<AlertInstanceOut[]>(
+      `/api/v1/alerts?vehicle_id=${vehicleId}&limit=500` +
+      `&triggered_at_from=${encodeURIComponent(alertFrom)}` +
+      `&triggered_at_to=${encodeURIComponent(alertTo)}`
+    ),
     enabled: Boolean(vehicleId),
     staleTime: 60_000,
   })
@@ -1155,6 +1168,55 @@ export default function ReportsPage() {
     selectedVehicle,
   } = useReportData()
 
+  const today = new Date().toISOString().slice(0, 10)
+  const [routeDate, setRouteDate] = useState(today)
+
+  const periodRightSlot = (
+    <SelectorBar
+      isCmg={isCmg}
+      tenants={tenants}
+      tenantId={tenantId}
+      setTenantId={setTenantId}
+      vehicles={vehicles}
+      vehicleId={vehicleId}
+      setVehicleId={setVehicleId}
+      period={period}
+      setPeriod={setPeriod}
+      customFrom={customFrom}
+      customTo={customTo}
+      setCustomFrom={setCustomFrom}
+      setCustomTo={setCustomTo}
+      hideVehicleSelect={true}
+    />
+  )
+
+  const rightSlotByTab: Record<ReportsTab, React.ReactNode> = {
+    historico: (
+      <>
+        {periodRightSlot}
+        <div style={{ marginLeft: 'auto' }}>
+          <PdfDownloadBtn
+            vehicleId={vehicleId}
+            vehicles={vehicles}
+            isCmg={isCmg}
+            tenantId={tenantId || selectedVehicle?.tenant_id || ''}
+          />
+        </div>
+      </>
+    ),
+    rutas: (
+      <Input
+        type="date"
+        size="sm"
+        value={routeDate}
+        max={today}
+        onChange={e => setRouteDate(e.target.value)}
+      />
+    ),
+    mantenimiento: null,
+    alertas: periodRightSlot,
+  }
+
   return (
     <Shell title="Reportes">
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -1164,45 +1226,33 @@ export default function ReportsPage() {
           activeKey={tab}
           onChange={(k) => setTab(k as ReportsTab)}
           leftSlot={
-            <Select
-              size="sm"
-              value={vehicleId}
-              onChange={e => setVehicleId(e.target.value)}
-              style={{ background: 'var(--bg-card)', color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}
-            >
-              <option value="">— Selecciona un vehículo —</option>
-              {vehicles.map(v => (
-                <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
-              ))}
-            </Select>
+            <>
+              {fromVehicleId && (
+                <button
+                  onClick={() => navigate(-1)}
+                  style={{
+                    background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+                    padding: '4px 10px', fontSize: 13, color: 'var(--fg-muted)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                  }}
+                >
+                  ‹ Volver
+                </button>
+              )}
+              <Select
+                size="sm"
+                value={vehicleId}
+                onChange={e => setVehicleId(e.target.value)}
+                style={{ background: 'var(--bg-card)', color: vehicleId ? 'var(--fg-primary)' : 'var(--fg-muted)', minWidth: 180 }}
+              >
+                <option value="">— Selecciona un vehículo —</option>
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.id}>{v.name}{v.license_plate ? ` (${v.license_plate})` : ''}</option>
+                ))}
+              </Select>
+            </>
           }
-          rightSlot={
-            <SelectorBar
-              isCmg={isCmg}
-              tenants={tenants}
-              tenantId={tenantId}
-              setTenantId={setTenantId}
-              vehicles={vehicles}
-              vehicleId={vehicleId}
-              setVehicleId={setVehicleId}
-              period={period}
-              setPeriod={setPeriod}
-              customFrom={customFrom}
-              customTo={customTo}
-              setCustomFrom={setCustomFrom}
-              setCustomTo={setCustomTo}
-              onBack={fromVehicleId ? () => navigate(-1) : undefined}
-              hideVehicleSelect={true}
-              pdfSlot={
-                <PdfDownloadBtn
-                  vehicleId={vehicleId}
-                  vehicles={vehicles}
-                  isCmg={isCmg}
-                  tenantId={tenantId || selectedVehicle?.tenant_id || ''}
-                />
-              }
-            />
-          }
+          rightSlot={rightSlotByTab[tab]}
         />
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
@@ -1220,10 +1270,10 @@ export default function ReportsPage() {
             <MantenimientoTab vehicleId={vehicleId} />
           )}
           {tab === 'rutas' && (
-            <RutasTab vehicleId={vehicleId} />
+            <RutasTab vehicleId={vehicleId} date={routeDate} />
           )}
           {tab === 'alertas' && (
-            <AlertasTab vehicleId={vehicleId} />
+            <AlertasTab vehicleId={vehicleId} period={period} customFrom={customFrom} customTo={customTo} />
           )}
         </div>
       </div>
