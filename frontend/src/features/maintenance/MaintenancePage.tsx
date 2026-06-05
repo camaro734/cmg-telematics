@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
+import ContextNavBand from '../../shared/ui/ContextNavBand'
+import type { ContextNavTab } from '../../shared/ui/ContextNavBand'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import ProgressBar from './ProgressBar'
 import ThresholdBuilder from './ThresholdBuilder'
@@ -205,129 +207,79 @@ export default function MaintenancePage() {
       p.name.toLowerCase().includes(searchLower))
     .sort((a, b) => (STATUS_ORDER[a.progress.status] ?? 3) - (STATUS_ORDER[b.progress.status] ?? 3))
 
-  const pillDefs: Array<{ key: StatusFilter; label: string; count: number; color: string }> = [
-    { key: 'all',      label: 'Todos',   count: byVehicle.length, color: 'var(--fg-secondary)' },
-    { key: 'vencido',  label: 'Vencido', count: countVencido,     color: 'var(--danger)' },
-    { key: 'próximo',  label: 'Próximo', count: countProximo,     color: 'var(--warn)' },
-    { key: 'ok',       label: 'Al día',  count: countOk,          color: 'var(--ok)' },
+  const tabsConfig: ContextNavTab[] = [
+    { key: 'all',      label: 'Todos',   count: byVehicle.length },
+    { key: 'vencido',  label: 'Vencido', count: countVencido     },
+    { key: 'próximo',  label: 'Próximo', count: countProximo     },
+    { key: 'ok',       label: 'Al día',  count: countOk          },
   ]
 
   return (
     <Shell title="Mantenimiento">
-      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-        {/* ── Cabecera ─────────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, color: 'var(--fg-primary)', lineHeight: 1.2 }}>
-              Mantenimiento
+        <ContextNavBand
+          tabs={tabsConfig}
+          activeKey={statusFilter}
+          onChange={(k) => setStatusFilter(k as StatusFilter)}
+          leftSlot={
+            <>
+              <Select
+                size="sm"
+                value={vehicleFilter}
+                onChange={e => { setVehicleFilter(e.target.value); setStatusFilter('all') }}
+              >
+                <option value="">Todos los vehículos</option>
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </Select>
+              <input
+                type="search"
+                placeholder="Buscar vehículo o plan…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '5px 10px', fontSize: 'var(--fs-sm)',
+                  color: 'var(--fg-primary)', colorScheme: 'dark', outline: 'none', width: 200,
+                }}
+              />
+            </>
+          }
+          rightSlot={
+            <>
+              <button
+                onClick={handleExportCsv}
+                style={{
+                  padding: '5px 12px', background: 'transparent', color: 'var(--fg-secondary)',
+                  border: '1px solid var(--border)', borderRadius: 6, fontSize: 'var(--fs-sm)',
+                  cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap',
+                }}
+              >
+                Exportar CSV
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => openForm('new')}
+                  style={{
+                    background: 'var(--cmg-teal)', color: '#fff', border: 'none',
+                    borderRadius: 6, padding: '5px 14px', fontSize: 'var(--fs-sm)',
+                    fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  + Nuevo plan
+                </button>
+              )}
+            </>
+          }
+        />
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {!isLoading && (
+            <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-muted)' }}>
+              {plans.length} {plans.length === 1 ? 'plan' : 'planes'} · {uniqueVehicles} vehículo{uniqueVehicles !== 1 ? 's' : ''}
             </div>
-            {!isLoading && (
-              <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-muted)', marginTop: 3 }}>
-                {plans.length} {plans.length === 1 ? 'plan' : 'planes'} · {uniqueVehicles} vehículo{uniqueVehicles !== 1 ? 's' : ''}
-              </div>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-            <button
-              onClick={handleExportCsv}
-              style={{
-                padding: '7px 14px',
-                background: 'transparent',
-                color: 'var(--fg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                fontSize: 'var(--fs-sm)',
-                cursor: 'pointer',
-                fontWeight: 500,
-              }}
-            >
-              Exportar CSV
-            </button>
-            {isAdmin && (
-              <button
-                onClick={() => openForm('new')}
-                style={{
-                  background: 'var(--cmg-teal)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '7px 16px',
-                  fontSize: 'var(--fs-sm)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                + Nuevo plan
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── Barra de filtros ─────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Select
-            size="sm"
-            value={vehicleFilter}
-            onChange={e => { setVehicleFilter(e.target.value); setStatusFilter('all') }}
-          >
-            <option value="">Todos los vehículos</option>
-            {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </Select>
-
-          <input
-            type="search"
-            placeholder="Buscar vehículo o plan…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              padding: '5px 10px',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--fg-primary)',
-              colorScheme: 'dark',
-              outline: 'none',
-              width: 200,
-            }}
-          />
-
-          <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px' }} />
-
-          {pillDefs.map(({ key, label, count, color }) => {
-            const active = statusFilter === key
-            return (
-              <button
-                key={key}
-                onClick={() => setStatusFilter(key)}
-                style={{
-                  background: active ? 'var(--bg-elevated)' : 'transparent',
-                  border: active ? '1px solid var(--border-strong)' : '1px solid transparent',
-                  borderRadius: 20,
-                  padding: '3px 10px',
-                  fontSize: 'var(--fs-sm)',
-                  cursor: 'pointer',
-                  color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  fontWeight: active ? 600 : 400,
-                  transition: 'background 0.15s, border-color 0.15s',
-                }}
-              >
-                {label}
-                <span style={{
-                  fontSize: 'var(--fs-2xs)',
-                  fontWeight: 700,
-                  color: count > 0 ? color : 'var(--fg-dim)',
-                }}>
-                  {count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+          )}
 
         {/* ── Tabla ────────────────────────────────────────────────────────── */}
         {isLoading ? (
@@ -611,6 +563,7 @@ export default function MaintenancePage() {
           </div>
         </div>
       )}
+      </div>{/* fin flex column outer */}
     </Shell>
   )
 }
