@@ -22,8 +22,8 @@ import type { Period } from './useReportData'
 import type { ReportsTab } from './useReportsTabStore'
 import type {
   VehicleTypeOut, KpiHour,
-  AlertInstanceOut, MaintenancePlanOut, MaintenanceLogOut,
-  RuleOut, DayTrips, Trip,
+  MaintenancePlanOut, MaintenanceLogOut,
+  DayTrips, Trip,
 } from '../../lib/types'
 
 // ── Style constants ───────────────────────────────────────────────────────────
@@ -965,192 +965,12 @@ function DaySummaryCard({ label, value, accent }: { label: string; value: string
   )
 }
 
-// ── ALERTAS tab ───────────────────────────────────────────────────────────────
-
-type Severity = 'all' | 'critical' | 'warning' | 'info'
-
-function AlertasTab({ vehicleId, period, customFrom, customTo }: {
-  vehicleId: string
-  period: Period
-  customFrom: string
-  customTo: string
-}) {
-  const [severityFilter, setSeverityFilter] = useState<Severity>('all')
-
-  const hours = periodToHours(period, customFrom, customTo)
-  const now = new Date()
-  const alertFrom = period === 'custom'
-    ? new Date(customFrom + 'T00:00:00').toISOString()
-    : new Date(now.getTime() - hours * 3_600_000).toISOString()
-  const alertTo = period === 'custom'
-    ? new Date(customTo + 'T23:59:59').toISOString()
-    : now.toISOString()
-
-  const { data: alerts = [] } = useQuery<AlertInstanceOut[]>({
-    queryKey: [...keys.alerts(), 'reports', vehicleId, period, customFrom, customTo],
-    queryFn: () => apiClient.get<AlertInstanceOut[]>(
-      `/api/v1/alerts?vehicle_id=${vehicleId}&limit=500` +
-      `&triggered_at_from=${encodeURIComponent(alertFrom)}` +
-      `&triggered_at_to=${encodeURIComponent(alertTo)}`
-    ),
-    enabled: Boolean(vehicleId),
-    staleTime: 60_000,
-  })
-
-  const { data: rules = [] } = useQuery<RuleOut[]>({
-    queryKey: keys.rules(),
-    queryFn: () => apiClient.get<RuleOut[]>('/api/v1/rules'),
-    staleTime: 300_000,
-  })
-
-  const ruleMap = new Map(rules.map(r => [r.id, r]))
-
-  if (!vehicleId) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
-        Selecciona un vehículo para ver las alertas
-      </div>
-    )
-  }
-
-  const rows = alerts
-    .filter(a => a.vehicle_id === vehicleId)
-    .filter(a => severityFilter === 'all' || (ruleMap.get(a.rule_id)?.severity ?? 'info') === severityFilter)
-    .sort((a, b) => (b.triggered_at > a.triggered_at ? 1 : -1))
-
-  const statusColors: Record<string, string> = {
-    firing: 'var(--danger)',
-    escalated: 'var(--danger)',
-    acknowledged: 'var(--warn)',
-    resolved: 'var(--ok)',
-  }
-  const statusLabels: Record<string, string> = {
-    firing: 'Activa', escalated: 'Escalada', acknowledged: 'Reconocida', resolved: 'Resuelta',
-  }
-
-  const severityColors: Record<string, string> = {
-    critical: 'var(--danger)',
-    warning: 'var(--warn)',
-    info: 'var(--info)',
-  }
-  const severityLabels: Record<string, string> = {
-    critical: 'CRÍTICA', warning: 'AVISO', info: 'INFO',
-  }
-
-  function handleCsvExport() {
-    const csvRows = rows.map(a => {
-      const rule = ruleMap.get(a.rule_id)
-      return {
-        'Fecha': a.triggered_at ? new Date(a.triggered_at).toLocaleString('es-ES') : '—',
-        'Regla': rule?.name ?? a.rule_id,
-        'Severidad': rule?.severity ?? '—',
-        'Estado': statusLabels[a.status] ?? a.status,
-        'Resuelta': a.resolved_at ? new Date(a.resolved_at).toLocaleString('es-ES') : '',
-      }
-    })
-    exportToCsv(`alertas-${vehicleId}.csv`, csvRows)
-  }
-
-  const severityFilterBtn = (s: Severity, color?: string): React.CSSProperties => ({
-    padding: '4px 12px', fontSize: 11, fontWeight: 600,
-    fontFamily: 'var(--font-sans)', border: `1px solid ${color ?? 'var(--border)'}`,
-    borderRadius: 20, cursor: 'pointer',
-    background: severityFilter === s ? (color ?? 'var(--bg-card)') : 'transparent',
-    color: severityFilter === s ? '#fff' : (color ?? 'var(--fg-muted)'),
-    transition: 'all 0.15s',
-  })
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--fg-muted)', marginRight: 4 }}>Severidad:</span>
-          <button style={severityFilterBtn('all')} onClick={() => setSeverityFilter('all')}>Todas</button>
-          <button style={severityFilterBtn('critical', 'var(--danger)')} onClick={() => setSeverityFilter('critical')}>Crítica</button>
-          <button style={severityFilterBtn('warning', 'var(--warn)')} onClick={() => setSeverityFilter('warning')}>Aviso</button>
-          <button style={severityFilterBtn('info', 'var(--info)')} onClick={() => setSeverityFilter('info')}>Info</button>
-        </div>
-        <button style={btnSecondary} onClick={handleCsvExport} disabled={rows.length === 0}>
-          ⬇ CSV
-        </button>
-      </div>
-
-      <div style={{ ...card, overflowX: 'auto' }}>
-        {rows.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--fg-muted)', padding: '16px 0', textAlign: 'center' }}>
-            Sin alertas registradas
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Fecha</th>
-                <th style={thStyle}>Nombre regla</th>
-                <th style={thStyle}>Severidad</th>
-                <th style={thStyle}>Estado</th>
-                <th style={thStyle}>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(a => {
-                const rule = ruleMap.get(a.rule_id)
-                const sev = rule?.severity ?? 'info'
-                const trigVal = a.trigger_value ? JSON.stringify(a.trigger_value) : '—'
-                const valStr = trigVal.length > 24 ? trigVal.slice(0, 24) + '…' : trigVal
-                return (
-                  <tr key={a.id}>
-                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap' }}>
-                      {a.triggered_at ? new Date(a.triggered_at).toLocaleString('es-ES', {
-                        day: '2-digit', month: '2-digit', year: '2-digit',
-                        hour: '2-digit', minute: '2-digit',
-                      }) : '—'}
-                    </td>
-                    <td style={{ ...tdStyle, fontSize: 12 }}>
-                      {rule?.name ?? (
-                        <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                          {a.rule_id.slice(0, 8)}…
-                        </span>
-                      )}
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                        background: `${severityColors[sev] ?? '#64748B'}22`,
-                        color: severityColors[sev] ?? 'var(--fg-muted)',
-                      }}>
-                        {severityLabels[sev] ?? sev.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                        background: `${statusColors[a.status] ?? '#64748B'}22`,
-                        color: statusColors[a.status] ?? 'var(--fg-muted)',
-                      }}>
-                        {statusLabels[a.status] ?? a.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                      {valStr}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Configuración de pestañas ─────────────────────────────────────────────────
 
 const REPORT_TABS_CONFIG: ContextNavTab[] = [
-  { key: 'historico',     label: 'Actividad',             icon: 'ti-chart-bar' },
-  { key: 'mantenimiento', label: 'Intervenciones',         icon: 'ti-tool' },
-  { key: 'rutas',         label: 'Rutas',                  icon: 'ti-route' },
-  { key: 'alertas',       label: 'Historial de alertas',   icon: 'ti-bell' },
+  { key: 'historico',     label: 'Actividad',     icon: 'ti-chart-bar' },
+  { key: 'mantenimiento', label: 'Intervenciones', icon: 'ti-tool' },
+  { key: 'rutas',         label: 'Rutas',          icon: 'ti-route' },
 ]
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -1214,7 +1034,6 @@ export default function ReportsPage() {
       />
     ),
     mantenimiento: null,
-    alertas: periodRightSlot,
   }
 
   return (
@@ -1271,9 +1090,6 @@ export default function ReportsPage() {
           )}
           {tab === 'rutas' && (
             <RutasTab vehicleId={vehicleId} date={routeDate} />
-          )}
-          {tab === 'alertas' && (
-            <AlertasTab vehicleId={vehicleId} period={period} customFrom={customFrom} customTo={customTo} />
           )}
         </div>
       </div>

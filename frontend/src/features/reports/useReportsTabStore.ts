@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ReportsTab = 'historico' | 'mantenimiento' | 'rutas' | 'alertas'
+export type ReportsTab = 'historico' | 'mantenimiento' | 'rutas'
 
 interface ReportsTabStore {
   tab: ReportsTab
@@ -11,7 +11,6 @@ export const REPORTS_TABS: { key: ReportsTab; label: string }[] = [
   { key: 'historico',     label: 'HISTÓRICO' },
   { key: 'mantenimiento', label: 'MANTENIMIENTO' },
   { key: 'rutas',         label: 'RUTAS' },
-  { key: 'alertas',       label: 'ALERTAS' },
 ]
 
 export const useReportsTabStore = create<ReportsTabStore>(set => ({
