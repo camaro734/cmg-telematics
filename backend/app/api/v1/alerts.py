@@ -94,19 +94,30 @@ async def acknowledge_alert(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
     if user.tenant_tier != "cmg" and str(alert.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
-    if alert.status not in ("firing", "escalated"):
+    if alert.status == "acknowledged":
+        pass  # idempotente: devuelve sin re-escribir
+    elif alert.status in ("firing", "escalated"):
+        alert.status = "acknowledged"
+        alert.ack_by_user_id = user.user_id
+        alert.ack_at = datetime.now(timezone.utc)
+        alert.ack_note = body.note
+        await db.commit()
+        await db.refresh(alert)
+    else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se puede reconocer alerta en estado '{alert.status}'",
         )
 
-    alert.status = "acknowledged"
-    alert.ack_by_user_id = user.user_id
-    alert.ack_at = datetime.now(timezone.utc)
-    alert.ack_note = body.note
-    await db.commit()
-    await db.refresh(alert)
-    return alert
+    # Normaliza trigger_value: alertas antiguas lo almacenan como string JSON
+    row = {c.key: getattr(alert, c.key) for c in AlertInstance.__table__.columns}
+    tv = row.get("trigger_value")
+    if isinstance(tv, str):
+        try:
+            row["trigger_value"] = json.loads(tv)
+        except (json.JSONDecodeError, ValueError):
+            row["trigger_value"] = None
+    return AlertInstanceOut(**row)
 
 
 @router.get("/alerts/export.csv")
