@@ -228,7 +228,7 @@ export interface ConditionDef {
   type: 'threshold' | 'threshold_sustained' | 'accumulation' | 'trend_rising' | 'schedule' | 'composite' | 'geofence'
   field?: string
   op?: ConditionOp
-  value?: number
+  value?: number | boolean
   minutes?: number
   limit?: number
   threshold?: number

@@ -21,6 +21,18 @@ const CONDITION_TYPES = [
 
 const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
+// Campos top-level que el engine resuelve directamente (no pasan por can_data)
+const GENERAL_NUMERIC = [
+  { key: 'speed_kmh', label: 'Velocidad', unit: 'km/h' },
+] as const
+
+const GENERAL_BOOLEAN = [
+  { key: 'ignition',   label: 'Ignición' },
+  { key: 'pto_active', label: 'Toma de fuerza' },
+] as const
+
+const BOOLEAN_FIELDS = new Set(['ignition', 'pto_active'])
+
 interface Props {
   condition: ConditionDef
   sensors: SensorDef[]
@@ -28,98 +40,184 @@ interface Props {
   depth?: number
 }
 
-// Solo sensores con unidad numérica (excluye LEDs booleanos)
-function numericSensors(sensors: SensorDef[]): SensorDef[] {
-  return sensors.filter(s => s.unit !== null)
-}
-
-// Devuelve la clave que usa can_data para este sensor: avl_{id} si tiene avl_id, si no sensor.key
+// Devuelve la clave can_data que usa el engine: avl_{id} si tiene avl_id, si no sensor.key
 function sensorFieldKey(s: SensorDef): string {
   return s.avl_id != null ? `avl_${s.avl_id}` : s.key
 }
 
-function defaultCondition(type: ConditionDef['type'], sensors: SensorDef[]): ConditionDef {
-  const firstKey = sensors[0] ? sensorFieldKey(sensors[0]) : ''
-  const firstNumericKey = numericSensors(sensors)[0] ? sensorFieldKey(numericSensors(sensors)[0]) : firstKey
+// Siempre arranca con field vacío — el usuario debe elegir explícitamente
+function defaultCondition(type: ConditionDef['type']): ConditionDef {
   switch (type) {
-    case 'threshold':           return { type, field: firstKey, op: '>', value: 0 }
-    case 'threshold_sustained': return { type, field: firstKey, op: '>', value: 0, minutes: 5 }
-    case 'accumulation':        return { type, field: firstNumericKey, limit: 100 }
-    case 'trend_rising':        return { type, field: firstNumericKey, threshold: 1, window_minutes: 60 }
-    case 'schedule':            return { type, field: firstKey, expected_outside: false, schedule: { type: 'always' } }
+    case 'threshold':           return { type, field: '', op: '>', value: 0 }
+    case 'threshold_sustained': return { type, field: '', op: '>', value: 0, minutes: 5 }
+    case 'accumulation':        return { type, field: '', limit: 100 }
+    case 'trend_rising':        return { type, field: '', threshold: 1, window_minutes: 60 }
+    case 'schedule':            return { type, field: '', expected_outside: false, schedule: { type: 'always' } }
     case 'geofence':            return { type, polygon: [], action: 'enter' }
     case 'composite':
       return {
         type, op_composite: 'AND',
         conditions: [
-          { type: 'threshold', field: firstKey, op: '>', value: 0 },
-          { type: 'threshold', field: sensors[1] ? sensorFieldKey(sensors[1]) : firstKey, op: '>', value: 0 },
+          { type: 'threshold', field: '', op: '>', value: 0 },
+          { type: 'threshold', field: '', op: '>', value: 0 },
         ],
       }
   }
 }
 
-// Renderiza los campos específicos de una condición no-composite
 function SimpleCondition({ condition, sensors, onChange }: {
   condition: ConditionDef
   sensors: SensorDef[]
   onChange: (c: ConditionDef) => void
 }) {
   const t = condition.type
-  // Acumulador y tendencia solo permiten sensores con unidad numérica
-  const sensorList = t === 'accumulation' || t === 'trend_rising' ? numericSensors(sensors) : sensors
-  const unitLabel = sensors.find(s => sensorFieldKey(s) === condition.field || s.key === condition.field)?.unit ?? ''
+
+  // Solo sensores con avl_id son resolvibles por el engine (los que solo tienen kpi_key quedan fuera)
+  const avlSensors = sensors.filter(s => s.avl_id != null)
+  // Para acumulador/tendencia solo tiene sentido valores numéricos
+  const sensorList = (t === 'accumulation' || t === 'trend_rising')
+    ? avlSensors.filter(s => s.unit !== null)
+    : avlSensors
+
+  // Para accumulation/trend: solo speed_kmh del grupo general (ignition/pto son booleanos)
+  const showBooleanGeneral = t !== 'accumulation' && t !== 'trend_rising'
+
+  const isBoolean = BOOLEAN_FIELDS.has(condition.field ?? '')
+
+  // Etiqueta de unidad del campo seleccionado
+  const unitLabel = GENERAL_NUMERIC.find(f => f.key === condition.field)?.unit
+    ?? sensors.find(s => sensorFieldKey(s) === condition.field)?.unit
+    ?? ''
 
   const update = (patch: Partial<ConditionDef>) => onChange({ ...condition, ...patch })
 
+  const handleFieldChange = (newField: string) => {
+    if (BOOLEAN_FIELDS.has(newField)) {
+      // Al elegir campo booleano: fijar op == y valor true por defecto
+      update({ field: newField, op: '==', value: true })
+    } else {
+      update({ field: newField })
+    }
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      {/* Selector de sensor — muestra el key como valor de opción (necesario para tests y compatibilidad con el modelo de datos) */}
-      <Select value={condition.field ?? ''} onChange={e => update({ field: e.target.value })} style={{ background: 'var(--bg-card)' }}>
-        {sensorList.map(s => <option key={s.key} value={sensorFieldKey(s)}>{s.label || s.key}</option>)}
+      {/* Selector de variable agrupado */}
+      <Select
+        value={condition.field ?? ''}
+        onChange={e => handleFieldChange(e.target.value)}
+        style={{ background: 'var(--bg-card)' }}
+      >
+        <option value="" disabled>— Selecciona variable —</option>
+        <optgroup label="Telemetría general">
+          {GENERAL_NUMERIC.map(f => (
+            <option key={f.key} value={f.key}>{f.label} ({f.unit})</option>
+          ))}
+          {showBooleanGeneral && GENERAL_BOOLEAN.map(f => (
+            <option key={f.key} value={f.key}>{f.label}</option>
+          ))}
+        </optgroup>
+        {sensorList.length > 0 && (
+          <optgroup label="Sensores del vehículo">
+            {sensorList.map(s => (
+              <option key={s.key} value={sensorFieldKey(s)}>
+                {s.label || s.key}{s.unit ? ` (${s.unit})` : ''}
+              </option>
+            ))}
+          </optgroup>
+        )}
       </Select>
 
-      {/* Campos threshold y threshold_sustained */}
-      {(t === 'threshold' || t === 'threshold_sustained') && (
+      {/* Campos threshold / threshold_sustained — numérico */}
+      {(t === 'threshold' || t === 'threshold_sustained') && !isBoolean && (
         <>
-          <Select value={condition.op ?? '>'} onChange={e => update({ op: e.target.value as ConditionDef['op'] })} style={{ background: 'var(--bg-card)', width: 60 }}>
+          <Select
+            value={condition.op ?? '>'}
+            onChange={e => update({ op: e.target.value as ConditionDef['op'] })}
+            style={{ background: 'var(--bg-card)', width: 60 }}
+          >
             {OPS.map(op => <option key={op} value={op}>{op}</option>)}
           </Select>
-          <Input type="number" value={condition.value ?? 0} onChange={e => update({ value: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
+          <Input
+            type="number"
+            value={typeof condition.value === 'number' ? condition.value : 0}
+            onChange={e => update({ value: parseFloat(e.target.value) || 0 })}
+            style={{ background: 'var(--bg-card)', width: 80 }}
+          />
           {unitLabel && <span style={LABEL}>{unitLabel}</span>}
         </>
       )}
 
-      {/* Campos adicionales para threshold_sustained: duración en minutos */}
+      {/* Toggle activo/inactivo para campos booleanos (ignition, pto_active) */}
+      {(t === 'threshold' || t === 'threshold_sustained') && isBoolean && (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {([{ v: true, label: 'Activo' }, { v: false, label: 'Inactivo' }] as const).map(({ v, label }) => (
+            <button
+              key={String(v)}
+              type="button"
+              onClick={() => update({ value: v, op: '==' })}
+              style={{
+                padding: '4px 14px', fontSize: 12, fontFamily: 'var(--font-sans)',
+                border: 'none', borderRadius: 4, cursor: 'pointer',
+                background: condition.value === v ? 'var(--cmg-teal)' : 'var(--bg-card)',
+                color: condition.value === v ? '#fff' : 'var(--fg-muted)',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Duración adicional para threshold_sustained */}
       {t === 'threshold_sustained' && (
         <>
           <span style={LABEL}>durante</span>
-          <Input type="number" value={condition.minutes ?? 5} onChange={e => update({ minutes: parseInt(e.target.value) || 1 })} style={{ background: 'var(--bg-card)', width: 80 }} min={1} />
+          <Input
+            type="number"
+            value={condition.minutes ?? 5}
+            onChange={e => update({ minutes: parseInt(e.target.value) || 1 })}
+            style={{ background: 'var(--bg-card)', width: 80 }}
+            min={1}
+          />
           <span style={LABEL}>minutos</span>
         </>
       )}
 
-      {/* Campos acumulador */}
+      {/* Acumulador */}
       {t === 'accumulation' && (
         <>
           <span style={LABEL}>alcanza</span>
-          <Input type="number" value={condition.limit ?? 100} onChange={e => update({ limit: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
+          <Input
+            type="number"
+            value={condition.limit ?? 100}
+            onChange={e => update({ limit: parseFloat(e.target.value) || 0 })}
+            style={{ background: 'var(--bg-card)', width: 80 }}
+          />
           {unitLabel && <span style={LABEL}>{unitLabel}</span>}
         </>
       )}
 
-      {/* Campos tendencia */}
+      {/* Tendencia */}
       {t === 'trend_rising' && (
         <>
           <span style={LABEL}>pendiente &gt;</span>
-          <Input type="number" value={condition.threshold ?? 1} onChange={e => update({ threshold: parseFloat(e.target.value) || 0 })} style={{ background: 'var(--bg-card)', width: 80 }} />
+          <Input
+            type="number"
+            value={condition.threshold ?? 1}
+            onChange={e => update({ threshold: parseFloat(e.target.value) || 0 })}
+            style={{ background: 'var(--bg-card)', width: 80 }}
+          />
           <span style={LABEL}>en</span>
-          <Input type="number" value={condition.window_minutes ?? 60} onChange={e => update({ window_minutes: parseInt(e.target.value) || 1 })} style={{ background: 'var(--bg-card)', width: 80 }} />
+          <Input
+            type="number"
+            value={condition.window_minutes ?? 60}
+            onChange={e => update({ window_minutes: parseInt(e.target.value) || 1 })}
+            style={{ background: 'var(--bg-card)', width: 80 }}
+          />
           <span style={LABEL}>min</span>
         </>
       )}
 
-      {/* Campos horario: selector de días + rango horario */}
+      {/* Horario: selector de días + rango horario */}
       {t === 'schedule' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginLeft: 8 }}>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -187,24 +285,18 @@ function SimpleCondition({ condition, sensors, onChange }: {
 }
 
 export default function ConditionBuilder({ condition, sensors, onChange, depth = 0 }: Props) {
-  // Cambiar tipo borra los campos anteriores y aplica defaults
   const handleTypeChange = (newType: ConditionDef['type']) => {
-    onChange(defaultCondition(newType, sensors))
+    onChange(defaultCondition(newType))
   }
 
-  // Envuelve la condición actual en un composite AND con una nueva condición threshold
   const addComposite = () => {
     onChange({
       type: 'composite',
       op_composite: 'AND',
-      conditions: [
-        condition,
-        defaultCondition('threshold', sensors),
-      ],
+      conditions: [condition, defaultCondition('threshold')],
     })
   }
 
-  // Extrae la primera sub-condición del composite
   const removeComposite = () => {
     if (condition.type === 'composite' && condition.conditions?.length) {
       onChange(condition.conditions[0])
@@ -215,19 +307,24 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Selector del tipo de condición */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <Select value={condition.type} style={{ background: 'var(--bg-card)' }}
-          onChange={e => handleTypeChange(e.target.value as ConditionDef['type'])}>
+        <Select
+          value={condition.type}
+          style={{ background: 'var(--bg-card)' }}
+          onChange={e => handleTypeChange(e.target.value as ConditionDef['type'])}
+        >
           {CONDITION_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
         </Select>
       </div>
 
-      {/* Vista geofence: selector de acción + mapa con editor de polígono */}
       {condition.type === 'geofence' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={LABEL}>Disparar al</span>
-            <Select value={condition.action ?? 'enter'} style={{ background: 'var(--bg-card)' }}
-              onChange={e => onChange({ ...condition, action: e.target.value as 'enter' | 'exit' })}>
+            <Select
+              value={condition.action ?? 'enter'}
+              style={{ background: 'var(--bg-card)' }}
+              onChange={e => onChange({ ...condition, action: e.target.value as 'enter' | 'exit' })}
+            >
               <option value="enter">entrar en la zona</option>
               <option value="exit">salir de la zona</option>
             </Select>
@@ -243,17 +340,15 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
           )}
         </div>
       ) : condition.type === 'composite' ? (
-        /* Vista composite: dos sub-condiciones con operador AND/OR entre ellas */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 12, borderLeft: '2px solid var(--border)' }}>
           <SimpleCondition
-            condition={condition.conditions?.[0] ?? defaultCondition('threshold', sensors)}
+            condition={condition.conditions?.[0] ?? defaultCondition('threshold')}
             sensors={sensors}
             onChange={sub => onChange({
               ...condition,
-              conditions: [sub, condition.conditions?.[1] ?? defaultCondition('threshold', sensors)],
+              conditions: [sub, condition.conditions?.[1] ?? defaultCondition('threshold')],
             })}
           />
-          {/* Selector AND/OR + botón para deshacer composite */}
           <div style={{ display: 'flex', gap: 6 }}>
             {(['AND', 'OR'] as const).map(op => (
               <button
@@ -279,18 +374,17 @@ export default function ConditionBuilder({ condition, sensors, onChange, depth =
             >— quitar</button>
           </div>
           <SimpleCondition
-            condition={condition.conditions?.[1] ?? defaultCondition('threshold', sensors)}
+            condition={condition.conditions?.[1] ?? defaultCondition('threshold')}
             sensors={sensors}
             onChange={sub => onChange({
               ...condition,
-              conditions: [condition.conditions?.[0] ?? defaultCondition('threshold', sensors), sub],
+              conditions: [condition.conditions?.[0] ?? defaultCondition('threshold'), sub],
             })}
           />
         </div>
       ) : (
         <>
           <SimpleCondition condition={condition} sensors={sensors} onChange={onChange} />
-          {/* Botón para añadir segunda condición (solo en el nivel raíz) */}
           {depth === 0 && (
             <button
               type="button"

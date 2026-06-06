@@ -70,6 +70,10 @@ const CONDITION_HELP: Record<string, string> = {
   trend_rising: 'Detecta una tendencia de subida en el sensor. Útil para alertas tempranas antes de alcanzar el umbral crítico.',
 }
 
+// Tipos de condición que requieren un campo/variable para funcionar
+const NEEDS_FIELD_TYPES = new Set(['threshold', 'threshold_sustained', 'accumulation', 'trend_rising', 'schedule'])
+function condNeedsField(cond: ConditionDef): boolean { return NEEDS_FIELD_TYPES.has(cond.type) }
+
 function mergedSensors(vehicleTypes: VehicleTypeOut[]): SensorDef[] {
   const seen = new Set<string>()
   const result: SensorDef[] = []
@@ -109,6 +113,7 @@ export default function RuleFormPage() {
   const [step, setStep] = useState(1)
   const [visitedSteps, setVisitedSteps] = useState(new Set([1]))
   const [nameError, setNameError] = useState('')
+  const [condError, setCondError] = useState('')
   const [apiError, setApiError] = useState('')
 
   const { data: existingRule } = useQuery({
@@ -164,7 +169,11 @@ export default function RuleFormPage() {
   const goTo = (s: number) => {
     if (s < 1 || s > 5) return
     if (s > step && step === 1 && !form.name.trim()) { setNameError('El nombre es obligatorio'); return }
+    if (s > step && step === 3 && condNeedsField(form.condition) && !form.condition.field) {
+      setCondError('Elige una variable para la condición'); return
+    }
     setNameError('')
+    setCondError('')
     setStep(s)
     setVisitedSteps(prev => new Set([...prev, s]))
   }
@@ -282,7 +291,16 @@ export default function RuleFormPage() {
                 <p style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginBottom: 20, lineHeight: 1.5 }}>
                   Define cuándo debe dispararse la alerta. Se evalúa en cada paquete de telemetría recibido del vehículo.
                 </p>
-                <ConditionBuilder condition={form.condition} sensors={sensors} onChange={c => update('condition', c)} />
+                <ConditionBuilder
+                  condition={form.condition}
+                  sensors={sensors}
+                  onChange={c => { update('condition', c); if (condError) setCondError('') }}
+                />
+                {condError && (
+                  <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4, fontFamily: 'var(--font-sans)' }}>
+                    {condError}
+                  </div>
+                )}
                 {form.condition?.type && CONDITION_HELP[form.condition.type] && (
                   <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     <span style={{ color: 'var(--info)', fontSize: 14, flexShrink: 0, lineHeight: 1.6 }}>ⓘ</span>
@@ -368,7 +386,12 @@ export default function RuleFormPage() {
               </button>
             ) : (
               <button type="button" disabled={isPending}
-                onClick={() => { setApiError(''); if (!form.name.trim()) { setNameError('El nombre es obligatorio'); goTo(1); return } mutate() }}
+                onClick={() => {
+                  setApiError('')
+                  if (!form.name.trim()) { setNameError('El nombre es obligatorio'); goTo(1); return }
+                  if (condNeedsField(form.condition) && !form.condition.field) { setCondError('Elige una variable'); goTo(3); return }
+                  mutate()
+                }}
                 style={{ padding: '8px 24px', fontSize: 13, fontWeight: 600, background: 'var(--cmg-teal)', border: 'none', borderRadius: 6, color: '#fff', cursor: isPending ? 'wait' : 'pointer', fontFamily: 'var(--font-sans)' }}>
                 {isPending ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear regla'}
               </button>

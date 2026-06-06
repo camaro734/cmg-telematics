@@ -3,7 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
+
+_FIELD_REQUIRED_TYPES = {"threshold", "threshold_sustained", "accumulation", "trend_rising", "schedule"}
+
+
+def _check_condition_field(condition: dict) -> None:
+    if condition.get("type") in _FIELD_REQUIRED_TYPES and not condition.get("field"):
+        raise ValueError("La condición requiere una variable — 'field' está vacío")
 
 
 class RuleOut(BaseModel):
@@ -34,6 +41,11 @@ class RuleCreate(BaseModel):
     schedule: dict[str, Any] = {"type": "always"}
     cooldown_minutes: int = 30
 
+    @model_validator(mode='after')
+    def check_condition_field(self) -> 'RuleCreate':
+        _check_condition_field(self.condition)
+        return self
+
 
 class RuleUpdate(BaseModel):
     name: str | None = None
@@ -46,6 +58,12 @@ class RuleUpdate(BaseModel):
     escalation: list[Any] | None = None
     schedule: dict[str, Any] | None = None
     cooldown_minutes: int | None = None
+
+    @model_validator(mode='after')
+    def check_condition_field(self) -> 'RuleUpdate':
+        if self.condition is not None:
+            _check_condition_field(self.condition)
+        return self
 
 
 class RuleTestRequest(BaseModel):
