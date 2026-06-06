@@ -11,6 +11,7 @@ import type { TenantOut } from '../../lib/types'
 import {
   IconFlota,
   IconAlertas,
+  IconReglas,
   IconMantenimiento,
   IconReportes,
   IconVehiculos,
@@ -31,6 +32,7 @@ import type { VehicleStatus } from '../../lib/types'
 const MODULES = [
   { key: 'fleet',       label: 'Flota',          Icon: IconFlota,        to: '/fleet' },
   { key: 'alerts',      label: 'Alertas',        Icon: IconAlertas,      to: '/alerts' },
+  { key: 'rules',       label: 'Reglas',         Icon: IconReglas,       to: '/rules' },
   { key: 'maintenance', label: 'Mantenimiento',  Icon: IconMantenimiento, to: '/maintenance' },
   { key: 'reports',     label: 'Reportes',       Icon: IconReportes,     to: '/reports' },
 ] as const
@@ -473,7 +475,11 @@ export default function TopNav() {
     staleTime: 25_000,
   })
 
-  const visibleModules = MODULES.filter(m => isCmg || enabledModules.includes(m.key))
+  const canSeeRules = isAdmin && user?.tenant_tier !== 'subclient'
+  const visibleModules = MODULES.filter(m => {
+    if (m.key === 'rules') return canSeeRules
+    return isCmg || enabledModules.includes(m.key)
+  })
 
   const btnBase: React.CSSProperties = {
     display: 'flex',
