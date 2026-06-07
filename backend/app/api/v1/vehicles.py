@@ -1572,3 +1572,123 @@ async def send_dout_command(
     }))
     logger.info("DOUT publicado → IMEI %s slot=%s state=%s", device.imei, body.slot, body.state)
     return {"ok": True, "imei": device.imei, "command": command}
+
+
+# ── GDPR Art. 17 — purga irreversible por vehículo ──────────────────────────
+
+class _GdprPurgeBody(BaseModel):
+    confirm: str = Field(..., description="Debe ser exactamente 'PURGE-{vehicle_id}'")
+
+
+@router.delete("/vehicles/{vehicle_id}/gdpr-purge", status_code=200)
+async def gdpr_purge_vehicle(
+    vehicle_id: uuid.UUID,
+    body: _GdprPurgeBody,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Purga hard-delete de todos los datos de un vehículo (Art. 17 GDPR).
+    Exclusivo CMG admin. Operación atómica — rollback total si falla algo.
+    """
+    _cmg_admin(user)
+
+    expected = f"PURGE-{vehicle_id}"
+    if body.confirm != expected:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Confirmación inválida — envía {{\"confirm\": \"{expected}\"}}",
+        )
+
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    vid = str(vehicle_id)
+    tenant_id = str(vehicle.tenant_id)
+    ip = (request.headers.get("X-Real-IP") or
+          (request.client.host if request.client else None))
+    ua = request.headers.get("user-agent")
+
+    try:
+        # 1. alert_instance — FK NO ACTION bloquea DELETE vehicle si queda alguna
+        r_alerts = await db.execute(
+            text("DELETE FROM alert_instance WHERE vehicle_id = :vid"),
+            {"vid": vehicle_id},
+        )
+        # 2. work_order_stop — lat/lon + client_name (datos personales en paradas)
+        r_stops = await db.execute(
+            text("""
+                DELETE FROM work_order_stop
+                WHERE work_order_id IN (
+                    SELECT id FROM work_order WHERE vehicle_id = :vid
+                )
+            """),
+            {"vid": vehicle_id},
+        )
+        # 3. Telemetría cruda (hypertable)
+        r_raw = await db.execute(
+            text("DELETE FROM telemetry_record WHERE vehicle_id = :vid"),
+            {"vid": vehicle_id},
+        )
+        # 4. KPIs materializados (CA — TimescaleDB enruta a _materialized_hypertable_3)
+        r_ca = await db.execute(
+            text("DELETE FROM telemetry_1h WHERE vehicle_id = :vid"),
+            {"vid": vehicle_id},
+        )
+        # 5. Audit log de accesos a este vehículo (IP + user_agent = dato personal)
+        r_audit = await db.execute(
+            text("DELETE FROM access_audit_log WHERE target_vehicle_id = :vid"),
+            {"vid": vehicle_id},
+        )
+        # 6. Vehículo — CASCADE: command_log, maintenance_log/plan, assignments, work_cycle
+        #    SET NULL automático: work_order, work_report, device
+        await db.execute(
+            text("DELETE FROM vehicle WHERE id = :vid"),
+            {"vid": vehicle_id},
+        )
+
+        counts = {
+            "alert_instances":        r_alerts.rowcount,
+            "work_order_stops":       r_stops.rowcount,
+            "telemetry_record":       r_raw.rowcount,
+            "telemetry_1h":           r_ca.rowcount,
+            "access_audit_deleted":   r_audit.rowcount,
+        }
+
+        # 7. Prueba de cumplimiento Art. 5(2) — esta fila SE CONSERVA
+        await db.execute(
+            text("""
+                INSERT INTO access_audit_log
+                    (time, user_id, user_tenant_id, user_tenant_tier,
+                     target_vehicle_id, target_tenant_id,
+                     operation, scope, justification, endpoint, ip_address, user_agent)
+                VALUES
+                    (now(), :uid, :utid, :utier,
+                     :vid, :tid,
+                     'GDPR_PURGE', 'vehicle', :justif, :ep, :ip, :ua)
+            """),
+            {
+                "uid":   user.user_id,
+                "utid":  user.tenant_id,
+                "utier": user.tenant_tier,
+                "vid":   vehicle_id,
+                "tid":   vehicle.tenant_id,
+                "justif": f"Purga GDPR Art.17 — {counts}",
+                "ep":    str(request.url.path),
+                "ip":    ip,
+                "ua":    ua,
+            },
+        )
+
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise
+
+    logger.info(
+        "GDPR_PURGE vehicle=%s tenant=%s by user=%s | %s",
+        vid, tenant_id, user.user_id, counts,
+    )
+    return {"vehicle_id": vid, "purged": counts}
