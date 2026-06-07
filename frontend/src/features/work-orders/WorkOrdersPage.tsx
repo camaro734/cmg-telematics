@@ -16,6 +16,7 @@ import { toast } from '../../shared/ui/Toast'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
+import { CARTO_TILES_URL } from '../../lib/mapConfig'
 
 async function downloadOrderPdf(order: WorkOrderOut) {
   const token = useAuthStore.getState().accessToken
@@ -71,7 +72,7 @@ function WorkOrdersMap({ orders }: { orders: WorkOrderOut[] }) {
       center: [40.416775, -3.70379], zoom: 6, zoomControl: false,
     })
     L.control.zoom({ position: 'topright' }).addTo(mapRef.current)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer(CARTO_TILES_URL, {
       subdomains: 'abcd', maxZoom: 19,
       attribution: '© OpenStreetMap © CARTO',
     }).addTo(mapRef.current)
@@ -183,7 +184,7 @@ function StopLocationPicker({
     if (!containerRef.current || mapRef.current) return
     const center: [number, number] = lat && lon ? [lat, lon] : [39.47, -0.376]
     const map = L.map(containerRef.current, { center, zoom: lat ? 14 : 6, zoomControl: true })
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer(CARTO_TILES_URL, {
       subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap © CARTO',
     }).addTo(map)
     mapRef.current = map
