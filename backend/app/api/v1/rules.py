@@ -56,6 +56,7 @@ def _point_in_polygon(lat: float, lon: float, polygon: list) -> bool:
 
 @router.get("/rules", response_model=list[RuleOut])
 async def list_rules(
+    include_archived: bool = Query(False),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -65,10 +66,9 @@ async def list_rules(
         .correlate(AlertRule)
         .scalar_subquery()
     )
-    query = (
-        select(AlertRule, alert_count_sq.label("alert_count"))
-        .where(AlertRule.archived_at.is_(None))
-    )
+    query = select(AlertRule, alert_count_sq.label("alert_count"))
+    if not include_archived:
+        query = query.where(AlertRule.archived_at.is_(None))
     if user.tenant_tier != "cmg":
         query = query.where(AlertRule.tenant_id == user.tenant_id)
     result = await db.execute(query.order_by(AlertRule.created_at.desc()))
@@ -171,6 +171,25 @@ async def delete_rule(
     rule.active = False
     await db.commit()
     return JSONResponse(status_code=200, content={"archived": True, "alert_count": alert_count})
+
+
+@router.post("/rules/{rule_id}/restore", response_model=RuleOut)
+async def restore_rule(
+    rule_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rule = await db.get(AlertRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
+    if user.tenant_tier != "cmg" and str(rule.tenant_id) != str(user.tenant_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+    rule.archived_at = None
+    await db.commit()
+    await db.refresh(rule)
+    return rule
 
 
 @router.post("/rules/{rule_id}/test", response_model=RuleTestResult)

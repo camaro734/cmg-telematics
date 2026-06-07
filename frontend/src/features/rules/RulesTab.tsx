@@ -29,6 +29,8 @@ const TH: CSSProperties = {
   letterSpacing: '0.05em', textAlign: 'left' as const,
 }
 
+const ARCHIVED_KEY = ['rules', 'with-archived'] as const
+
 interface DeleteModal {
   rule: RuleOut
   confirmPurge: boolean
@@ -38,12 +40,17 @@ export default function RulesTab() {
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
   const canManageRules = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
+  const [showArchived, setShowArchived] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deleteModal, setDeleteModal] = useState<DeleteModal | null>(null)
 
+  const queryKey = showArchived ? ARCHIVED_KEY : keys.rules()
+
   const { data: rules = [] } = useQuery({
-    queryKey: keys.rules(),
-    queryFn: () => apiClient.get<RuleOut[]>('/api/v1/rules'),
+    queryKey,
+    queryFn: () => apiClient.get<RuleOut[]>(
+      `/api/v1/rules${showArchived ? '?include_archived=true' : ''}`
+    ),
   })
 
   const toggleMutation = useMutation({
@@ -56,20 +63,30 @@ export default function RulesTab() {
     },
   })
 
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) => apiClient.post<RuleOut>(`/api/v1/rules/${id}/restore`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rules'] })
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: ({ id, purge }: { id: string; purge: boolean }) =>
       apiClient.delete<{ archived?: boolean; alert_count?: number } | undefined>(
         `/api/v1/rules/${id}${purge ? '?purge=true' : ''}`
       ),
-    onSuccess: (_, { id }) => {
-      qc.setQueryData(keys.rules(), (prev: RuleOut[] = []) => prev.filter(r => r.id !== id))
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rules'] })
       setConfirmDelete(null)
       setDeleteModal(null)
     },
   })
 
   const handleDeleteClick = (rule: RuleOut) => {
-    if (rule.alert_count > 0) {
+    if (rule.archived_at) {
+      // Ya archivada → ir directo al paso de confirmación de purga
+      setDeleteModal({ rule, confirmPurge: true })
+    } else if (rule.alert_count > 0) {
       setDeleteModal({ rule, confirmPurge: false })
     } else {
       setConfirmDelete(rule.id)
@@ -79,9 +96,26 @@ export default function RulesTab() {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.06em' }}>
-          REGLAS DE ALERTA
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.06em' }}>
+            REGLAS DE ALERTA
+          </span>
+          {canManageRules && (
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              style={{
+                padding: '3px 10px', fontSize: 11, fontFamily: 'var(--font-sans)',
+                borderRadius: 4, cursor: 'pointer',
+                border: `1px solid ${showArchived ? 'var(--cmg-teal)' : 'var(--border)'}`,
+                background: showArchived ? 'color-mix(in srgb, var(--cmg-teal) 12%, transparent)' : 'transparent',
+                color: showArchived ? 'var(--cmg-teal)' : 'var(--fg-muted)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {showArchived ? '● Archivadas visibles' : '○ Ver archivadas'}
+            </button>
+          )}
+        </div>
         {canManageRules && (
           <Link
             to="/rules/new"
@@ -98,9 +132,10 @@ export default function RulesTab() {
 
       {rules.length === 0 ? (
         <div style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '20px 0' }}>
-          Sin reglas configuradas.{' '}
-          {canManageRules && (
-            <Link to="/rules/new" style={{ color: 'var(--cmg-teal)' }}>Crea la primera.</Link>
+          {showArchived ? 'No hay reglas archivadas.' : (
+            <>Sin reglas configuradas.{' '}
+              {canManageRules && <Link to="/rules/new" style={{ color: 'var(--cmg-teal)' }}>Crea la primera.</Link>}
+            </>
           )}
         </div>
       ) : (
@@ -116,13 +151,28 @@ export default function RulesTab() {
             <tbody>
               {rules.map(rule => {
                 const sev = SEVERITY_LABEL[rule.severity] ?? { label: rule.severity, color: 'var(--fg-muted)' }
+                const isArchived = !!rule.archived_at
                 const isConfirming = confirmDelete === rule.id
+                const rowStyle: CSSProperties = isArchived ? { opacity: 0.55 } : {}
+
                 return (
-                  <tr key={rule.id}>
+                  <tr key={rule.id} style={rowStyle}>
                     <td style={TD}>
-                      <Link to={`/rules/${rule.id}`} style={{ color: 'var(--cmg-teal)', textDecoration: 'none' }}>
-                        {rule.name}
-                      </Link>
+                      {isArchived ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: 'var(--fg-muted)' }}>{rule.name}</span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
+                            padding: '1px 6px', borderRadius: 3,
+                            background: 'color-mix(in srgb, var(--accent-warn) 15%, transparent)',
+                            color: 'var(--accent-warn)',
+                          }}>ARCHIVADA</span>
+                        </span>
+                      ) : (
+                        <Link to={`/rules/${rule.id}`} style={{ color: 'var(--cmg-teal)', textDecoration: 'none' }}>
+                          {rule.name}
+                        </Link>
+                      )}
                     </td>
                     <td style={{ ...TD, color: 'var(--fg-muted)' }}>
                       {SCOPE_LABEL[rule.vehicle_filter.scope] ?? rule.vehicle_filter.scope}
@@ -134,40 +184,63 @@ export default function RulesTab() {
                       <span style={{ color: sev.color, fontWeight: 600, fontSize: 11 }}>{sev.label}</span>
                     </td>
                     <td style={{ ...TD, color: 'var(--fg-muted)', fontFamily: 'var(--font-data)' }}>
-                      {rule.alert_count > 0 ? rule.alert_count : '—'}
+                      {(rule.alert_count ?? 0) > 0 ? rule.alert_count : '—'}
                     </td>
                     <td style={TD}>
-                      <input
-                        type="checkbox"
-                        checked={rule.active}
-                        onChange={() => toggleMutation.mutate({ id: rule.id, active: !rule.active })}
-                        style={{ accentColor: 'var(--cmg-teal)', cursor: 'pointer' }}
-                      />
+                      {!isArchived && (
+                        <input
+                          type="checkbox"
+                          checked={rule.active}
+                          onChange={() => toggleMutation.mutate({ id: rule.id, active: !rule.active })}
+                          style={{ accentColor: 'var(--cmg-teal)', cursor: 'pointer' }}
+                        />
+                      )}
                     </td>
                     <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                      {canManageRules && (isConfirming ? (
-                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
-                          ¿Eliminar?{' '}
-                          <button
-                            onClick={() => deleteMutation.mutate({ id: rule.id, purge: false })}
-                            style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
-                          >Sí</button>
-                          {' / '}
-                          <button
-                            onClick={() => setConfirmDelete(null)}
-                            style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
-                          >No</button>
-                        </span>
-                      ) : (
-                        <>
-                          <Link to={`/rules/${rule.id}`} style={{ color: 'var(--fg-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
-                          <button
-                            onClick={() => handleDeleteClick(rule)}
-                            style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
-                            title="Eliminar regla"
-                          >✕</button>
-                        </>
-                      ))}
+                      {canManageRules && (
+                        isArchived ? (
+                          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <button
+                              onClick={() => restoreMutation.mutate(rule.id)}
+                              disabled={restoreMutation.isPending}
+                              style={{
+                                fontSize: 12, fontFamily: 'var(--font-sans)', fontWeight: 600,
+                                color: 'var(--cmg-teal)', background: 'none', border: 'none',
+                                cursor: 'pointer', padding: 0,
+                              }}
+                            >
+                              Restaurar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(rule)}
+                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}
+                              title="Eliminar definitivamente"
+                            >✕</button>
+                          </span>
+                        ) : isConfirming ? (
+                          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
+                            ¿Eliminar?{' '}
+                            <button
+                              onClick={() => deleteMutation.mutate({ id: rule.id, purge: false })}
+                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
+                            >Sí</button>
+                            {' / '}
+                            <button
+                              onClick={() => setConfirmDelete(null)}
+                              style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
+                            >No</button>
+                          </span>
+                        ) : (
+                          <>
+                            <Link to={`/rules/${rule.id}`} style={{ color: 'var(--fg-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
+                            <button
+                              onClick={() => handleDeleteClick(rule)}
+                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
+                              title="Eliminar regla"
+                            >✕</button>
+                          </>
+                        )
+                      )}
                     </td>
                   </tr>
                 )
@@ -177,7 +250,7 @@ export default function RulesTab() {
         </div>
       )}
 
-      {/* Modal de archivo/eliminación para reglas con alertas */}
+      {/* Modal archivo/eliminación */}
       {deleteModal && (
         <div
           style={{
@@ -246,7 +319,7 @@ export default function RulesTab() {
                 </p>
                 <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)', marginBottom: 20 }}>
                   Se borrarán permanentemente la regla <strong style={{ color: 'var(--fg-primary)' }}>{deleteModal.rule.name}</strong> y
-                  sus <strong style={{ color: 'var(--fg-primary)' }}>{deleteModal.rule.alert_count} alertas</strong>. Esta acción no se puede deshacer.
+                  sus <strong style={{ color: 'var(--fg-primary)' }}>{deleteModal.rule.alert_count ?? 0} alertas</strong>. Esta acción no se puede deshacer.
                 </p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button
@@ -261,13 +334,17 @@ export default function RulesTab() {
                     {deleteMutation.isPending ? 'Eliminando…' : 'Confirmar eliminación'}
                   </button>
                   <button
-                    onClick={() => setDeleteModal({ ...deleteModal, confirmPurge: false })}
+                    onClick={() => setDeleteModal(
+                      deleteModal.rule.archived_at ? null : { ...deleteModal, confirmPurge: false }
+                    )}
                     style={{
                       padding: '9px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
                       background: 'var(--bg-card)', color: 'var(--fg-muted)',
                       border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
                     }}
-                  >Volver</button>
+                  >
+                    {deleteModal.rule.archived_at ? 'Cancelar' : 'Volver'}
+                  </button>
                 </div>
               </>
             )}
