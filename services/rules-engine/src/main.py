@@ -12,6 +12,7 @@ from src.config import settings
 from src.loader import load_rules, load_vehicle_type_map, Rule
 from src.evaluator import process_message, TelemetryMsg, RuleMatch
 from src.field_ops import handle_field_operations
+from src.silence import sweep_silent_vehicles, maybe_resolve_silence
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,11 @@ async def _process_one(db_pool: asyncpg.Pool, redis: Redis, msg_id: str, fields:
         msg.vehicle_id, msg.pto_active,
         msg.lat, msg.lon,
     )
+    # Auto-resolve alerta de silencio si había una firing para este vehículo
+    from src.silence import _silence_key
+    if await redis.exists(_silence_key(msg.vehicle_id)):
+        async with db_pool.acquire() as conn:
+            await maybe_resolve_silence(conn, redis, msg.vehicle_id, msg.tenant_id)
     await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
 
 
@@ -186,6 +192,18 @@ async def _listen_rule_changes(db_pool: asyncpg.Pool) -> None:
         await conn.close()
 
 
+async def _run_silence_sweep(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    """Barrido periódico de vehículos mudos — corre cada 30 minutos."""
+    logger.info(
+        "Sweep de silencio activo (moving=%.1fh, parked=%.1fh)",
+        settings.silence_moving_hours,
+        settings.silence_parked_hours,
+    )
+    while True:
+        await asyncio.sleep(1800)
+        await sweep_silent_vehicles(db_pool, redis)
+
+
 async def main() -> None:
     global _rules, _vehicle_type_map
 
@@ -218,6 +236,7 @@ async def main() -> None:
     await asyncio.gather(
         _process_stream(db_pool, redis),
         _listen_rule_changes(db_pool),
+        _run_silence_sweep(db_pool, redis),
     )
 
 
