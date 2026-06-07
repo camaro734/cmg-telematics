@@ -30,11 +30,17 @@ const TH: CSSProperties = {
   letterSpacing: '0.05em', textAlign: 'left' as const,
 }
 
+interface DeleteModal {
+  rule: RuleOut
+  confirmPurge: boolean
+}
+
 export default function RulesPage() {
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
   const canManageRules = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleteModal, setDeleteModal] = useState<DeleteModal | null>(null)
 
   const { data: rules = [] } = useQuery({
     queryKey: keys.rules(),
@@ -52,12 +58,24 @@ export default function RulesPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete<void>(`/api/v1/rules/${id}`),
-    onSuccess: (_, id) => {
+    mutationFn: ({ id, purge }: { id: string; purge: boolean }) =>
+      apiClient.delete<{ archived?: boolean; alert_count?: number } | undefined>(
+        `/api/v1/rules/${id}${purge ? '?purge=true' : ''}`
+      ),
+    onSuccess: (_, { id }) => {
       qc.setQueryData(keys.rules(), (prev: RuleOut[] = []) => prev.filter(r => r.id !== id))
       setConfirmDelete(null)
+      setDeleteModal(null)
     },
   })
+
+  const handleDeleteClick = (rule: RuleOut) => {
+    if (rule.alert_count > 0) {
+      setDeleteModal({ rule, confirmPurge: false })
+    } else {
+      setConfirmDelete(rule.id)
+    }
+  }
 
   return (
     <Shell title="Reglas">
@@ -87,7 +105,7 @@ export default function RulesPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Nombre', 'Alcance', 'Tipo condición', 'Severidad', 'Activa', ''].map(h => (
+                  {['Nombre', 'Alcance', 'Tipo condición', 'Severidad', 'Alertas', 'Activa', ''].map(h => (
                     <th key={h} style={TH}>{h}</th>
                   ))}
                 </tr>
@@ -112,6 +130,9 @@ export default function RulesPage() {
                       <td style={TD}>
                         <span style={{ color: sev.color, fontWeight: 600, fontSize: 11 }}>{sev.label}</span>
                       </td>
+                      <td style={{ ...TD, color: 'var(--fg-muted)', fontFamily: 'var(--font-data)' }}>
+                        {rule.alert_count > 0 ? rule.alert_count : '—'}
+                      </td>
                       <td style={TD}>
                         <input
                           type="checkbox"
@@ -124,15 +145,21 @@ export default function RulesPage() {
                         {canManageRules && (isConfirming ? (
                           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
                             ¿Eliminar?{' '}
-                            <button onClick={() => deleteMutation.mutate(rule.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}>Sí</button>
+                            <button
+                              onClick={() => deleteMutation.mutate({ id: rule.id, purge: false })}
+                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
+                            >Sí</button>
                             {' / '}
-                            <button onClick={() => setConfirmDelete(null)} style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}>No</button>
+                            <button
+                              onClick={() => setConfirmDelete(null)}
+                              style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
+                            >No</button>
                           </span>
                         ) : (
                           <>
                             <Link to={`/rules/${rule.id}`} style={{ color: 'var(--fg-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
                             <button
-                              onClick={() => setConfirmDelete(rule.id)}
+                              onClick={() => handleDeleteClick(rule)}
                               style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
                               title="Eliminar regla"
                             >✕</button>
@@ -147,6 +174,104 @@ export default function RulesPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de archivo/eliminación para reglas con alertas */}
+      {deleteModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setDeleteModal(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: 28, maxWidth: 420, width: '90%',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {!deleteModal.confirmPurge ? (
+              <>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--fg-primary)', marginBottom: 8 }}>
+                  <strong>{deleteModal.rule.name}</strong>
+                </p>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)', marginBottom: 20 }}>
+                  Esta regla tiene <strong style={{ color: 'var(--fg-primary)' }}>{deleteModal.rule.alert_count} alertas</strong> asociadas
+                  y no puede eliminarse directamente.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button
+                    onClick={() => deleteMutation.mutate({ id: deleteModal.rule.id, purge: false })}
+                    disabled={deleteMutation.isPending}
+                    style={{
+                      padding: '9px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+                      background: 'var(--cmg-teal)', color: '#fff',
+                      border: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    Archivar (recomendado)
+                    <span style={{ display: 'block', fontSize: 11, opacity: 0.75, marginTop: 2 }}>
+                      Desactiva la regla y oculta las alertas. Recuperable.
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal({ ...deleteModal, confirmPurge: true })}
+                    style={{
+                      padding: '9px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+                      background: 'var(--bg-card)', color: 'var(--danger)',
+                      border: '1px solid var(--danger)', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    Eliminar definitivamente
+                    <span style={{ display: 'block', fontSize: 11, opacity: 0.75, marginTop: 2 }}>
+                      Borra la regla y sus {deleteModal.rule.alert_count} alertas. Irreversible.
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal(null)}
+                    style={{
+                      padding: '8px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+                      background: 'none', color: 'var(--fg-muted)', border: 'none', cursor: 'pointer',
+                    }}
+                  >Cancelar</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--danger)', fontWeight: 600, marginBottom: 8 }}>
+                  Confirmar eliminación definitiva
+                </p>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)', marginBottom: 20 }}>
+                  Se borrarán permanentemente la regla <strong style={{ color: 'var(--fg-primary)' }}>{deleteModal.rule.name}</strong> y
+                  sus <strong style={{ color: 'var(--fg-primary)' }}>{deleteModal.rule.alert_count} alertas</strong>. Esta acción no se puede deshacer.
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => deleteMutation.mutate({ id: deleteModal.rule.id, purge: true })}
+                    disabled={deleteMutation.isPending}
+                    style={{
+                      flex: 1, padding: '9px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+                      background: 'var(--danger)', color: '#fff',
+                      border: 'none', borderRadius: 6, cursor: 'pointer',
+                    }}
+                  >
+                    {deleteMutation.isPending ? 'Eliminando…' : 'Confirmar eliminación'}
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal({ ...deleteModal, confirmPurge: false })}
+                    style={{
+                      padding: '9px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
+                      background: 'var(--bg-card)', color: 'var(--fg-muted)',
+                      border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
+                    }}
+                  >Volver</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </Shell>
   )
 }

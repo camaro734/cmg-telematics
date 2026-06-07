@@ -21,7 +21,7 @@ async def load_rules(conn: asyncpg.Connection) -> list[Rule]:
     rows = await conn.fetch(
         "SELECT id::text, tenant_id::text, name, active, vehicle_filter, condition, "
         "severity, actions, escalation, schedule, cooldown_minutes "
-        "FROM alert_rule WHERE active = true"
+        "FROM alert_rule WHERE active = true AND archived_at IS NULL"
     )
     return [Rule(**dict(row)) for row in rows]
 

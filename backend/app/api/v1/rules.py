@@ -1,15 +1,17 @@
 # backend/app/api/v1/rules.py
 import operator
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.rule import RuleOut, RuleCreate, RuleUpdate, RuleTestRequest, RuleTestResult
 from app.models.alert_rule import AlertRule
+from app.models.alert_instance import AlertInstance
 
 router = APIRouter(tags=["rules"])
 
@@ -57,11 +59,26 @@ async def list_rules(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(AlertRule)
+    alert_count_sq = (
+        select(func.count())
+        .where(AlertInstance.rule_id == AlertRule.id)
+        .correlate(AlertRule)
+        .scalar_subquery()
+    )
+    query = (
+        select(AlertRule, alert_count_sq.label("alert_count"))
+        .where(AlertRule.archived_at.is_(None))
+    )
     if user.tenant_tier != "cmg":
         query = query.where(AlertRule.tenant_id == user.tenant_id)
     result = await db.execute(query.order_by(AlertRule.created_at.desc()))
-    return result.scalars().all()
+    rows = result.all()
+    out = []
+    for rule, alert_count in rows:
+        data = {c.key: getattr(rule, c.key) for c in AlertRule.__table__.columns}
+        data["alert_count"] = alert_count
+        out.append(RuleOut(**data))
+    return out
 
 
 @router.get("/rules/{rule_id}", response_model=RuleOut)
@@ -118,9 +135,10 @@ async def update_rule(
     return rule
 
 
-@router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/rules/{rule_id}")
 async def delete_rule(
     rule_id: uuid.UUID,
+    purge: bool = Query(False),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -131,15 +149,28 @@ async def delete_rule(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    try:
+
+    alert_count = await db.scalar(
+        select(func.count()).where(AlertInstance.rule_id == rule.id)
+    ) or 0
+
+    if purge:
+        # Elimina instancias primero para evitar FK RESTRICT, luego la regla
+        await db.execute(sa_delete(AlertInstance).where(AlertInstance.rule_id == rule.id))
         await db.delete(rule)
         await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="No se puede eliminar la regla: tiene alertas asociadas",
-        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if alert_count == 0:
+        await db.delete(rule)
+        await db.commit()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # Tiene alertas → archivar: desactiva y marca timestamp de archivo
+    rule.archived_at = datetime.now(timezone.utc)
+    rule.active = False
+    await db.commit()
+    return JSONResponse(status_code=200, content={"archived": True, "alert_count": alert_count})
 
 
 @router.post("/rules/{rule_id}/test", response_model=RuleTestResult)

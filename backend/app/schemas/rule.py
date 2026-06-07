@@ -28,6 +28,8 @@ class RuleOut(BaseModel):
     schedule: dict[str, Any]
     cooldown_minutes: int
     created_at: datetime
+    archived_at: datetime | None = None
+    alert_count: int | None = None
 
 
 class RuleCreate(BaseModel):

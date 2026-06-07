@@ -371,6 +371,8 @@ export interface RuleOut {
   escalation: EscalationStep[]
   cooldown_minutes: number
   created_at: string
+  archived_at: string | null
+  alert_count: number
 }
 
 export interface RuleCreate {
