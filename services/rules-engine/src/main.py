@@ -37,7 +37,7 @@ async def _write_alert(conn: asyncpg.Connection, match: RuleMatch) -> str:
         match.rule.id,
         match.vehicle_id,
         match.rule.tenant_id,
-        json.dumps(match.trigger_value),
+        match.trigger_value,
     )
     return alert_id
 
