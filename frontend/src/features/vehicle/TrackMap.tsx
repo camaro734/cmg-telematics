@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import type { TrackPoint, VehicleStatus } from '../../lib/types'
+import { CARTO_TILES_URL, CARTO_ATTRIBUTION } from '../../lib/mapConfig'
 
 
 // ── Design token mirrors (CSS vars cannot be used in SVG/Leaflet strings) ──
@@ -111,8 +112,8 @@ export default function TrackMap({ track, status, emptyMessage = 'Sin recorrido 
       center: [40.416775, -3.70379],
       zoom: 12,
     })
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    L.tileLayer(CARTO_TILES_URL, {
+      attribution: CARTO_ATTRIBUTION,
       subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(mapRef.current)

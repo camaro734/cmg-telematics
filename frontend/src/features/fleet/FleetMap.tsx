@@ -8,6 +8,7 @@ import { useFleetStore } from './useFleetStore'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../lib/sensorValue'
 import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut, VehicleTypeOut, SensorDef } from '../../lib/types'
+import { CARTO_TILES_URL, CARTO_ATTRIBUTION } from '../../lib/mapConfig'
 
 
 // ── Design token mirrors (CSS vars can't be used in SVG strings) ────────────
@@ -311,8 +312,8 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
         zoomControl: false,
       })
       L.control.zoom({ position: 'topright' }).addTo(mapRef.current)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      L.tileLayer(CARTO_TILES_URL, {
+        attribution: CARTO_ATTRIBUTION,
         subdomains: 'abcd',
         maxZoom: 19,
       }).addTo(mapRef.current)
