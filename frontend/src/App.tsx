@@ -55,7 +55,6 @@ const FleetPage         = lazy(() => import('./features/fleet/FleetPage'))
 const VehicleDetailPage = lazy(() => import('./features/vehicle/VehicleDetailPage'))
 const AlertsPage        = lazy(() => import('./features/alerts/AlertsPage'))
 const SettingsPage      = lazy(() => import('./features/settings/SettingsPage'))
-const RulesPage                  = lazy(() => import('./features/rules/RulesPage'))
 const RuleFormPage               = lazy(() => import('./features/rules/RuleFormPage'))
 const MaintenancePage            = lazy(() => import('./features/maintenance/MaintenancePage'))
 const MaintenancePlanDetailPage  = lazy(() => import('./features/maintenance/MaintenancePlanDetailPage'))
@@ -114,7 +113,7 @@ export default function App() {
                 <Route path="vehicles/:id" element={<SectionErrorBoundary label="VehicleDetail"><VehicleDetailPage /></SectionErrorBoundary>} />
                 <Route path="alerts"       element={<RequireModule module="alerts"><SectionErrorBoundary label="Alerts"><AlertsPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="settings"     element={<SectionErrorBoundary label="Settings"><SettingsPage /></SectionErrorBoundary>} />
-                <Route path="rules"              element={<RequireRules><SectionErrorBoundary label="Rules"><RulesPage /></SectionErrorBoundary></RequireRules>} />
+                <Route path="rules"              element={<Navigate to="/alerts" state={{ tab: 'reglas' }} replace />} />
                 <Route path="rules/new"          element={<RequireRules><SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary></RequireRules>} />
                 <Route path="rules/:id"          element={<RequireRules><SectionErrorBoundary label="RuleForm"><RuleFormPage /></SectionErrorBoundary></RequireRules>} />
                 <Route path="maintenance"          element={<RequireModule module="maintenance"><SectionErrorBoundary label="Maintenance"><MaintenancePage /></SectionErrorBoundary></RequireModule>} />

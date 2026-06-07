@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import ContextNavBand from '../../shared/ui/ContextNavBand'
@@ -11,16 +11,26 @@ import { keys } from '../../lib/queryKeys'
 import { Chip } from '../../shared/ui/Chip'
 import ActiveAlertsList from './ActiveAlertsList'
 import AlertHistory from './AlertHistory'
+import RulesTab from '../rules/RulesTab'
 import type { HistoryStatus } from './AlertHistory'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
+import { useAuthStore } from '../auth/useAuthStore'
 import { useTenantContext } from '../../lib/useTenantContext'
 
-type AlertTab = 'activas' | 'historial'
+type AlertTab = 'activas' | 'historial' | 'reglas'
 
 export default function AlertsPage() {
+  const user = useAuthStore(s => s.user)
+  const canManageRules = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
   const { activeTenantId } = useTenantContext()
   const tenantQ = activeTenantId ? `&tenant_id=${activeTenantId}` : ''
-  const [tab, setTab] = useState<AlertTab>('activas')
+  const location = useLocation()
+
+  const [tab, setTab] = useState<AlertTab>(() => {
+    const fromState = (location.state as { tab?: string } | null)?.tab
+    if (fromState === 'reglas' && canManageRules) return 'reglas'
+    return 'activas'
+  })
 
   // Estado levantado desde AlertHistory
   const [histStatus, setHistStatus] = useState<HistoryStatus>('all')
@@ -77,6 +87,7 @@ export default function AlertsPage() {
       count: activeAlerts.length > 0 ? activeAlerts.length : undefined,
     },
     { key: 'historial', label: 'Historial', icon: 'ti-history' },
+    ...(canManageRules ? [{ key: 'reglas', label: 'Reglas', icon: 'ti-settings' } as ContextNavTab] : []),
   ]
 
   const btnSecondary: React.CSSProperties = {
@@ -113,6 +124,7 @@ export default function AlertsPage() {
         <Input type="date" size="sm" value={histDateTo}   onChange={e => setHistDateTo(e.target.value)}   title="Hasta" />
       </>
     ),
+    reglas: null,
   }
 
   return (
@@ -129,7 +141,7 @@ export default function AlertsPage() {
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
 
           {/* Filtro activo por vehículo (desde URL) */}
-          {vehicleParam && (
+          {vehicleParam && tab !== 'reglas' && (
             <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
                 Filtrado por vehículo:
@@ -162,6 +174,8 @@ export default function AlertsPage() {
               dateTo={histDateTo}
             />
           )}
+
+          {tab === 'reglas' && canManageRules && <RulesTab />}
 
         </div>
       </div>

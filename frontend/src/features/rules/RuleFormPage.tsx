@@ -159,7 +159,7 @@ export default function RuleFormPage() {
     mutationFn: () => isEdit
       ? apiClient.put<RuleOut>(`/api/v1/rules/${id}`, form)
       : apiClient.post<RuleOut>('/api/v1/rules', form),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: keys.rules() }); navigate('/rules') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: keys.rules() }); navigate('/alerts', { state: { tab: 'reglas' } }) },
     onError: (err) => setApiError((err as Error).message),
   })
 
@@ -197,7 +197,7 @@ export default function RuleFormPage() {
                 {isEdit ? 'Editar regla' : 'Nueva regla de alerta'}
               </span>
               <button
-                onClick={() => navigate('/rules')}
+                onClick={() => navigate('/alerts', { state: { tab: 'reglas' } })}
                 style={{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4 }}
               >✕</button>
             </div>
@@ -375,7 +375,7 @@ export default function RuleFormPage() {
 
           {/* Footer */}
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', flexShrink: 0, background: 'var(--bg-surface)' }}>
-            <button type="button" onClick={() => step > 1 ? goTo(step - 1) : navigate('/rules')}
+            <button type="button" onClick={() => step > 1 ? goTo(step - 1) : navigate('/alerts', { state: { tab: 'reglas' } })}
               style={{ padding: '8px 16px', fontSize: 13, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-muted)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
               {step > 1 ? '← Anterior' : 'Cancelar'}
             </button>

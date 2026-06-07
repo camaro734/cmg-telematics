@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useAuthStore } from '../auth/useAuthStore'
@@ -35,7 +34,7 @@ interface DeleteModal {
   confirmPurge: boolean
 }
 
-export default function RulesPage() {
+export default function RulesTab() {
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
   const canManageRules = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
@@ -78,13 +77,13 @@ export default function RulesPage() {
   }
 
   return (
-    <Shell title="Reglas">
-      <div style={{ padding: 24, maxWidth: 1100, overflowY: 'auto', height: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.06em' }}>
-            REGLAS DE ALERTA
-          </span>
-          {canManageRules && <Link
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.06em' }}>
+          REGLAS DE ALERTA
+        </span>
+        {canManageRules && (
+          <Link
             to="/rules/new"
             style={{
               padding: '6px 16px', fontSize: 13, fontFamily: 'var(--font-sans)',
@@ -93,87 +92,90 @@ export default function RulesPage() {
             }}
           >
             + Nueva regla
-          </Link>}
-        </div>
-
-        {rules.length === 0 ? (
-          <div style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '20px 0' }}>
-            Sin reglas configuradas. <Link to="/rules/new" style={{ color: 'var(--cmg-teal)' }}>Crea la primera.</Link>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Nombre', 'Alcance', 'Tipo condición', 'Severidad', 'Alertas', 'Activa', ''].map(h => (
-                    <th key={h} style={TH}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map(rule => {
-                  const sev = SEVERITY_LABEL[rule.severity] ?? { label: rule.severity, color: 'var(--fg-muted)' }
-                  const isConfirming = confirmDelete === rule.id
-                  return (
-                    <tr key={rule.id}>
-                      <td style={TD}>
-                        <Link to={`/rules/${rule.id}`} style={{ color: 'var(--cmg-teal)', textDecoration: 'none' }}>
-                          {rule.name}
-                        </Link>
-                      </td>
-                      <td style={{ ...TD, color: 'var(--fg-muted)' }}>
-                        {SCOPE_LABEL[rule.vehicle_filter.scope] ?? rule.vehicle_filter.scope}
-                      </td>
-                      <td style={{ ...TD, color: 'var(--fg-muted)' }}>
-                        {rule.condition.type}
-                      </td>
-                      <td style={TD}>
-                        <span style={{ color: sev.color, fontWeight: 600, fontSize: 11 }}>{sev.label}</span>
-                      </td>
-                      <td style={{ ...TD, color: 'var(--fg-muted)', fontFamily: 'var(--font-data)' }}>
-                        {rule.alert_count > 0 ? rule.alert_count : '—'}
-                      </td>
-                      <td style={TD}>
-                        <input
-                          type="checkbox"
-                          checked={rule.active}
-                          onChange={() => toggleMutation.mutate({ id: rule.id, active: !rule.active })}
-                          style={{ accentColor: 'var(--cmg-teal)', cursor: 'pointer' }}
-                        />
-                      </td>
-                      <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                        {canManageRules && (isConfirming ? (
-                          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
-                            ¿Eliminar?{' '}
-                            <button
-                              onClick={() => deleteMutation.mutate({ id: rule.id, purge: false })}
-                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
-                            >Sí</button>
-                            {' / '}
-                            <button
-                              onClick={() => setConfirmDelete(null)}
-                              style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
-                            >No</button>
-                          </span>
-                        ) : (
-                          <>
-                            <Link to={`/rules/${rule.id}`} style={{ color: 'var(--fg-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
-                            <button
-                              onClick={() => handleDeleteClick(rule)}
-                              style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
-                              title="Eliminar regla"
-                            >✕</button>
-                          </>
-                        ))}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          </Link>
         )}
       </div>
+
+      {rules.length === 0 ? (
+        <div style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '20px 0' }}>
+          Sin reglas configuradas.{' '}
+          {canManageRules && (
+            <Link to="/rules/new" style={{ color: 'var(--cmg-teal)' }}>Crea la primera.</Link>
+          )}
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Nombre', 'Alcance', 'Tipo condición', 'Severidad', 'Alertas', 'Activa', ''].map(h => (
+                  <th key={h} style={TH}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rules.map(rule => {
+                const sev = SEVERITY_LABEL[rule.severity] ?? { label: rule.severity, color: 'var(--fg-muted)' }
+                const isConfirming = confirmDelete === rule.id
+                return (
+                  <tr key={rule.id}>
+                    <td style={TD}>
+                      <Link to={`/rules/${rule.id}`} style={{ color: 'var(--cmg-teal)', textDecoration: 'none' }}>
+                        {rule.name}
+                      </Link>
+                    </td>
+                    <td style={{ ...TD, color: 'var(--fg-muted)' }}>
+                      {SCOPE_LABEL[rule.vehicle_filter.scope] ?? rule.vehicle_filter.scope}
+                    </td>
+                    <td style={{ ...TD, color: 'var(--fg-muted)' }}>
+                      {rule.condition.type}
+                    </td>
+                    <td style={TD}>
+                      <span style={{ color: sev.color, fontWeight: 600, fontSize: 11 }}>{sev.label}</span>
+                    </td>
+                    <td style={{ ...TD, color: 'var(--fg-muted)', fontFamily: 'var(--font-data)' }}>
+                      {rule.alert_count > 0 ? rule.alert_count : '—'}
+                    </td>
+                    <td style={TD}>
+                      <input
+                        type="checkbox"
+                        checked={rule.active}
+                        onChange={() => toggleMutation.mutate({ id: rule.id, active: !rule.active })}
+                        style={{ accentColor: 'var(--cmg-teal)', cursor: 'pointer' }}
+                      />
+                    </td>
+                    <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+                      {canManageRules && (isConfirming ? (
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12 }}>
+                          ¿Eliminar?{' '}
+                          <button
+                            onClick={() => deleteMutation.mutate({ id: rule.id, purge: false })}
+                            style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
+                          >Sí</button>
+                          {' / '}
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12 }}
+                          >No</button>
+                        </span>
+                      ) : (
+                        <>
+                          <Link to={`/rules/${rule.id}`} style={{ color: 'var(--fg-muted)', marginRight: 12, fontSize: 13 }} title="Editar regla">✎</Link>
+                          <button
+                            onClick={() => handleDeleteClick(rule)}
+                            style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
+                            title="Eliminar regla"
+                          >✕</button>
+                        </>
+                      ))}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Modal de archivo/eliminación para reglas con alertas */}
       {deleteModal && (
@@ -272,6 +274,6 @@ export default function RulesPage() {
           </div>
         </div>
       )}
-    </Shell>
+    </>
   )
 }
