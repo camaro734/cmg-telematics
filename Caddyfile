@@ -64,6 +64,14 @@ cmgnexus.es {
         }
     }
 
+    # Content Hub — Agente Redes Sociales
+    handle /hub* {
+        reverse_proxy cmg-content-hub:3500 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
     handle {
         reverse_proxy 10.0.0.2:8000 {
             header_up X-Real-IP {remote_host}
