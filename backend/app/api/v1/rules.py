@@ -67,8 +67,9 @@ async def list_rules(
         .scalar_subquery()
     )
     query = select(AlertRule, alert_count_sq.label("alert_count"))
-    # Ocultar reglas de sistema (type=silence) — no editables por el usuario
+    # Ocultar reglas de sistema — no editables por el usuario
     query = query.where(AlertRule.condition["type"].as_string() != "silence")
+    query = query.where(AlertRule.condition["type"].as_string() != "maintenance")
     if not include_archived:
         query = query.where(AlertRule.archived_at.is_(None))
     if user.tenant_tier != "cmg":

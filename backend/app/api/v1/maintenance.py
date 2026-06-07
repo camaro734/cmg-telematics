@@ -1,6 +1,7 @@
 # backend/app/api/v1/maintenance.py
 import csv
 import io
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,8 @@ from app.schemas.maintenance import (
     MaintenanceLogCreate, MaintenanceLogOut,
     MaintenanceProgress, ThresholdProgress,
 )
+from app.models.alert_instance import AlertInstance
+from app.models.alert_rule import AlertRule
 from app.models.maintenance import MaintenancePlan, MaintenanceLog
 from app.models.user import User
 from app.models.vehicle import Vehicle
@@ -24,6 +27,8 @@ from app.models.permission_grant import PermissionGrant
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
 router = APIRouter(tags=["maintenance"])
+
+logger = logging.getLogger(__name__)
 
 # Safe mapping from threshold type to telemetry_1h column name
 _COUNTER_COLUMNS = {
@@ -58,6 +63,67 @@ async def _require_admin_or_grant(user: CurrentUser, db: AsyncSession) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sin permiso para registrar intervenciones",
         )
+
+
+async def _ensure_maintenance_rule(db: AsyncSession, tenant_id: uuid.UUID) -> uuid.UUID:
+    """Garantiza UNA regla __maintenance__ por tenant. Idempotente."""
+    result = await db.execute(
+        select(AlertRule.id).where(
+            AlertRule.tenant_id == tenant_id,
+            AlertRule.condition["type"].as_string() == "maintenance",
+        ).limit(1)
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        return existing
+    rule = AlertRule(
+        tenant_id=tenant_id,
+        name="Sistema: mantenimiento vencido",
+        condition={"type": "maintenance"},
+        vehicle_filter={"scope": "all"},
+        severity="critical",
+        actions=[],
+        escalation=[],
+        schedule={"type": "always"},
+        active=False,
+        cooldown_minutes=0,
+    )
+    db.add(rule)
+    await db.flush()
+    logger.info("Regla __maintenance__ creada para tenant=%s rule=%s", tenant_id, rule.id)
+    return rule.id
+
+
+async def _resolve_maintenance_alert_for_plan(
+    db: AsyncSession,
+    vehicle_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    plan_id: uuid.UUID,
+) -> None:
+    """Resuelve el alert_instance firing de un plan concreto (dedup por plan_id en trigger_value)."""
+    rule_result = await db.execute(
+        select(AlertRule.id).where(
+            AlertRule.tenant_id == tenant_id,
+            AlertRule.condition["type"].as_string() == "maintenance",
+        ).limit(1)
+    )
+    rule_id = rule_result.scalar_one_or_none()
+    if not rule_id:
+        return
+
+    instance_result = await db.execute(
+        select(AlertInstance).where(
+            AlertInstance.vehicle_id == vehicle_id,
+            AlertInstance.rule_id == rule_id,
+            AlertInstance.status == "firing",
+            AlertInstance.trigger_value["plan_id"].as_string() == str(plan_id),
+        ).limit(1)
+    )
+    instance = instance_result.scalar_one_or_none()
+    if instance:
+        instance.status = "resolved"
+        instance.resolved_at = datetime.now(timezone.utc)
+        logger.info("Alerta mantenimiento resuelta: plan=%s vehicle=%s", plan_id, vehicle_id)
 
 
 async def _fetch_baselines(
@@ -442,6 +508,7 @@ async def complete_plan(
             plan.next_due_at = now + timedelta(days=float(t["value"]))
             break
 
+    await _resolve_maintenance_alert_for_plan(db, plan.vehicle_id, plan.tenant_id, plan_id)
     await db.commit()
     await db.refresh(log)
     return MaintenanceLogOut(
