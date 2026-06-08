@@ -19,10 +19,11 @@ from app.schemas.auth import CurrentUser
 # ---------------------------------------------------------------------------
 # IDs fijos de prueba
 # ---------------------------------------------------------------------------
-CMG_TENANT_ID    = uuid.UUID("10000000-0000-0000-0000-000000000001")
-CLIENT_TENANT_ID = uuid.UUID("20000000-0000-0000-0000-000000000002")
-MANUF_TENANT_ID  = uuid.UUID("30000000-0000-0000-0000-000000000003")
-OTHER_TENANT_ID  = uuid.UUID("40000000-0000-0000-0000-000000000004")
+CMG_TENANT_ID       = uuid.UUID("10000000-0000-0000-0000-000000000001")
+CLIENT_TENANT_ID    = uuid.UUID("20000000-0000-0000-0000-000000000002")
+MANUF_TENANT_ID     = uuid.UUID("30000000-0000-0000-0000-000000000003")
+OTHER_TENANT_ID     = uuid.UUID("40000000-0000-0000-0000-000000000004")
+SUBCLIENT_TENANT_ID = uuid.UUID("50000000-0000-0000-0000-000000000005")
 VEHICLE_ID       = uuid.UUID("a0000000-0000-0000-0000-000000000001")
 DRIVER_USER_ID   = uuid.UUID("b0000000-0000-0000-0000-000000000001")
 
@@ -69,6 +70,14 @@ MANUFACTURER_USER = CurrentUser(
     email="manuf@test.com",
 )
 
+SUBCLIENT_USER = CurrentUser(
+    user_id=uuid.uuid4(),
+    tenant_id=SUBCLIENT_TENANT_ID,
+    tenant_tier="subclient",
+    role="viewer",
+    email="subclient@test.com",
+)
+
 
 # ---------------------------------------------------------------------------
 # Constructores de mocks
@@ -103,10 +112,14 @@ def _make_vehicle(
     return v
 
 
-def _make_tenant(manufacturer_can_view_operations: bool = False) -> MagicMock:
+def _make_tenant(
+    manufacturer_can_view_operations: bool = False,
+    manufacturer_can_view_can_data: bool = True,
+) -> MagicMock:
     t = MagicMock(spec=Tenant)
     t.id = CLIENT_TENANT_ID
     t.manufacturer_can_view_operations = manufacturer_can_view_operations
+    t.manufacturer_can_view_can_data = manufacturer_can_view_can_data
     return t
 
 
@@ -408,3 +421,96 @@ async def test_list_client_returns_own_tenant_ids():
 
     assert result == ids
     db.scalars.assert_called_once()
+
+
+# ===========================================================================
+# Tests 21–22: scope="technical" — manufacturer_can_view_can_data
+# ===========================================================================
+
+async def test_manufacturer_technical_flag_false_returns_404():
+    """Manufacturer pide scope=technical pero el cliente deshabilitó can_data → 404."""
+    vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID, manufacturer_tenant_id=MANUF_TENANT_ID)
+    client_tenant = _make_tenant(manufacturer_can_view_can_data=False)
+    db = _make_db(vehicle=vehicle, tenant=client_tenant)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await assert_can_access_vehicle(
+            MANUFACTURER_USER, VEHICLE_ID, db, scope="technical"
+        )
+
+    assert exc_info.value.status_code == 404
+
+
+async def test_manufacturer_technical_flag_true_ok():
+    """Manufacturer pide scope=technical y el cliente habilitó can_data (default) → pasa."""
+    vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID, manufacturer_tenant_id=MANUF_TENANT_ID)
+    client_tenant = _make_tenant(manufacturer_can_view_can_data=True)
+    db = _make_db(vehicle=vehicle, tenant=client_tenant)
+    audit_session = _make_audit_session_mock()
+
+    with patch("app.api.v1.access_v2.AsyncSessionLocal", return_value=audit_session):
+        result = await assert_can_access_vehicle(
+            MANUFACTURER_USER, VEHICLE_ID, db, scope="technical"
+        )
+
+    assert result is vehicle
+
+
+# ===========================================================================
+# Test 23: edge case — vehicle.manufacturer_tenant_id es NULL
+# ===========================================================================
+
+async def test_manufacturer_null_manufacturer_id_returns_404():
+    """Vehículo sin fabricante asignado (NULL) + usuario fabricante → 404.
+
+    NULL != cualquier UUID, así que el fabricante nunca puede acceder a
+    vehículos sin manufacturer_tenant_id aunque pertenezcan a cualquier tenant.
+    """
+    vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID, manufacturer_tenant_id=None)
+    db = _make_db(vehicle=vehicle)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await assert_can_access_vehicle(MANUFACTURER_USER, VEHICLE_ID, db)
+
+    assert exc_info.value.status_code == 404
+
+
+# ===========================================================================
+# Tests 24–25: subclient
+# ===========================================================================
+
+async def test_subclient_reads_own_vehicle():
+    """Subclient accede a vehículo de su propio tenant → pasa (Level 2)."""
+    vehicle = _make_vehicle(tenant_id=SUBCLIENT_TENANT_ID)
+    db = _make_db(vehicle=vehicle)
+
+    result = await assert_can_access_vehicle(SUBCLIENT_USER, VEHICLE_ID, db)
+
+    assert result is vehicle
+
+
+async def test_subclient_other_tenant_returns_404():
+    """Subclient intenta acceder a vehículo de otro tenant → 404 (Level 5)."""
+    vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID)
+    db = _make_db(vehicle=vehicle)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await assert_can_access_vehicle(SUBCLIENT_USER, VEHICLE_ID, db)
+
+    assert exc_info.value.status_code == 404
+
+
+# ===========================================================================
+# Test 26: write path para client admin (ruta que usa update_plan)
+# ===========================================================================
+
+async def test_client_admin_writes_own_vehicle():
+    """Client admin con operation='write' sobre su propio vehículo → pasa."""
+    vehicle = _make_vehicle(tenant_id=CLIENT_TENANT_ID)
+    db = _make_db(vehicle=vehicle)
+
+    result = await assert_can_access_vehicle(
+        CLIENT_USER, VEHICLE_ID, db, operation="write"
+    )
+
+    assert result is vehicle

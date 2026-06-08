@@ -86,8 +86,11 @@ async def assert_can_access_vehicle(
        (permite al conductor registrar datos del parte de servicio).
 
     4. Fabricante (tenant_tier='manufacturer'): acceso técnico a vehículos
-       donde vehicle.manufacturer_tenant_id == user.tenant_id. Acceso
-       operativo solo si el tenant cliente tiene manufacturer_can_view_operations=True.
+       donde vehicle.manufacturer_tenant_id == user.tenant_id. Acceso a
+       datos CAN/telemetría (scope='technical') solo si el tenant cliente tiene
+       manufacturer_can_view_can_data=True (default True — el fabricante ve
+       su propia maquinaria por defecto; el cliente puede restringirlo).
+       Acceso operativo (scope='operational') solo si manufacturer_can_view_operations=True.
        Nunca puede modificar ni eliminar.
 
     5. Cualquier otro caso: 404. Nunca 403 en casos de falta de acceso —
@@ -142,6 +145,12 @@ async def assert_can_access_vehicle(
     if user.tenant_tier == "manufacturer":
         if vehicle.manufacturer_tenant_id != user.tenant_id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+
+        # Scope técnico requiere flag habilitado en el tenant cliente del vehículo
+        if scope == "technical":
+            client_tenant = await db.get(Tenant, vehicle.tenant_id)
+            if not client_tenant or not client_tenant.manufacturer_can_view_can_data:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
         # Scope operativo requiere flag habilitado en el tenant cliente del vehículo
         if scope == "operational":
