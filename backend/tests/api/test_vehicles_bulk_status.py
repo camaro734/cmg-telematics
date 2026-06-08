@@ -62,11 +62,17 @@ def _make_vehicle(
 
 
 def _db_with_vehicles(vehicles: list) -> AsyncMock:
-    """AsyncSession mock cuyo db.execute devuelve la lista de vehículos vía scalars().all()."""
+    """AsyncSession mock para el endpoint bulk statuses.
+
+    - db.scalars: usado por list_accessible_vehicle_ids (v2) — devuelve los IDs de
+      los vehículos cuyo tenant_id coincide con CLIENT_TENANT_ID.
+    - db.execute: usado por la query bulk de Vehicle activos — devuelve los vehículos.
+    """
     result = MagicMock()
     result.scalars.return_value.all.return_value = vehicles
     db = AsyncMock()
     db.execute = AsyncMock(return_value=result)
+    db.scalars = AsyncMock(return_value=[v.id for v in vehicles if v.tenant_id == CLIENT_TENANT_ID])
     return db
 
 
