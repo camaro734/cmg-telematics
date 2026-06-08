@@ -175,13 +175,6 @@ class MaintenanceTemplatesUpdate(BaseModel):
     templates: list[MaintenanceTemplateItem]
 
 
-def _check_vehicle_access(vehicle: Vehicle, user: CurrentUser) -> None:
-    if user.tenant_tier == "cmg":
-        return
-    if str(vehicle.tenant_id) != str(user.tenant_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-
-
 @router.get("/sensors/catalog", response_model=list[SensorCatalogItem])
 async def get_sensor_catalog(
     user: CurrentUser = Depends(get_current_user),

@@ -151,7 +151,7 @@ def test_statuses_returns_list_for_own_vehicles():
 def test_statuses_cross_tenant_returns_empty():
     _override_user(CLIENT_USER)
 
-    # Vehículo pertenece a otro tenant — _check_vehicle_access lo filtrará
+    # Vehículo pertenece a otro tenant — list_accessible_vehicle_ids lo excluirá
     vehicle = _make_vehicle(VEHICLE_ID_1, OTHER_TENANT_ID)
     db = _db_with_vehicles([vehicle])
     _override_db(db)

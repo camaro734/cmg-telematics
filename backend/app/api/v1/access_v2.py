@@ -1,11 +1,8 @@
 """Sistema de permisos v2 — jerarquía CMG → Fabricante → Cliente → Conductor.
 
-Coexiste con el helper v1 (_check_vehicle_access en vehicles.py) durante
-la fase de migración. Los endpoints migrarán uno a uno al v2.
+Helper central para control de acceso a vehículos. Todos los endpoints de
+vehicles.py, maintenance.py y alerts.py usan este módulo (Fase 4 completa).
 Ref: docs/SPEC-jerarquia-v2.md §3
-
-NO registrar en routers todavía. Solo código nuevo que nada llama salvo tests.
-Fase 2 de 6.
 """
 
 import logging
