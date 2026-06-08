@@ -1476,10 +1476,9 @@ async def get_vehicle_kpis(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="technical")
+    if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
 
     if start is None:
         start = datetime.now(timezone.utc) - timedelta(hours=24)
