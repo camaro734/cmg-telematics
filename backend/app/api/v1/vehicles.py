@@ -874,10 +874,9 @@ async def update_vehicle(
 ):
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
     if body.vehicle_type_id is not None:
         vtype = await db.get(VehicleType, body.vehicle_type_id)
         if not vtype:
@@ -1528,10 +1527,9 @@ async def send_dout_command(
 ):
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
 
     result = await db.execute(
         select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)

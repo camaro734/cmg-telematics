@@ -336,8 +336,9 @@ async def update_plan(
 ):
     await _require_admin(user)
     plan = await db.get(MaintenancePlan, plan_id)
-    if not plan or (user.tenant_tier != "cmg" and str(plan.tenant_id) != str(user.tenant_id)):
+    if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
+    await assert_can_access_vehicle(user, plan.vehicle_id, db, operation="write")
 
     if body.name is not None:
         plan.name = body.name
