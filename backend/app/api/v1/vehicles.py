@@ -1499,10 +1499,7 @@ async def list_vehicle_maintenance(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle:
-        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
 
     result = await db.execute(
         select(MaintenancePlan)
