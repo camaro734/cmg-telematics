@@ -33,7 +33,7 @@ from app.models.device import Device
 from app.models.driver import Driver, VehicleDriverAssignment
 from app.models.tenant import Tenant
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
-from app.api.v1.access_v2 import assert_can_access_vehicle
+from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
 from pydantic import BaseModel, Field
 
@@ -915,21 +915,35 @@ async def get_vehicles_statuses_bulk(
 
     redis = request.app.state.redis
 
-    # Una sola query para validar acceso de hasta 200 vehículos
+    # Filtrar IDs accesibles por jerarquía v2 (subconjunto silencioso, sin 403)
+    accessible_set = await list_accessible_vehicle_ids(user, db)
+    if accessible_set != "ALL":
+        accessible_set_ids = set(accessible_set)
+        vehicle_ids = [vid for vid in vehicle_ids if vid in accessible_set_ids]
+
+    if not vehicle_ids:
+        return []
+
+    # Validar existencia y active en bulk
     res = await db.execute(
         select(Vehicle).where(Vehicle.id.in_(vehicle_ids), Vehicle.active == True)
     )
     vehicles_by_id = {v.id: v for v in res.scalars().all()}
-    accessible_ids: list[uuid.UUID] = []
-    for vid in vehicle_ids:
-        v = vehicles_by_id.get(vid)
-        if v is None:
-            continue
-        try:
-            _check_vehicle_access(v, user)
-            accessible_ids.append(vid)
-        except Exception:
-            continue
+
+    # Fabricante cross-tenant: filtrar además por flag operativo del tenant dueño
+    # (list_accessible_vehicle_ids solo filtra por manufacturer_tenant_id, sin flags)
+    if user.tenant_tier == "manufacturer":
+        accessible_ids: list[uuid.UUID] = []
+        for vid in vehicle_ids:
+            if vid not in vehicles_by_id:
+                continue
+            try:
+                await assert_can_access_vehicle(user, vid, db, operation="read", scope="operational")
+                accessible_ids.append(vid)
+            except Exception:
+                continue
+    else:
+        accessible_ids = [vid for vid in vehicle_ids if vid in vehicles_by_id]
 
     if not accessible_ids:
         return []
@@ -1077,10 +1091,9 @@ async def get_vehicle_status(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
+    if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    _check_vehicle_access(vehicle, user)
 
     redis = request.app.state.redis
     redis_key = f"vehicle:{vehicle_id}:status"
