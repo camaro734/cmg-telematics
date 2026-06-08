@@ -1300,7 +1300,7 @@ async def get_vehicle_track_today(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
 
@@ -1328,7 +1328,7 @@ async def get_vehicle_track(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
     if from_ > to:
@@ -1357,7 +1357,7 @@ async def get_vehicle_trips(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DayTrips:
-    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
 
