@@ -10,6 +10,7 @@ import { Select } from '../../shared/ui/Select'
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type MetricFormState = {
+  source: 'core' | 'can'
   key: string
   label: string
   color: string
@@ -22,6 +23,7 @@ type MetricFormState = {
 }
 
 const emptyMetricForm: MetricFormState = {
+  source: 'can',
   key: '', label: '', color: '#22C55E', unit: '', transform: '1',
   avl_id: '', chart_type: 'line', show_in_pdf: true, group: '',
 }
@@ -99,6 +101,7 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
   function openEditMetric(m: HistoricMetricItem, idx: number) {
     setEditingMetricIdx(idx)
     setMetricForm({
+      source: m.avl_id == null ? 'core' : 'can',
       key: m.key,
       label: m.label,
       color: m.color,
@@ -117,19 +120,25 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
       setMetricError('El nombre de la métrica es obligatorio')
       return
     }
-    if (!metricForm.avl_id) {
+    if (metricForm.source === 'core' && !metricForm.key) {
+      setMetricError('Debes seleccionar una métrica KPI')
+      return
+    }
+    if (metricForm.source === 'can' && !metricForm.avl_id) {
       setMetricError('Debes seleccionar una señal FMC650')
       return
     }
     setMetricError(null)
-    const autoKey = metricForm.key || `custom_avl_${metricForm.avl_id}`
+    const autoKey = metricForm.source === 'can'
+      ? (metricForm.key || `custom_avl_${metricForm.avl_id}`)
+      : metricForm.key
     const newMetric: HistoricMetricItem = {
       key: autoKey,
       label: metricForm.label.trim() || metricForm.key,
       color: metricForm.color,
       unit: metricForm.unit,
       transform: parseFloat(metricForm.transform) || 1,
-      avl_id: metricForm.avl_id ? parseInt(metricForm.avl_id) : undefined,
+      avl_id: metricForm.source === 'can' && metricForm.avl_id ? parseInt(metricForm.avl_id) : undefined,
       chart_type: metricForm.chart_type,
       show_in_pdf: metricForm.show_in_pdf,
       group: metricForm.group.trim() || null,
@@ -233,28 +242,49 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
               {editingMetricIdx === null ? 'Nueva métrica de reporte' : 'Editar métrica de reporte'}
             </h3>
 
-            <div>
-              <label style={labelStyle}>MÉTRICA (KPI)</label>
-              <Select value={metricForm.key}
-                onChange={e => {
-                  const opt = KPI_OPTIONS.find(o => o.key === e.target.value)
-                  setMetricForm(f => ({
-                    ...f,
-                    key: e.target.value,
-                    label: opt ? opt.label : f.label,
-                    unit: opt ? opt.unit : f.unit,
-                    color: opt ? opt.color : f.color,
-                    transform: opt ? opt.transform.toString() : f.transform,
-                  }))
-                }}>
-                <option value="">— Selecciona —</option>
-                {KPI_OPTIONS.map(o => (
-                  <option key={o.key} value={o.key}>{o.label} ({o.key})</option>
-                ))}
-              </Select>
+            {/* Origen: Core KPI (telemetry_1h) vs CAN/FMC650 */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['core', 'can'] as const).map(src => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setMetricForm(f => ({ ...f, source: src, key: '', avl_id: '' }))}
+                  style={{
+                    flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    border: metricForm.source === src ? '2px solid var(--cmg-teal)' : '1px solid var(--border)',
+                    background: metricForm.source === src ? 'rgba(29,158,117,0.12)' : 'var(--bg-surface)',
+                    color: metricForm.source === src ? 'var(--cmg-teal)' : 'var(--offline)',
+                  }}
+                >
+                  {src === 'core' ? 'Core (KPI)' : 'CAN / FMC650'}
+                </button>
+              ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {metricForm.source === 'core' && (
+              <div>
+                <label style={labelStyle}>MÉTRICA KPI</label>
+                <Select value={metricForm.key}
+                  onChange={e => {
+                    const opt = KPI_OPTIONS.find(o => o.key === e.target.value)
+                    setMetricForm(f => ({
+                      ...f,
+                      key: e.target.value,
+                      label: opt ? opt.label : f.label,
+                      unit: opt ? opt.unit : f.unit,
+                      color: opt ? opt.color : f.color,
+                      transform: opt ? opt.transform.toString() : f.transform,
+                    }))
+                  }}>
+                  <option value="">— Selecciona —</option>
+                  {KPI_OPTIONS.map(o => (
+                    <option key={o.key} value={o.key}>{o.label} ({o.key})</option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: metricForm.source === 'can' ? '1fr 1fr' : '1fr', gap: 12 }}>
               <div>
                 <label style={labelStyle}>ETIQUETA</label>
                 <Input
@@ -263,39 +293,41 @@ export default function HistoricMetricsSection({ typeId, selectedType }: Props) 
                   placeholder="Nombre visible en el histórico"
                 />
               </div>
-              <div>
-                <label style={labelStyle}>SEÑAL FMC650</label>
-                <Select value={AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) ? metricForm.avl_id : metricForm.avl_id ? '__custom__' : ''}
-                  onChange={e => {
-                    if (e.target.value === '__custom__') {
-                      setMetricForm(f => ({ ...f, avl_id: '' }))
-                    } else if (e.target.value === '') {
-                      setMetricForm(f => ({ ...f, avl_id: '' }))
-                    } else {
-                      const info = AVL_NAMES[`avl_${e.target.value}`]
-                      setMetricForm(f => ({
-                        ...f,
-                        avl_id: e.target.value,
-                        label: f.label || (info?.name ?? ''),
-                        unit: f.unit || (info?.unit ?? ''),
-                      }))
-                    }
-                  }}>
-                  <option value="">-- Selecciona señal --</option>
-                  {AVL_OPTIONS.map(opt => (
-                    <option key={opt.id} value={String(opt.id)}>
-                      AVL {opt.id} — {opt.name}{opt.unit ? ` (${opt.unit})` : ''}
-                    </option>
-                  ))}
-                  <option value="__custom__">Otro AVL ID personalizado...</option>
-                </Select>
-                {!AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) && (
-                  <Input type="number" min="1" max="65535" style={{ marginTop: 6 }}
-                    value={metricForm.avl_id}
-                    onChange={e => setMetricForm(f => ({ ...f, avl_id: e.target.value }))}
-                    placeholder="AVL ID numérico (1–65535)" />
-                )}
-              </div>
+              {metricForm.source === 'can' && (
+                <div>
+                  <label style={labelStyle}>SEÑAL FMC650</label>
+                  <Select value={AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) ? metricForm.avl_id : metricForm.avl_id ? '__custom__' : ''}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        setMetricForm(f => ({ ...f, avl_id: '' }))
+                      } else if (e.target.value === '') {
+                        setMetricForm(f => ({ ...f, avl_id: '' }))
+                      } else {
+                        const info = AVL_NAMES[`avl_${e.target.value}`]
+                        setMetricForm(f => ({
+                          ...f,
+                          avl_id: e.target.value,
+                          label: f.label || (info?.name ?? ''),
+                          unit: f.unit || (info?.unit ?? ''),
+                        }))
+                      }
+                    }}>
+                    <option value="">-- Selecciona señal --</option>
+                    {AVL_OPTIONS.map(opt => (
+                      <option key={opt.id} value={String(opt.id)}>
+                        AVL {opt.id} — {opt.name}{opt.unit ? ` (${opt.unit})` : ''}
+                      </option>
+                    ))}
+                    <option value="__custom__">Otro AVL ID personalizado...</option>
+                  </Select>
+                  {!AVL_OPTIONS.some(o => String(o.id) === metricForm.avl_id) && (
+                    <Input type="number" min="1" max="65535" style={{ marginTop: 6 }}
+                      value={metricForm.avl_id}
+                      onChange={e => setMetricForm(f => ({ ...f, avl_id: e.target.value }))}
+                      placeholder="AVL ID numérico (1–65535)" />
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
