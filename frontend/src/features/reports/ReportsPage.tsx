@@ -14,6 +14,9 @@ import TrackMap from '../vehicle/TrackMap'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { exportToCsv } from '../../lib/csvExport'
+import { useUserPreferences, usePatchUserPreferences } from '../../lib/useUserPreferences'
+import { resolveVisibleMetrics } from '../../lib/resolveVisibleMetrics'
+import { MetricPicker } from '../../components/MetricPicker'
 import { useReportData, periodToHours, PERIOD_LABELS } from './useReportData'
 import { SelectorBar, PdfDownloadBtn } from './ReportFilters'
 import { Input } from '../../shared/ui/Input'
@@ -193,6 +196,9 @@ function HistoricoTab({
 }) {
   const isMobile = useIsMobile()
   const hours = periodToHours(period, customFrom ?? '', customTo ?? '')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const { data: prefs } = useUserPreferences()
+  const patchPrefs = usePatchUserPreferences()
 
   const customQuerySuffix = period === 'custom' ? `${customFrom}_${customTo}` : hours
 
@@ -215,7 +221,12 @@ function HistoricoTab({
   })
 
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicleTypeId)
-  const metrics = vehicleType?.historic_metrics ?? []
+  const metrics = resolveVisibleMetrics(vehicleType?.historic_metrics ?? [], prefs, vehicleTypeId)
+
+  const showAvlRangeBanner = period === 'custom' &&
+    Boolean(customFrom) &&
+    new Date(customFrom!).getTime() < Date.now() - 90 * 24 * 60 * 60 * 1000 &&
+    (vehicleType?.historic_metrics ?? []).some(m => m.avl_id != null)
 
   // KpiHour column names — estas métricas vienen de telemetry_1h, nunca de avl-series
   const KPI_HOUR_KEYS = new Set(['engine_on_minutes', 'pto_active_minutes', 'avg_pressure_1', 'max_pressure_1', 'avg_oil_temp', 'max_oil_temp', 'record_count'])
@@ -376,6 +387,7 @@ function HistoricoTab({
   }
 
   return (
+    <>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* KPI row */}
@@ -386,15 +398,45 @@ function HistoricoTab({
         <KpiCard label="% PTO / Motor" value={ptoPct != null ? `${ptoPct}%` : '—'} accent={ptoPct != null && ptoPct > 80 ? 'var(--warn)' : undefined} />
       </div>
 
+      {showAvlRangeBanner && (
+        <div style={{
+          background: 'var(--bg-elevated)', border: '1px solid var(--accent-warn)',
+          borderRadius: 8, padding: '9px 14px', fontSize: 12, color: 'var(--accent-warn)',
+          display: 'flex', alignItems: 'flex-start', gap: 8,
+        }}>
+          <span style={{ flexShrink: 0 }}>⚠</span>
+          <span>
+            Los sensores CAN solo tienen <strong>90 días</strong> de histórico.
+            Las métricas de motor, PTO y operación llegan hasta <strong>~1 año</strong>.
+            Para rangos superiores a 90 días los sensores CAN pueden no tener datos.
+          </span>
+        </div>
+      )}
+
       {/* Export + multi-series line chart */}
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
             Desempeño histórico — {PERIOD_LABELS[period]}
           </div>
-          <button style={btnSecondary} onClick={handleCsvExport} disabled={kpis.length === 0}>
-            ⬇ CSV
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {(vehicleType?.historic_metrics ?? []).length > 0 && (
+              <button
+                onClick={() => setPickerOpen(true)}
+                title="Personalizar métricas"
+                style={{
+                  background: 'transparent', border: '1px solid var(--border)',
+                  borderRadius: 6, cursor: 'pointer', color: 'var(--fg-muted)',
+                  fontSize: 14, padding: '3px 8px', lineHeight: 1,
+                }}
+              >
+                ⚙
+              </button>
+            )}
+            <button style={btnSecondary} onClick={handleCsvExport} disabled={kpis.length === 0}>
+              ⬇ CSV
+            </button>
+          </div>
         </div>
 
         {lineData.length === 0 ? (
@@ -636,6 +678,19 @@ function HistoricoTab({
       )}
 
     </div>
+
+    {pickerOpen && vehicleTypeId && (
+      <MetricPicker
+        allMetrics={vehicleType?.historic_metrics ?? []}
+        savedKeys={prefs?.historic_metrics?.[vehicleTypeId]?.keys}
+        onClose={() => setPickerOpen(false)}
+        onSave={(keys) => {
+          patchPrefs.mutate({ historic_metrics: { [vehicleTypeId]: { keys } } })
+          setPickerOpen(false)
+        }}
+      />
+    )}
+    </>
   )
 }
 

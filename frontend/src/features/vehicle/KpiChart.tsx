@@ -8,6 +8,9 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { KpiHour, VehicleTypeOut } from '../../lib/types'
 import { buildAvlSeries, type Period } from '../../lib/avlSeries'
+import { useUserPreferences, usePatchUserPreferences } from '../../lib/useUserPreferences'
+import { resolveVisibleMetrics } from '../../lib/resolveVisibleMetrics'
+import { MetricPicker } from '../../components/MetricPicker'
 
 const PERIOD_HOURS: Record<Period, number> = { dia: 24, semana: 168, mes: 720 }
 
@@ -100,6 +103,10 @@ const tooltipStyle: React.CSSProperties = {
 
 export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: string; vehicleTypeId?: string }) {
   const [period, setPeriod] = useState<Period>('semana')
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const { data: prefs } = useUserPreferences()
+  const patchPrefs = usePatchUserPreferences()
   const hours = PERIOD_HOURS[period]
 
   const { data: kpis = [], isLoading } = useQuery<KpiHour[]>({
@@ -120,7 +127,7 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
     enabled: Boolean(vehicleTypeId),
   })
   const vehicleType = vehicleTypes.find(vt => vt.id === vehicleTypeId)
-  const metrics = vehicleType?.historic_metrics ?? []
+  const metrics = resolveVisibleMetrics(vehicleType?.historic_metrics ?? [], prefs, vehicleTypeId)
 
   const avlMetrics = metrics.filter(m => m.avl_id !== undefined && m.avl_id !== null)
   const kpiMetrics = metrics.filter(m => m.avl_id === undefined || m.avl_id === null)
@@ -169,15 +176,30 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
   }
 
   return (
+    <>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Period selector */}
-      <div style={{ display: 'flex', gap: 6 }}>
+      {/* Period selector + metric picker */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         {(['dia', 'semana', 'mes'] as Period[]).map(p => (
           <button key={p} style={periodBtn(p)} onClick={() => setPeriod(p)}>
             {p === 'dia' ? '24h' : p === 'semana' ? '7 días' : '30 días'}
           </button>
         ))}
+        {vehicleTypeId && (vehicleType?.historic_metrics ?? []).length > 0 && (
+          <button
+            onClick={() => setPickerOpen(true)}
+            title="Personalizar métricas"
+            style={{
+              marginLeft: 'auto', background: 'transparent',
+              border: '1px solid var(--border)', borderRadius: 6,
+              cursor: 'pointer', color: 'var(--fg-muted)',
+              fontSize: 14, padding: '3px 8px', lineHeight: 1,
+            }}
+          >
+            ⚙
+          </button>
+        )}
       </div>
 
       {/* KPI summary */}
@@ -257,5 +279,18 @@ export default function KpiChart({ vehicleId, vehicleTypeId }: { vehicleId: stri
       })}
 
     </div>
+
+    {pickerOpen && vehicleTypeId && (
+      <MetricPicker
+        allMetrics={vehicleType?.historic_metrics ?? []}
+        savedKeys={prefs?.historic_metrics?.[vehicleTypeId]?.keys}
+        onClose={() => setPickerOpen(false)}
+        onSave={(keys) => {
+          patchPrefs.mutate({ historic_metrics: { [vehicleTypeId]: { keys } } })
+          setPickerOpen(false)
+        }}
+      />
+    )}
+    </>
   )
 }

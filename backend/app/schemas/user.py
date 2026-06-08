@@ -4,6 +4,18 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
+class MetricPreferences(BaseModel):
+    keys: list[str] | None = None
+
+
+class UserPreferencesIn(BaseModel):
+    historic_metrics: dict[str, MetricPreferences] = {}
+
+
+class UserPreferencesOut(BaseModel):
+    historic_metrics: dict[str, MetricPreferences] = {}
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

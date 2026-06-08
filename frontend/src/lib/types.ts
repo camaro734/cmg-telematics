@@ -671,3 +671,19 @@ export interface SmtpConfigUpdate {
   from_addr: string
   tls: boolean
 }
+
+export interface MetricTypePreferences {
+  keys: string[]
+}
+
+export interface UserPreferences {
+  historic_metrics: Record<string, MetricTypePreferences>
+}
+
+export interface MetricTypePatch {
+  keys: string[] | null
+}
+
+export interface PreferencesPatch {
+  historic_metrics: Record<string, MetricTypePatch>
+}

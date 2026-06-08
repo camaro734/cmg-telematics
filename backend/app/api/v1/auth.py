@@ -19,12 +19,14 @@ def _versioned_url(url: str | None) -> str | None:
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import attributes
 
 from app.core.database import get_db
 from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutRequest, CurrentUser
+from app.schemas.user import MetricPreferences, UserPreferencesIn, UserPreferencesOut
 from app.api.v1.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -171,3 +173,48 @@ async def get_me(
         "tier": current_user.tenant_tier,
         "enabled_modules": tenant.enabled_modules if tenant else [],
     }
+
+
+@router.get("/me/preferences", response_model=UserPreferencesOut)
+async def get_preferences(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(User, current_user.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    hm = (user.preferences or {}).get("historic_metrics", {})
+    return UserPreferencesOut(
+        historic_metrics={
+            type_id: MetricPreferences(keys=entry["keys"])
+            for type_id, entry in hm.items()
+            if isinstance(entry, dict) and entry.get("keys") is not None
+        }
+    )
+
+
+@router.patch("/me/preferences", response_model=UserPreferencesOut)
+async def patch_preferences(
+    body: UserPreferencesIn,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(User, current_user.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    existing_hm: dict = dict((user.preferences or {}).get("historic_metrics", {}))
+    for type_id, metric_pref in body.historic_metrics.items():
+        if metric_pref.keys is None:
+            existing_hm.pop(type_id, None)
+        else:
+            existing_hm[type_id] = {"keys": metric_pref.keys}
+    user.preferences = {"historic_metrics": existing_hm}
+    attributes.flag_modified(user, "preferences")
+    await db.commit()
+    return UserPreferencesOut(
+        historic_metrics={
+            type_id: MetricPreferences(keys=entry["keys"])
+            for type_id, entry in existing_hm.items()
+            if isinstance(entry, dict) and entry.get("keys") is not None
+        }
+    )
