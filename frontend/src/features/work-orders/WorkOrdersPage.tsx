@@ -6,6 +6,7 @@ import { keys } from '../../lib/queryKeys'
 import type {
   WorkOrderOut, WorkOrderStatus, WorkOrderPriority, DriverOut, VehicleOut,
   WorkOrderStopOut, WorkOrderStopCreate, WorkOrderStopStatus, VehicleStatus,
+  AutoCloseConfig, AutoCloseSignal,
 } from '../../lib/types'
 import Shell from '../../shared/ui/Shell'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
@@ -707,6 +708,11 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
   })
   const [draftStops, setDraftStops] = useState<DraftStop[]>([])
   const [error, setError] = useState('')
+  const [autoClose, setAutoClose] = useState<AutoCloseConfig>(() => {
+    const cfg = initial?.auto_close_config
+    if (cfg?.enabled) return cfg
+    return { enabled: false, service_signal_key: '', signal_op: '==', signal_value: true, min_active_seconds: 60, min_inactive_seconds: 300, exit_margin_m: 25 }
+  })
 
   function addStop() {
     setDraftStops(ds => [...ds, {
@@ -726,6 +732,13 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
 
   const validStops = draftStops.filter(s => s.title.trim())
 
+  const { data: signals = [] } = useQuery<AutoCloseSignal[]>({
+    queryKey: ['work-order-vehicle-signals', form.vehicle_id],
+    queryFn: () => apiClient.get<AutoCloseSignal[]>(`/api/v1/work-orders/vehicle-signals/${form.vehicle_id}`),
+    enabled: !!form.vehicle_id,
+  })
+  const selectedSignal = signals.find(s => s.key === autoClose.service_signal_key)
+
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -737,6 +750,7 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
         notes: form.notes || null,
         final_client_name: form.final_client_name.trim() || null,
         final_client_address: form.final_client_address.trim() || null,
+        auto_close_config: autoClose.enabled && autoClose.service_signal_key ? autoClose : null,
       }
       const order = initial
         ? await apiClient.put<WorkOrderOut>(`/api/v1/work-orders/${initial.id}`, payload)
@@ -845,6 +859,132 @@ function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }: ModalP
               />
             </div>
           </div>
+        </div>
+
+        {/* ── Auto-cierre de servicio ── */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700, color: 'var(--fg-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Auto-cierre de servicio
+              </span>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', margin: '4px 0 0' }}>
+                Cierra la parada automáticamente al cumplirse geocerca + señal activa.
+              </p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexShrink: 0, marginLeft: 12, paddingTop: 2 }}>
+              <input
+                type="checkbox"
+                checked={autoClose.enabled}
+                onChange={e => setAutoClose(a => ({ ...a, enabled: e.target.checked }))}
+              />
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-primary)' }}>Activar</span>
+            </label>
+          </div>
+
+          {autoClose.enabled && (
+            <>
+              {!form.vehicle_id && (
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--accent-warn)', margin: '0 0 8px' }}>
+                  ⚠ Selecciona un vehículo para ver las señales disponibles.
+                </p>
+              )}
+
+              {/* Señal de servicio */}
+              <div style={S.field}>
+                <span style={S.label}>Señal de servicio *</span>
+                <Select
+                  value={autoClose.service_signal_key}
+                  onChange={e => {
+                    const key = e.target.value
+                    const sig = signals.find(s => s.key === key)
+                    setAutoClose(a => ({
+                      ...a,
+                      service_signal_key: key,
+                      signal_op: sig?.signal_type === 'bool' ? '==' : '>',
+                      signal_value: sig?.signal_type === 'bool' ? true : 0,
+                    }))
+                  }}
+                >
+                  <option value="">— Selecciona señal —</option>
+                  {signals.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </Select>
+              </div>
+
+              {/* Condición */}
+              {autoClose.service_signal_key && (
+                <div style={{ display: 'grid', gridTemplateColumns: selectedSignal?.signal_type === 'bool' ? '1fr' : '160px 1fr', gap: 8, marginBottom: 8 }}>
+                  {selectedSignal?.signal_type !== 'bool' && (
+                    <div style={S.field}>
+                      <span style={S.label}>Operador</span>
+                      <Select
+                        value={autoClose.signal_op}
+                        onChange={e => setAutoClose(a => ({ ...a, signal_op: e.target.value }))}
+                      >
+                        <option value=">">&gt; mayor que</option>
+                        <option value=">=">&ge; mayor o igual</option>
+                        <option value="<">&lt; menor que</option>
+                        <option value="<=">&le; menor o igual</option>
+                        <option value="==">= igual a</option>
+                      </Select>
+                    </div>
+                  )}
+                  <div style={S.field}>
+                    <span style={S.label}>Valor</span>
+                    {selectedSignal?.signal_type === 'bool' ? (
+                      <Select
+                        value={autoClose.signal_value === true || autoClose.signal_value === 1 ? 'true' : 'false'}
+                        onChange={e => setAutoClose(a => ({ ...a, signal_value: e.target.value === 'true', signal_op: '==' }))}
+                      >
+                        <option value="true">Activo (true)</option>
+                        <option value="false">Inactivo (false)</option>
+                      </Select>
+                    ) : (
+                      <Input
+                        type="number"
+                        value={String(autoClose.signal_value)}
+                        onChange={e => setAutoClose(a => ({ ...a, signal_value: parseFloat(e.target.value) || 0 }))}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Umbrales temporales */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={S.field}>
+                  <span style={S.label}>Mín. señal activa (s)</span>
+                  <Input
+                    type="number" min={5} step={5}
+                    value={String(autoClose.min_active_seconds)}
+                    onChange={e => setAutoClose(a => ({ ...a, min_active_seconds: parseInt(e.target.value) || 60 }))}
+                  />
+                </div>
+                <div style={S.field}>
+                  <span style={S.label}>Mín. señal apagada (s)</span>
+                  <Input
+                    type="number" min={5} step={5}
+                    value={String(autoClose.min_inactive_seconds)}
+                    onChange={e => setAutoClose(a => ({ ...a, min_inactive_seconds: parseInt(e.target.value) || 300 }))}
+                  />
+                </div>
+                <div style={S.field}>
+                  <span style={S.label}>Margen geocerca (m)</span>
+                  <Input
+                    type="number" min={0} step={5}
+                    value={String(autoClose.exit_margin_m)}
+                    onChange={e => setAutoClose(a => ({ ...a, exit_margin_m: parseInt(e.target.value) || 25 }))}
+                  />
+                </div>
+              </div>
+
+              {draftStops.some(s => !s.lat) && (
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--accent-warn)', margin: '6px 0 0' }}>
+                  ⚠ Una o más paradas no tienen ubicación fijada — el auto-cierre no actuará en ellas.
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         {/* ── Paradas programadas ── */}

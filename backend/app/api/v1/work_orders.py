@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
@@ -353,3 +354,40 @@ async def delete_stop(
         raise HTTPException(status_code=404, detail="Parada no encontrada")
     await db.delete(stop)
     await db.commit()
+
+
+_BUILTIN_SIGNALS = [
+    {"key": "pto_active",  "label": "PTO activo",        "signal_type": "bool"},
+    {"key": "ignition",    "label": "Ignición",           "signal_type": "bool"},
+    {"key": "speed_kmh",   "label": "Velocidad (km/h)",   "signal_type": "numeric"},
+]
+
+
+@router.get("/work-orders/vehicle-signals/{vehicle_id}")
+async def get_vehicle_signals(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """Señales disponibles para configurar el auto-cierre de una orden."""
+    result = await db.execute(
+        select(Vehicle)
+        .options(selectinload(Vehicle.vehicle_type))
+        .where(Vehicle.id == vehicle_id)
+    )
+    vehicle = result.scalar_one_or_none()
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    _check_tenant(user, vehicle.tenant_id)
+
+    channels = vehicle.vehicle_type.sensor_schema or []
+    can_signals = [
+        {
+            "key": ch["key"],
+            "label": ch.get("label", ch["key"]),
+            "signal_type": ch.get("type", "numeric"),
+        }
+        for ch in channels
+        if ch.get("key")
+    ]
+    return _BUILTIN_SIGNALS + can_signals

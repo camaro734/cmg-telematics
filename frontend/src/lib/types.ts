@@ -245,6 +245,22 @@ export interface ConditionDef {
 export type WorkOrderStatus   = 'pending' | 'in_progress' | 'done' | 'cancelled'
 export type WorkOrderPriority = 'low' | 'normal' | 'high' | 'urgent'
 
+export interface AutoCloseConfig {
+  enabled: boolean
+  service_signal_key: string
+  signal_op: string
+  signal_value: boolean | number
+  min_active_seconds: number
+  min_inactive_seconds: number
+  exit_margin_m: number
+}
+
+export interface AutoCloseSignal {
+  key: string
+  label: string
+  signal_type: 'bool' | 'numeric'
+}
+
 export interface WorkOrderOut {
   id: string
   tenant_id: string
@@ -266,6 +282,7 @@ export interface WorkOrderOut {
   doc_number: string | null
   created_by: string | null
   created_at: string
+  auto_close_config: AutoCloseConfig | null
   vehicle_name: string | null
   driver_name: string | null
 }

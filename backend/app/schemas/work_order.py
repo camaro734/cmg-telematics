@@ -30,6 +30,7 @@ class WorkOrderOut(BaseModel):
     doc_number: str | None = None
     created_by: uuid.UUID | None = None
     created_at: datetime
+    auto_close_config: dict | None = None
     # Populated at query time
     vehicle_name: str | None = None
     driver_name: str | None = None
@@ -48,6 +49,7 @@ class WorkOrderCreate(BaseModel):
     notes: str | None = None
     final_client_name: str | None = None
     final_client_address: str | None = None
+    auto_close_config: dict | None = None
 
 
 class WorkOrderUpdate(BaseModel):
@@ -64,6 +66,7 @@ class WorkOrderUpdate(BaseModel):
     notes: str | None = None
     final_client_name: str | None = None
     final_client_address: str | None = None
+    auto_close_config: dict | None = None
 
 
 class WorkOrderStatusPatch(BaseModel):
