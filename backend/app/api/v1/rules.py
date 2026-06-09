@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_management_tier
 from app.schemas.auth import CurrentUser
 from app.schemas.rule import RuleOut, RuleCreate, RuleUpdate, RuleTestRequest, RuleTestResult
 from app.models.alert_rule import AlertRule
@@ -101,11 +101,9 @@ async def get_rule(
 @router.post("/rules", response_model=RuleOut, status_code=status.HTTP_201_CREATED)
 async def create_rule(
     body: RuleCreate,
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_management_tier()),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     data = body.model_dump()
     data.pop("tenant_id", None)
     data.pop("created_by_user_id", None)
@@ -120,7 +118,7 @@ async def create_rule(
 async def update_rule(
     rule_id: uuid.UUID,
     body: RuleUpdate,
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_management_tier()),
     db: AsyncSession = Depends(get_db),
 ):
     rule = await db.get(AlertRule, rule_id)
@@ -128,8 +126,6 @@ async def update_rule(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
     if user.tenant_tier != "cmg" and str(rule.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
-    if user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
 
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(rule, field, value)
@@ -142,7 +138,7 @@ async def update_rule(
 async def delete_rule(
     rule_id: uuid.UUID,
     purge: bool = Query(False),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_management_tier()),
     db: AsyncSession = Depends(get_db),
 ):
     rule = await db.get(AlertRule, rule_id)
@@ -150,8 +146,6 @@ async def delete_rule(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
     if user.tenant_tier != "cmg" and str(rule.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
-    if user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
 
     alert_count = await db.scalar(
         select(func.count()).where(AlertInstance.rule_id == rule.id)
@@ -179,7 +173,7 @@ async def delete_rule(
 @router.post("/rules/{rule_id}/restore", response_model=RuleOut)
 async def restore_rule(
     rule_id: uuid.UUID,
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_management_tier()),
     db: AsyncSession = Depends(get_db),
 ):
     rule = await db.get(AlertRule, rule_id)
@@ -187,8 +181,6 @@ async def restore_rule(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
     if user.tenant_tier != "cmg" and str(rule.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Regla no encontrada")
-    if user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     rule.archived_at = None
     await db.commit()
     await db.refresh(rule)

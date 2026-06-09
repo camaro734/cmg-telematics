@@ -79,6 +79,35 @@ async def assert_can_manage_tenant(user: CurrentUser, target_tenant_id: uuid.UUI
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permiso sobre este cliente")
 
 
+def require_management_tier(*roles: str):
+    """Dependency factory: exige tier cmg o manufacturer Y rol en roles.
+    Bloquea a client y subclient con 403 — política: SOLO VEN.
+    Si no se especifican roles, permite admin y operator.
+    """
+    allowed_roles = roles or ("admin", "operator")
+
+    async def checker(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+        if user.tenant_tier not in ("cmg", "manufacturer"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+        if user.role not in allowed_roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+        return user
+
+    return checker
+
+
+def require_operational_role():
+    """Dependency factory: exige role admin u operator de cualquier tier.
+    Bloquea a viewer y driver con 403.
+    """
+    async def checker(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+        if user.role not in ("admin", "operator"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+        return user
+
+    return checker
+
+
 def require_module(*modules: str):
     """Dependency factory: verifica que el tenant tenga activo al menos uno de los módulos.
     Bypass automático para tier=cmg y tier=manufacturer.
