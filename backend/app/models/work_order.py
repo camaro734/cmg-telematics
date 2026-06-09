@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, Text, ForeignKey, DateTime, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -33,6 +33,18 @@ class WorkOrder(Base):
     doc_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # Configuración para cierre automático de paradas por geocerca + señal.
+    # NULL = desactivado. Contrato esperado cuando enabled=true:
+    # {
+    #   "enabled": bool,
+    #   "service_signal_key": str,    # clave sensor_schema o campo directo ("pto_active", "avl_150")
+    #   "signal_op": "==" | ">" | ">=" | "<" | "<=",
+    #   "signal_value": bool | number,
+    #   "min_active_seconds": int,    # sostenido mínimo → EN_CURSO
+    #   "min_inactive_seconds": int,  # sostenido apagado → COMPLETADO
+    #   "exit_margin_m": int          # histéresis radio de salida (arrival_radius_m + exit_margin_m)
+    # }
+    auto_close_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
 
     vehicle = relationship("Vehicle", foreign_keys=[vehicle_id])
     driver = relationship("Driver", foreign_keys=[driver_id])
