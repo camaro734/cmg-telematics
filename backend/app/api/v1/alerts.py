@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, require_module
+from app.api.v1.deps import get_current_user, require_module, require_operational_role
 from app.schemas.auth import CurrentUser
 from app.schemas.alert import AlertInstanceOut, AlertInstanceEnrichedOut, AckRequest
 from app.models.alert_instance import AlertInstance
@@ -76,7 +76,7 @@ async def list_alerts(
 async def acknowledge_alert(
     alert_id: uuid.UUID,
     body: AckRequest,
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_operational_role()),
     _: None = Depends(require_module("alerts")),
     db: AsyncSession = Depends(get_db),
 ):
