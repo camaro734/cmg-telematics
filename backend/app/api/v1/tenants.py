@@ -431,6 +431,8 @@ async def generate_portal_token(
 ):
     if user.tenant_tier != "cmg" and str(user.tenant_id) != str(tenant_id):
         raise HTTPException(status_code=403, detail="Sin permiso")
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
     tenant = await db.get(Tenant, tenant_id)
     if not tenant or not tenant.active:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")

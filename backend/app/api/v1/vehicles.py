@@ -14,7 +14,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_management_tier
 from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
@@ -803,11 +803,9 @@ async def list_vehicles(
 @router.post("/vehicles", response_model=VehicleOut, status_code=201)
 async def create_vehicle(
     body: VehicleCreate,
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_management_tier("admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
     effective_tenant_id = (
         body.tenant_id
         if (body.tenant_id is not None and user.tenant_tier == "cmg")

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func, cast, or_
 from sqlalchemy.dialects.postgresql import array
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, require_module, require_management_tier
+from app.api.v1.deps import get_current_user, require_module, require_management_tier, require_operational_role
 from app.schemas.auth import CurrentUser
 from app.schemas.maintenance import (
     MaintenancePlanCreate, MaintenancePlanUpdate, MaintenancePlanOut,
@@ -451,7 +451,7 @@ async def complete_plan(
     plan_id: uuid.UUID,
     file: UploadFile | None = File(None),
     description: str | None = Form(None),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_operational_role()),
     _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
