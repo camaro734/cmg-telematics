@@ -9,6 +9,8 @@ import type {
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import { StopLocationPicker } from './StopLocationPicker'
+import { StopsRouteMap } from './StopsRouteMap'
+import type { RouteStop } from './StopsRouteMap'
 
 const PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
   low: 'Baja', normal: 'Normal', high: 'Alta', urgent: 'Urgente',
@@ -105,6 +107,9 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
   const validStops      = draftStops.filter(s => s.title.trim())
   const canEnableAC     = !!form.vehicle_id
   const signalRequired  = autoClose.enabled && !autoClose.service_signal_key
+  const stopsForMap: RouteStop[] = draftStops
+    .map((s, idx) => ({ ...s, cardIndex: idx + 1 }))
+    .filter((s): s is typeof s & { lat: number; lon: number } => s.lat !== null && s.lon !== null)
 
   const { data: signals = [] } = useQuery<AutoCloseSignal[]>({
     queryKey: ['work-order-vehicle-signals', form.vehicle_id],
@@ -414,6 +419,11 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
                 </div>
               ))}
             </div>
+
+            {/* Mapa de ruta — visible cuando al menos una parada tiene coordenadas */}
+            {stopsForMap.length > 0 && (
+              <StopsRouteMap stops={stopsForMap} />
+            )}
           </section>
 
         </div>
