@@ -362,6 +362,28 @@ _BUILTIN_SIGNALS = [
     {"key": "speed_kmh",   "label": "Velocidad (km/h)",   "signal_type": "numeric"},
 ]
 
+# Prefijos y valores exactos que identifican canales NO instantáneos:
+#   min_* / minutos_*    → acumuladores de minutos de operación (IFM CR2530 interno)
+#   pico_maximo_*        → running max de presión/vacío durante la sesión
+#   maximas_*            → running max de RPM u otras magnitudes
+#   avl_10314            → Kilómetros Totales (odómetro de por vida)
+#   avl_10315            → Combustible Total (acumulador de por vida)
+#   unit "Min" / "Veces" → acumulador de tiempo o contador de eventos
+_ACCUM_PREFIXES = ("min_", "minutos_", "pico_maximo_", "pico_max_", "maximas_")
+_ACCUM_KEYS     = frozenset({"avl_10314", "avl_10315"})
+_ACCUM_UNITS    = frozenset({"min", "veces"})
+
+
+def _is_accumulator_channel(ch: dict) -> bool:
+    """True si el canal es un acumulador monótono o running-max — no sirve como disparador de auto-cierre."""
+    key  = (ch.get("key")  or "").lower()
+    unit = (ch.get("unit") or "").lower()
+    return (
+        key in _ACCUM_KEYS
+        or any(key.startswith(p) for p in _ACCUM_PREFIXES)
+        or unit in _ACCUM_UNITS
+    )
+
 
 @router.get("/work-orders/vehicle-signals/{vehicle_id}")
 async def get_vehicle_signals(
@@ -369,7 +391,11 @@ async def get_vehicle_signals(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
-    """Señales disponibles para configurar el auto-cierre de una orden."""
+    """Señales instantáneas disponibles para configurar el auto-cierre de una orden.
+
+    Excluye acumuladores monótonos (min_*, pico_maximo_*, odómetros) que no
+    pueden actuar como disparador de 'señal inactiva' en el evaluador de ventana.
+    """
     result = await db.execute(
         select(Vehicle)
         .options(selectinload(Vehicle.vehicle_type))
@@ -388,6 +414,6 @@ async def get_vehicle_signals(
             "signal_type": ch.get("type", "numeric"),
         }
         for ch in channels
-        if ch.get("key")
+        if ch.get("key") and not _is_accumulator_channel(ch)
     ]
     return _BUILTIN_SIGNALS + can_signals
