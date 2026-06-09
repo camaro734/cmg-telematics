@@ -27,6 +27,7 @@ from redis.asyncio import Redis
 
 from src.config import settings
 from src.field_ops import _haversine_m
+from src.order_rollup import maybe_rollup_order
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +252,7 @@ async def sweep_stop_autoclose(db_pool: asyncpg.Pool, redis: Redis) -> None:
                        wos.arrival_radius_m,
                        wos.arrived_at,
                        wos.started_at,
+                       wo.id::text           AS work_order_id,
                        wo.vehicle_id::text   AS vehicle_id,
                        wo.created_at         AS order_created_at,
                        wo.auto_close_config,
@@ -261,6 +263,7 @@ async def sweep_stop_autoclose(db_pool: asyncpg.Pool, redis: Redis) -> None:
                 JOIN   vehicle_type  vt  ON vt.id  = v.vehicle_type_id
                 WHERE  (wo.auto_close_config ->> 'enabled')::bool = true
                   AND  wos.status NOT IN ('done', 'skipped')
+                  AND  wo.status  NOT IN ('done', 'cancelled')
                   AND  wos.lat IS NOT NULL
                   AND  wos.lon IS NOT NULL
                 """
@@ -316,12 +319,35 @@ async def sweep_stop_autoclose(db_pool: asyncpg.Pool, redis: Redis) -> None:
                     updates = _eval_stop_window(rows, stop, cfg, now, freshness_s, schema_map)
                     if updates:
                         await _persist_update(conn, redis, stop["id"], updates)
+                        if updates.get("status") == "done":
+                            await maybe_rollup_order(conn, stop["work_order_id"])
 
                 except Exception as exc:
                     logger.error(
                         "stop:autoclose error for stop %s: %s",
                         stop_rec.get("id", "?"), exc, exc_info=True,
                     )
+
+            # Safety net: órdenes donde todas las paradas ya están cerradas pero la
+            # orden aún no — cubre fallos transitorios en la pasada anterior.
+            try:
+                orphans = await conn.fetch(
+                    """
+                    SELECT DISTINCT wo.id::text AS work_order_id
+                    FROM   work_order wo
+                    WHERE  (wo.auto_close_config ->> 'enabled')::bool = true
+                      AND  wo.status = 'in_progress'
+                      AND  NOT EXISTS (
+                               SELECT 1 FROM work_order_stop wos
+                               WHERE  wos.work_order_id = wo.id
+                                 AND  wos.status NOT IN ('done', 'skipped')
+                           )
+                    """
+                )
+                for o in orphans:
+                    await maybe_rollup_order(conn, o["work_order_id"])
+            except Exception as exc:
+                logger.error("stop:autoclose safety-net failed: %s", exc, exc_info=True)
 
     except Exception as exc:
         logger.error("stop:autoclose sweep failed: %s", exc, exc_info=True)
