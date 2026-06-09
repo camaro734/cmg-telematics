@@ -45,6 +45,8 @@ async def _get_active_stop(conn: asyncpg.Connection, vehicle_id: str) -> dict | 
         WHERE  wo.vehicle_id = $1::uuid
           AND  wo.status     = 'in_progress'
           AND  wos.status   IN ('pending', 'arrived', 'in_progress')
+          AND  (wo.auto_close_config IS NULL
+                OR NOT (wo.auto_close_config ->> 'enabled')::bool)
         ORDER BY wos.order_index ASC
         LIMIT 1
         """,

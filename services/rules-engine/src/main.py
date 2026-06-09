@@ -13,6 +13,7 @@ from src.loader import load_rules, load_vehicle_type_map, Rule
 from src.evaluator import process_message, TelemetryMsg, RuleMatch
 from src.field_ops import handle_field_operations
 from src.silence import sweep_silent_vehicles, maybe_resolve_silence
+from src.stop_autoclose import sweep_stop_autoclose
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +205,13 @@ async def _run_silence_sweep(db_pool: asyncpg.Pool, redis: Redis) -> None:
         await sweep_silent_vehicles(db_pool, redis)
 
 
+async def _run_stop_autoclose_sweep(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    """Barrido periódico de cierre automático de paradas — corre cada 30 s."""
+    while True:
+        await asyncio.sleep(30)
+        await sweep_stop_autoclose(db_pool, redis)
+
+
 async def main() -> None:
     global _rules, _vehicle_type_map
 
@@ -237,6 +245,7 @@ async def main() -> None:
         _process_stream(db_pool, redis),
         _listen_rule_changes(db_pool),
         _run_silence_sweep(db_pool, redis),
+        _run_stop_autoclose_sweep(db_pool, redis),
     )
 
 
