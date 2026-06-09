@@ -41,14 +41,38 @@ _MAX_WINDOW_ROWS = 5_000
 AUTOCLOSE_STATE_KEY = "stop:autoclose:{stop_id}:state"
 
 
-def _resolve_signal(cfg: dict, row: dict) -> bool:
-    """True si la señal del punto de telemetría cumple la condición configurada."""
-    key      = cfg["service_signal_key"]
-    op_fn    = _OPS.get(cfg.get("signal_op", "=="))
+def _resolve_signal(
+    cfg: dict,
+    row: dict,
+    schema_map: dict[str, dict] | None = None,
+) -> bool:
+    """True si la señal del punto de telemetría cumple la condición configurada.
+
+    Orden de resolución:
+    1. top_level  — campos directos del row (pto_active, ignition, speed_kmh…).
+    2. schema_map — key semántica del sensor_schema del vehículo; se traduce a
+                    can_data["avl_<id>"] y se extrae el bit si hay bit_index.
+    3. fallback   — acceso directo a can_data["<key>"] (claves avl_<n> explícitas).
+    """
+    key       = cfg["service_signal_key"]
+    op_fn     = _OPS.get(cfg.get("signal_op", "=="))
     threshold = cfg.get("signal_value", True)
 
     top_level = {"speed_kmh", "ignition", "pto_active", "lat", "lon"}
-    value = row.get(key) if key in top_level else (row.get("can_data") or {}).get(key)
+
+    if key in top_level:
+        value = row.get(key)
+    elif schema_map and key in schema_map:
+        # Señal semántica del sensor_schema → busca avl_<id> en can_data
+        ch      = schema_map[key]
+        avl_key = f"avl_{ch['avl_id']}"
+        raw     = (row.get("can_data") or {}).get(avl_key)
+        if raw is None:
+            return False
+        bit_index = ch.get("bit_index")
+        value = bool((int(raw) >> int(bit_index)) & 1) if bit_index is not None else raw
+    else:
+        value = (row.get("can_data") or {}).get(key)
 
     if value is None or op_fn is None:
         return False
@@ -64,6 +88,7 @@ def _eval_stop_window(
     cfg: dict,
     now: datetime,
     freshness_seconds: float,
+    schema_map: dict[str, dict] | None = None,
 ) -> dict | None:
     """
     Evalúa la ventana de telemetría (rows ordenados por time ASC) y devuelve
@@ -114,7 +139,7 @@ def _eval_stop_window(
             effective_r = (radius_m + exit_margin_m) if geo_inside else radius_m
             geo_inside  = dist <= effective_r
 
-        sig_active = _resolve_signal(cfg, row)
+        sig_active = _resolve_signal(cfg, row, schema_map)
         predicate  = geo_inside and sig_active
 
         # pending → arrived: primer punto dentro de la geocerca
@@ -228,9 +253,12 @@ async def sweep_stop_autoclose(db_pool: asyncpg.Pool, redis: Redis) -> None:
                        wos.started_at,
                        wo.vehicle_id::text   AS vehicle_id,
                        wo.created_at         AS order_created_at,
-                       wo.auto_close_config
+                       wo.auto_close_config,
+                       vt.sensor_schema      AS sensor_schema
                 FROM   work_order_stop wos
-                JOIN   work_order wo ON wo.id = wos.work_order_id
+                JOIN   work_order    wo  ON wo.id  = wos.work_order_id
+                JOIN   vehicle       v   ON v.id   = wo.vehicle_id
+                JOIN   vehicle_type  vt  ON vt.id  = v.vehicle_type_id
                 WHERE  (wo.auto_close_config ->> 'enabled')::bool = true
                   AND  wos.status NOT IN ('done', 'skipped')
                   AND  wos.lat IS NOT NULL
@@ -279,7 +307,13 @@ async def sweep_stop_autoclose(db_pool: asyncpg.Pool, redis: Redis) -> None:
                         )
                     ]
 
-                    updates = _eval_stop_window(rows, stop, cfg, now, freshness_s)
+                    sensor_schema = stop.get("sensor_schema") or []
+                    schema_map = {
+                        ch["key"]: ch
+                        for ch in sensor_schema
+                        if ch.get("key") and ch.get("avl_id") is not None
+                    }
+                    updates = _eval_stop_window(rows, stop, cfg, now, freshness_s, schema_map)
                     if updates:
                         await _persist_update(conn, redis, stop["id"], updates)
 

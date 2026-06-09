@@ -336,3 +336,70 @@ def test_resolve_signal_can_analogico():
     assert _resolve_signal(cfg, row_activo)   is True
     assert _resolve_signal(cfg, row_inactivo) is False
     assert _resolve_signal(cfg, row_sin_senal) is False
+
+
+# ── Tests de resolución via schema_map (sensor_schema del vehículo) ───────────
+#
+# El ingest guarda can_data["avl_383"] = raw_int (no "bomba_encendida").
+# Con schema_map el evaluador traduce la key semántica → avl_<id> y extrae el bit.
+
+_SCHEMA_CISTERNA = [
+    {"key": "bomba_encendida",    "avl_id": 383, "bit_index": 0, "gauge_type": "led"},
+    {"key": "depresor_encendido", "avl_id": 384, "bit_index": 0, "gauge_type": "led"},
+    {"key": "pto_activado",       "avl_id": 385, "bit_index": 0, "gauge_type": "led"},
+]
+_SCHEMA_MAP = {ch["key"]: ch for ch in _SCHEMA_CISTERNA}
+
+
+def test_resolve_signal_schema_bomba_on():
+    """bomba_encendida: can_data["avl_383"]=1 → True."""
+    cfg = {"service_signal_key": "bomba_encendida", "signal_op": "==", "signal_value": True}
+    row = {"pto_active": False, "can_data": {"avl_383": 1}}
+    assert _resolve_signal(cfg, row, _SCHEMA_MAP) is True
+
+
+def test_resolve_signal_schema_bomba_off():
+    """bomba_encendida: can_data["avl_383"]=0 → False."""
+    cfg = {"service_signal_key": "bomba_encendida", "signal_op": "==", "signal_value": True}
+    row = {"pto_active": False, "can_data": {"avl_383": 0}}
+    assert _resolve_signal(cfg, row, _SCHEMA_MAP) is False
+
+
+def test_resolve_signal_schema_depresor_on():
+    """depresor_encendido: can_data["avl_384"]=1 → True."""
+    cfg = {"service_signal_key": "depresor_encendido", "signal_op": "==", "signal_value": True}
+    row = {"pto_active": False, "can_data": {"avl_384": 1}}
+    assert _resolve_signal(cfg, row, _SCHEMA_MAP) is True
+
+
+def test_resolve_signal_schema_pto_activado_on():
+    """pto_activado: can_data["avl_385"]=1 → True."""
+    cfg = {"service_signal_key": "pto_activado", "signal_op": "==", "signal_value": True}
+    row = {"pto_active": False, "can_data": {"avl_385": 1}}
+    assert _resolve_signal(cfg, row, _SCHEMA_MAP) is True
+
+
+def test_resolve_signal_schema_sin_dato_can():
+    """Key del schema pero can_data vacío → False sin excepción."""
+    cfg = {"service_signal_key": "bomba_encendida", "signal_op": "==", "signal_value": True}
+    row = {"pto_active": False, "can_data": {}}
+    assert _resolve_signal(cfg, row, _SCHEMA_MAP) is False
+
+
+def test_resolve_signal_pto_active_top_level_con_schema():
+    """pto_active se sigue resolviendo top-level aunque schema_map esté presente."""
+    cfg = {"service_signal_key": "pto_active", "signal_op": "==", "signal_value": True}
+    row = {"pto_active": True, "can_data": {}}
+    assert _resolve_signal(cfg, row, _SCHEMA_MAP) is True
+    assert _resolve_signal(cfg, row, None)        is True
+
+
+def test_resolve_signal_schema_bit_index_no_cero():
+    """bit_index extrae el bit correcto cuando no es el bit 0."""
+    schema = {"key": "señal_bit2", "avl_id": 390, "bit_index": 2, "gauge_type": "led"}
+    cfg    = {"service_signal_key": "señal_bit2", "signal_op": "==", "signal_value": True}
+    sm     = {"señal_bit2": schema}
+    row_on  = {"pto_active": False, "can_data": {"avl_390": 0b00000100}}  # bit 2 = 1
+    row_off = {"pto_active": False, "can_data": {"avl_390": 0b00000011}}  # bit 2 = 0
+    assert _resolve_signal(cfg, row_on,  sm) is True
+    assert _resolve_signal(cfg, row_off, sm) is False
