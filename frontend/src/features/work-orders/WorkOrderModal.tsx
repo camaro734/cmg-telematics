@@ -15,32 +15,29 @@ const PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
 }
 
 const S = {
-  btn:    { fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--cmg-teal)', color: '#fff' } as const,
+  btn:    { fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--cmg-teal)', color: '#fff' } as const,
   btnSm:  { fontFamily: 'var(--font-sans)', fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--fg-muted)', cursor: 'pointer' } as const,
   field:  { display: 'flex', flexDirection: 'column' as const, gap: 4 },
   input:  { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', fontSize: 13, padding: '8px 10px' } as const,
   overlay: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modal:   { background: 'var(--bg-surface)', borderRadius: 12, width: 'min(640px, 95vw)', display: 'flex', flexDirection: 'column' as const, maxHeight: '90vh', overflow: 'hidden' },
-  header:  { flexShrink: 0, padding: '20px 28px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as const,
-  body:    { flex: 1, overflowY: 'auto' as const, padding: '20px 28px', display: 'flex', flexDirection: 'column' as const, gap: 18 },
-  footer:  { flexShrink: 0, padding: '14px 28px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 } as const,
+  modal:   { background: 'var(--bg-surface)', borderRadius: 12, width: 'min(880px, 95vw)', display: 'flex', flexDirection: 'column' as const, maxHeight: '90vh', overflow: 'hidden' },
+  header:  { flexShrink: 0, padding: 'var(--space-5) var(--space-8) var(--space-4)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } as const,
+  body:    { flex: 1, overflowY: 'auto' as const, padding: 'var(--space-6) var(--space-8)', display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-7)' },
+  footer:  { flexShrink: 0, padding: 'var(--space-4) var(--space-8)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-3)' } as const,
 }
 
-function SectionHeader({ icon, title, detail }: { icon: string; title: string; detail?: string }) {
+function SectionHeader({ title, detail }: { title: string; detail?: string }) {
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: detail ? 3 : 10 }}>
-        <span style={{ fontSize: 14, lineHeight: 1, userSelect: 'none' as const }}>{icon}</span>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
-          {title}
-        </span>
-      </div>
+    <div style={{ marginBottom: 'var(--space-4)' }}>
+      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
+        {title}
+      </span>
       {detail && (
-        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', margin: '0 0 10px', paddingLeft: 21 }}>
+        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', margin: 'var(--space-1) 0 var(--space-3)' }}>
           {detail}
         </p>
       )}
-      <div style={{ borderBottom: '1px solid var(--border-soft)', marginBottom: 14 }} />
+      <div style={{ borderBottom: '1px solid var(--border-soft)', marginTop: detail ? 0 : 'var(--space-2)' }} />
     </div>
   )
 }
@@ -86,6 +83,11 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
     return { enabled: false, service_signal_key: '', signal_op: '==', signal_value: true, min_active_seconds: 60, min_inactive_seconds: 300, exit_margin_m: 25 }
   })
 
+  function setVehicle(id: string) {
+    setForm(f => ({ ...f, vehicle_id: id }))
+    if (!id) setAutoClose(a => ({ ...a, enabled: false }))
+  }
+
   function addStop() {
     setDraftStops(ds => [...ds, {
       _id: Math.random().toString(36).slice(2),
@@ -100,8 +102,9 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
     setDraftStops(ds => ds.filter(d => d._id !== _id))
   }
 
-  const validStops = draftStops.filter(s => s.title.trim())
-  const signalRequired = autoClose.enabled && !autoClose.service_signal_key
+  const validStops      = draftStops.filter(s => s.title.trim())
+  const canEnableAC     = !!form.vehicle_id
+  const signalRequired  = autoClose.enabled && !autoClose.service_signal_key
 
   const { data: signals = [] } = useQuery<AutoCloseSignal[]>({
     queryKey: ['work-order-vehicle-signals', form.vehicle_id],
@@ -143,7 +146,7 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
   })
 
   const u = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
-  const canSave = !isPending && form.title.trim() && !signalRequired
+  const canSave  = !isPending && !!form.title.trim() && !signalRequired
   const saveLabel = isPending
     ? 'Guardando…'
     : initial
@@ -156,169 +159,181 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div style={S.header}>
-          <h2 style={{ fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)', margin: 0 }}>
+          <h2 style={{ fontFamily: 'var(--font-sans)', fontSize: 17, fontWeight: 700, color: 'var(--fg-primary)', margin: 0 }}>
             {initial ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'}
           </h2>
           <button onClick={onClose} type="button" aria-label="Cerrar"
-            style={{ background: 'transparent', border: 'none', color: 'var(--fg-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+            style={{ background: 'transparent', border: 'none', color: 'var(--fg-muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>
             ×
           </button>
         </div>
 
-        {/* Body */}
+        {/* ── Body ── */}
         <div style={S.body}>
 
-          {/* ── Datos generales ── */}
-          <section>
-            <SectionHeader icon="📋" title="Datos generales" detail="Título, vehículo, conductor y programación del servicio." />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Input label="Título *" value={form.title} onChange={e => u('title', e.target.value)} placeholder="Ej: Limpieza alcantarilla Calle Mayor 5" />
-              <div style={S.field}>
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Descripción</span>
-                <textarea style={{ ...S.input, resize: 'vertical', minHeight: 52 }} value={form.description} onChange={e => u('description', e.target.value)} />
+          {/* Rejilla dos columnas — apila automáticamente en ventanas estrechas */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-8)', alignItems: 'start' }}>
+
+            {/* Columna izquierda — Información general */}
+            <section>
+              <SectionHeader title="Información general" detail="Título, vehículo, conductor y programación del servicio." />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <Input label="Título *" value={form.title} onChange={e => u('title', e.target.value)} placeholder="Ej: Limpieza alcantarilla Calle Mayor 5" />
+                <div style={S.field}>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Descripción</span>
+                  <textarea style={{ ...S.input, resize: 'vertical', minHeight: 60 }} value={form.description} onChange={e => u('description', e.target.value)} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <Select label="Vehículo" value={form.vehicle_id} onChange={e => setVehicle(e.target.value)}>
+                    <option value="">— Sin asignar —</option>
+                    {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </Select>
+                  <Select label="Conductor" value={form.driver_id} onChange={e => u('driver_id', e.target.value)}>
+                    <option value="">— Sin asignar —</option>
+                    {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                  </Select>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <Select label="Prioridad" value={form.priority} onChange={e => u('priority', e.target.value as WorkOrderPriority)}>
+                    {(Object.entries(PRIORITY_LABELS) as [WorkOrderPriority, string][]).map(([k, l]) => (
+                      <option key={k} value={k}>{l}</option>
+                    ))}
+                  </Select>
+                  <Input label="Fecha programada" type="datetime-local" value={form.scheduled_at} onChange={e => u('scheduled_at', e.target.value)} />
+                </div>
+                <div style={S.field}>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notas internas</span>
+                  <textarea style={{ ...S.input, resize: 'vertical', minHeight: 48 }} value={form.notes} onChange={e => u('notes', e.target.value)} />
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Select label="Vehículo" value={form.vehicle_id} onChange={e => u('vehicle_id', e.target.value)}>
-                  <option value="">— Sin asignar —</option>
-                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
-                <Select label="Conductor" value={form.driver_id} onChange={e => u('driver_id', e.target.value)}>
-                  <option value="">— Sin asignar —</option>
-                  {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                </Select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Select label="Prioridad" value={form.priority} onChange={e => u('priority', e.target.value as WorkOrderPriority)}>
-                  {(Object.entries(PRIORITY_LABELS) as [WorkOrderPriority, string][]).map(([k, l]) => (
-                    <option key={k} value={k}>{l}</option>
-                  ))}
-                </Select>
-                <Input label="Fecha programada" type="datetime-local" value={form.scheduled_at} onChange={e => u('scheduled_at', e.target.value)} />
-              </div>
-              <div style={S.field}>
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notas internas</span>
-                <textarea style={{ ...S.input, resize: 'vertical', minHeight: 40 }} value={form.notes} onChange={e => u('notes', e.target.value)} />
-              </div>
-            </div>
-          </section>
+            </section>
 
-          {/* ── Cliente final ── */}
-          <section>
-            <SectionHeader icon="👤" title="Cliente final (opcional)" detail="Aparecerá en el bloque «Cliente» del PDF del parte de servicio." />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Input label="Nombre / Razón social" value={form.final_client_name} maxLength={200}
-                placeholder="Comunidad El Pinar" onChange={e => u('final_client_name', e.target.value)} />
-              <Input label="Dirección" value={form.final_client_address} maxLength={300}
-                placeholder="C/ Mayor 12, Valencia" onChange={e => u('final_client_address', e.target.value)} />
-            </div>
-          </section>
+            {/* Columna derecha — Cliente final + Auto-cierre */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-7)' }}>
 
-          {/* ── Auto-cierre de servicio ── */}
-          <section>
-            <SectionHeader icon="⚡" title="Auto-cierre de servicio" detail="Cierra la parada automáticamente al cumplir geocerca + señal activa." />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-primary)' }}>Activar auto-cierre</span>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="checkbox" checked={autoClose.enabled}
-                  onChange={e => setAutoClose(a => ({ ...a, enabled: e.target.checked }))} />
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)' }}>
-                  {autoClose.enabled ? 'Activado' : 'Desactivado'}
-                </span>
-              </label>
-            </div>
+              {/* Cliente final */}
+              <section>
+                <SectionHeader title="Cliente final (opcional)" detail="Aparecerá en el bloque «Cliente» del PDF del parte de servicio." />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                  <Input label="Nombre / Razón social" value={form.final_client_name} maxLength={200}
+                    placeholder="Comunidad El Pinar" onChange={e => u('final_client_name', e.target.value)} />
+                  <Input label="Dirección" value={form.final_client_address} maxLength={300}
+                    placeholder="C/ Mayor 12, Valencia" onChange={e => u('final_client_address', e.target.value)} />
+                </div>
+              </section>
 
-            {autoClose.enabled && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {!form.vehicle_id && (
-                  <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--warn)', margin: 0 }}>
-                    ⚠ Selecciona un vehículo para ver las señales disponibles.
-                  </p>
-                )}
+              {/* Auto-cierre de servicio */}
+              <section>
+                <SectionHeader title="Auto-cierre de servicio" detail="Cierra la parada automáticamente al cumplir geocerca + señal activa." />
 
-                <Select
-                  label="Señal de servicio *"
-                  value={autoClose.service_signal_key}
-                  error={signalRequired ? 'Requerida para activar el auto-cierre' : undefined}
-                  onChange={e => {
-                    const key = e.target.value
-                    const sig = signals.find(s => s.key === key)
-                    setAutoClose(a => ({
-                      ...a,
-                      service_signal_key: key,
-                      signal_op: sig?.signal_type === 'bool' ? '==' : '>',
-                      signal_value: sig?.signal_type === 'bool' ? true : 0,
-                    }))
-                  }}
-                >
-                  <option value="">— Selecciona señal —</option>
-                  {signals.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </Select>
-
-                {autoClose.service_signal_key && (
-                  <div style={{ display: 'grid', gridTemplateColumns: selectedSignal?.signal_type === 'bool' ? '1fr' : '160px 1fr', gap: 8 }}>
-                    {selectedSignal?.signal_type !== 'bool' && (
-                      <Select label="Operador" value={autoClose.signal_op}
-                        onChange={e => setAutoClose(a => ({ ...a, signal_op: e.target.value }))}>
-                        <option value=">">&gt; mayor que</option>
-                        <option value=">=">&ge; mayor o igual</option>
-                        <option value="<">&lt; menor que</option>
-                        <option value="<=">&le; menor o igual</option>
-                        <option value="==">= igual a</option>
-                      </Select>
+                {/* Toggle — deshabilitado sin vehículo */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
+                  <div>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: canEnableAC ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
+                      Activar auto-cierre
+                    </span>
+                    {!canEnableAC && (
+                      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', margin: '2px 0 0' }}>
+                        Elige un vehículo primero
+                      </p>
                     )}
-                    <div>
-                      {selectedSignal?.signal_type === 'bool' ? (
-                        <Select label="Valor"
-                          value={autoClose.signal_value === true || autoClose.signal_value === 1 ? 'true' : 'false'}
-                          onChange={e => setAutoClose(a => ({ ...a, signal_value: e.target.value === 'true', signal_op: '==' }))}>
-                          <option value="true">Activo (true)</option>
-                          <option value="false">Inactivo (false)</option>
-                        </Select>
-                      ) : (
-                        <Input label="Valor" type="number"
-                          value={String(autoClose.signal_value)}
-                          onChange={e => setAutoClose(a => ({ ...a, signal_value: parseFloat(e.target.value) || 0 }))} />
-                      )}
-                    </div>
                   </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                  <Input label="Mín. señal activa (s)" type="number" min={5} step={5}
-                    value={String(autoClose.min_active_seconds)}
-                    onChange={e => setAutoClose(a => ({ ...a, min_active_seconds: parseInt(e.target.value) || 60 }))} />
-                  <Input label="Mín. señal apagada (s)" type="number" min={5} step={5}
-                    value={String(autoClose.min_inactive_seconds)}
-                    onChange={e => setAutoClose(a => ({ ...a, min_inactive_seconds: parseInt(e.target.value) || 300 }))} />
-                  <Input label="Margen geocerca (m)" type="number" min={0} step={5}
-                    value={String(autoClose.exit_margin_m)}
-                    onChange={e => setAutoClose(a => ({ ...a, exit_margin_m: parseInt(e.target.value) || 25 }))} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: canEnableAC ? 'pointer' : 'not-allowed', opacity: canEnableAC ? 1 : 0.45, flexShrink: 0, marginLeft: 'var(--space-3)', paddingTop: 2 }}>
+                    <input type="checkbox" checked={autoClose.enabled} disabled={!canEnableAC}
+                      onChange={e => setAutoClose(a => ({ ...a, enabled: e.target.checked }))} />
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)' }}>
+                      {autoClose.enabled ? 'Activado' : 'Desactivado'}
+                    </span>
+                  </label>
                 </div>
 
-                {draftStops.some(s => !s.lat) && (
-                  <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--warn)', margin: 0 }}>
-                    ⚠ Una o más paradas no tienen ubicación fijada — el auto-cierre no actuará en ellas.
-                  </p>
-                )}
-              </div>
-            )}
-          </section>
+                {autoClose.enabled && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    <Select
+                      label="Señal de servicio *"
+                      value={autoClose.service_signal_key}
+                      error={signalRequired ? 'Requerida para activar el auto-cierre' : undefined}
+                      onChange={e => {
+                        const key = e.target.value
+                        const sig = signals.find(s => s.key === key)
+                        setAutoClose(a => ({
+                          ...a,
+                          service_signal_key: key,
+                          signal_op: sig?.signal_type === 'bool' ? '==' : '>',
+                          signal_value: sig?.signal_type === 'bool' ? true : 0,
+                        }))
+                      }}
+                    >
+                      <option value="">— Selecciona señal —</option>
+                      {signals.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                    </Select>
 
-          {/* ── Paradas programadas ── */}
+                    {autoClose.service_signal_key && (
+                      <div style={{ display: 'grid', gridTemplateColumns: selectedSignal?.signal_type === 'bool' ? '1fr' : '140px 1fr', gap: 'var(--space-2)' }}>
+                        {selectedSignal?.signal_type !== 'bool' && (
+                          <Select label="Operador" value={autoClose.signal_op}
+                            onChange={e => setAutoClose(a => ({ ...a, signal_op: e.target.value }))}>
+                            <option value=">">&gt; mayor que</option>
+                            <option value=">=">&ge; mayor o igual</option>
+                            <option value="<">&lt; menor que</option>
+                            <option value="<=">&le; menor o igual</option>
+                            <option value="==">= igual a</option>
+                          </Select>
+                        )}
+                        <div>
+                          {selectedSignal?.signal_type === 'bool' ? (
+                            <Select label="Valor"
+                              value={autoClose.signal_value === true || autoClose.signal_value === 1 ? 'true' : 'false'}
+                              onChange={e => setAutoClose(a => ({ ...a, signal_value: e.target.value === 'true', signal_op: '==' }))}>
+                              <option value="true">Activo (true)</option>
+                              <option value="false">Inactivo (false)</option>
+                            </Select>
+                          ) : (
+                            <Input label="Valor" type="number"
+                              value={String(autoClose.signal_value)}
+                              onChange={e => setAutoClose(a => ({ ...a, signal_value: parseFloat(e.target.value) || 0 }))} />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
+                      <Input label="Mín. activa (s)" type="number" min={5} step={5}
+                        value={String(autoClose.min_active_seconds)}
+                        onChange={e => setAutoClose(a => ({ ...a, min_active_seconds: parseInt(e.target.value) || 60 }))} />
+                      <Input label="Mín. apagada (s)" type="number" min={5} step={5}
+                        value={String(autoClose.min_inactive_seconds)}
+                        onChange={e => setAutoClose(a => ({ ...a, min_inactive_seconds: parseInt(e.target.value) || 300 }))} />
+                      <Input label="Margen geo (m)" type="number" min={0} step={5}
+                        value={String(autoClose.exit_margin_m)}
+                        onChange={e => setAutoClose(a => ({ ...a, exit_margin_m: parseInt(e.target.value) || 25 }))} />
+                    </div>
+
+                    {draftStops.some(s => !s.lat) && (
+                      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--warn)', margin: 0 }}>
+                        ⚠ Una o más paradas sin ubicación — el auto-cierre no actuará en ellas.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </section>
+
+            </div>
+          </div>
+
+          {/* ── Paradas programadas — ancho completo ── */}
           <section>
             <SectionHeader
-              icon="📍"
               title="Paradas programadas"
               detail={
                 initial
-                  ? 'Las paradas existentes se gestionan desde el panel de paradas de la orden. Aquí puedes añadir nuevas.'
+                  ? 'Las paradas existentes se gestionan desde el panel de la orden. Aquí puedes añadir nuevas.'
                   : 'Puntos de trabajo con ubicación en mapa y datos del cliente final.'
               }
             />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--cmg-teal)' }}>
                 {draftStops.length > 0 ? `${draftStops.length} parada${draftStops.length > 1 ? 's' : ''}` : 'Sin paradas nuevas'}
               </span>
@@ -336,10 +351,10 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
               </p>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {draftStops.map((stop, idx) => (
                 <div key={stop._id} style={{
-                  background: 'var(--bg-base)', borderRadius: 8, padding: 12,
+                  background: 'var(--bg-base)', borderRadius: 8, padding: 'var(--space-4)',
                   border: '1px solid var(--border)', borderLeft: '3px solid var(--cmg-teal)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -399,7 +414,7 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
 
         </div>
 
-        {/* Footer */}
+        {/* ── Footer ── */}
         <div style={S.footer}>
           {error && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--danger)', flex: 1 }}>{error}</span>}
           <button style={S.btnSm} onClick={onClose} type="button">Cancelar</button>
