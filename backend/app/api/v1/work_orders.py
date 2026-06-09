@@ -356,10 +356,23 @@ async def delete_stop(
     await db.commit()
 
 
+# Patrones de key que excluyen una señal bool del grupo "Recomendadas para auto-cierre":
+# ignición (estado del motor, no del equipo), setas de emergencia/radio, pedal de freno.
+_EXCLUDED_SERVICE_PATTERNS = ("ignition", "seta", "pedal", "freno")
+
+
+def _recommended_for_service(key: str, signal_type: str) -> bool:
+    """True si la señal es un indicador on/off de mecanismo de trabajo (bomba, depresor, PTO)."""
+    if signal_type != "bool":
+        return False
+    k = key.lower()
+    return not any(p in k for p in _EXCLUDED_SERVICE_PATTERNS)
+
+
 _BUILTIN_SIGNALS = [
-    {"key": "pto_active",  "label": "PTO activo",        "signal_type": "bool"},
-    {"key": "ignition",    "label": "Ignición",           "signal_type": "bool"},
-    {"key": "speed_kmh",   "label": "Velocidad (km/h)",   "signal_type": "numeric"},
+    {"key": "pto_active",  "label": "PTO activo",       "signal_type": "bool",    "recommended_for_service": True},
+    {"key": "ignition",    "label": "Ignición",          "signal_type": "bool",    "recommended_for_service": False},
+    {"key": "speed_kmh",   "label": "Velocidad (km/h)",  "signal_type": "numeric", "recommended_for_service": False},
 ]
 
 # Prefijos y valores exactos que identifican canales NO instantáneos:
@@ -385,6 +398,17 @@ def _is_accumulator_channel(ch: dict) -> bool:
     )
 
 
+def _can_signal_entry(ch: dict) -> dict:
+    """Construye la entrada de señal CAN para el desplegable de auto-cierre."""
+    stype = "bool" if ch.get("gauge_type") == "led" else ch.get("type", "numeric")
+    return {
+        "key":                    ch["key"],
+        "label":                  ch.get("label", ch["key"]),
+        "signal_type":            stype,
+        "recommended_for_service": _recommended_for_service(ch["key"], stype),
+    }
+
+
 @router.get("/work-orders/vehicle-signals/{vehicle_id}")
 async def get_vehicle_signals(
     vehicle_id: uuid.UUID,
@@ -393,8 +417,9 @@ async def get_vehicle_signals(
 ) -> list[dict]:
     """Señales instantáneas disponibles para configurar el auto-cierre de una orden.
 
-    Excluye acumuladores monótonos (min_*, pico_maximo_*, odómetros) que no
-    pueden actuar como disparador de 'señal inactiva' en el evaluador de ventana.
+    Excluye acumuladores monótonos (min_*, pico_maximo_*, odómetros) y las keys
+    que ya aparecen como señal built-in (evita duplicados de 'Ignición').
+    Los canales gauge_type=led se exponen como signal_type=bool.
     """
     result = await db.execute(
         select(Vehicle)
@@ -406,14 +431,13 @@ async def get_vehicle_signals(
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     _check_tenant(user, vehicle.tenant_id)
 
-    channels = vehicle.vehicle_type.sensor_schema or []
-    can_signals = [
-        {
-            "key": ch["key"],
-            "label": ch.get("label", ch["key"]),
-            "signal_type": ch.get("type", "numeric"),
-        }
+    builtin_keys = {s["key"] for s in _BUILTIN_SIGNALS}
+    channels     = vehicle.vehicle_type.sensor_schema or []
+    can_signals  = [
+        _can_signal_entry(ch)
         for ch in channels
-        if ch.get("key") and not _is_accumulator_channel(ch)
+        if ch.get("key")
+        and not _is_accumulator_channel(ch)
+        and ch["key"] not in builtin_keys
     ]
     return _BUILTIN_SIGNALS + can_signals
