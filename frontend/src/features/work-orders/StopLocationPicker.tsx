@@ -1,17 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
-import { CARTO_TILES_URL } from '../../lib/mapConfig'
+import { CARTO_TILES_URL, CARTO_ATTRIBUTION } from '../../lib/mapConfig'
 
 type NominatimPlace = { lat: string; lon: string; display_name: string }
 
-// Chincheta naranja SVG — evita el icono PNG por defecto de Leaflet que Vite no resuelve
-function makeStopIcon(label?: string) {
+function makeStopIcon() {
   return L.divIcon({
     html: `<div style="position:relative;width:28px;height:36px">
       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.45))">
         <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z" fill="var(--energy-orange)"/>
         <circle cx="14" cy="14" r="6" fill="white"/>
-        ${label ? `<text x="14" y="18" text-anchor="middle" font-size="8" font-weight="700" fill="var(--energy-orange)" font-family="monospace">${label}</text>` : ''}
       </svg>
     </div>`,
     className: '',
@@ -21,68 +19,145 @@ function makeStopIcon(label?: string) {
   })
 }
 
-export function StopLocationPicker({
-  lat, lon, searchQuery, onPick,
-}: { lat: number | null; lon: number | null; searchQuery?: string; onPick: (lat: number, lon: number) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef    = useRef<L.Map | null>(null)
-  const markerRef = useRef<L.Marker | null>(null)
-  const [query,       setQuery]       = useState(searchQuery ?? '')
-  const [places,      setPlaces]      = useState<NominatimPlace[]>([])
-  const [searching,   setSearching]   = useState(false)
-  const [showDrop,    setShowDrop]    = useState(false)
-  const [noResults,   setNoResults]   = useState(false)
+const GEOCIRCLE: L.CircleOptions = {
+  color: '#1D9E75', fillColor: '#1D9E75', fillOpacity: 0.12, weight: 2,
+}
 
+export function StopLocationPicker({
+  lat, lon, searchQuery, arrivalRadiusM, onPick, onAddressChange,
+}: {
+  lat: number | null
+  lon: number | null
+  searchQuery?: string
+  arrivalRadiusM: number
+  onPick: (lat: number, lon: number) => void
+  onAddressChange?: (address: string) => void
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef       = useRef<L.Map | null>(null)
+  const markerRef    = useRef<L.Marker | null>(null)
+  const circleRef    = useRef<L.Circle | null>(null)
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const radiusRef    = useRef(arrivalRadiusM)
+  const onPickRef    = useRef(onPick)
+  const onAddrRef    = useRef(onAddressChange)
+
+  const [query,     setQuery]     = useState(searchQuery ?? '')
+  const [places,    setPlaces]    = useState<NominatimPlace[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showDrop,  setShowDrop]  = useState(false)
+  const [noResults, setNoResults] = useState(false)
+
+  // Mantener refs de callbacks actualizados
+  useEffect(() => { onPickRef.current = onPick }, [onPick])
+  useEffect(() => { onAddrRef.current = onAddressChange }, [onAddressChange])
+  useEffect(() => { radiusRef.current = arrivalRadiusM }, [arrivalRadiusM])
+
+  // Actualizar radio del círculo cuando cambia la prop
+  useEffect(() => {
+    circleRef.current?.setRadius(arrivalRadiusM)
+  }, [arrivalRadiusM])
+
+  // Coloca o mueve el pin + círculo en el mapa; registra dragend al crear
+  function setOrMovePin(la: number, lo: number) {
+    const map = mapRef.current
+    if (!map) return
+    const latlng: [number, number] = [la, lo]
+
+    if (circleRef.current) {
+      circleRef.current.setLatLng(latlng)
+    } else {
+      circleRef.current = L.circle(latlng, { ...GEOCIRCLE, radius: radiusRef.current }).addTo(map)
+    }
+
+    if (markerRef.current) {
+      markerRef.current.setLatLng(latlng)
+    } else {
+      const m = L.marker(latlng, { icon: makeStopIcon(), draggable: true }).addTo(map)
+      m.on('dragend', async () => {
+        const pos = m.getLatLng()
+        onPickRef.current(pos.lat, pos.lng)
+        circleRef.current?.setLatLng(pos)
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json&accept-language=es`,
+            { headers: { Accept: 'application/json' } },
+          )
+          const data: { display_name?: string } = await res.json()
+          if (data.display_name) {
+            setQuery(data.display_name)
+            onAddrRef.current?.(data.display_name)
+          }
+        } catch { /* silencioso */ }
+      })
+      markerRef.current = m
+    }
+  }
+
+  // Inicializar mapa (una sola vez)
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     const center: [number, number] = lat && lon ? [lat, lon] : [39.47, -0.376]
     const map = L.map(containerRef.current, { center, zoom: lat ? 14 : 6, zoomControl: true })
     L.tileLayer(CARTO_TILES_URL, {
-      subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap © CARTO',
+      subdomains: 'abcd', maxZoom: 19, attribution: CARTO_ATTRIBUTION,
     }).addTo(map)
     mapRef.current = map
-    if (lat && lon) {
-      markerRef.current = L.marker([lat, lon], { icon: makeStopIcon() }).addTo(map)
-    }
+
+    if (lat && lon) setOrMovePin(lat, lon)
+
     map.on('click', (e: L.LeafletMouseEvent) => {
-      onPick(e.latlng.lat, e.latlng.lng)
-      if (markerRef.current) markerRef.current.setLatLng(e.latlng)
-      else markerRef.current = L.marker(e.latlng, { icon: makeStopIcon() }).addTo(map)
+      setOrMovePin(e.latlng.lat, e.latlng.lng)
+      onPickRef.current(e.latlng.lat, e.latlng.lng)
       setShowDrop(false)
     })
-    return () => { map.remove(); mapRef.current = null }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      map.remove()
+      mapRef.current = null
+      markerRef.current = null
+      circleRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function geocode() {
-    const q = query.trim()
-    if (!q) return
+  async function geocode(q: string) {
     setSearching(true)
     setPlaces([])
     setNoResults(false)
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&accept-language=es`,
-        { headers: { 'Accept': 'application/json' } }
+        { headers: { Accept: 'application/json' } },
       )
       const data: NominatimPlace[] = await res.json()
       if (data.length === 0) { setNoResults(true); setShowDrop(true) }
-      else { setPlaces(data); setShowDrop(true) }
+      else                   { setPlaces(data);    setShowDrop(true) }
     } catch {
       setNoResults(true); setShowDrop(true)
     }
     setSearching(false)
   }
 
+  function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value
+    setQuery(val)
+    setShowDrop(false)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (val.trim().length >= 3) {
+      debounceRef.current = setTimeout(() => geocode(val.trim()), 400)
+    }
+  }
+
   function pickPlace(p: NominatimPlace) {
     const la = parseFloat(p.lat), lo = parseFloat(p.lon)
     setShowDrop(false)
     setPlaces([])
-    onPick(la, lo)
+    onPickRef.current(la, lo)
     if (mapRef.current) {
       mapRef.current.setView([la, lo], 16)
-      if (markerRef.current) markerRef.current.setLatLng([la, lo])
-      else markerRef.current = L.marker([la, lo], { icon: makeStopIcon() }).addTo(mapRef.current)
+      setOrMovePin(la, lo)
     }
   }
 
@@ -94,25 +169,29 @@ export function StopLocationPicker({
 
   return (
     <div>
-      {/* Buscador de dirección */}
+      {/* Buscador con debounce */}
       <div style={{ position: 'relative', marginBottom: 6 }}>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
             style={inputStyle}
-            placeholder="Buscar dirección, lugar o coordenadas…"
+            placeholder="Escribe para buscar (≥3 letras) o arrastra el pin…"
             value={query}
-            onChange={e => { setQuery(e.target.value); setShowDrop(false) }}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); geocode() } }}
+            onChange={handleQueryChange}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                const q = query.trim()
+                if (q) geocode(q)
+              }
+            }}
             onFocus={() => places.length > 0 && setShowDrop(true)}
           />
-          <button
-            type="button"
-            onClick={geocode}
-            disabled={searching || !query.trim()}
-            style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 5, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, opacity: searching || !query.trim() ? 0.6 : 1 }}
-          >
-            {searching ? '…' : 'Buscar'}
-          </button>
+          {searching && (
+            <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              Buscando…
+            </span>
+          )}
         </div>
 
         {/* Dropdown resultados */}
@@ -140,7 +219,7 @@ export function StopLocationPicker({
       {/* Mapa */}
       <div ref={containerRef} style={{ width: '100%', height: 220, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }} />
       <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', marginTop: 4, marginBottom: 0 }}>
-        Busca una dirección arriba o haz clic en el mapa para fijar la ubicación
+        Selecciona buscando o haz clic en el mapa · pin arrastrable
         {lat && lon ? ` · ${lat.toFixed(5)}, ${lon.toFixed(5)}` : ''}
       </p>
     </div>

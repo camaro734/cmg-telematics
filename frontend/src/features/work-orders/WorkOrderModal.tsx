@@ -403,8 +403,12 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
                   </div>
                   {stop.mapOpen && (
                     <div style={{ marginTop: 8 }}>
-                      <StopLocationPicker lat={stop.lat} lon={stop.lon} searchQuery={stop.address}
-                        onPick={(la, lo) => { updateStop(stop._id, 'lat', la); updateStop(stop._id, 'lon', lo) }} />
+                      <StopLocationPicker
+                        lat={stop.lat} lon={stop.lon} searchQuery={stop.address}
+                        arrivalRadiusM={stop.arrival_radius_m}
+                        onPick={(la, lo) => { updateStop(stop._id, 'lat', la); updateStop(stop._id, 'lon', lo) }}
+                        onAddressChange={(addr) => updateStop(stop._id, 'address', addr)}
+                      />
                     </div>
                   )}
                 </div>
