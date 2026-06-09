@@ -1,8 +1,8 @@
 """
 Portal público — acceso sin JWT via portal_access_token.
 Expone solo datos de lectura del tenant: vehículos, estado y órdenes recientes.
+Permite al cliente firmar una orden completada mediante el endpoint /sign.
 """
-import json
 import uuid
 from datetime import datetime, timezone
 
@@ -11,10 +11,14 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.work_reports import _save_signature
 from app.core.database import get_db
 from app.models.tenant import Tenant
 from app.models.vehicle import Vehicle
 from app.models.work_order import WorkOrder
+from app.models.work_order_stop import WorkOrderStop
+from app.models.work_report import WorkReport
+from app.services.doc_numbers import assign_doc_number
 
 router = APIRouter(prefix="/portal", tags=["portal"])
 
@@ -51,9 +55,32 @@ class PortalOrder(BaseModel):
     scheduled_at: str | None = None
     completed_at: str | None = None
     location_address: str | None = None
+    report_number: str | None = None   # presente si la orden ya está firmada
 
 
-# ── Helper: resolve token → tenant ───────────────────────────────────────────
+class PortalStop(BaseModel):
+    id: str
+    order_index: int
+    title: str
+    address: str | None = None
+    status: str
+    completed_at: str | None = None
+    pto_minutes: float | None = None
+    pump_minutes: float | None = None
+    fuel_l: float | None = None
+
+
+class PortalSignRequest(BaseModel):
+    signature: str               # data_url base64
+    client_signee_name: str
+    client_signee_dni: str
+
+
+class PortalSignResponse(BaseModel):
+    report_number: str
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_tenant_by_token(token: str, db: AsyncSession) -> Tenant:
     result = await db.execute(
@@ -63,6 +90,18 @@ async def _get_tenant_by_token(token: str, db: AsyncSession) -> Tenant:
     if not tenant:
         raise HTTPException(status_code=404, detail="Portal no encontrado o inactivo")
     return tenant
+
+
+async def _get_portal_order(
+    order_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> WorkOrder:
+    result = await db.execute(select(WorkOrder).where(WorkOrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order or order.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    return order
 
 
 async def _get_vehicle_status(vehicle_id: uuid.UUID, redis) -> dict:
@@ -143,9 +182,21 @@ async def portal_orders(token: str, db: AsyncSession = Depends(get_db)):
     )
     orders = result.scalars().all()
 
-    # Enrich with vehicle/driver names
     from app.models.vehicle import Vehicle
     from app.models.driver import Driver
+
+    # Batch: órdenes ya firmadas (evita N+1)
+    order_ids = [o.id for o in orders]
+    signed_order_ids: set[str] = set()
+    if order_ids:
+        rep_rows = await db.execute(
+            select(WorkReport.work_order_id).where(
+                WorkReport.work_order_id.in_(order_ids),
+                WorkReport.signature_url.is_not(None),
+                WorkReport.client_signee_name.is_not(None),
+            )
+        )
+        signed_order_ids = {str(r[0]) for r in rep_rows.all()}
 
     out: list[PortalOrder] = []
     for o in orders:
@@ -171,5 +222,93 @@ async def portal_orders(token: str, db: AsyncSession = Depends(get_db)):
             scheduled_at=o.scheduled_at.isoformat() if o.scheduled_at else None,
             completed_at=o.completed_at.isoformat() if o.completed_at else None,
             location_address=o.location_address,
+            report_number=o.doc_number if str(o.id) in signed_order_ids else None,
         ))
     return out
+
+
+@router.get("/{token}/orders/{order_id}/stops", response_model=list[PortalStop])
+async def portal_order_stops(
+    token: str,
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = await _get_tenant_by_token(token, db)
+    order = await _get_portal_order(order_id, tenant.id, db)
+
+    result = await db.execute(
+        select(WorkOrderStop)
+        .where(WorkOrderStop.work_order_id == order.id)
+        .order_by(WorkOrderStop.order_index)
+    )
+    stops = result.scalars().all()
+    return [
+        PortalStop(
+            id=str(s.id),
+            order_index=s.order_index,
+            title=s.title,
+            address=s.address,
+            status=s.status,
+            completed_at=s.completed_at.isoformat() if s.completed_at else None,
+            pto_minutes=s.pto_minutes,
+            pump_minutes=s.pump_minutes,
+            fuel_l=s.fuel_l,
+        )
+        for s in stops
+    ]
+
+
+@router.post("/{token}/orders/{order_id}/sign", response_model=PortalSignResponse)
+async def portal_sign_order(
+    token: str,
+    order_id: uuid.UUID,
+    body: PortalSignRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = await _get_tenant_by_token(token, db)
+    order = await _get_portal_order(order_id, tenant.id, db)
+
+    if order.status != "done":
+        raise HTTPException(
+            status_code=422,
+            detail="La orden debe estar completada antes de firmar",
+        )
+
+    result = await db.execute(
+        select(WorkReport).where(WorkReport.work_order_id == order.id)
+    )
+    report = result.scalar_one_or_none()
+    if report and report.signature_url and report.client_signee_name:
+        raise HTTPException(status_code=409, detail="La orden ya está firmada")
+
+    name = body.client_signee_name.strip()
+    dni = body.client_signee_dni.strip()
+    if not name or not dni:
+        raise HTTPException(status_code=422, detail="Nombre y DNI obligatorios")
+
+    if not report:
+        report = WorkReport(
+            id=uuid.uuid4(),
+            work_order_id=order.id,
+            tenant_id=order.tenant_id,
+            vehicle_id=order.vehicle_id,
+            driver_id=order.driver_id,
+            photo_urls=[],
+            materials_used=[],
+        )
+        db.add(report)
+        await db.flush()
+
+    report.signature_url = _save_signature(body.signature, report.id)
+    report.client_signee_name = name
+    report.client_signee_dni = dni
+    report.unsigned_reason = None
+
+    # Asignar doc_number si el rollup no pudo (defensivo)
+    if not order.doc_number:
+        order.doc_number = await assign_doc_number(
+            db, order.tenant_id, order.completed_at or datetime.now(timezone.utc)
+        )
+
+    await db.commit()
+    return PortalSignResponse(report_number=order.doc_number)
