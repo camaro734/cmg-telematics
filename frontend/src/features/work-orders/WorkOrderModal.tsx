@@ -272,8 +272,24 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
                       }}
                     >
                       <option value="">— Selecciona señal —</option>
-                      {signals.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      {signals.some(s => s.recommended_for_service) && (
+                        <optgroup label="Recomendadas para auto-cierre">
+                          {signals.filter(s => s.recommended_for_service).map(s => (
+                            <option key={s.key} value={s.key}>{s.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {signals.some(s => !s.recommended_for_service) && (
+                        <optgroup label="Otras señales">
+                          {signals.filter(s => !s.recommended_for_service).map(s => (
+                            <option key={s.key} value={s.key}>{s.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
                     </Select>
+                    <p style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', margin: 0 }}>
+                      Las recomendadas detectan si el equipo está en servicio activo (bomba, depresor o PTO encendido).
+                    </p>
 
                     {autoClose.service_signal_key && (
                       <div style={{ display: 'grid', gridTemplateColumns: selectedSignal?.signal_type === 'bool' ? '1fr' : '140px 1fr', gap: 'var(--space-2)' }}>

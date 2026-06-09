@@ -259,6 +259,7 @@ export interface AutoCloseSignal {
   key: string
   label: string
   signal_type: 'bool' | 'numeric'
+  recommended_for_service: boolean
 }
 
 export interface WorkOrderOut {
