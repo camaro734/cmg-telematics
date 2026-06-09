@@ -424,7 +424,9 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
               lat={pickedLat}
               lon={pickedLon}
               searchQuery={newStop.address ?? ''}
+              arrivalRadiusM={newStop.arrival_radius_m ?? 50}
               onPick={(la, lo) => { setPickedLat(la); setPickedLon(lo) }}
+              onAddressChange={(addr) => setNewStop(s => ({ ...s, address: addr }))}
             />
             {stopError && (
               <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>{stopError}</div>
