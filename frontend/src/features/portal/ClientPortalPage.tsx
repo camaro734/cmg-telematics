@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { CARTO_TILES_URL, CARTO_ATTRIBUTION } from '../../lib/mapConfig'
 import { PortalSignModal } from './PortalSignModal'
 
 // ── API (sin auth) ────────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ function PortalMap({ vehicles }: { vehicles: PortalVehicle[] }) {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     mapRef.current = L.map(containerRef.current, { center: [40.4, -3.7], zoom: 6, zoomControl: true })
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapRef.current)
+    L.tileLayer(CARTO_TILES_URL, { attribution: CARTO_ATTRIBUTION, subdomains: 'abcd', maxZoom: 19 }).addTo(mapRef.current)
     return () => { mapRef.current?.remove(); mapRef.current = null }
   }, [])
 

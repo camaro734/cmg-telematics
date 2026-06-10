@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
+import { CARTO_TILES_URL, CARTO_ATTRIBUTION } from '../../lib/mapConfig'
 
 // Centro de España como fallback cuando no hay polígono
 const DEFAULT_CENTER: [number, number] = [40.416775, -3.70379]
@@ -26,8 +27,9 @@ export default function GeofenceMapEditor({ polygon, onChange }: Props) {
     if (!containerRef.current || mapRef.current) return
 
     const map = L.map(containerRef.current, { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
+    L.tileLayer(CARTO_TILES_URL, {
+      attribution: CARTO_ATTRIBUTION,
+      subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(map)
 
