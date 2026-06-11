@@ -49,3 +49,4 @@ class MaintenanceLog(Base):
     cost_eur: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     photo_urls: Mapped[list | None] = mapped_column(ARRAY(String), nullable=True)
     document_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    counter_readings: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

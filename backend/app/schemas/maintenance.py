@@ -91,3 +91,17 @@ class MaintenanceLogOut(BaseModel):
     reset_counters: list[str]
     cost_eur: float | None = None
     document_url: str | None = None
+    counter_readings: dict | None = None
+
+
+class ThresholdProjection(BaseModel):
+    type: str
+    current: float
+    limit: float
+    pct: float
+    days_remaining: float | None = None
+
+
+class MaintenanceProjection(BaseModel):
+    status: Literal['ok', 'próximo', 'vencido']
+    thresholds: list[ThresholdProjection]

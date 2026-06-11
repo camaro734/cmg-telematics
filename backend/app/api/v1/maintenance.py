@@ -2,6 +2,7 @@
 import csv
 import io
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,7 +17,7 @@ from app.schemas.auth import CurrentUser
 from app.schemas.maintenance import (
     MaintenancePlanCreate, MaintenancePlanUpdate, MaintenancePlanOut,
     MaintenanceLogCreate, MaintenanceLogOut,
-    MaintenanceProgress, ThresholdProgress,
+    MaintenanceProgress, MaintenanceProjection, ThresholdProgress, ThresholdProjection,
 )
 from app.models.alert_instance import AlertInstance
 from app.models.alert_rule import AlertRule
@@ -36,6 +37,9 @@ _COUNTER_COLUMNS = {
     "pto_hours": "pto_active_minutes",
     "engine_hours": "engine_on_minutes",
 }
+
+# Acepta solo claves de la forma avl_\d+ (las únicas que existen en can_data)
+_SAFE_AVL_KEY = re.compile(r"^avl_\d{1,6}$")
 
 
 async def _require_admin(user: CurrentUser) -> None:
@@ -148,6 +152,67 @@ async def _validate_counter_types(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Contadores no disponibles para este tipo de vehículo: {', '.join(sorted(invalid))}",
         )
+
+
+async def _snapshot_counter_values(
+    vehicle_id: uuid.UUID,
+    vtype: VehicleType | None,
+    counter_types: list[str],
+    db: AsyncSession,
+) -> dict:
+    """Devuelve {tipo: lectura_actual} para audit trail en la intervención.
+
+    Valores almacenados en unidades crudas del sensor: minutos para acumuladores
+    CAN (PLC), horas acumuladas para telemetry_1h, km absolutos para odómetro.
+    Los contadores de tipo calendar no tienen lectura instantánea y se omiten.
+    Limitación: telemetry_record tiene retención 90d; baselines más antiguas
+    recuperarán 0 para acumuladores CAN.
+    """
+    if not vtype or not vtype.maintenance_counters:
+        return {}
+    catalog = {c["type"]: c for c in vtype.maintenance_counters}
+    readings: dict = {}
+
+    for t_type in counter_types:
+        counter = catalog.get(t_type)
+        if not counter:
+            continue
+        source_type = counter.get("source_type")
+        source_key = counter.get("source_key") or ""
+
+        if source_type == "calendar":
+            continue
+        elif source_type == "telemetry_1h":
+            col = _COUNTER_COLUMNS.get(t_type)
+            if not col:
+                continue
+            row = await db.execute(
+                text(
+                    f"SELECT COALESCE(SUM({col}), 0) / 60.0 "
+                    "FROM telemetry_1h WHERE vehicle_id = :vid"
+                ),
+                {"vid": vehicle_id},
+            )
+            val = row.scalar_one_or_none()
+            readings[t_type] = round(float(val), 2) if val is not None else None
+        elif source_type == "can_data":
+            if not _SAFE_AVL_KEY.match(source_key):
+                logger.warning("source_key inseguro ignorado en snapshot: %r", source_key)
+                continue
+            row = await db.execute(
+                text(
+                    f"SELECT (can_data->>'{source_key}')::float "
+                    "FROM telemetry_record "
+                    "WHERE vehicle_id = :vid "
+                    f"AND can_data->>'{source_key}' IS NOT NULL "
+                    "ORDER BY time DESC LIMIT 1"
+                ),
+                {"vid": vehicle_id},
+            )
+            val = row.scalar_one_or_none()
+            readings[t_type] = float(val) if val is not None else None
+
+    return readings
 
 
 async def _fetch_baselines(
@@ -421,6 +486,12 @@ async def create_log(
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     await _require_admin_or_grant(user, db)
 
+    _vehicle = await db.get(Vehicle, plan.vehicle_id)
+    _vtype = await db.get(VehicleType, _vehicle.vehicle_type_id) if _vehicle else None
+    counter_readings = await _snapshot_counter_values(
+        plan.vehicle_id, _vtype, body.reset_counters, db
+    )
+
     log = MaintenanceLog(
         vehicle_id=plan.vehicle_id,
         plan_id=plan_id,
@@ -429,6 +500,7 @@ async def create_log(
         description=body.description,
         reset_counters=body.reset_counters,
         cost_eur=body.cost_eur,
+        counter_readings=counter_readings or None,
     )
     db.add(log)
     await db.commit()
@@ -442,6 +514,7 @@ async def create_log(
         description=log.description,
         reset_counters=log.reset_counters or [],
         cost_eur=float(log.cost_eur) if log.cost_eur is not None else None,
+        counter_readings=log.counter_readings,
     )
 
 
@@ -529,6 +602,10 @@ async def complete_plan(
     reset_counters = [t["type"] for t in thresholds]
     now = datetime.now(timezone.utc)
 
+    _vehicle = await db.get(Vehicle, plan.vehicle_id)
+    _vtype = await db.get(VehicleType, _vehicle.vehicle_type_id) if _vehicle else None
+    counter_readings = await _snapshot_counter_values(plan.vehicle_id, _vtype, reset_counters, db)
+
     log = MaintenanceLog(
         id=log_id,
         vehicle_id=plan.vehicle_id,
@@ -538,6 +615,7 @@ async def complete_plan(
         description=description,
         reset_counters=reset_counters,
         document_url=document_url,
+        counter_readings=counter_readings or None,
     )
     db.add(log)
 
@@ -560,6 +638,7 @@ async def complete_plan(
         reset_counters=log.reset_counters or [],
         cost_eur=None,
         document_url=log.document_url,
+        counter_readings=log.counter_readings,
     )
 
 
