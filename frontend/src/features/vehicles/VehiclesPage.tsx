@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import type { VehicleOut, VehicleTypeOut, TenantOut, DeviceOut } from '../../lib/types'
+import type { VehicleOut, VehicleTypeOut, TenantOut, DeviceOut, VehicleReassignOut } from '../../lib/types'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
@@ -62,6 +62,7 @@ export default function VehiclesPage() {
   const { activeTenantId } = useTenantContext()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const userTier = useAuthStore(s => s.user?.tenant_tier)
+  const userTenantId = useAuthStore(s => s.user?.tenant_id)
 
   const [modal, setModal] = useState<'closed' | 'create' | 'edit'>('closed')
   const [editingVehicle, setEditingVehicle] = useState<VehicleOut | null>(null)
@@ -69,6 +70,12 @@ export default function VehiclesPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [reassignVehicle, setReassignVehicle] = useState<VehicleOut | null>(null)
+  const [reassignTarget, setReassignTarget] = useState('')
+  const [reassigning, setReassigning] = useState(false)
+  const [reassignResult, setReassignResult] = useState<VehicleReassignOut | null>(null)
+  const [reassignError, setReassignError] = useState<string | null>(null)
 
   // ── Datos ────────────────────────────────────────────────────────────────
 
@@ -101,6 +108,10 @@ export default function VehiclesPage() {
   const tenantMap = new Map(tenants.map(t => [t.id, t.name]))
   const deviceByVehicle = new Map(devices.filter(d => d.vehicle_id).map(d => [d.vehicle_id!, d]))
   const clientTenants = tenants.filter(t => t.tier !== 'cmg')
+
+  const reassignableTargets = userTier === 'cmg'
+    ? tenants.filter(t => t.tier !== 'cmg')
+    : tenants.filter(t => t.id === userTenantId || t.parent_manufacturer_id === userTenantId)
 
   // ── Abrir/cerrar modales ─────────────────────────────────────────────────
 
@@ -138,6 +149,46 @@ export default function VehiclesPage() {
 
   function setField(key: keyof FormState, value: string) {
     setForm(f => ({ ...f, [key]: value }))
+  }
+
+  function openReassign(v: VehicleOut) {
+    setReassignVehicle(v)
+    setReassignTarget('')
+    setReassignResult(null)
+    setReassignError(null)
+  }
+
+  function closeReassign() {
+    setReassignVehicle(null)
+    setReassignTarget('')
+    setReassignResult(null)
+    setReassignError(null)
+  }
+
+  async function handleReassign() {
+    if (!reassignVehicle || !reassignTarget) return
+    setReassigning(true)
+    setReassignError(null)
+    try {
+      const result = await apiClient.post<VehicleReassignOut>(
+        `/api/v1/vehicles/${reassignVehicle.id}/reassign`,
+        { target_tenant_id: reassignTarget },
+      )
+      setReassignResult(result)
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const m = msg.match(/^\d{3}:\s*(\{.*\})$/)
+      let detail: string | null = null
+      if (m) {
+        try { detail = JSON.parse(m[1]).detail } catch { /* ignora */ }
+      }
+      if (detail) setReassignError(detail)
+      else if (msg.includes('409')) setReassignError('Este vehículo tiene órdenes de trabajo abiertas. Ciérralas o cancélalas antes de reasignar.')
+      else setReassignError('Error al reasignar. Inténtalo de nuevo.')
+    } finally {
+      setReassigning(false)
+    }
   }
 
   // ── Guardar ──────────────────────────────────────────────────────────────
@@ -345,7 +396,7 @@ export default function VehiclesPage() {
                         <td style={{ ...tdStyle, color: 'var(--fg-muted)', fontSize: 12 }}>
                           {dev?.last_seen ? formatLastSeen(dev.last_seen) : '—'}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <td style={{ ...tdStyle, textAlign: 'right', display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                           {isAdmin && <button
                             onClick={() => openEdit(v)}
                             style={{
@@ -360,6 +411,22 @@ export default function VehiclesPage() {
                           >
                             Editar
                           </button>}
+                          {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && v.manufacturer_tenant_id === userTenantId)) && (
+                            <button
+                              onClick={() => openReassign(v)}
+                              style={{
+                                background: 'transparent',
+                                color: 'var(--accent-info)',
+                                border: '1px solid var(--accent-info)',
+                                borderRadius: 4,
+                                padding: '4px 10px',
+                                fontSize: 12,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Reasignar
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )
@@ -571,6 +638,140 @@ export default function VehiclesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── Modal: Reasignar vehículo ──────────────────────────────────────── */}
+      {reassignVehicle && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) closeReassign() }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1100,
+          }}
+        >
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            padding: 28,
+            width: 460,
+            maxWidth: '92vw',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+                Reasignar vehículo
+              </h2>
+              <button onClick={closeReassign} style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}>✕</button>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 14 }}>
+              Vehículo: <strong style={{ color: 'var(--fg-primary)' }}>{reassignVehicle.name}</strong>
+              {reassignVehicle.license_plate && <span> · {reassignVehicle.license_plate}</span>}
+            </div>
+
+            {/* Aviso de impacto */}
+            <div style={{
+              background: 'rgba(234,179,8,0.08)',
+              border: '1px solid rgba(234,179,8,0.4)',
+              borderRadius: 6,
+              padding: '10px 14px',
+              fontSize: 12,
+              color: 'var(--accent-warn)',
+              marginBottom: 18,
+              lineHeight: 1.5,
+            }}>
+              <strong>Atención:</strong> La telemetría histórica permanecerá asociada al cliente anterior — el nuevo cliente verá datos desde hoy.
+              Las alertas específicas del cliente anterior sobre este vehículo se desactivarán y los permisos concedidos se revocarán.
+            </div>
+
+            {reassignResult ? (
+              /* Estado: reasignación completada */
+              <div>
+                <div style={{
+                  background: 'rgba(34,197,94,0.08)',
+                  border: '1px solid var(--accent-ok)',
+                  borderRadius: 6,
+                  padding: '10px 14px',
+                  fontSize: 13,
+                  color: 'var(--accent-ok)',
+                  marginBottom: 16,
+                }}>
+                  Vehículo reasignado correctamente a <strong>{tenantMap.get(reassignResult.to_tenant_id) ?? reassignResult.to_tenant_id}</strong>.
+                  {reassignResult.alert_rules_deactivated > 0 && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--fg-muted)' }}>
+                      {reassignResult.alert_rules_deactivated} regla{reassignResult.alert_rules_deactivated !== 1 ? 's' : ''} desactivada{reassignResult.alert_rules_deactivated !== 1 ? 's' : ''} · {reassignResult.grants_revoked} permiso{reassignResult.grants_revoked !== 1 ? 's' : ''} revocado{reassignResult.grants_revoked !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={closeReassign} style={{
+                    background: 'var(--cmg-teal)', color: '#fff',
+                    border: 'none', borderRadius: 6,
+                    padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Cerrar</button>
+                </div>
+              </div>
+            ) : (
+              /* Estado: seleccionar destino */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <Select
+                  label="Cliente destino"
+                  value={reassignTarget}
+                  onChange={e => setReassignTarget(e.target.value)}
+                >
+                  <option value="">— Selecciona cliente —</option>
+                  {userTier === 'manufacturer' && (
+                    <option value={userTenantId ?? ''}>— Mi flota —</option>
+                  )}
+                  {reassignableTargets
+                    .filter(t => t.id !== userTenantId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))
+                  }
+                </Select>
+
+                {reassignError && (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid var(--accent-crit)',
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    color: 'var(--accent-crit)',
+                  }}>
+                    {reassignError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button
+                    onClick={closeReassign}
+                    style={{
+                      background: 'var(--bg-elevated)', color: 'var(--fg-muted)',
+                      border: '1px solid var(--border)', borderRadius: 6,
+                      padding: '8px 16px', fontSize: 13, cursor: 'pointer',
+                    }}
+                  >Cancelar</button>
+                  <button
+                    onClick={handleReassign}
+                    disabled={reassigning || !reassignTarget}
+                    style={{
+                      background: reassigning || !reassignTarget ? 'var(--bg-elevated)' : 'var(--accent-warn)',
+                      color: reassigning || !reassignTarget ? 'var(--fg-muted)' : '#000',
+                      border: 'none', borderRadius: 6,
+                      padding: '8px 20px', fontSize: 13, fontWeight: 600,
+                      cursor: reassigning || !reassignTarget ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {reassigning ? 'Reasignando…' : 'Confirmar reasignación'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

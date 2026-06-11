@@ -28,6 +28,15 @@ export interface VehicleOut {
   created_at: string
 }
 
+export interface VehicleReassignOut {
+  vehicle_id: string
+  from_tenant_id: string
+  to_tenant_id: string
+  reassigned_at: string
+  alert_rules_deactivated: number
+  grants_revoked: number
+}
+
 export interface VehicleStatus {
   vehicle_id: string
   online: boolean
@@ -89,6 +98,7 @@ export type SensorIcon =
 export interface TenantOut {
   id: string
   parent_id: string | null
+  parent_manufacturer_id: string | null
   tier: string
   name: string
   slug: string
