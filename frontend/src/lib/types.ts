@@ -438,6 +438,7 @@ export interface MaintenancePlanOut {
   vehicle_id: string
   vehicle_name: string
   tenant_id: string
+  owner_tenant_id: string
   name: string
   trigger_condition: TriggerCondition
   warn_before_pct: number

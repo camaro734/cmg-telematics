@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useIsMobile } from '../../lib/useIsMobile'
 import {
   LineChart, Line,
@@ -26,9 +26,13 @@ import type { ReportsTab } from './useReportsTabStore'
 import type {
   VehicleTypeOut, KpiHour,
   MaintenancePlanOut, MaintenanceLogOut,
+  MaintenanceProjectionOut,
   DayTrips, Trip,
 } from '../../lib/types'
 import { MaintenanceStatusBadge } from '../../shared/ui/MaintenanceStatusBadge'
+import ProgressBar from '../maintenance/ProgressBar'
+import LogInterventionModal from '../maintenance/LogInterventionModal'
+import { useAuthStore } from '../auth/useAuthStore'
 
 // ── Style constants ───────────────────────────────────────────────────────────
 
@@ -698,9 +702,18 @@ function HistoricoTab({
 // ── MANTENIMIENTO tab ────────────────────────────────────────────────────────
 
 
+const THRESHOLD_UNIT: Record<string, string> = {
+  pto_hours: 'h PTO',
+  engine_hours: 'h motor',
+  calendar_days: 'días',
+}
+
 function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [logModalOpen, setLogModalOpen] = useState(false)
   const isMobile = useIsMobile()
+  const qc = useQueryClient()
+  const { user } = useAuthStore()
 
   const { data: plans = [] } = useQuery<MaintenancePlanOut[]>({
     queryKey: keys.vehicleMaintenance(vehicleId),
@@ -718,6 +731,13 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
     staleTime: 60_000,
   })
 
+  const { data: projection } = useQuery<MaintenanceProjectionOut>({
+    queryKey: keys.maintenanceProjection(selectedPlanId ?? ''),
+    queryFn: () => apiClient.get<MaintenanceProjectionOut>(`/api/v1/maintenance/plans/${selectedPlanId}/projection`),
+    enabled: Boolean(selectedPlanId),
+    staleTime: 120_000,
+  })
+
   if (!vehicleId) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-muted)', fontSize: 13 }}>
@@ -726,127 +746,262 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
     )
   }
 
+  const isOperatorOrAdmin = user?.role === 'admin' || user?.role === 'operator'
+  const canManage = user?.role === 'admin' && (
+    user.tenant_tier === 'cmg' ||
+    (selectedPlan != null && String(selectedPlan.owner_tenant_id) === String(user.tenant_id))
+  )
+
+  const worstOf = (plan: MaintenancePlanOut) =>
+    plan.progress.thresholds.length > 0
+      ? plan.progress.thresholds.reduce((a, b) => a.pct > b.pct ? a : b)
+      : null
+
+  const lastLog = allLogs[0] ?? null
+  const accumulatedCost = allLogs.reduce((s, l) => s + (l.cost_eur ?? 0), 0)
+
+  function handleLogClose() {
+    setLogModalOpen(false)
+    if (selectedPlanId) {
+      qc.invalidateQueries({ queryKey: keys.maintenanceLogs(selectedPlanId) })
+      qc.invalidateQueries({ queryKey: keys.vehicleMaintenance(vehicleId) })
+      qc.invalidateQueries({ queryKey: keys.maintenanceProjection(selectedPlanId) })
+    }
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, height: isMobile ? undefined : '100%' }}>
+    <>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, height: isMobile ? undefined : '100%' }}>
 
-      <div style={{ ...card, width: isMobile ? '100%' : 210, flexShrink: 0, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>Planes de mantenimiento</span>
-          <Link
-            to="/maintenance"
-            style={{ fontSize: 11, color: 'var(--cmg-teal)', textDecoration: 'none', whiteSpace: 'nowrap', marginLeft: 8 }}
-          >
-            Ver todo →
-          </Link>
+        {/* ── LEFT: lista de planes ─────────────────────────────────────── */}
+        <div style={{ ...card, width: isMobile ? '100%' : 210, flexShrink: 0, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Planes</span>
+            <Link to="/maintenance" style={{ fontSize: 11, color: 'var(--cmg-teal)', textDecoration: 'none' }}>Ver todo →</Link>
+          </div>
+          {plans.length === 0 ? (
+            <div style={{ padding: 12, fontSize: 12, color: 'var(--fg-muted)' }}>Sin planes</div>
+          ) : (
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {plans.map(p => {
+                const worst = worstOf(p)
+                const remaining = worst ? worst.limit - worst.current : null
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => setSelectedPlanId(p.id === selectedPlanId ? null : p.id)}
+                    style={{
+                      padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                      background: p.id === selectedPlanId ? 'var(--bg-card)' : 'transparent',
+                      display: 'flex', flexDirection: 'column', gap: 5,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: 'var(--fg-primary)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
+                      {p.name}
+                    </span>
+                    {worst && <ProgressBar pct={worst.pct} status={p.progress.status} />}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                      <MaintenanceStatusBadge status={p.progress.status} size="sm" />
+                      {worst && remaining !== null && (
+                        <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {remaining < 0
+                            ? `+${Math.abs(remaining).toFixed(0)}`
+                            : `quedan ${remaining.toFixed(0)}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-        {plans.length === 0 ? (
-          <div style={{ padding: 12, fontSize: 12, color: 'var(--fg-muted)' }}>Sin planes</div>
-        ) : (
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {plans.map(p => (
-              <div
-                key={p.id}
-                onClick={() => setSelectedPlanId(p.id === selectedPlanId ? null : p.id)}
-                style={{
-                  padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
-                  background: p.id === selectedPlanId ? 'var(--bg-card)' : 'transparent',
-                  display: 'flex', flexDirection: 'column', gap: 4,
-                }}
-              >
-                <span style={{ fontSize: 12, color: 'var(--fg-primary)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
-                  {p.name}
+
+        {/* ── CENTER: timeline de intervenciones ───────────────────────── */}
+        <div style={{ ...card, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+          {!selectedPlan ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: 'var(--fg-muted)', fontSize: 13 }}>
+              Selecciona un plan
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
+                  {selectedPlan.name} — Intervenciones
                 </span>
-                <MaintenanceStatusBadge status={p.progress.status} size="sm" />
+                {isOperatorOrAdmin && (
+                  <button
+                    onClick={() => setLogModalOpen(true)}
+                    style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    + Registrar
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ ...card, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {!selectedPlan ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: 'var(--fg-muted)', fontSize: 13 }}>
-            Selecciona un plan
-          </div>
-        ) : (
-          <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
-              {selectedPlan.name} — Historial de intervenciones
-            </div>
-            {allLogs.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--fg-muted)', padding: '16px 0' }}>Sin intervenciones registradas</div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 360 }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Fecha</th>
-                    <th style={thStyle}>Notas</th>
-                    <th style={thStyle}>Documento</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allLogs.map(log => (
-                    <tr key={log.id}>
-                      <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap' }}>
-                        {log.performed_at ? new Date(log.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
-                      </td>
-                      <td style={tdStyle}>{log.description ?? '—'}</td>
-                      <td style={tdStyle}>
-                        {log.document_url
-                          ? <a href={log.document_url} target="_blank" rel="noreferrer" style={{ color: 'var(--info)', fontSize: 11 }}>Ver</a>
-                          : <span style={{ color: 'var(--fg-muted)' }}>—</span>
-                        }
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ overflowY: 'auto', flex: 1, padding: '16px 16px 16px 20px' }}>
+                {allLogs.length === 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingTop: 32, color: 'var(--fg-muted)', fontSize: 13 }}>
+                    <span>Sin intervenciones registradas</span>
+                    {isOperatorOrAdmin && (
+                      <button
+                        onClick={() => setLogModalOpen(true)}
+                        style={{ background: 'none', border: '1px dashed var(--border)', color: 'var(--fg-muted)', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}
+                      >
+                        + Registrar primera intervención
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--border)' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                      {allLogs.map(log => (
+                        <div key={log.id} style={{ display: 'flex', gap: 16, position: 'relative' }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-elevated)', border: '2px solid var(--cmg-teal)', flexShrink: 0, marginTop: 2, position: 'relative', zIndex: 1 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>
+                                {log.performed_by_email ?? 'Operario'}
+                              </span>
+                              <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                                {log.performed_at ? new Date(log.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
+                              </span>
+                            </div>
+                            {log.description && (
+                              <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--fg-secondary)' }}>{log.description}</p>
+                            )}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {log.reset_counters.map(c => (
+                                <span key={c} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(29,158,117,0.15)', color: 'var(--cmg-teal)', fontWeight: 600 }}>
+                                  {c}
+                                </span>
+                              ))}
+                              {log.cost_eur != null && (
+                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(234,179,8,0.12)', color: 'var(--accent-warn)', fontWeight: 600 }}>
+                                  {log.cost_eur.toFixed(2)} €
+                                </span>
+                              )}
+                              {log.document_url && (
+                                <a href={log.document_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(56,189,248,0.12)', color: 'var(--accent-info)', fontWeight: 600, textDecoration: 'none' }}>
+                                  Doc
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
 
-      <div style={{ width: isMobile ? '100%' : 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {selectedPlan && (
-          <>
-            <div style={card}>
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Estado</div>
-              <MaintenanceStatusBadge status={selectedPlan.progress.status} />
-            </div>
-            {selectedPlan.progress.thresholds.map((t, i) => {
-              const pct = Math.min(100, Math.round(t.pct))
-              const barColor = t.pct >= 100
-                ? 'var(--danger)'
-                : t.pct >= (100 - selectedPlan.warn_before_pct)
-                  ? 'var(--warn)'
-                  : 'var(--ok)'
-              const typeLabel: Record<string, string> = {
-                pto_hours: 'Horas PTO',
-                engine_hours: 'Horas motor',
-                calendar_days: 'Días calendario',
-              }
-              return (
-                <div key={i} style={card}>
-                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
-                    {typeLabel[t.type] ?? t.type}
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
-                    {Math.round(t.current)} / {t.limit}
-                  </div>
-                  <div style={{ height: 6, borderRadius: 3, background: 'var(--bg-card)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 3, transition: 'width 0.3s' }} />
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--fg-muted)', marginTop: 2 }}>{pct}%</div>
+        {/* ── RIGHT: tarjeta unificada ──────────────────────────────────── */}
+        <div style={{ width: isMobile ? '100%' : 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {selectedPlan && (
+            <>
+              {/* Estado + intervalo de mantenimiento */}
+              <div style={card}>
+                <div style={{ marginBottom: 8 }}>
+                  <MaintenanceStatusBadge status={selectedPlan.progress.status} />
                 </div>
-              )
-            })}
-          </>
-        )}
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
+                  {selectedPlan.trigger_condition.thresholds.map((t, i) => (
+                    <span key={t.type}>
+                      {i > 0 && ' / '}
+                      Cada {t.value} {THRESHOLD_UNIT[t.type] ?? t.type}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--fg-muted)' }}>
+                  Aviso al {selectedPlan.warn_before_pct}% restante
+                </div>
+              </div>
+
+              {/* Progreso + proyección por umbral */}
+              {selectedPlan.progress.thresholds.map(t => {
+                const proj = projection?.thresholds.find(pt => pt.type === t.type)
+                const remaining = t.limit - t.current
+                return (
+                  <div key={t.type} style={card}>
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
+                      {THRESHOLD_UNIT[t.type] ?? t.type}
+                    </div>
+                    <ProgressBar pct={t.pct} status={selectedPlan.progress.status} showLabel />
+                    <div style={{ fontSize: 11, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                      {Math.round(t.current)} / {t.limit}
+                      <span style={{ color: 'var(--fg-muted)', marginLeft: 6 }}>
+                        · {remaining < 0
+                          ? `excedido ${Math.abs(remaining).toFixed(0)}`
+                          : `quedan ${remaining.toFixed(0)}`}
+                      </span>
+                    </div>
+                    {proj?.days_remaining != null && (
+                      <div style={{ fontSize: 10, color: 'var(--accent-info)', marginTop: 3 }}>
+                        ≈ {Math.round(proj.days_remaining)} días restantes
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Última intervención + coste acumulado */}
+              <div style={card}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Última intervención</div>
+                {lastLog ? (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(lastLog.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </div>
+                    {lastLog.performed_by_email && (
+                      <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>{lastLog.performed_by_email}</div>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin registros</span>
+                )}
+                {accumulatedCost > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--accent-warn)', marginTop: 8, fontFamily: 'var(--font-mono)' }}>
+                    Coste total: {accumulatedCost.toFixed(2)} €
+                  </div>
+                )}
+              </div>
+
+              {/* Acciones */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(selectedPlan.progress.status === 'próximo' || selectedPlan.progress.status === 'vencido') && isOperatorOrAdmin && (
+                  <button
+                    onClick={() => setLogModalOpen(true)}
+                    style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Completar intervención
+                  </button>
+                )}
+                {canManage && (
+                  <Link
+                    to={`/maintenance/${selectedPlan.id}`}
+                    style={{ display: 'block', textAlign: 'center', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', fontSize: 12, textDecoration: 'none' }}
+                  >
+                    Editar plan
+                  </Link>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
       </div>
 
-    </div>
+      {logModalOpen && selectedPlan && (
+        <LogInterventionModal
+          planId={selectedPlan.id}
+          thresholds={selectedPlan.trigger_condition.thresholds}
+          onClose={handleLogClose}
+        />
+      )}
+    </>
   )
 }
 
