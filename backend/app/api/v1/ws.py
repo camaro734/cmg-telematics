@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -27,6 +28,26 @@ def _enrich_payload(payload: dict) -> dict:
             except Exception:
                 pass
     return payload
+
+
+def _should_emit(
+    vehicle_id: str,
+    online: object,
+    ignition: object,
+    last_sent: dict[str, float],
+    last_state: dict[str, tuple],
+    now_mono: float,
+    throttle_s: float = 2.0,
+) -> bool:
+    """True si el evento debe emitirse al frontend.
+
+    Siempre emite si el estado (online/ignition) cambió respecto al último emit —
+    son los cambios que el usuario debe ver inmediatamente. Si no cambió, aplica
+    el throttle de 2 s para reducir re-renders con N vehículos activos."""
+    last = last_state.get(vehicle_id)
+    if last is None or last[0] != online or last[1] != ignition:
+        return True
+    return (now_mono - last_sent.get(vehicle_id, 0.0)) >= throttle_s
 
 
 class ConnectionManager:
@@ -75,9 +96,15 @@ class ConnectionManager:
 
 async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
     last_id = "$"
+    _last_sent: dict[str, float] = {}   # vehicle_id → monotonic del último emit
+    _last_state: dict[str, tuple] = {}  # vehicle_id → (online, ignition) del último emit
+    _last_cleanup = time.monotonic()
+    _CLEANUP_INTERVAL_S = 300.0
+
     while True:
         try:
             entries = await redis.xread({"telemetry.raw": last_id}, block=1000, count=50)
+            now_mono = time.monotonic()
             for _stream, messages in entries:
                 for msg_id, fields in messages:
                     last_id = msg_id
@@ -87,6 +114,19 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             else fields[b"payload"]
                         )
                         payload = _enrich_payload(payload)
+                        vehicle_id = payload.get("vehicle_id")
+                        if vehicle_id and not _should_emit(
+                            vehicle_id,
+                            payload.get("online"),
+                            payload.get("ignition"),
+                            _last_sent,
+                            _last_state,
+                            now_mono,
+                        ):
+                            continue
+                        if vehicle_id:
+                            _last_sent[vehicle_id] = now_mono
+                            _last_state[vehicle_id] = (payload.get("online"), payload.get("ignition"))
                         tenant_id = payload.get("tenant_id")
                         msg = {"type": "telemetry", "data": payload}
                         if tenant_id:
@@ -95,6 +135,17 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                         await manager.broadcast_to_tenant("__cmg__", msg)
                     except Exception as exc:
                         logger.warning("WS broadcast parse error: %s", exc)
+
+            # Limpieza periódica: eliminar vehículos sin reportar en los últimos 5 min
+            if now_mono - _last_cleanup > _CLEANUP_INTERVAL_S:
+                _last_cleanup = now_mono
+                cutoff = now_mono - _CLEANUP_INTERVAL_S
+                stale = [vid for vid, t in _last_sent.items() if t < cutoff]
+                for vid in stale:
+                    _last_sent.pop(vid, None)
+                    _last_state.pop(vid, None)
+                if stale:
+                    logger.debug("Throttle cleanup: %d vehículos eliminados", len(stale))
         except asyncio.CancelledError:
             break
         except Exception as exc:
