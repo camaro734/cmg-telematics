@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, func, cast, or_
 from sqlalchemy.dialects.postgresql import array
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, require_module, require_management_tier, require_operational_role
+from app.api.v1.deps import (
+    get_current_user, require_module, require_management_tier, require_operational_role,
+    require_plan_admin, assert_can_manage_plan,
+)
 from app.schemas.auth import CurrentUser
 from app.schemas.maintenance import (
     MaintenancePlanCreate, MaintenancePlanUpdate, MaintenancePlanOut,
@@ -487,17 +490,11 @@ async def list_plans(
 @router.post("/maintenance/plans", response_model=MaintenancePlanOut, status_code=201)
 async def create_plan(
     body: MaintenancePlanCreate,
-    user: CurrentUser = Depends(require_management_tier("admin")),
+    user: CurrentUser = Depends(require_plan_admin),
     _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
-    # NOTE: cuando existan subclientes, migrar el check de tenant v1 siguiente a
-    # assert_can_access_vehicle(write) para que el fabricante gestione planes de subclientes.
-    vehicle = await db.get(Vehicle, body.vehicle_id)
-    if not vehicle:
-        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    if user.tenant_tier != "cmg" and str(vehicle.tenant_id) != str(user.tenant_id):
-        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    vehicle = await assert_can_access_vehicle(user, body.vehicle_id, db, operation="read")
 
     await _validate_counter_types(vehicle, body.trigger_condition.thresholds, db)
 
@@ -534,14 +531,14 @@ async def get_plan(
 async def update_plan(
     plan_id: uuid.UUID,
     body: MaintenancePlanUpdate,
-    user: CurrentUser = Depends(require_management_tier("admin")),
+    user: CurrentUser = Depends(require_plan_admin),
     _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.get(MaintenancePlan, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
-    await assert_can_access_vehicle(user, plan.vehicle_id, db, operation="write")
+    await assert_can_manage_plan(user, plan)
 
     if body.name is not None:
         plan.name = body.name
@@ -564,15 +561,14 @@ async def update_plan(
 @router.delete("/maintenance/plans/{plan_id}", status_code=204)
 async def delete_plan(
     plan_id: uuid.UUID,
-    user: CurrentUser = Depends(require_management_tier("admin")),
+    user: CurrentUser = Depends(require_plan_admin),
     _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
 ):
-    # NOTE: cuando existan subclientes, migrar el check de tenant v1 siguiente a
-    # assert_can_access_vehicle(write) para que el fabricante gestione planes de subclientes.
     plan = await db.get(MaintenancePlan, plan_id)
-    if not plan or (user.tenant_tier != "cmg" and str(plan.tenant_id) != str(user.tenant_id)):
+    if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
+    await assert_can_manage_plan(user, plan)
     await db.delete(plan)
     await db.commit()
 

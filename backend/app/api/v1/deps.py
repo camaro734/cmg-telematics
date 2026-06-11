@@ -126,3 +126,39 @@ def require_module(*modules: str):
                 detail="Módulo no habilitado para este tenant",
             )
     return checker
+
+
+async def require_plan_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Dependency: exige rol admin de tier cmg, manufacturer o client.
+    Subclient y roles no-admin obtienen 403.
+    Usado en creación, edición y borrado de planes de mantenimiento.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    if user.tenant_tier not in ("cmg", "manufacturer", "client"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Tier no autorizado para gestionar planes"
+        )
+    return user
+
+
+async def assert_can_manage_plan(user: CurrentUser, plan) -> None:
+    """
+    Verifica que el usuario puede gestionar (editar/borrar) un plan de mantenimiento.
+
+    Política de propiedad (M3):
+    - cmg admin: siempre.
+    - manufacturer admin / client admin: solo si plan.owner_tenant_id == user.tenant_id.
+    - Cualquier rol no-admin o tier no reconocido (subclient): 403.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    if user.tenant_tier == "cmg":
+        return
+    if user.tenant_tier in ("manufacturer", "client"):
+        if str(plan.owner_tenant_id) == str(user.tenant_id):
+            return
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permiso sobre este plan")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Tier no autorizado para gestionar planes"
+    )
