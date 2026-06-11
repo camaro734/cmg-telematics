@@ -119,7 +119,11 @@ class TeltonikaConnection:
                     await update_device_online(conn, self.imei, False)
                 if self.device_info:
                     try:
-                        await set_vehicle_offline(self.redis, self.device_info["vehicle_id"])
+                        await set_vehicle_offline(
+                            self.redis,
+                            self.device_info["vehicle_id"],
+                            self.device_info["tenant_id"],
+                        )
                     except Exception as e:
                         logger.warning("No se pudo marcar offline en Redis: %s", e)
             self.writer.close()

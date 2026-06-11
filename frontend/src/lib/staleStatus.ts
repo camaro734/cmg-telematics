@@ -10,6 +10,8 @@ export const ONLINE_PARKED_MIN = 60
  *  ignition=false/undefined → umbral 60 min (vehículo aparcado en sleep mode) */
 export function isOnline(status: VehicleStatus | null | undefined): boolean {
   if (!status) return false
+  // Offline empujado explícitamente por el servidor (desconexión TCP o silencio)
+  if (status.online === false) return false
   const ts = status.device_last_seen ?? status.last_seen
   if (!ts) return false
   const limitMin = status.ignition === true ? ONLINE_ACTIVE_MIN : ONLINE_PARKED_MIN

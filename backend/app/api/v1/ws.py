@@ -3,12 +3,30 @@ import asyncio
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.core.security import decode_token
 from app.schemas.auth import CurrentUser
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
+
+
+def _enrich_payload(payload: dict) -> dict:
+    """Mapea received_at→device_last_seen y calcula el campo online.
+    Si online ya es False (evento de desconexión TCP), se preserva sin recalcular."""
+    if "received_at" in payload:
+        payload["device_last_seen"] = payload["received_at"]
+    if payload.get("online") is not False:
+        received_str = payload.get("received_at") or payload.get("last_seen")
+        if received_str:
+            try:
+                ts = datetime.fromisoformat(received_str.replace("Z", "+00:00"))
+                age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
+                payload["online"] = age_min < 5
+            except Exception:
+                pass
+    return payload
 
 
 class ConnectionManager:
@@ -68,21 +86,7 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             fields["payload"] if isinstance(fields, dict) and "payload" in fields
                             else fields[b"payload"]
                         )
-                        # Mapear received_at -> device_last_seen para que el frontend
-                        # pueda usar isOnline(device_last_seen ?? last_seen) < 60 min
-                        if "received_at" in payload:
-                            payload["device_last_seen"] = payload["received_at"]
-                        # Calcular online usando received_at (hora servidor), no last_seen
-                        # del dispositivo — así los paquetes del buffer offline no marcan offline
-                        from datetime import datetime, timezone
-                        received_str = payload.get("received_at") or payload.get("last_seen")
-                        if received_str:
-                            try:
-                                ts = datetime.fromisoformat(received_str.replace("Z", "+00:00"))
-                                age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
-                                payload["online"] = age_min < 5
-                            except Exception:
-                                pass
+                        payload = _enrich_payload(payload)
                         tenant_id = payload.get("tenant_id")
                         msg = {"type": "telemetry", "data": payload}
                         if tenant_id:

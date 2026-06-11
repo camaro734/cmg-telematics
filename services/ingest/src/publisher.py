@@ -120,8 +120,23 @@ async def _update_status_hash(
     await redis.expire(key, STATUS_TTL)
 
 
-async def set_vehicle_offline(redis: Redis, vehicle_id: str) -> None:
-    """Marca el vehículo como offline en Redis al cerrar la conexión TCP."""
+async def set_vehicle_offline(redis: Redis, vehicle_id: str, tenant_id: str) -> None:
+    """Marca el vehículo como offline en Redis y publica un evento en el stream
+    para que el WS notifique al frontend sin esperar el próximo paquete."""
+    from datetime import datetime, timezone as _tz
+    received_at = datetime.now(_tz.utc).isoformat()
     key = f"vehicle:{vehicle_id}:status"
-    await redis.hset(key, mapping={"online": "false"})
+    await redis.hset(key, mapping={"online": "false", "received_at": received_at})
     await redis.expire(key, STATUS_TTL)
+    payload = {
+        "vehicle_id": vehicle_id,
+        "tenant_id": tenant_id,
+        "online": False,
+        "received_at": received_at,
+    }
+    await redis.xadd(
+        STREAM_KEY,
+        {"payload": json.dumps(payload)},
+        maxlen=settings.stream_maxlen,
+        approximate=True,
+    )
