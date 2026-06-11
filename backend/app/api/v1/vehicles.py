@@ -806,16 +806,37 @@ async def create_vehicle(
     user: CurrentUser = Depends(require_management_tier("admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    effective_tenant_id = (
-        body.tenant_id
-        if (body.tenant_id is not None and user.tenant_tier == "cmg")
-        else uuid.UUID(str(user.tenant_id))
-    )
+    effective_tenant_id = uuid.UUID(str(user.tenant_id))
+    manufacturer_tenant_id = None
+    target_tenant: Tenant | None = None
+
+    if body.tenant_id is not None:
+        if user.tenant_tier == "cmg":
+            effective_tenant_id = body.tenant_id
+        elif user.tenant_tier == "manufacturer":
+            target_tenant = await db.get(Tenant, body.tenant_id)
+            if target_tenant is None or str(target_tenant.parent_manufacturer_id) != str(user.tenant_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Solo puedes crear vehículos para tus clientes propios",
+                )
+            effective_tenant_id = body.tenant_id
+        # client/subclient: body.tenant_id ignorado, se usa user.tenant_id
+
+    if user.tenant_tier == "manufacturer":
+        manufacturer_tenant_id = user.tenant_id
+    elif user.tenant_tier == "cmg" and effective_tenant_id != uuid.UUID(str(user.tenant_id)):
+        if target_tenant is None:
+            target_tenant = await db.get(Tenant, effective_tenant_id)
+        if target_tenant is not None and target_tenant.parent_manufacturer_id:
+            manufacturer_tenant_id = target_tenant.parent_manufacturer_id
+
     vtype = await db.get(VehicleType, body.vehicle_type_id)
     if not vtype:
         raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
     vehicle = Vehicle(
         tenant_id=effective_tenant_id,
+        manufacturer_tenant_id=manufacturer_tenant_id,
         vehicle_type_id=body.vehicle_type_id,
         name=body.name,
         license_plate=body.license_plate,

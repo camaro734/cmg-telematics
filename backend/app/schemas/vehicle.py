@@ -114,6 +114,7 @@ class VehicleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     tenant_id: uuid.UUID
+    manufacturer_tenant_id: uuid.UUID | None = None
     vehicle_type_id: uuid.UUID
     name: str
     license_plate: str | None = None
