@@ -261,9 +261,10 @@ async def _compute_progress(
 
         if baselines is not None:
             baseline: datetime = baselines.get((plan.id, t_type)) or plan.created_at
+            last_log_readings: dict | None = None
         else:
             log_res = await db.execute(
-                select(MaintenanceLog.performed_at)
+                select(MaintenanceLog.performed_at, MaintenanceLog.counter_readings)
                 .where(
                     MaintenanceLog.plan_id == plan.id,
                     MaintenanceLog.reset_counters.op("@>")(array([t_type])),
@@ -271,7 +272,9 @@ async def _compute_progress(
                 .order_by(MaintenanceLog.performed_at.desc())
                 .limit(1)
             )
-            baseline = log_res.scalar_one_or_none() or plan.created_at
+            log_row = log_res.fetchone()
+            baseline = (log_row[0] if log_row else None) or plan.created_at
+            last_log_readings = log_row[1] if log_row else None
 
         if t_type == "calendar_days":
             current = float(max(0, (datetime.now(timezone.utc) - baseline).days))
@@ -314,28 +317,64 @@ async def _compute_progress(
                     raise ValueError(f"source_key inválido en catálogo: {source_key!r}")
 
                 if semantics == "sum":
-                    # Los acumuladores PLC (avl_146/148/150) son contadores de sesión
-                    # que resetean en cada reinicio del IFM. La suma de deltas positivos
-                    # contabiliza correctamente el tiempo activo entre reinicios.
-                    # Nota: retención telemetry_record = 90d; baselines más antiguas
-                    # producirán subestimación silenciosa.
-                    row = await db.execute(
-                        text(
-                            f"SELECT COALESCE(SUM(GREATEST(0, curr_val - prev_val)), 0) / 60.0 "
-                            "FROM ("
-                            f"  SELECT (can_data->>'{source_key}')::float AS curr_val,"
-                            f"    LAG((can_data->>'{source_key}')::float) OVER (ORDER BY time) AS prev_val"
-                            "  FROM telemetry_record"
-                            "  WHERE vehicle_id = :vid"
-                            "    AND time >= :baseline"
-                            f"   AND can_data->>'{source_key}' IS NOT NULL"
-                            "  ORDER BY time"
-                            "  LIMIT 5000"
-                            ") t WHERE prev_val IS NOT NULL"
-                        ),
-                        {"vid": plan.vehicle_id, "baseline": baseline},
+                    # avl_148/avl_150: totalizadores retentivos (solo reset manual desde app).
+                    # avl_146: contador módulo-60 por hora (0→59→0); valores >59 son
+                    # artefactos de inicialización CAN (objeto CANopen retiene el último
+                    # valor PLC hasta el primer ciclo de refresco).
+                    used_photo = False
+                    photo_val: float | None = (
+                        last_log_readings.get(t_type)
+                        if isinstance(last_log_readings, dict)
+                        else None
                     )
-                    current = float(row.scalar_one() or 0.0)
+                    if photo_val is not None:
+                        cur_raw_row = await db.execute(
+                            text(
+                                f"SELECT (can_data->>'{source_key}')::float "
+                                "FROM telemetry_record "
+                                "WHERE vehicle_id = :vid "
+                                f"  AND can_data->>'{source_key}' IS NOT NULL "
+                                "ORDER BY time DESC LIMIT 1"
+                            ),
+                            {"vid": plan.vehicle_id},
+                        )
+                        cur_raw = cur_raw_row.scalar_one_or_none()
+                        if cur_raw is not None:
+                            if cur_raw >= photo_val:
+                                current = (cur_raw - photo_val) / 60.0
+                                used_photo = True
+                            else:
+                                logger.warning(
+                                    "Reset manual detectado en contador '%s' plan=%s "
+                                    "(foto=%.0f > actual=%.0f) — usando suma de deltas",
+                                    t_type, plan.id, photo_val, cur_raw,
+                                )
+                    if not used_photo:
+                        modulo_filter = (
+                            f"AND (can_data->>'{source_key}')::float <= 59 "
+                            if source_key == "avl_146"
+                            else ""
+                        )
+                        row = await db.execute(
+                            text(
+                                "SELECT COALESCE(SUM(GREATEST(0, LEAST(curr_val - prev_val, elapsed_min + 1))), 0) / 60.0 "
+                                "FROM ("
+                                f"  SELECT (can_data->>'{source_key}')::float AS curr_val,"
+                                f"    LAG((can_data->>'{source_key}')::float) OVER w AS prev_val,"
+                                "    EXTRACT(EPOCH FROM (time - LAG(time) OVER w)) / 60.0 AS elapsed_min"
+                                "  FROM telemetry_record"
+                                "  WHERE vehicle_id = :vid"
+                                "    AND time >= :baseline"
+                                f"   AND can_data->>'{source_key}' IS NOT NULL"
+                                f"   {modulo_filter}"
+                                "  WINDOW w AS (ORDER BY time)"
+                                "  ORDER BY time"
+                                "  LIMIT 5000"
+                                ") t WHERE prev_val IS NOT NULL"
+                            ),
+                            {"vid": plan.vehicle_id, "baseline": baseline},
+                        )
+                        current = float(row.scalar_one() or 0.0)
                 elif semantics == "max_minus_min":
                     # Odómetro J1939: lectura absoluta acumulativa. MAX-MIN en ventana.
                     # Excluye ceros de inicio de sesión (avl_10314 arranca en 0 hasta sync CAN).

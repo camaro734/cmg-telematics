@@ -237,3 +237,172 @@ async def test_snapshot_counter_values_unsafe_key_ignored():
     assert "pump_hours" not in readings
     # No debe haberse llamado execute para la clave insegura
     mock_db.execute.assert_not_called()
+
+
+# ── Test 7: baseline foto usada cuando actual ≥ foto ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_compute_progress_can_sum_photo_baseline_used():
+    """Si hay foto en el último log y actual ≥ foto, usa (actual − foto) / 60 exacto."""
+    plan = _make_plan([{"type": "pump_hours", "value": 200.0}])
+    vehicle = _make_vehicle()
+    vtype = _make_vtype([
+        {"type": "pump_hours", "label": "Bomba", "unit": "h",
+         "source_type": "can_data", "source_key": "avl_148", "semantics": "sum"},
+    ])
+
+    calls: list[str] = []
+
+    async def fake_execute(stmt, params=None):
+        sql = str(stmt)
+        calls.append(sql)
+        if "maintenance_log" in sql.lower() or "performed_at" in sql.lower():
+            r = MagicMock()
+            r.fetchone = MagicMock(return_value=(
+                datetime(2026, 3, 1, tzinfo=timezone.utc),
+                {"pump_hours": 6000.0},
+            ))
+            return r
+        # Consulta de valor raw actual: avl_148 = 6720 min
+        r = MagicMock()
+        r.scalar_one_or_none = MagicMock(return_value=6720.0)
+        return r
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=fake_execute)
+    mock_db.get = AsyncMock(side_effect=lambda model, pk: vehicle if pk == VEHICLE_ID else vtype)
+
+    result = await _compute_progress(plan, mock_db)
+    tp = result.thresholds[0]
+
+    # (6720 − 6000) / 60 = 12.0 h
+    assert tp.current == 12.0
+    assert tp.type == "pump_hours"
+    # La consulta de suma de deltas NO debe haberse ejecutado
+    assert not any("LEAST" in s for s in calls)
+
+
+# ── Test 8: reset manual detectado → fallback suma deltas + warning ───────────
+
+@pytest.mark.asyncio
+async def test_compute_progress_can_sum_photo_fallback_on_reset(caplog):
+    """Si actual < foto (reset manual), avisa y usa suma de deltas como fallback."""
+    import logging
+
+    plan = _make_plan([{"type": "pump_hours", "value": 200.0}])
+    vehicle = _make_vehicle()
+    vtype = _make_vtype([
+        {"type": "pump_hours", "label": "Bomba", "unit": "h",
+         "source_type": "can_data", "source_key": "avl_148", "semantics": "sum"},
+    ])
+
+    calls: list[str] = []
+
+    async def fake_execute(stmt, params=None):
+        sql = str(stmt)
+        calls.append(sql)
+        if "maintenance_log" in sql.lower() or "performed_at" in sql.lower():
+            r = MagicMock()
+            r.fetchone = MagicMock(return_value=(
+                datetime(2026, 3, 1, tzinfo=timezone.utc),
+                {"pump_hours": 6000.0},
+            ))
+            return r
+        if "LEAST" in sql:
+            # Suma de deltas tras reset
+            r = MagicMock()
+            r.scalar_one = MagicMock(return_value=3.5)
+            return r
+        # Valor raw actual < foto → reset detectado
+        r = MagicMock()
+        r.scalar_one_or_none = MagicMock(return_value=500.0)
+        return r
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=fake_execute)
+    mock_db.get = AsyncMock(side_effect=lambda model, pk: vehicle if pk == VEHICLE_ID else vtype)
+
+    with caplog.at_level(logging.WARNING):
+        result = await _compute_progress(plan, mock_db)
+
+    tp = result.thresholds[0]
+    # Fallback a deltas: 3.5 h
+    assert tp.current == 3.5
+    # La consulta de suma de deltas SÍ se ejecutó
+    assert any("LEAST" in s for s in calls)
+    # Se emitió warning de reset
+    assert any("Reset manual" in r.message for r in caplog.records)
+
+
+# ── Test 9: avl_146 incluye filtro módulo-60 en el SQL ───────────────────────
+
+@pytest.mark.asyncio
+async def test_compute_progress_avl146_modulo60_filter_present():
+    """El SQL para avl_146 (transfer) debe incluir el filtro <= 59."""
+    plan = _make_plan([{"type": "transfer_hours", "value": 50.0}])
+    vehicle = _make_vehicle()
+    vtype = _make_vtype([
+        {"type": "transfer_hours", "label": "Transferencia", "unit": "h",
+         "source_type": "can_data", "source_key": "avl_146", "semantics": "sum"},
+    ])
+
+    sql_calls: list[str] = []
+
+    async def fake_execute(stmt, params=None):
+        sql = str(stmt)
+        sql_calls.append(sql)
+        if "maintenance_log" in sql.lower() or "performed_at" in sql.lower():
+            r = MagicMock()
+            r.fetchone = MagicMock(return_value=None)
+            return r
+        r = MagicMock()
+        r.scalar_one = MagicMock(return_value=1.0)
+        return r
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=fake_execute)
+    mock_db.get = AsyncMock(side_effect=lambda model, pk: vehicle if pk == VEHICLE_ID else vtype)
+
+    await _compute_progress(plan, mock_db)
+
+    delta_sql = next((s for s in sql_calls if "LEAST" in s), None)
+    assert delta_sql is not None, "No se encontró la consulta de suma de deltas"
+    assert "<= 59" in delta_sql, "Falta el filtro módulo-60 para avl_146"
+
+
+# ── Test 10: clamp elapsed_min presente en SQL para avl_148 ──────────────────
+
+@pytest.mark.asyncio
+async def test_compute_progress_can_sum_elapsed_clamp_present():
+    """El SQL de suma de deltas debe incluir LEAST(delta, elapsed_min+1) para evitar artefactos."""
+    plan = _make_plan([{"type": "pump_hours", "value": 100.0}])
+    vehicle = _make_vehicle()
+    vtype = _make_vtype([
+        {"type": "pump_hours", "label": "Bomba", "unit": "h",
+         "source_type": "can_data", "source_key": "avl_148", "semantics": "sum"},
+    ])
+
+    sql_calls: list[str] = []
+
+    async def fake_execute(stmt, params=None):
+        sql = str(stmt)
+        sql_calls.append(sql)
+        if "maintenance_log" in sql.lower() or "performed_at" in sql.lower():
+            r = MagicMock()
+            r.fetchone = MagicMock(return_value=None)
+            return r
+        r = MagicMock()
+        r.scalar_one = MagicMock(return_value=1.0)
+        return r
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=fake_execute)
+    mock_db.get = AsyncMock(side_effect=lambda model, pk: vehicle if pk == VEHICLE_ID else vtype)
+
+    await _compute_progress(plan, mock_db)
+
+    delta_sql = next((s for s in sql_calls if "LEAST" in s), None)
+    assert delta_sql is not None, "No se encontró la consulta de suma de deltas"
+    assert "elapsed_min" in delta_sql, "Falta la columna elapsed_min en el SQL"
+    assert "WINDOW w AS" in delta_sql, "Falta la cláusula WINDOW"
+    assert "<= 59" not in delta_sql, "avl_148 no debe tener el filtro módulo-60"
