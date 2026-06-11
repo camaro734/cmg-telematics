@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
-from app.schemas.device import DeviceOut, DeviceCreate, DeviceUpdate, DeviceAssignVehicle
+from app.schemas.device import DeviceOut, DeviceCreate, DeviceUpdate, DeviceAssignVehicle, DeviceTransfer
 from app.models.device import Device
 from app.models.vehicle import Vehicle
 from app.models.tenant import Tenant
@@ -87,13 +87,26 @@ async def create_device(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Política: solo CMG admin o manufacturer admin puede registrar dispositivos.
+    # CMG puede indicar un tenant destino (debe ser tier cmg o manufacturer).
+    # Manufacturer siempre registra en su propio tenant.
     if user.tenant_tier not in ("cmg", "manufacturer") or user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG o manufacturer admin puede registrar dispositivos")
-    # El fabricante siempre registra devices en su propio tenant
-    effective_tenant_id = body.tenant_id if user.tenant_tier == "cmg" else user.tenant_id
-    tenant = await db.get(Tenant, effective_tenant_id)
-    if not tenant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    if user.tenant_tier == "cmg":
+        if body.tenant_id is not None:
+            target_tenant = await db.get(Tenant, body.tenant_id)
+            if not target_tenant:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+            if target_tenant.tier not in ("cmg", "manufacturer"):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Solo se puede aprovisionar dispositivos a tenants CMG o fabricante",
+                )
+            effective_tenant_id = body.tenant_id
+        else:
+            effective_tenant_id = user.tenant_id
+    else:
+        effective_tenant_id = user.tenant_id
     device = Device(imei=body.imei, model=body.model, firmware_ver=body.firmware_ver, tenant_id=effective_tenant_id)
     db.add(device)
     try:
@@ -190,6 +203,39 @@ async def assign_vehicle(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El vehículo ya tiene un dispositivo activo asignado")
     device.vehicle_id = body.vehicle_id
+    await db.commit()
+    await db.refresh(device)
+    return device
+
+
+@router.patch("/{device_id}/transfer", response_model=DeviceOut)
+async def transfer_device(
+    device_id: uuid.UUID,
+    body: DeviceTransfer,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Solo CMG admin. Transfiere un device libre (sin vehículo) a otro tenant
+    CMG o fabricante. Si el device está vinculado a un vehículo → 409."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG admin puede transferir dispositivos")
+    device = await db.get(Device, device_id)
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
+    if device.vehicle_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Desvincula primero el dispositivo del vehículo o reasigna el vehículo",
+        )
+    target = await db.get(Tenant, body.target_tenant_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant destino no encontrado")
+    if target.tier not in ("cmg", "manufacturer"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Solo se puede transferir dispositivos a tenants CMG o fabricante",
+        )
+    device.tenant_id = body.target_tenant_id
     await db.commit()
     await db.refresh(device)
     return device

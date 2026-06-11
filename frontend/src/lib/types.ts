@@ -140,10 +140,10 @@ export interface SensorDef {
   category?: 'maquina' | 'chasis'
 }
 
-export interface WsMessage {
-  type: 'telemetry'
-  data: VehicleStatus
-}
+export type WsMessage =
+  | { type: 'telemetry'; data: VehicleStatus }
+  | { type: 'alert'; data: { action: 'fired' | 'resolved'; tenant_id: string; alert_id: string } }
+  | { type: 'connected'; tenant_id: string; data?: never }
 
 export interface DoutSlot {
   slot: number
@@ -613,7 +613,12 @@ export interface DeviceCreate {
   imei: string
   model?: string
   firmware_ver?: string | null
-  tenant_id: string
+  tenant_id?: string | null
+  sim_phone?: string | null
+}
+
+export interface DeviceTransfer {
+  target_tenant_id: string
 }
 
 export interface DeviceAssignVehicle {

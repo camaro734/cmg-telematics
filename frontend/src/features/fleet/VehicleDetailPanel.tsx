@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { useVehicleLive } from '../../lib/useVehicleLive'
-import type { VehicleStatus } from '../../lib/types'
 
 interface VehicleDetailPanelProps {
   vehicleId: string | null

@@ -24,7 +24,9 @@ class DeviceCreate(BaseModel):
     imei: str
     model: str = "FMC650"
     firmware_ver: str | None = None
-    tenant_id: uuid.UUID
+    # CMG puede omitir (default: propio CMG) o indicar un tenant manufacturer.
+    # Manufacturer ignora este campo (siempre se fuerza a su propio tenant).
+    tenant_id: uuid.UUID | None = None
 
     @field_validator("imei")
     @classmethod
@@ -33,6 +35,10 @@ class DeviceCreate(BaseModel):
         if not v.isdigit() or not (14 <= len(v) <= 15):
             raise ValueError("IMEI debe ser numérico de 14-15 dígitos")
         return v
+
+
+class DeviceTransfer(BaseModel):
+    target_tenant_id: uuid.UUID
 
 
 class DeviceUpdate(BaseModel):
