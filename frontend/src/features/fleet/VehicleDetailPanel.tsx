@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '../../lib/apiClient'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
+import { useVehicleLive } from '../../lib/useVehicleLive'
 import type { VehicleStatus } from '../../lib/types'
 
 interface VehicleDetailPanelProps {
@@ -28,12 +27,7 @@ function KpiRow({ label, value, unit }: { label: string; value: React.ReactNode;
 export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: VehicleDetailPanelProps) {
   const navigate = useNavigate()
 
-  const { data: status } = useQuery({
-    queryKey: ['vehicles', vehicleId, 'status'],
-    queryFn: () => apiClient.get<VehicleStatus>(`/api/v1/vehicles/${vehicleId}/status`),
-    enabled: !!vehicleId,
-    refetchInterval: 5_000,
-  })
+  const { data: status } = useVehicleLive(vehicleId)
 
   const online = status ? isEffectivelyOnline(status) : false
   const stale = !online

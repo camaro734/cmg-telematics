@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useVehicleLive } from '../../lib/useVehicleLive'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { SkeletonCard } from '../../shared/ui/SkeletonCard'
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom'
@@ -93,12 +94,7 @@ export default function VehicleDetailPage() {
     enabled: !!id,
   })
 
-  const { data: status } = useQuery({
-    queryKey: keys.vehicleStatus(id ?? ''),
-    queryFn: () => apiClient.get<VehicleStatus>(`/api/v1/vehicles/${id}/status`),
-    refetchInterval: 5_000,
-    enabled: !!vehicle,
-  })
+  const { data: status } = useVehicleLive(vehicle ? id : null)
   const isStale = !isEffectivelyOnline(status)
 
   const { data: track = [] } = useQuery({
