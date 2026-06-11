@@ -43,15 +43,6 @@ const card: React.CSSProperties = {
   padding: '14px 16px',
 }
 
-const thStyle: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 11, fontWeight: 600, textAlign: 'left',
-  borderBottom: '1px solid var(--border)', color: 'var(--fg-muted)',
-}
-
-const tdStyle: React.CSSProperties = {
-  padding: '6px 8px', fontSize: 12,
-  color: 'var(--fg-primary)', borderBottom: '1px solid var(--border)',
-}
 
 const btnSecondary: React.CSSProperties = {
   padding: '5px 12px', fontSize: 12, fontWeight: 600,

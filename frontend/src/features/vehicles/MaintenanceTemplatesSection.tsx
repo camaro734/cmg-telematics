@@ -96,7 +96,7 @@ export default function MaintenanceTemplatesSection({ typeId, selectedType }: Pr
     setEditingTemplateIdx(idx)
     setTemplateForm({
       name: tmpl.name,
-      thresholdType: tmpl.thresholds[0]?.type ?? 'pto_hours',
+      thresholdType: (tmpl.thresholds[0]?.type ?? 'pto_hours') as TemplateFormState['thresholdType'],
       value: tmpl.thresholds[0]?.value?.toString() ?? '',
       warn_before_pct: tmpl.warn_before_pct.toString(),
     })
