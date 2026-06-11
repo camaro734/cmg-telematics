@@ -24,6 +24,7 @@ from app.schemas.vehicle import (
     SystemBlockTemplateOut, SystemBlockTemplateCreate, SystemBlockTemplateUpdate,
     SaveAsTemplateBody, SensorCatalogItem,
     TripPoint, Trip, DayTripTotals, DayTrips,
+    VehicleReassignBody, VehicleReassignOut,
 )
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
@@ -32,6 +33,9 @@ from app.models.maintenance import MaintenancePlan
 from app.models.device import Device
 from app.models.driver import Driver, VehicleDriverAssignment
 from app.models.tenant import Tenant
+from app.models.work_order import WorkOrder
+from app.models.alert_rule import AlertRule
+from app.models.permission_grant import PermissionGrant
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
@@ -909,6 +913,110 @@ async def update_vehicle(
             detail = "Ya existe un vehículo con esos datos"
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
     return vehicle
+
+
+@router.post("/vehicles/{vehicle_id}/reassign", response_model=VehicleReassignOut)
+async def reassign_vehicle(
+    vehicle_id: uuid.UUID,
+    body: VehicleReassignBody,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> VehicleReassignOut:
+    if user.role != "admin" or user.tenant_tier not in ("cmg", "manufacturer"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo admin de CMG o fabricante puede reasignar vehículos",
+        )
+
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle or not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+
+    if user.tenant_tier == "manufacturer":
+        if vehicle.manufacturer_tenant_id is None or str(vehicle.manufacturer_tenant_id) != str(user.tenant_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes reasignar vehículos de tu fabricante",
+            )
+
+    target = await db.get(Tenant, body.target_tenant_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant destino no encontrado")
+
+    if user.tenant_tier == "manufacturer":
+        own = str(target.id) == str(user.tenant_id)
+        client_of_mfr = (
+            target.parent_manufacturer_id is not None
+            and str(target.parent_manufacturer_id) == str(user.tenant_id)
+        )
+        if not own and not client_of_mfr:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes reasignar a tus clientes o a tu propia flota",
+            )
+
+    # Candado: no reasignar si hay órdenes de trabajo en estado abierto
+    open_order = await db.execute(
+        select(WorkOrder.id).where(
+            WorkOrder.vehicle_id == vehicle_id,
+            ~WorkOrder.status.in_(["done", "cancelled"]),
+        ).limit(1)
+    )
+    if open_order.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cierra o cancela las órdenes abiertas antes de reasignar",
+        )
+
+    from_tenant_id = vehicle.tenant_id
+
+    # 1) Cambiar tenant del vehículo
+    vehicle.tenant_id = body.target_tenant_id
+
+    # 2) Desactivar alert rules específicas del tenant anterior para este vehículo
+    rules_result = await db.execute(
+        select(AlertRule).where(
+            AlertRule.tenant_id == from_tenant_id,
+            AlertRule.active == True,
+            AlertRule.vehicle_filter["scope"].as_string() == "specific",
+        )
+    )
+    deactivated = 0
+    vid_str = str(vehicle_id)
+    for rule in rules_result.scalars().all():
+        if vid_str in rule.vehicle_filter.get("vehicle_ids", []):
+            rule.active = False
+            deactivated += 1
+
+    # 3) Revocar permission_grants que apuntan a este vehículo
+    grants_result = await db.execute(
+        select(PermissionGrant).where(
+            PermissionGrant.resource_type == "vehicle",
+            PermissionGrant.resource_id == vehicle_id,
+        )
+    )
+    grants = grants_result.scalars().all()
+    for grant in grants:
+        await db.delete(grant)
+    revoked = len(grants)
+
+    # 4) Migrar plan.tenant_id al nuevo tenant; owner_tenant_id intacto (política M3)
+    plans_result = await db.execute(
+        select(MaintenancePlan).where(MaintenancePlan.vehicle_id == vehicle_id)
+    )
+    for plan in plans_result.scalars().all():
+        plan.tenant_id = body.target_tenant_id
+
+    await db.commit()
+
+    return VehicleReassignOut(
+        vehicle_id=vehicle_id,
+        from_tenant_id=from_tenant_id,
+        to_tenant_id=body.target_tenant_id,
+        reassigned_at=datetime.now(timezone.utc),
+        alert_rules_deactivated=deactivated,
+        grants_revoked=revoked,
+    )
 
 
 @router.get("/vehicles/statuses", response_model=list[VehicleStatus])

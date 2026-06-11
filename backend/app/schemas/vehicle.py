@@ -149,6 +149,19 @@ class VehicleUpdate(BaseModel):
     vehicle_type_id: uuid.UUID | None = None
 
 
+class VehicleReassignBody(BaseModel):
+    target_tenant_id: uuid.UUID
+
+
+class VehicleReassignOut(BaseModel):
+    vehicle_id: uuid.UUID
+    from_tenant_id: uuid.UUID
+    to_tenant_id: uuid.UUID
+    reassigned_at: datetime
+    alert_rules_deactivated: int
+    grants_revoked: int
+
+
 class VehicleStatus(BaseModel):
     vehicle_id: uuid.UUID
     online: bool
