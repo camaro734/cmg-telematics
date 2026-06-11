@@ -87,12 +87,14 @@ async def create_device(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.tenant_tier != "cmg" or user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG admin puede registrar dispositivos")
-    tenant = await db.get(Tenant, body.tenant_id)
+    if user.tenant_tier not in ("cmg", "manufacturer") or user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG o manufacturer admin puede registrar dispositivos")
+    # El fabricante siempre registra devices en su propio tenant
+    effective_tenant_id = body.tenant_id if user.tenant_tier == "cmg" else user.tenant_id
+    tenant = await db.get(Tenant, effective_tenant_id)
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
-    device = Device(imei=body.imei, model=body.model, firmware_ver=body.firmware_ver, tenant_id=body.tenant_id)
+    device = Device(imei=body.imei, model=body.model, firmware_ver=body.firmware_ver, tenant_id=effective_tenant_id)
     db.add(device)
     try:
         await db.commit()
@@ -174,7 +176,13 @@ async def assign_vehicle(
     vehicle = await db.get(Vehicle, body.vehicle_id)
     if not vehicle or not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    if str(vehicle.tenant_id) != str(device.tenant_id):
+    same_tenant = str(vehicle.tenant_id) == str(device.tenant_id)
+    # El fabricante puede vincular un device suyo a un vehicle de su cliente
+    mfr_cross = (
+        vehicle.manufacturer_tenant_id is not None
+        and str(vehicle.manufacturer_tenant_id) == str(device.tenant_id)
+    )
+    if not same_tenant and not mfr_cross:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El vehículo no pertenece al tenant del dispositivo")
     existing = await db.execute(
         select(Device).where(Device.vehicle_id == body.vehicle_id, Device.id != device_id, Device.active == True)
