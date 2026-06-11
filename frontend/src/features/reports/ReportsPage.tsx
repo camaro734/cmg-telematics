@@ -28,6 +28,7 @@ import type {
   MaintenancePlanOut, MaintenanceLogOut,
   DayTrips, Trip,
 } from '../../lib/types'
+import { MaintenanceStatusBadge } from '../../shared/ui/MaintenanceStatusBadge'
 
 // ── Style constants ───────────────────────────────────────────────────────────
 
@@ -696,27 +697,6 @@ function HistoricoTab({
 
 // ── MANTENIMIENTO tab ────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: MaintenancePlanOut['progress']['status'] }) {
-  const colors: Record<string, string> = {
-    ok: 'var(--ok)',
-    próximo: 'var(--warn)',
-    vencido: 'var(--danger)',
-  }
-  const labels: Record<string, string> = {
-    ok: 'OK',
-    próximo: 'PRÓXIMO',
-    vencido: 'VENCIDO',
-  }
-  return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-      background: `${colors[status] ?? '#64748B'}22`,
-      color: colors[status] ?? 'var(--offline)',
-    }}>
-      {labels[status] ?? status.toUpperCase()}
-    </span>
-  )
-}
 
 function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
@@ -776,7 +756,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                 <span style={{ fontSize: 12, color: 'var(--fg-primary)', fontWeight: p.id === selectedPlanId ? 600 : 400 }}>
                   {p.name}
                 </span>
-                <StatusBadge status={p.progress.status} />
+                <MaintenanceStatusBadge status={p.progress.status} size="sm" />
               </div>
             ))}
           </div>
@@ -833,7 +813,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
           <>
             <div style={card}>
               <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Estado</div>
-              <StatusBadge status={selectedPlan.progress.status} />
+              <MaintenanceStatusBadge status={selectedPlan.progress.status} />
             </div>
             {selectedPlan.progress.thresholds.map((t, i) => {
               const pct = Math.min(100, Math.round(t.pct))

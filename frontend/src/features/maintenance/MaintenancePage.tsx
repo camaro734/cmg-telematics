@@ -14,6 +14,7 @@ import { useTenantContext } from '../../lib/useTenantContext'
 import type { MaintenancePlanOut, VehicleOut, MaintenancePlanCreate, MaintenancePlanUpdate, MaintenanceThreshold } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
+import { MaintenanceStatusBadge } from '../../shared/ui/MaintenanceStatusBadge'
 
 type StatusFilter = 'all' | 'vencido' | 'próximo' | 'ok'
 
@@ -23,9 +24,6 @@ const STATUS_COLORS: Record<string, { border: string; badge: string; text: strin
   ok:       { border: 'var(--ok)',     badge: 'var(--ok)',     text: '#fff' },
 }
 
-const STATUS_BADGE_LABEL: Record<string, string> = {
-  ok: 'Al día', 'próximo': 'Próximo', vencido: 'Vencido',
-}
 
 const THRESHOLD_LABEL: Record<string, string> = {
   pto_hours: 'h PTO', engine_hours: 'h motor', calendar_days: 'días',
@@ -391,18 +389,7 @@ export default function MaintenancePage() {
 
                       {/* Estado — badge */}
                       <td style={{ padding: '10px 14px' }}>
-                        <span style={{
-                          fontSize: 'var(--fs-2xs)',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          background: colors.badge,
-                          color: colors.text,
-                          letterSpacing: '0.04em',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {(STATUS_BADGE_LABEL[status] ?? status).toUpperCase()}
-                        </span>
+                        <MaintenanceStatusBadge status={status} />
                       </td>
 
                       {/* Acciones */}
@@ -470,7 +457,7 @@ export default function MaintenancePage() {
                   <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 8 }}>
                     UMBRALES (se dispara al llegar al primero)
                   </div>
-                  <ThresholdBuilder thresholds={formThresholds} onChange={setFormThresholds} />
+                  <ThresholdBuilder thresholds={formThresholds} onChange={setFormThresholds} vehicleId={formVehicleId || undefined} />
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>

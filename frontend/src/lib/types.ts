@@ -406,7 +406,7 @@ export interface RuleCreate {
 }
 
 export interface MaintenanceThreshold {
-  type: 'pto_hours' | 'engine_hours' | 'calendar_days'
+  type: string
   value: number
 }
 
@@ -478,6 +478,28 @@ export interface MaintenanceLogCreate {
   description?: string
   reset_counters: string[]
   cost_eur?: number
+}
+
+export interface MaintenanceCounter {
+  type: string
+  label: string
+  unit: string
+  source_type: string
+  source_key: string
+  semantics: string
+}
+
+export interface MaintenanceProjectionThreshold {
+  type: string
+  current: number
+  limit: number
+  pct: number
+  days_remaining: number | null
+}
+
+export interface MaintenanceProjectionOut {
+  status: 'ok' | 'próximo' | 'vencido'
+  thresholds: MaintenanceProjectionThreshold[]
 }
 
 export interface TenantCreate {
