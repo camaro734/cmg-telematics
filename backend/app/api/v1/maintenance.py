@@ -23,6 +23,7 @@ from app.models.alert_rule import AlertRule
 from app.models.maintenance import MaintenancePlan, MaintenanceLog
 from app.models.user import User
 from app.models.vehicle import Vehicle
+from app.models.vehicle_type import VehicleType
 from app.models.permission_grant import PermissionGrant
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
@@ -126,6 +127,29 @@ async def _resolve_maintenance_alert_for_plan(
         logger.info("Alerta mantenimiento resuelta: plan=%s vehicle=%s", plan_id, vehicle_id)
 
 
+async def _validate_counter_types(
+    vehicle: Vehicle,
+    thresholds: list,
+    db: AsyncSession,
+) -> None:
+    """Verifica que cada threshold.type exista en maintenance_counters del tipo de vehículo.
+
+    Si el catálogo está vacío (tipo sin contadores definidos) la validación pasa:
+    compatibilidad con tipos futuros que aún no hayan sido catalogados.
+    """
+    vtype = await db.get(VehicleType, vehicle.vehicle_type_id)
+    catalog: list = (vtype.maintenance_counters if vtype else None) or []
+    if not catalog:
+        return
+    catalog_types = {c["type"] for c in catalog}
+    invalid = [t.type for t in thresholds if t.type not in catalog_types]
+    if invalid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Contadores no disponibles para este tipo de vehículo: {', '.join(sorted(invalid))}",
+        )
+
+
 async def _fetch_baselines(
     plan_ids: list[uuid.UUID],
     db: AsyncSession,
@@ -205,7 +229,13 @@ async def _compute_progress(
             )
             current = float(row.scalar_one() or 0.0)
         else:
-            current = 0.0
+            logger.error(
+                "Tipo de contador '%s' no implementado en _COUNTER_COLUMNS — plan=%s",
+                t_type, plan.id,
+            )
+            raise ValueError(
+                f"Tipo de contador '{t_type}' no implementado en _COUNTER_COLUMNS"
+            )
 
         pct = round(current / limit * 100.0, 1) if limit > 0 else 0.0
         results.append(ThresholdProgress(
@@ -300,6 +330,8 @@ async def create_plan(
     if user.tenant_tier != "cmg" and str(vehicle.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
+    await _validate_counter_types(vehicle, body.trigger_condition.thresholds, db)
+
     plan = MaintenancePlan(
         vehicle_id=body.vehicle_id,
         tenant_id=vehicle.tenant_id,
@@ -345,6 +377,9 @@ async def update_plan(
     if body.name is not None:
         plan.name = body.name
     if body.trigger_condition is not None:
+        vehicle = await db.get(Vehicle, plan.vehicle_id)
+        if vehicle:
+            await _validate_counter_types(vehicle, body.trigger_condition.thresholds, db)
         plan.trigger_condition = body.trigger_condition.model_dump()
     if body.warn_before_pct is not None:
         plan.warn_before_pct = body.warn_before_pct
