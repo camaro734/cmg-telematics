@@ -62,9 +62,30 @@ async def _publish_alert(redis: Redis, alert_id: str, match: RuleMatch) -> None:
     )
 
 
+async def _publish_alert_ws(redis: Redis, alert_id: str, match: RuleMatch) -> None:
+    """Notifica al frontend vía telemetry.raw para que el WS invalide la caché de alertas."""
+    await redis.xadd(
+        STREAM_KEY,
+        {
+            "payload": json.dumps({
+                "_ws_type": "alert",
+                "action": "fired",
+                "tenant_id": match.rule.tenant_id,
+                "alert_id": alert_id,
+            })
+        },
+        maxlen=50_000,
+        approximate=True,
+    )
+
+
 async def _process_one(db_pool: asyncpg.Pool, redis: Redis, msg_id: str, fields: dict) -> None:
     raw = fields.get("payload") or fields.get(b"payload", "{}")
     payload = json.loads(raw)
+    # Eventos de desconexión TCP u otros no-telemetría no tienen campo "time"
+    if not payload.get("time"):
+        await redis.xack(STREAM_KEY, CONSUMER_GROUP, msg_id)
+        return
     can = payload.get("can_data") or {}
     if isinstance(can, str):
         can = json.loads(can)
@@ -86,6 +107,7 @@ async def _process_one(db_pool: asyncpg.Pool, redis: Redis, msg_id: str, fields:
             for match in matches:
                 alert_id = await _write_alert(conn, match)
                 await _publish_alert(redis, alert_id, match)
+                await _publish_alert_ws(redis, alert_id, match)
     await handle_field_operations(
         db_pool, redis,
         msg.vehicle_id, msg.pto_active,

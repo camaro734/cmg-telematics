@@ -2,10 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
+import { useWsConnected } from '../../lib/useWsConnected'
 import type { VehicleOut, VehicleStatus } from '../../lib/types'
 
 export function useVehicleStatuses(vehicles: VehicleOut[]) {
   const queryClient = useQueryClient()
+  const wsConnected = useWsConnected()
 
   // Un único query bulk en lugar de N queries paralelos
   const ids = vehicles.map(v => v.id).join(',')
@@ -16,8 +18,8 @@ export function useVehicleStatuses(vehicles: VehicleOut[]) {
       return apiClient.get<VehicleStatus[]>(`/api/v1/vehicles/statuses?ids=${ids}`)
     },
     enabled: vehicles.length > 0,
-    staleTime: Infinity,      // WebSocket mantiene el cache fresco
-    refetchInterval: false,   // Sin polling — el WS actualiza via setQueryData
+    staleTime: wsConnected ? Infinity : 0,      // WS fresco; polling si cae
+    refetchInterval: wsConnected ? false : 60_000,
     refetchOnWindowFocus: false,
   })
 

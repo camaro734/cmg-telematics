@@ -113,22 +113,24 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                             fields["payload"] if isinstance(fields, dict) and "payload" in fields
                             else fields[b"payload"]
                         )
-                        payload = _enrich_payload(payload)
-                        vehicle_id = payload.get("vehicle_id")
-                        if vehicle_id and not _should_emit(
-                            vehicle_id,
-                            payload.get("online"),
-                            payload.get("ignition"),
-                            _last_sent,
-                            _last_state,
-                            now_mono,
-                        ):
-                            continue
-                        if vehicle_id:
-                            _last_sent[vehicle_id] = now_mono
-                            _last_state[vehicle_id] = (payload.get("online"), payload.get("ignition"))
+                        ws_type = payload.pop("_ws_type", "telemetry")
+                        if ws_type == "telemetry":
+                            payload = _enrich_payload(payload)
+                            vehicle_id = payload.get("vehicle_id")
+                            if vehicle_id and not _should_emit(
+                                vehicle_id,
+                                payload.get("online"),
+                                payload.get("ignition"),
+                                _last_sent,
+                                _last_state,
+                                now_mono,
+                            ):
+                                continue
+                            if vehicle_id:
+                                _last_sent[vehicle_id] = now_mono
+                                _last_state[vehicle_id] = (payload.get("online"), payload.get("ignition"))
                         tenant_id = payload.get("tenant_id")
-                        msg = {"type": "telemetry", "data": payload}
+                        msg = {"type": ws_type, "data": payload}
                         if tenant_id:
                             await manager.broadcast_to_tenant(tenant_id, msg)
                         # CMG admins ven todos los tenants — conexiones registradas bajo "__cmg__"

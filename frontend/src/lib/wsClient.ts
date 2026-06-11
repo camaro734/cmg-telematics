@@ -98,6 +98,9 @@ class WsClientImpl {
             },
           )
           this.listeners.forEach(cb => cb(data))
+        } else if (msg.type === 'alert') {
+          // Invalida todas las queries de alertas para que el frontend refresque
+          void this.queryClient?.invalidateQueries({ queryKey: ['alerts'] })
         }
       } catch {
         /* ignora mensajes malformados */

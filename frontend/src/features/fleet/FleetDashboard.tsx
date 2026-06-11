@@ -8,6 +8,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
+import { useWsConnected } from '../../lib/useWsConnected'
 import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, VehicleStatus, RuleOut, WorkOrderOut, TenantOut } from '../../lib/types'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { VehicleListPanel, type VehicleEntry } from './VehicleListPanel'
@@ -46,6 +47,7 @@ export default function FleetDashboard() {
   const isMobile = useIsMobile()
   const navigate = useNavigate()
   const { activeTenantId } = useTenantContext()
+  const wsConnected = useWsConnected()
 
   const tenantQ = activeTenantId ? `?tenant_id=${activeTenantId}` : ''
 
@@ -64,7 +66,7 @@ export default function FleetDashboard() {
   const { data: firingAlerts = [] } = useQuery({
     queryKey: [...keys.alerts(), 'firing', activeTenantId],
     queryFn: () => apiClient.get<AlertInstanceOut[]>(`/api/v1/alerts?status=firing${activeTenantId ? `&tenant_id=${activeTenantId}` : ''}`),
-    refetchInterval: 30_000,
+    refetchInterval: wsConnected ? false : 30_000,  // WS invalida; fallback si cae
   })
 
   const { data: rules = [] } = useQuery({
