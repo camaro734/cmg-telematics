@@ -61,6 +61,7 @@ export default function VehiclesPage() {
   const queryClient = useQueryClient()
   const { activeTenantId } = useTenantContext()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
+  const userTier = useAuthStore(s => s.user?.tenant_tier)
 
   const [modal, setModal] = useState<'closed' | 'create' | 'edit'>('closed')
   const [editingVehicle, setEditingVehicle] = useState<VehicleOut | null>(null)
@@ -471,18 +472,22 @@ export default function VehiclesPage() {
                   max={new Date().getFullYear() + 1}
                 />
 
-                {/* Cliente */}
-                <div>
-                  <Select label="Cliente" value={form.tenant_id}
-                    onChange={e => setField('tenant_id', e.target.value)}
-                    disabled={modal === 'edit'}
-                    helperText={modal === 'edit' ? 'El cliente no se puede cambiar una vez asignado.' : undefined}>
-                    <option value="">— CMG (sin cliente) —</option>
-                    {clientTenants.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </Select>
-                </div>
+                {/* Cliente — visible para cmg y manufacturer */}
+                {(userTier === 'cmg' || userTier === 'manufacturer') && (
+                  <div>
+                    <Select label="Cliente" value={form.tenant_id}
+                      onChange={e => setField('tenant_id', e.target.value)}
+                      disabled={modal === 'edit'}
+                      helperText={modal === 'edit' ? 'El cliente no se puede cambiar una vez asignado.' : undefined}>
+                      <option value="">
+                        {userTier === 'manufacturer' ? '— Mi flota —' : '— CMG (sin cliente) —'}
+                      </option>
+                      {clientTenants.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
               </div>
 
               {/* Sección dispositivo GPS */}

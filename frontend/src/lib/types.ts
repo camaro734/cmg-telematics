@@ -17,6 +17,7 @@ export interface TokenResponse {
 export interface VehicleOut {
   id: string
   tenant_id: string
+  manufacturer_tenant_id: string | null
   vehicle_type_id: string
   name: string
   license_plate: string | null
