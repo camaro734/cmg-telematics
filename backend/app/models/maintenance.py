@@ -20,6 +20,11 @@ class MaintenancePlan(Base):
     trigger_condition: Mapped[dict] = mapped_column(JSONB, nullable=False)
     next_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     warn_before_pct: Mapped[int] = mapped_column(Integer, default=10)
+    owner_tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenant.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

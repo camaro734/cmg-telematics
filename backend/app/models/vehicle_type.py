@@ -13,6 +13,7 @@ class VehicleType(Base):
     sensor_schema: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     icon_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     maintenance_templates: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
+    maintenance_counters: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     historic_metrics: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     dout_config: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     pdf_metrics: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)

@@ -5,8 +5,18 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 
+class MaintenanceCounter(BaseModel):
+    """Entrada del catálogo de contadores de un vehicle_type."""
+    type: str
+    label: str
+    unit: str
+    source_type: Literal['telemetry_1h', 'can_data', 'calendar']
+    source_key: str | None = None
+    semantics: Literal['sum', 'max_minus_min'] | None = None
+
+
 class MaintenanceThreshold(BaseModel):
-    type: Literal['pto_hours', 'engine_hours', 'calendar_days']
+    type: str
     value: float
 
 
@@ -54,6 +64,7 @@ class MaintenancePlanOut(BaseModel):
     vehicle_id: uuid.UUID
     vehicle_name: str
     tenant_id: uuid.UUID
+    owner_tenant_id: uuid.UUID
     name: str
     trigger_condition: TriggerCondition
     warn_before_pct: int

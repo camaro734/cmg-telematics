@@ -238,6 +238,7 @@ async def _to_out(
         vehicle_id=plan.vehicle_id,
         vehicle_name=vehicle_name,
         tenant_id=plan.tenant_id,
+        owner_tenant_id=plan.owner_tenant_id,
         name=plan.name,
         trigger_condition=plan.trigger_condition,
         warn_before_pct=plan.warn_before_pct,
@@ -302,6 +303,7 @@ async def create_plan(
     plan = MaintenancePlan(
         vehicle_id=body.vehicle_id,
         tenant_id=vehicle.tenant_id,
+        owner_tenant_id=user.tenant_id,
         name=body.name,
         trigger_condition=body.trigger_condition.model_dump(),
         warn_before_pct=body.warn_before_pct,

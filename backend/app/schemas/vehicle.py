@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
-from app.schemas.maintenance import MaintenanceTemplateItem
+from app.schemas.maintenance import MaintenanceTemplateItem, MaintenanceCounter
 
 
 PdfMetricKey = Literal['pto_minutes', 'pressure_min', 'pressure_max', 'rpm_avg', 'pump_minutes', 'fuel_l']
@@ -103,6 +103,7 @@ class VehicleTypeOut(BaseModel):
     sensor_schema: list[dict[str, Any]]
     icon_url: str | None = None
     maintenance_templates: list[MaintenanceTemplateItem] = []
+    maintenance_counters: list[MaintenanceCounter] = []
     historic_metrics: list[HistoricMetricItem] = []
     dout_config: list[DoutSlot] = []
     pdf_metrics: list[PdfMetric] = []
