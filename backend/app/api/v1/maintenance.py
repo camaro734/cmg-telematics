@@ -253,6 +253,7 @@ async def _compute_progress(
 ) -> MaintenanceProgress:
     thresholds = plan.trigger_condition.get("thresholds", [])
     results: list[ThresholdProgress] = []
+    _can_catalog: dict | None = None  # cargado lazy la primera vez que se necesita un contador CAN
 
     for thresh in thresholds:
         t_type = thresh["type"]
@@ -294,13 +295,77 @@ async def _compute_progress(
             )
             current = float(row.scalar_one() or 0.0)
         else:
-            logger.error(
-                "Tipo de contador '%s' no implementado en _COUNTER_COLUMNS — plan=%s",
-                t_type, plan.id,
-            )
-            raise ValueError(
-                f"Tipo de contador '{t_type}' no implementado en _COUNTER_COLUMNS"
-            )
+            # Carga catálogo lazy la primera vez que se necesita un contador CAN
+            if _can_catalog is None:
+                _vehicle_for_catalog = await db.get(Vehicle, plan.vehicle_id)
+                if _vehicle_for_catalog:
+                    _vt = await db.get(VehicleType, _vehicle_for_catalog.vehicle_type_id)
+                    _can_catalog = {
+                        c["type"]: c for c in (_vt.maintenance_counters if _vt else []) or []
+                    }
+                else:
+                    _can_catalog = {}
+
+            counter_cfg = _can_catalog.get(t_type)
+            if counter_cfg and counter_cfg.get("source_type") == "can_data":
+                source_key = counter_cfg.get("source_key") or ""
+                semantics = counter_cfg.get("semantics") or "sum"
+                if not _SAFE_AVL_KEY.match(source_key):
+                    raise ValueError(f"source_key inválido en catálogo: {source_key!r}")
+
+                if semantics == "sum":
+                    # Los acumuladores PLC (avl_146/148/150) son contadores de sesión
+                    # que resetean en cada reinicio del IFM. La suma de deltas positivos
+                    # contabiliza correctamente el tiempo activo entre reinicios.
+                    # Nota: retención telemetry_record = 90d; baselines más antiguas
+                    # producirán subestimación silenciosa.
+                    row = await db.execute(
+                        text(
+                            f"SELECT COALESCE(SUM(GREATEST(0, curr_val - prev_val)), 0) / 60.0 "
+                            "FROM ("
+                            f"  SELECT (can_data->>'{source_key}')::float AS curr_val,"
+                            f"    LAG((can_data->>'{source_key}')::float) OVER (ORDER BY time) AS prev_val"
+                            "  FROM telemetry_record"
+                            "  WHERE vehicle_id = :vid"
+                            "    AND time >= :baseline"
+                            f"   AND can_data->>'{source_key}' IS NOT NULL"
+                            "  ORDER BY time"
+                            "  LIMIT 5000"
+                            ") t WHERE prev_val IS NOT NULL"
+                        ),
+                        {"vid": plan.vehicle_id, "baseline": baseline},
+                    )
+                    current = float(row.scalar_one() or 0.0)
+                elif semantics == "max_minus_min":
+                    # Odómetro J1939: lectura absoluta acumulativa. MAX-MIN en ventana.
+                    # Excluye ceros de inicio de sesión (avl_10314 arranca en 0 hasta sync CAN).
+                    row = await db.execute(
+                        text(
+                            "SELECT GREATEST(0, MAX(v) - MIN(v)) FROM ("
+                            f"  SELECT (can_data->>'{source_key}')::float AS v"
+                            "  FROM telemetry_record"
+                            "  WHERE vehicle_id = :vid"
+                            "    AND time >= :baseline"
+                            f"   AND can_data->>'{source_key}' IS NOT NULL"
+                            f"   AND (can_data->>'{source_key}')::float > 0"
+                            "  LIMIT 5000"
+                            ") t"
+                        ),
+                        {"vid": plan.vehicle_id, "baseline": baseline},
+                    )
+                    current = float(row.scalar_one() or 0.0)
+                else:
+                    raise ValueError(
+                        f"Semántica '{semantics}' no soportada para contador '{t_type}'"
+                    )
+            else:
+                logger.error(
+                    "Tipo de contador '%s' no implementado — plan=%s",
+                    t_type, plan.id,
+                )
+                raise ValueError(
+                    f"Tipo de contador '{t_type}' no implementado en _COUNTER_COLUMNS"
+                )
 
         pct = round(current / limit * 100.0, 1) if limit > 0 else 0.0
         results.append(ThresholdProgress(
@@ -640,6 +705,64 @@ async def complete_plan(
         document_url=log.document_url,
         counter_readings=log.counter_readings,
     )
+
+
+@router.get("/maintenance/counter-types/{vehicle_id}", response_model=list)
+async def get_vehicle_counter_types(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Catálogo de contadores disponibles para un vehículo (filtrado por su vehicle_type)."""
+    from app.schemas.maintenance import MaintenanceCounter
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    vtype = await db.get(VehicleType, vehicle.vehicle_type_id)
+    if not vtype:
+        return []
+    return [MaintenanceCounter(**c) for c in (vtype.maintenance_counters or [])]
+
+
+@router.get("/maintenance/plans/{plan_id}/projection", response_model=MaintenanceProjection)
+async def get_plan_projection(
+    plan_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("maintenance")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Proyección de vencimiento para cada umbral del plan basada en la tasa de uso histórica."""
+    plan = await db.get(MaintenancePlan, plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+    await assert_can_access_vehicle(user, plan.vehicle_id, db, operation="read")
+
+    progress = await _compute_progress(plan, db)
+
+    thresholds_proj: list[ThresholdProjection] = []
+    for tp in progress.thresholds:
+        if tp.current <= 0:
+            thresholds_proj.append(ThresholdProjection(**tp.model_dump(), days_remaining=None))
+            continue
+        log_res = await db.execute(
+            select(MaintenanceLog.performed_at)
+            .where(
+                MaintenanceLog.plan_id == plan_id,
+                MaintenanceLog.reset_counters.op("@>")(array([tp.type])),
+            )
+            .order_by(MaintenanceLog.performed_at.desc())
+            .limit(1)
+        )
+        baseline = log_res.scalar_one_or_none() or plan.created_at
+        elapsed_days = max(1.0, (datetime.now(timezone.utc) - baseline).total_seconds() / 86400)
+        rate_per_day = tp.current / elapsed_days
+        if rate_per_day > 0:
+            remaining = max(0.0, tp.limit - tp.current)
+            days_remaining: float | None = round(remaining / rate_per_day, 1)
+        else:
+            days_remaining = None
+        thresholds_proj.append(ThresholdProjection(**tp.model_dump(), days_remaining=days_remaining))
+
+    return MaintenanceProjection(status=progress.status, thresholds=thresholds_proj)
 
 
 @router.get("/logs/export.csv")
