@@ -142,7 +142,7 @@ export interface SensorDef {
 
 export type WsMessage =
   | { type: 'telemetry'; data: VehicleStatus }
-  | { type: 'alert'; data: { action: 'fired' | 'resolved'; tenant_id: string; alert_id: string } }
+  | { type: 'alert'; data: { action: 'fired' | 'silence' | 'resolved'; tenant_id: string; alert_id: string; vehicle_id?: string } }
   | { type: 'connected'; tenant_id: string; data?: never }
 
 export interface DoutSlot {

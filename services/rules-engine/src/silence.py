@@ -5,6 +5,7 @@ del umbral adaptativo según ignición. Crea una alert_instance de tipo
 'silence' visible en Alertas. Se auto-resuelve cuando vuelve el primer
 paquete.
 """
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -17,6 +18,29 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 _SILENCE_KEY = "silence:firing:{vehicle_id}"
+_STREAM_KEY  = "telemetry.raw"
+
+
+async def _publish_alert_ws(
+    redis: Redis,
+    action: str,
+    alert_id: str,
+    tenant_id: str,
+    vehicle_id: str,
+) -> None:
+    """Notifica al frontend vía telemetry.raw para que invalide la caché de alertas."""
+    await redis.xadd(
+        _STREAM_KEY,
+        {"payload": json.dumps({
+            "_ws_type":  "alert",
+            "action":    action,
+            "tenant_id": tenant_id,
+            "alert_id":  alert_id,
+            "vehicle_id": vehicle_id,
+        })},
+        maxlen=50_000,
+        approximate=True,
+    )
 
 
 def _silence_key(vehicle_id: str) -> str:
@@ -85,19 +109,22 @@ async def maybe_resolve_silence(
         await redis.delete(key)
         return
 
-    updated = await conn.execute(
+    resolved_rows = await conn.fetch(
         """
         UPDATE alert_instance
         SET status = 'resolved', resolved_at = now()
         WHERE vehicle_id = $1::uuid
           AND rule_id    = $2::uuid
           AND status     = 'firing'
+        RETURNING id::text
         """,
         vehicle_id,
         row["id"],
     )
     await redis.delete(key)
-    logger.info("Silencio resuelto: vehicle=%s (%s)", vehicle_id, updated)
+    for r in resolved_rows:
+        await _publish_alert_ws(redis, "resolved", r["id"], tenant_id, vehicle_id)
+    logger.info("Silencio resuelto: vehicle=%s (%d alertas)", vehicle_id, len(resolved_rows))
 
 
 async def sweep_silent_vehicles(db_pool: asyncpg.Pool, redis: Redis) -> None:
@@ -189,6 +216,7 @@ async def sweep_silent_vehicles(db_pool: asyncpg.Pool, redis: Redis) -> None:
                     _silence_key(vehicle_id), "1",
                     ex=int(threshold * 3),
                 )
+                await _publish_alert_ws(redis, "silence", alert_id, tenant_id, vehicle_id)
                 fired += 1
                 logger.info(
                     "Vehículo mudo: vehicle=%s %.1fh sin reportar ignición=%s",
