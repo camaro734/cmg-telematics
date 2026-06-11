@@ -118,9 +118,9 @@ async def write_record(
 async def get_device_info(
     conn: asyncpg.Connection, imei: str
 ) -> dict | None:
-    """Devuelve {device_id, vehicle_id, tenant_id} para un IMEI. None si no existe."""
+    """Devuelve {device_id, vehicle_id, tenant_id, manufacturer_tenant_id} para un IMEI."""
     row = await conn.fetchrow("""
-        SELECT d.id AS device_id, d.vehicle_id, v.tenant_id
+        SELECT d.id AS device_id, d.vehicle_id, v.tenant_id, v.manufacturer_tenant_id
         FROM device d
         JOIN vehicle v ON v.id = d.vehicle_id
         WHERE d.imei = $1 AND d.active = true AND v.active = true
@@ -131,6 +131,7 @@ async def get_device_info(
         "device_id": str(row["device_id"]),
         "vehicle_id": str(row["vehicle_id"]),
         "tenant_id": str(row["tenant_id"]),
+        "manufacturer_tenant_id": str(row["manufacturer_tenant_id"]) if row["manufacturer_tenant_id"] else None,
     }
 
 

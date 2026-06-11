@@ -123,6 +123,7 @@ class TeltonikaConnection:
                             self.redis,
                             self.device_info["vehicle_id"],
                             self.device_info["tenant_id"],
+                            self.device_info.get("manufacturer_tenant_id"),
                         )
                     except Exception as e:
                         logger.warning("No se pudo marcar offline en Redis: %s", e)
@@ -253,6 +254,7 @@ class TeltonikaConnection:
                     self.device_info["device_id"],
                     self.device_info["vehicle_id"],
                     self.device_info["tenant_id"],
+                    self.device_info.get("manufacturer_tenant_id"),
                 )
 
             ack = build_ack(len(records))

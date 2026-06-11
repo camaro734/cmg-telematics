@@ -47,6 +47,7 @@ async def publish_record(
     device_id: str,
     vehicle_id: str,
     tenant_id: str,
+    manufacturer_tenant_id: str | None = None,
 ) -> None:
     """Publica un AVL record al stream Redis y actualiza el hash de estado."""
     can_data = {
@@ -60,6 +61,7 @@ async def publish_record(
         "device_id": device_id,
         "vehicle_id": vehicle_id,
         "tenant_id": tenant_id,
+        "manufacturer_tenant_id": manufacturer_tenant_id,
         "lat": avl.latitude,
         "lon": avl.longitude,
         "speed_kmh": avl.speed_kmh,
@@ -120,7 +122,12 @@ async def _update_status_hash(
     await redis.expire(key, STATUS_TTL)
 
 
-async def set_vehicle_offline(redis: Redis, vehicle_id: str, tenant_id: str) -> None:
+async def set_vehicle_offline(
+    redis: Redis,
+    vehicle_id: str,
+    tenant_id: str,
+    manufacturer_tenant_id: str | None = None,
+) -> None:
     """Marca el vehículo como offline en Redis y publica un evento en el stream
     para que el WS notifique al frontend sin esperar el próximo paquete."""
     from datetime import datetime, timezone as _tz
@@ -131,6 +138,7 @@ async def set_vehicle_offline(redis: Redis, vehicle_id: str, tenant_id: str) -> 
     payload = {
         "vehicle_id": vehicle_id,
         "tenant_id": tenant_id,
+        "manufacturer_tenant_id": manufacturer_tenant_id,
         "online": False,
         "received_at": received_at,
     }

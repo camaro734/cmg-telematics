@@ -94,6 +94,26 @@ class ConnectionManager:
         )
 
 
+def _broadcast_channels(
+    tenant_id: str | None,
+    manufacturer_tenant_id: str | None,
+    ws_type: str,
+) -> list[str]:
+    """Canales WS a los que emitir según tipo de evento.
+
+    El fabricante recibe telemetría de sus vehículos asignados a clientes.
+    Las alertas NO llegan al fabricante: pertenecen al tenant propietario.
+    Cuando la Pieza 3 active el consentimiento explícito, añadir aquí la lógica.
+    """
+    channels: list[str] = []
+    if tenant_id:
+        channels.append(tenant_id)
+    if ws_type == "telemetry" and manufacturer_tenant_id and manufacturer_tenant_id != tenant_id:
+        channels.append(manufacturer_tenant_id)
+    channels.append("__cmg__")
+    return channels
+
+
 async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
     last_id = "$"
     _last_sent: dict[str, float] = {}   # vehicle_id → monotonic del último emit
@@ -130,11 +150,10 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                                 _last_sent[vehicle_id] = now_mono
                                 _last_state[vehicle_id] = (payload.get("online"), payload.get("ignition"))
                         tenant_id = payload.get("tenant_id")
+                        manufacturer_tenant_id = payload.get("manufacturer_tenant_id")
                         msg = {"type": ws_type, "data": payload}
-                        if tenant_id:
-                            await manager.broadcast_to_tenant(tenant_id, msg)
-                        # CMG admins ven todos los tenants — conexiones registradas bajo "__cmg__"
-                        await manager.broadcast_to_tenant("__cmg__", msg)
+                        for channel in _broadcast_channels(tenant_id, manufacturer_tenant_id, ws_type):
+                            await manager.broadcast_to_tenant(channel, msg)
                     except Exception as exc:
                         logger.warning("WS broadcast parse error: %s", exc)
 
