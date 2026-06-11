@@ -411,7 +411,7 @@ export default function VehiclesPage() {
                           >
                             Editar
                           </button>}
-                          {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && v.manufacturer_tenant_id === userTenantId)) && (
+                          {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && (v.manufacturer_tenant_id === userTenantId || v.tenant_id === userTenantId))) && (
                             <button
                               onClick={() => openReassign(v)}
                               style={{

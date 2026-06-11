@@ -35,10 +35,11 @@ async def list_tenants(
             ).order_by(Tenant.name)
         )
     elif user.tenant_tier == "manufacturer":
-        # manufacturer ve solo los clientes que ha creado (no a sí mismo)
+        # manufacturer ve su propio tenant + los clientes que ha creado
         result = await db.execute(
             select(Tenant).where(
-                Tenant.parent_manufacturer_id == user.tenant_id
+                (Tenant.id == user.tenant_id) |
+                (Tenant.parent_manufacturer_id == user.tenant_id)
             ).order_by(Tenant.name)
         )
     else:
