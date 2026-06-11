@@ -29,7 +29,7 @@ class Tenant(Base):
     portal_access_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     business_cif: Mapped[str | None] = mapped_column(String(20), nullable=True)
     business_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    manufacturer_can_view_operations: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    manufacturer_can_view_operations: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     manufacturer_can_view_can_data: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     manufacturer_can_create_rules: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     compliance_level: Mapped[str] = mapped_column(String(20), server_default="standard", nullable=False)
