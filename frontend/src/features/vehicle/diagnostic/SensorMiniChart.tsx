@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { SensorDef, VehicleStatus } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
 import {
-  buildSensorSeries, injectGaps, buildChartTicks,
+  buildSensorSeries, injectGaps,
   type AvlPoint, type ChartPointTime,
 } from '../../../lib/avlSeries'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
@@ -137,11 +137,11 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
                   borderRadius: 6, fontSize: 11,
                 }}
                 itemStyle={{ color: 'var(--fg-primary)' }}
-                formatter={(v: number | null) =>
-                  v === null
-                    ? ['sin datos', sensor.label]
-                    : [`${v}${sensor.unit ? ' ' + sensor.unit : ''}`, sensor.label]
-                }
+                formatter={(v) => {
+                  const val = v as number | null
+                  if (val === null) return ['sin datos', sensor.label]
+                  return [`${val}${sensor.unit ? ' ' + sensor.unit : ''}`, sensor.label]
+                }}
                 labelFormatter={(ts: number) =>
                   new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 }

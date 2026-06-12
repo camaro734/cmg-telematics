@@ -237,13 +237,12 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                     borderRadius: 6, fontSize: 12,
                   }}
                   itemStyle={{ color: 'var(--fg-primary)' }}
-                  formatter={(v: number | null) =>
-                    v === null
-                      ? ['sin datos', sensor.label]
-                      : isBoolean
-                        ? [v === 1 ? 'ON' : 'OFF', sensor.label]
-                        : [`${v}${unitLabel}`, sensor.label]
-                  }
+                  formatter={(v) => {
+                    const val = v as number | null
+                    if (val === null) return ['sin datos', sensor.label]
+                    if (isBoolean) return [val === 1 ? 'ON' : 'OFF', sensor.label]
+                    return [`${val}${unitLabel}`, sensor.label]
+                  }}
                   labelFormatter={(ts: number) => fmtTooltipLabel(ts, hours)}
                 />
                 <Area
