@@ -16,6 +16,13 @@ const ZONE_COLOR: Record<string, string> = {
   crit: 'var(--accent-crit)',
 }
 
+const ZONE_VALUE_COLOR: Record<string, string> = {
+  crit: 'var(--accent-crit)',
+  warn: 'var(--accent-warn)',
+  ok: 'var(--fg-primary)',
+  nodata: 'var(--fg-dim)',
+}
+
 interface SensorMiniChartProps {
   sensor: SensorDef
   vehicleId: string
@@ -24,15 +31,20 @@ interface SensorMiniChartProps {
   isStale?: boolean
 }
 
-const ZONE_VALUE_COLOR: Record<string, string> = {
-  crit: 'var(--accent-crit)',
-  warn: 'var(--accent-warn)',
-  ok: 'var(--fg-primary)',
-  nodata: 'var(--fg-dim)',
-}
-
-// Horas de la ventana fija de la mini-tarjeta
+// Altura fija del sparkline — igual para todos los bloques
+const SPARKLINE_H = 56
+// Ventana histórica de la mini-tarjeta
 const MINI_HOURS = 24
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const h = Math.floor(diff / 3_600_000)
+  const m = Math.floor((diff % 3_600_000) / 60_000)
+  if (h >= 48) return `hace ${Math.floor(h / 24)}d`
+  if (h >= 1)  return `hace ${h}h`
+  if (m >= 1)  return `hace ${m}m`
+  return 'hace <1m'
+}
 
 export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }: SensorMiniChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -42,29 +54,14 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
     if (!sensor.avl_id) return
     const el = containerRef.current
     if (!el) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setInView(true)
-      return
-    }
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return }
     const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true)
-          obs.disconnect()
-        }
-      },
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect() } },
       { threshold: 0.1 },
     )
     obs.observe(el)
     return () => obs.disconnect()
   }, [sensor.avl_id])
-
-  const raw = resolveRawValue(sensor, status, derived)
-  const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
-  const zone = sensorSeverity(sensor, scaled) ?? 'nodata'
-  const valueColor = isStale ? ZONE_VALUE_COLOR.nodata : (ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata)
-  const formatted = formatSensorValue(scaled) ?? '—'
-  const strokeColor = isStale ? 'var(--fg-dim)' : (ZONE_COLOR[zone ?? 'ok'] ?? ZONE_COLOR.ok)
 
   const { data: seriesRaw = [] } = useQuery<AvlPoint[]>({
     queryKey: ['avl-series', vehicleId, sensor.avl_id, MINI_HOURS],
@@ -78,37 +75,79 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
 
   if (!sensor.avl_id) return null
 
-  const now = Date.now()
-  const domainStart = now - MINI_HOURS * 60 * 60 * 1000
-  // Solo ticks de inicio y fin (sin etiquetas) para no saturar el espacio reducido
-  const xTicks = [domainStart, now]
-
   const chartData: ChartPointTime[] = injectGaps(
     buildSensorSeries(seriesRaw, sensor.scale, sensor.offset),
     MINI_HOURS,
   )
-  const hasData = chartData.filter(d => d.value !== null).length >= 2
+
+  // Valor actual desde el status en vivo
+  const liveRaw = resolveRawValue(sensor, status, derived)
+  const liveScaled = applyScaleOffset(liveRaw, sensor.scale, sensor.offset)
+
+  // Fallback: último valor histórico si el status no tiene dato CAN
+  const lastHistorical = liveScaled === null
+    ? chartData.reduceRight<ChartPointTime | null>((acc, d) => acc ?? (d.value !== null ? d : null), null)
+    : null
+  const lastHistoricalScaled = lastHistorical?.value ?? null
+
+  const displayScaled = liveScaled ?? lastHistoricalScaled
+  const displayFormatted = displayScaled !== null ? (formatSensorValue(displayScaled) ?? '—') : '—'
+
+  // Edad del último dato conocido (para mostrar cuando offline)
+  const staleAgeLabel: string | null = (() => {
+    if (!isStale) return null
+    const ts = lastHistorical?.ts ?? null
+    if (ts) return timeAgo(ts)
+    const lastSeen = status.device_last_seen ?? status.last_seen
+    if (lastSeen) return timeAgo(new Date(lastSeen).getTime())
+    return null
+  })()
+
+  // Color según zona (apagado si offline)
+  const zone = sensorSeverity(sensor, liveScaled) ?? 'nodata'
+  const valueColor = isStale ? ZONE_VALUE_COLOR.nodata : (ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata)
+  const strokeColor = isStale ? 'var(--fg-dim)' : (ZONE_COLOR[zone ?? 'ok'] ?? ZONE_COLOR.ok)
+
+  // Auto-zoom: dominio X sobre la extensión de los datos (sin margen fijo de 24h)
+  const validPts = chartData.filter(d => d.value !== null)
+  const hasData = validPts.length >= 2
+  const sparkDomain: [number, number] = (() => {
+    if (!hasData) return [Date.now() - MINI_HOURS * 3_600_000, Date.now()]
+    const first = validPts[0].ts
+    const last = validPts[validPts.length - 1].ts
+    const pad = Math.max((last - first) * 0.05, 60_000)
+    return [first - pad, last + pad]
+  })()
+
   const gradientId = `smg-${sensor.key.replace(/[^a-z0-9]/gi, '_')}`
 
   return (
     <div ref={containerRef} data-testid="sensor-mini-chart">
-      {/* Valor actual — layout unificado: siempre presente sobre la sparkline */}
-      <div style={{
-        display: 'flex', alignItems: 'baseline', gap: 4,
-        fontFamily: 'var(--font-mono)', color: valueColor,
-      }}>
-        <span style={{ fontSize: 'var(--fs-sensor-hero)', fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'], lineHeight: 1.1 }}>
-          {formatted}
+      {/* Valor actual — layout fijo: siempre visible, nunca "—" si hay histórico */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--fs-sensor-hero)',
+          fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'],
+          color: valueColor,
+          lineHeight: 1.1,
+        }}>
+          {displayFormatted}
         </span>
-        {sensor.unit && (
-          <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)' }}>
+        {sensor.unit && displayScaled !== null && (
+          <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
             {sensor.unit}
+          </span>
+        )}
+        {staleAgeLabel && (
+          <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)', marginLeft: 2 }}>
+            {staleAgeLabel}
           </span>
         )}
       </div>
 
-      {/* Sparkline — 70px de alto, sin YAxis, XAxis mínimo (solo inicio/fin) */}
-      <div style={{ height: 70, marginTop: 4 }}>
+      {/* Sparkline con altura fija — auto-zoom sobre los datos */}
+      <div style={{ height: SPARKLINE_H, marginTop: 4 }}>
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
@@ -122,14 +161,8 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
                 dataKey="ts"
                 type="number"
                 scale="time"
-                domain={[domainStart, now]}
-                ticks={xTicks}
-                tick={{ fontSize: 8, fill: 'var(--fg-dim)' }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(ts: number) =>
-                  new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-                }
+                domain={sparkDomain}
+                hide
               />
               <Tooltip
                 contentStyle={{
@@ -162,12 +195,9 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
           <div
             data-testid="sensor-mini-chart-empty"
             style={{
-              height: 70,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--fg-dim)',
-              fontSize: 'var(--fs-meta)',
+              height: SPARKLINE_H,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--fg-dim)', fontSize: 'var(--fs-meta)',
             }}
           >
             Sin histórico
