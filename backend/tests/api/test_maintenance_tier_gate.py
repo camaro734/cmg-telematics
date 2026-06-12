@@ -1,15 +1,14 @@
 """
-Test 2C + M3 — Gating de tier y política de propiedad en planes de mantenimiento.
+Test 2C + M3 (revertido) — Gating de tier y política de propiedad en planes de mantenimiento.
 
 Verifica:
-- Gate (require_plan_admin): subclient, non-admin y subclient.admin → 403.
-  client.admin pasa el gate (M3) — antes bloqueado, ahora 404 por recurso.
-- Propiedad (assert_can_manage_plan): manufacturer/client admin pueden editar/borrar
+- Gate (require_plan_admin): client, subclient, non-admin → 403.
+  Solo cmg y manufacturer admin superan el gate.
+- Propiedad (assert_can_manage_plan): manufacturer admin puede editar/borrar
   SOLO sus propios planes (plan.owner_tenant_id == user.tenant_id).
-- Fix R5: manufacturer.admin podía crear planes pero no editarlos (403 de
-  assert_can_access_vehicle write). Con M3 usa assert_can_manage_plan y pasa.
+- Fix R5: manufacturer.admin puede editar/borrar sus propios planes (intacto).
 - CMG admin puede gestionar cualquier plan.
-- Cross-tenant: client admin de otro tenant recibe 403 en gestión.
+- client tier: solo lectura — no crea, edita ni borra planes.
 """
 import uuid
 from datetime import datetime, timezone
@@ -68,12 +67,12 @@ _PLAN_BODY = {
 # ── POST /maintenance/plans ────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("tier,role", [
-    # client.admin eliminado: M3 le permite crear (pasa gate, falla en vehículo → 404)
+    ("client", "admin"),
     ("client", "operator"),
     ("subclient", "admin"),
 ])
 def test_create_plan_non_management_blocked(tier, role):
-    """Roles no-admin y subclient.admin siguen obteniendo 403 en creación."""
+    """client (cualquier rol), subclient y roles no-admin obtienen 403 en creación."""
     _override(_user(tier, role))
     resp = client.post("/api/v1/maintenance/plans", json=_PLAN_BODY)
     assert resp.status_code == 403, f"Esperado 403 para {tier}.{role}, got {resp.status_code}"
@@ -94,12 +93,12 @@ def test_create_plan_cmg_passes_gate():
 # ── PUT /maintenance/plans/{id} ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("tier,role", [
-    # client.admin eliminado: M3 le permite editar sus propios planes
+    ("client", "admin"),
     ("client", "operator"),
     ("subclient", "admin"),
 ])
 def test_update_plan_non_management_blocked(tier, role):
-    """Roles no-admin y subclient.admin siguen obteniendo 403 en actualización."""
+    """client (cualquier rol), subclient y roles no-admin obtienen 403 en actualización."""
     _override(_user(tier, role))
     resp = client.put(f"/api/v1/maintenance/plans/{PLAN_ID}", json={"name": "Actualizado"})
     assert resp.status_code == 403, f"Esperado 403 para {tier}.{role}, got {resp.status_code}"
@@ -120,11 +119,12 @@ def test_update_plan_cmg_passes_gate():
 # ── DELETE /maintenance/plans/{id} ────────────────────────────────────────────
 
 @pytest.mark.parametrize("tier,role", [
-    # client.admin eliminado: M3 le permite borrar sus propios planes
+    ("client", "admin"),
     ("client", "operator"),
+    ("subclient", "admin"),
 ])
 def test_delete_plan_non_management_blocked(tier, role):
-    """Roles no-admin siguen obteniendo 403 en borrado."""
+    """client (cualquier rol) y subclient obtienen 403 en borrado."""
     _override(_user(tier, role))
     resp = client.delete(f"/api/v1/maintenance/plans/{PLAN_ID}")
     assert resp.status_code == 403, f"Esperado 403 para {tier}.{role}, got {resp.status_code}"
@@ -212,33 +212,33 @@ def _override_db(db):
     app.dependency_overrides[get_db] = _gen
 
 
-# ── Gate: client.admin ya NO queda bloqueado (M3) ────────────────────────────
+# ── Gate: client.admin bloqueado (política solo-lectura en gestión) ──────────
 
-def test_create_plan_client_admin_passes_gate():
-    """Tras M3, client.admin supera el gate y recibe 404 (vehículo), no 403."""
+def test_create_plan_client_admin_blocked():
+    """client.admin recibe 403 en creación — solo-lectura en gestión de planes."""
     _override(_user("client", "admin", CLIENT_TENANT_ID))
     resp = client.post("/api/v1/maintenance/plans", json=_PLAN_BODY)
-    assert resp.status_code != 403, f"client.admin bloqueado en gate — no debería. Got {resp.status_code}"
+    assert resp.status_code == 403, f"client.admin no bloqueado en creación. Got {resp.status_code}"
 
 
-def test_update_plan_client_admin_passes_gate():
-    """Tras M3, client.admin supera el gate de actualización (recibe 404, no 403)."""
+def test_update_plan_client_admin_blocked():
+    """client.admin recibe 403 en actualización — gate bloquea antes del check de ownership."""
     _override(_user("client", "admin", CLIENT_TENANT_ID))
     resp = client.put(f"/api/v1/maintenance/plans/{PLAN_ID}", json={"name": "x"})
-    assert resp.status_code != 403, f"client.admin bloqueado en gate — no debería. Got {resp.status_code}"
+    assert resp.status_code == 403, f"client.admin no bloqueado en actualización. Got {resp.status_code}"
 
 
-def test_delete_plan_client_admin_passes_gate():
-    """Tras M3, client.admin supera el gate de borrado (recibe 404, no 403)."""
+def test_delete_plan_client_admin_blocked():
+    """client.admin recibe 403 en borrado — gate bloquea antes del check de ownership."""
     _override(_user("client", "admin", CLIENT_TENANT_ID))
     resp = client.delete(f"/api/v1/maintenance/plans/{PLAN_ID}")
-    assert resp.status_code != 403, f"client.admin bloqueado en gate — no debería. Got {resp.status_code}"
+    assert resp.status_code == 403, f"client.admin no bloqueado en borrado. Got {resp.status_code}"
 
 
-# ── Propiedad: client.admin puede gestionar SU plan ──────────────────────────
+# ── Propiedad: client.admin bloqueado incluso en SU plan (gate previo) ───────
 
-def test_update_plan_client_admin_own_plan():
-    """client.admin puede actualizar un plan cuyo owner_tenant_id es el suyo."""
+def test_update_plan_client_admin_own_plan_blocked():
+    """client.admin recibe 403 en su propio plan — gate bloquea antes del ownership."""
     user = _user("client", "admin", CLIENT_TENANT_ID)
     _override(user)
     db = _make_db(
@@ -247,17 +247,17 @@ def test_update_plan_client_admin_own_plan():
     )
     _override_db(db)
     resp = client.put(f"/api/v1/maintenance/plans/{PLAN_ID}", json={"name": "Actualizado"})
-    assert resp.status_code != 403, f"client.admin bloqueado en su propio plan. Got {resp.status_code}"
+    assert resp.status_code == 403, f"client.admin no bloqueado en su propio plan. Got {resp.status_code}"
 
 
-def test_delete_plan_client_admin_own_plan():
-    """client.admin puede borrar un plan cuyo owner_tenant_id es el suyo."""
+def test_delete_plan_client_admin_own_plan_blocked():
+    """client.admin recibe 403 en su propio plan — gate bloquea antes del ownership."""
     user = _user("client", "admin", CLIENT_TENANT_ID)
     _override(user)
     db = _make_db(plan=_plan_mock(owner_tenant_id=CLIENT_TENANT_ID))
     _override_db(db)
     resp = client.delete(f"/api/v1/maintenance/plans/{PLAN_ID}")
-    assert resp.status_code == 204, f"client.admin no pudo borrar su plan. Got {resp.status_code}"
+    assert resp.status_code == 403, f"client.admin no bloqueado en borrado de su plan. Got {resp.status_code}"
 
 
 # ── Propiedad: client.admin NO puede tocar el plan del fabricante ─────────────
