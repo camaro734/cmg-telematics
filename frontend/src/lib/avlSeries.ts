@@ -3,6 +3,7 @@ import { applyScaleOffset } from './sensorValue'
 export type Period = 'dia' | 'semana' | 'mes'
 export type AvlPoint = { bucket: string; value: number | null }
 export type ChartPoint = { label: string; value: number }
+export type ChartPointTime = { ts: number; label: string; value: number | null }
 
 // Extraído de KpiChart — transforma serie cruda (multiplicando por transform)
 export function buildAvlSeries(
@@ -33,21 +34,19 @@ export function buildAvlSeries(
     }))
 }
 
-// Para SensorMiniChart — aplica scale+offset (J1939 offset correcto)
+// Para SensorMiniChart — aplica scale+offset (J1939 offset correcto).
+// Preserva puntos nulos (value: null) para que el eje temporal muestre huecos reales.
 export function buildSensorSeries(
   raw: AvlPoint[],
   scale: number | undefined,
   offset: number | undefined,
-): ChartPoint[] {
-  return raw
-    .filter(d => d.value !== null)
-    .map(d => {
-      const v = applyScaleOffset(d.value, scale, offset)
-      if (v === null) return null
-      return {
-        label: new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        value: Math.round(v * 100) / 100,
-      }
-    })
-    .filter((d): d is ChartPoint => d !== null)
+): ChartPointTime[] {
+  return raw.map(d => {
+    const ts = new Date(d.bucket).getTime()
+    const label = new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    if (d.value === null) return { ts, label, value: null }
+    const v = applyScaleOffset(d.value, scale, offset)
+    if (v === null) return { ts, label, value: null }
+    return { ts, label, value: Math.round(v * 100) / 100 }
+  })
 }

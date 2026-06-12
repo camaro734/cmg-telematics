@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { SensorDef, VehicleStatus } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
-import { buildSensorSeries, type AvlPoint } from '../../../lib/avlSeries'
+import { buildSensorSeries, type AvlPoint, type ChartPointTime } from '../../../lib/avlSeries'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { resolveRawValue, applyScaleOffset } from '../../../lib/sensorValue'
 
@@ -63,13 +63,17 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived }: SensorMi
 
   if (!sensor.avl_id) return null
 
-  const chartData = buildSensorSeries(seriesRaw, sensor.scale, sensor.offset)
-  // gradientId único por sensor dentro del SVG
+  const chartData: ChartPointTime[] = buildSensorSeries(seriesRaw, sensor.scale, sensor.offset)
+  const hasData = chartData.filter(d => d.value !== null).length >= 2
+
+  // Ventana completa de 24h para que los huecos sin datos sean visibles
+  const now = Date.now()
+  const domainStart = now - 24 * 60 * 60 * 1000
   const gradientId = `smg-${sensor.key.replace(/[^a-z0-9]/gi, '_')}`
 
   return (
     <div ref={containerRef} data-testid="sensor-mini-chart" style={{ height: 90, marginTop: 6 }}>
-      {chartData.length >= 2 ? (
+      {hasData ? (
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
             <defs>
@@ -79,11 +83,17 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived }: SensorMi
               </linearGradient>
             </defs>
             <XAxis
-              dataKey="label"
+              dataKey="ts"
+              type="number"
+              scale="time"
+              domain={[domainStart, now]}
               tick={{ fontSize: 9, fill: 'var(--fg-dim)' }}
               tickLine={false}
               axisLine={false}
-              interval="preserveStartEnd"
+              tickCount={4}
+              tickFormatter={(ts: number) =>
+                new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+              }
             />
             <Tooltip
               contentStyle={{
@@ -92,7 +102,9 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived }: SensorMi
               }}
               itemStyle={{ color: 'var(--fg-primary)' }}
               formatter={(v: number) => [`${v}${sensor.unit ? ' ' + sensor.unit : ''}`, sensor.label]}
-              labelFormatter={(l) => String(l)}
+              labelFormatter={(ts: number) =>
+                new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              }
             />
             <Area
               type="monotone"
@@ -102,6 +114,7 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived }: SensorMi
               fill={`url(#${gradientId})`}
               dot={false}
               isAnimationActive={false}
+              connectNulls={false}
             />
           </AreaChart>
         </ResponsiveContainer>
