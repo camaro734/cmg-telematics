@@ -32,6 +32,8 @@ import type {
 import { MaintenanceStatusBadge } from '../../shared/ui/MaintenanceStatusBadge'
 import ProgressBar from '../maintenance/ProgressBar'
 import LogInterventionModal from '../maintenance/LogInterventionModal'
+import PlanSideCard from '../maintenance/PlanSideCard'
+import InterventionTimeline from '../maintenance/InterventionTimeline'
 import { useAuthStore } from '../auth/useAuthStore'
 
 // ── Style constants ───────────────────────────────────────────────────────────
@@ -693,12 +695,6 @@ function HistoricoTab({
 // ── MANTENIMIENTO tab ────────────────────────────────────────────────────────
 
 
-const THRESHOLD_UNIT: Record<string, string> = {
-  pto_hours: 'h PTO',
-  engine_hours: 'h motor',
-  calendar_days: 'días',
-}
-
 function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [logModalOpen, setLogModalOpen] = useState(false)
@@ -830,156 +826,28 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
                 )}
               </div>
               <div style={{ overflowY: 'auto', flex: 1, padding: '16px 16px 16px 20px' }}>
-                {allLogs.length === 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingTop: 32, color: 'var(--fg-muted)', fontSize: 13 }}>
-                    <span>Sin intervenciones registradas</span>
-                    {isOperatorOrAdmin && (
-                      <button
-                        onClick={() => setLogModalOpen(true)}
-                        style={{ background: 'none', border: '1px dashed var(--border)', color: 'var(--fg-muted)', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}
-                      >
-                        + Registrar primera intervención
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--border)' }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                      {allLogs.map(log => (
-                        <div key={log.id} style={{ display: 'flex', gap: 16, position: 'relative' }}>
-                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-elevated)', border: '2px solid var(--cmg-teal)', flexShrink: 0, marginTop: 2, position: 'relative', zIndex: 1 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>
-                                {log.performed_by_email ?? 'Operario'}
-                              </span>
-                              <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                                {log.performed_at ? new Date(log.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
-                              </span>
-                            </div>
-                            {log.description && (
-                              <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--fg-secondary)' }}>{log.description}</p>
-                            )}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                              {log.reset_counters.map(c => (
-                                <span key={c} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(29,158,117,0.15)', color: 'var(--cmg-teal)', fontWeight: 600 }}>
-                                  {c}
-                                </span>
-                              ))}
-                              {log.cost_eur != null && (
-                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(234,179,8,0.12)', color: 'var(--accent-warn)', fontWeight: 600 }}>
-                                  {log.cost_eur.toFixed(2)} €
-                                </span>
-                              )}
-                              {log.document_url && (
-                                <a href={log.document_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(56,189,248,0.12)', color: 'var(--accent-info)', fontWeight: 600, textDecoration: 'none' }}>
-                                  Doc
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <InterventionTimeline
+                  logs={allLogs}
+                  isOperatorOrAdmin={isOperatorOrAdmin}
+                  onRegister={() => setLogModalOpen(true)}
+                />
               </div>
             </>
           )}
         </div>
 
         {/* ── RIGHT: tarjeta unificada ──────────────────────────────────── */}
-        <div style={{ width: isMobile ? '100%' : 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ width: isMobile ? '100%' : 260, flexShrink: 0 }}>
           {selectedPlan && (
-            <>
-              {/* Estado + intervalo de mantenimiento */}
-              <div style={card}>
-                <div style={{ marginBottom: 8 }}>
-                  <MaintenanceStatusBadge status={selectedPlan.progress.status} />
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
-                  {selectedPlan.trigger_condition.thresholds.map((t, i) => (
-                    <span key={t.type}>
-                      {i > 0 && ' / '}
-                      Cada {t.value} {THRESHOLD_UNIT[t.type] ?? t.type}
-                    </span>
-                  ))}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--fg-muted)' }}>
-                  Aviso al {selectedPlan.warn_before_pct}% restante
-                </div>
-              </div>
-
-              {/* Progreso + proyección por umbral */}
-              {selectedPlan.progress.thresholds.map(t => {
-                const proj = projection?.thresholds.find(pt => pt.type === t.type)
-                const remaining = t.limit - t.current
-                return (
-                  <div key={t.type} style={card}>
-                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
-                      {THRESHOLD_UNIT[t.type] ?? t.type}
-                    </div>
-                    <ProgressBar pct={t.pct} status={selectedPlan.progress.status} showLabel />
-                    <div style={{ fontSize: 11, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-                      {Math.round(t.current)} / {t.limit}
-                      <span style={{ color: 'var(--fg-muted)', marginLeft: 6 }}>
-                        · {remaining < 0
-                          ? `excedido ${Math.abs(remaining).toFixed(0)}`
-                          : `quedan ${remaining.toFixed(0)}`}
-                      </span>
-                    </div>
-                    {proj?.days_remaining != null && (
-                      <div style={{ fontSize: 10, color: 'var(--accent-info)', marginTop: 3 }}>
-                        ≈ {Math.round(proj.days_remaining)} días restantes
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* Última intervención + coste acumulado */}
-              <div style={card}>
-                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Última intervención</div>
-                {lastLog ? (
-                  <>
-                    <div style={{ fontSize: 12, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>
-                      {new Date(lastLog.performed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </div>
-                    {lastLog.performed_by_email && (
-                      <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>{lastLog.performed_by_email}</div>
-                    )}
-                  </>
-                ) : (
-                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Sin registros</span>
-                )}
-                {accumulatedCost > 0 && (
-                  <div style={{ fontSize: 11, color: 'var(--accent-warn)', marginTop: 8, fontFamily: 'var(--font-mono)' }}>
-                    Coste total: {accumulatedCost.toFixed(2)} €
-                  </div>
-                )}
-              </div>
-
-              {/* Acciones */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {(selectedPlan.progress.status === 'próximo' || selectedPlan.progress.status === 'vencido') && isOperatorOrAdmin && (
-                  <button
-                    onClick={() => setLogModalOpen(true)}
-                    style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Completar intervención
-                  </button>
-                )}
-                {canManage && (
-                  <Link
-                    to={`/maintenance/${selectedPlan.id}`}
-                    style={{ display: 'block', textAlign: 'center', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 14px', fontSize: 12, textDecoration: 'none' }}
-                  >
-                    Editar plan
-                  </Link>
-                )}
-              </div>
-            </>
+            <PlanSideCard
+              plan={selectedPlan}
+              projection={projection}
+              lastLog={lastLog}
+              accumulatedCost={accumulatedCost}
+              isOperatorOrAdmin={isOperatorOrAdmin}
+              canManage={canManage}
+              onRegister={() => setLogModalOpen(true)}
+            />
           )}
         </div>
 

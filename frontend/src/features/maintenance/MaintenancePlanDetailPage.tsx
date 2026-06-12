@@ -1,23 +1,20 @@
 import { useState } from 'react'
 import { useParams, Navigate, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
-import ProgressBar from './ProgressBar'
 import LogInterventionModal from './LogInterventionModal'
+import PlanSideCard from './PlanSideCard'
+import InterventionTimeline from './InterventionTimeline'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
-import { exportToCsv } from '../../lib/csvExport'
-import type { MaintenancePlanOut, MaintenanceLogOut } from '../../lib/types'
-
-const THRESHOLD_LABEL: Record<string, string> = {
-  pto_hours: 'Horas PTO',
-  engine_hours: 'Horas motor',
-  calendar_days: 'Días calendario',
-}
+import { useAuthStore } from '../auth/useAuthStore'
+import type { MaintenancePlanOut, MaintenanceLogOut, MaintenanceProjectionOut } from '../../lib/types'
 
 export default function MaintenancePlanDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [showLog, setShowLog] = useState(false)
+  const qc = useQueryClient()
+  const { user } = useAuthStore()
 
   const { data: plan, isLoading } = useQuery({
     queryKey: keys.maintenancePlan(id ?? ''),
@@ -32,6 +29,13 @@ export default function MaintenancePlanDetailPage() {
     enabled: !!id,
   })
 
+  const { data: projection } = useQuery({
+    queryKey: keys.maintenanceProjection(id ?? ''),
+    queryFn: () => apiClient.get<MaintenanceProjectionOut>(`/api/v1/maintenance/plans/${id}/projection`),
+    enabled: !!id,
+    staleTime: 120_000,
+  })
+
   if (!id) return <Navigate to="/maintenance" replace />
   if (isLoading) return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)' }}>
@@ -40,102 +44,77 @@ export default function MaintenancePlanDetailPage() {
   )
   if (!plan) return <Navigate to="/maintenance" replace />
 
-  function handleExportLogs() {
-    const rows = logs.map(log => ({
-      performed_at: log.performed_at,
-      performed_by: log.performed_by_email ?? '',
-      description: log.description ?? '',
-      reset_counters: log.reset_counters.join('; '),
-      cost_eur: log.cost_eur,
-    }))
-    exportToCsv(`mantenimiento_${id}_logs.csv`, rows)
+  const isOperatorOrAdmin = user?.role === 'admin' || user?.role === 'operator'
+  const canManage = user?.role === 'admin' && (
+    user.tenant_tier === 'cmg' ||
+    (user.tenant_tier === 'manufacturer' && String(plan.owner_tenant_id) === String(user.tenant_id))
+  )
+
+  const lastLog = logs[0] ?? null
+  const accumulatedCost = logs.reduce((s, l) => s + (l.cost_eur ?? 0), 0)
+
+  function handleLogClose() {
+    setShowLog(false)
+    qc.invalidateQueries({ queryKey: keys.maintenanceLogs(id!) })
+    qc.invalidateQueries({ queryKey: keys.maintenancePlan(id!) })
+    qc.invalidateQueries({ queryKey: keys.maintenanceProjection(id!) })
   }
 
   return (
     <Shell title={plan.name}>
-      <div style={{ padding: 24, maxWidth: 800 }}>
+      <div style={{ padding: 24, maxWidth: 1100 }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{plan.vehicle_name}</div>
-            <div style={{ fontSize: 18, color: 'var(--fg-primary)', fontWeight: 600, marginTop: 2 }}>{plan.name}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link to={`/maintenance/${id}/edit`} style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--fg-muted)', borderRadius: 6, padding: '8px 16px', fontSize: 12, textDecoration: 'none' }}>
-              Editar
+            <Link to="/maintenance" style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }}>
+              ← Planes de mantenimiento
             </Link>
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 6 }}>{plan.vehicle_name}</div>
+            <div style={{ fontSize: 20, color: 'var(--fg-primary)', fontWeight: 600, marginTop: 2 }}>{plan.name}</div>
+          </div>
+          {isOperatorOrAdmin && (
             <button
               onClick={() => setShowLog(true)}
-              style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', marginTop: 4 }}
             >
-              Registrar intervención
+              + Registrar intervención
             </button>
-          </div>
-        </div>
-
-        {/* Progress cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
-          {plan.progress.thresholds.map(t => (
-            <div key={t.type} style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: '16px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 10 }}>
-                {THRESHOLD_LABEL[t.type] ?? t.type.toUpperCase()}
-              </div>
-              <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--fg-primary)', marginBottom: 10 }}>
-                {Math.round(t.current)} <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>/ {t.limit}</span>
-              </div>
-              <ProgressBar pct={t.pct} status={plan.progress.status} />
-            </div>
-          ))}
-        </div>
-
-        {/* History */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em' }}>
-              HISTORIAL DE INTERVENCIONES
-            </div>
-            {logs.length > 0 && (
-              <button
-                onClick={handleExportLogs}
-                style={{ padding: '4px 10px', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}
-              >
-                Exportar CSV
-              </button>
-            )}
-          </div>
-          {logs.length === 0 ? (
-            <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Sin intervenciones registradas</div>
-          ) : (
-            <div style={{ background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
-              {logs.map((log, i) => (
-                <div key={log.id} style={{ padding: '12px 16px', borderBottom: i < logs.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 13, color: 'var(--fg-primary)' }}>
-                        {log.description ?? 'Intervención registrada'}
-                      </div>
-                      {log.reset_counters.length > 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3 }}>
-                          Resetea: {log.reset_counters.map(c => THRESHOLD_LABEL[c] ?? c).join(', ')}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
-                      <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                        {new Date(log.performed_at).toLocaleDateString('es-ES')}
-                      </div>
-                      {log.cost_eur != null && (
-                        <div style={{ fontSize: 12, color: 'var(--ok)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-                          {log.cost_eur.toFixed(2)} €
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
+        </div>
+
+        {/* Layout: tarjeta lateral + timeline */}
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+
+          {/* Izquierda: tarjeta unificada del plan */}
+          <div style={{ width: 260, flexShrink: 0 }}>
+            <PlanSideCard
+              plan={plan}
+              projection={projection}
+              lastLog={lastLog}
+              accumulatedCost={accumulatedCost}
+              isOperatorOrAdmin={isOperatorOrAdmin}
+              canManage={canManage}
+              onRegister={() => setShowLog(true)}
+            />
+          </div>
+
+          {/* Derecha: timeline de intervenciones */}
+          <div style={{ flex: 1, minWidth: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>
+                Historial de intervenciones
+              </span>
+            </div>
+            <div style={{ padding: '16px 16px 16px 20px' }}>
+              <InterventionTimeline
+                logs={logs}
+                isOperatorOrAdmin={isOperatorOrAdmin}
+                onRegister={() => setShowLog(true)}
+              />
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -143,7 +122,7 @@ export default function MaintenancePlanDetailPage() {
         <LogInterventionModal
           planId={id}
           thresholds={plan.trigger_condition.thresholds}
-          onClose={() => setShowLog(false)}
+          onClose={handleLogClose}
         />
       )}
     </Shell>
