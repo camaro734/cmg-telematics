@@ -42,7 +42,6 @@ export default function VehicleDetailPage() {
   const canAlerts      = isPrivileged || enabledModules.includes('alerts')
   const canReports     = isPrivileged || enabledModules.includes('reports')
   const isMobile = useIsMobile()
-  const isCmgAdmin = isCmg && user?.role === 'admin'
   const setFleetSelected = useFleetStore(s => s.setSelected)
   const PAGE_TABS = canMaintenance
     ? [...BASE_TABS, { id: 'maintenance', label: 'MANTENIMIENTO' }]
