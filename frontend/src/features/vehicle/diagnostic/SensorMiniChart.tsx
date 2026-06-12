@@ -8,7 +8,7 @@ import {
   type AvlPoint, type ChartPointTime,
 } from '../../../lib/avlSeries'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
-import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
+import { resolveRawValue, applyScaleOffset, formatSensorValue, isJ1939NA } from '../../../lib/sensorValue'
 
 const ZONE_COLOR: Record<string, string> = {
   ok: 'var(--ok)',
@@ -84,14 +84,20 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
   const liveRaw = resolveRawValue(sensor, status, derived)
   const liveScaled = applyScaleOffset(liveRaw, sensor.scale, sensor.offset)
 
+  // Detectar centinela J1939 en el valor CAN en bruto (antes de escala)
+  const canRaw = sensor.avl_id != null
+    ? (status.can_data?.[`avl_${sensor.avl_id}`] as number | undefined) ?? null
+    : null
+  const isNA = canRaw !== null && isJ1939NA(canRaw)
+
   // Fallback: último valor histórico si el status no tiene dato CAN
-  const lastHistorical = liveScaled === null
+  const lastHistorical = liveScaled === null && !isNA
     ? chartData.reduceRight<ChartPointTime | null>((acc, d) => acc ?? (d.value !== null ? d : null), null)
     : null
   const lastHistoricalScaled = lastHistorical?.value ?? null
 
   const displayScaled = liveScaled ?? lastHistoricalScaled
-  const displayFormatted = displayScaled !== null ? (formatSensorValue(displayScaled) ?? '—') : '—'
+  const displayFormatted = isNA ? 'N/D' : (displayScaled !== null ? (formatSensorValue(displayScaled) ?? '—') : '—')
 
   // Edad del último dato conocido (para mostrar cuando offline)
   const staleAgeLabel: string | null = (() => {
@@ -103,9 +109,9 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
     return null
   })()
 
-  // Color según zona (apagado si offline)
+  // Color según zona (apagado si offline o centinela J1939)
   const zone = sensorSeverity(sensor, liveScaled) ?? 'nodata'
-  const valueColor = isStale ? ZONE_VALUE_COLOR.nodata : (ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata)
+  const valueColor = (isStale || isNA) ? ZONE_VALUE_COLOR.nodata : (ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata)
   const strokeColor = isStale ? 'var(--fg-dim)' : (ZONE_COLOR[zone ?? 'ok'] ?? ZONE_COLOR.ok)
 
   // Auto-zoom: dominio X sobre la extensión de los datos (sin margen fijo de 24h)
@@ -134,7 +140,7 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
         }}>
           {displayFormatted}
         </span>
-        {sensor.unit && displayScaled !== null && (
+        {sensor.unit && displayScaled !== null && !isNA && (
           <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
             {sensor.unit}
           </span>

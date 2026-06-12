@@ -1,8 +1,67 @@
 import { describe, it, expect } from 'vitest'
-import { injectGaps, buildChartTicks } from '../avlSeries'
-import type { ChartPointTime } from '../avlSeries'
+import { injectGaps, buildChartTicks, buildSensorSeries } from '../avlSeries'
+import type { ChartPointTime, AvlPoint } from '../avlSeries'
+
+const avlPt = (bucket: string, value: number | null): AvlPoint => ({ bucket, value })
+const epoch = (offsetMs: number) => new Date(1_700_000_000_000 + offsetMs).toISOString()
 
 const pt = (ts: number, value: number | null): ChartPointTime => ({ ts, label: '', value })
+
+// ─── buildSensorSeries ───────────────────────────────────────────────────────
+
+describe('buildSensorSeries — orden', () => {
+  it('ordena la salida ascendente aunque la entrada sea DESC (como devuelve el API)', () => {
+    // El API devuelve ORDER BY bucket DESC: más reciente primero
+    const raw: AvlPoint[] = [
+      avlPt(epoch(20 * 60_000), 300),  // ts +20 min (más reciente)
+      avlPt(epoch(10 * 60_000), 200),  // ts +10 min
+      avlPt(epoch(0), 100),            // ts base (más antiguo)
+    ]
+    const result = buildSensorSeries(raw, 1, 0)
+    expect(result[0].ts).toBeLessThan(result[1].ts)
+    expect(result[1].ts).toBeLessThan(result[2].ts)
+    // Valores en el orden ascendente
+    expect(result[0].value).toBe(100)
+    expect(result[1].value).toBe(200)
+    expect(result[2].value).toBe(300)
+  })
+
+  it('respeta el orden si la entrada ya es ASC', () => {
+    const raw: AvlPoint[] = [
+      avlPt(epoch(0), 100),
+      avlPt(epoch(10 * 60_000), 200),
+    ]
+    const result = buildSensorSeries(raw, 1, 0)
+    expect(result[0].value).toBe(100)
+    expect(result[1].value).toBe(200)
+  })
+})
+
+describe('buildSensorSeries — sentinels J1939', () => {
+  it('raw=255 (0xFF) → null en la serie', () => {
+    const raw: AvlPoint[] = [avlPt(epoch(0), 255)]
+    const result = buildSensorSeries(raw, 1, 0)
+    expect(result[0].value).toBeNull()
+  })
+
+  it('raw=65535 (0xFFFF) → null en la serie', () => {
+    const raw: AvlPoint[] = [avlPt(epoch(0), 65535)]
+    const result = buildSensorSeries(raw, 1, 0)
+    expect(result[0].value).toBeNull()
+  })
+
+  it('raw=4294967295 (0xFFFFFFFF) → null en la serie', () => {
+    const raw: AvlPoint[] = [avlPt(epoch(0), 4294967295)]
+    const result = buildSensorSeries(raw, 1, 0)
+    expect(result[0].value).toBeNull()
+  })
+
+  it('raw=250 (válido) pasa por scale+offset', () => {
+    const raw: AvlPoint[] = [avlPt(epoch(0), 250)]
+    const result = buildSensorSeries(raw, 0.1, 0)
+    expect(result[0].value).toBeCloseTo(25)
+  })
+})
 
 // ─── injectGaps ──────────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { applyScaleOffset } from './sensorValue'
+import { applyScaleOffset, J1939_NA } from './sensorValue'
 
 export type Period = 'dia' | 'semana' | 'mes'
 export type AvlPoint = { bucket: string; value: number | null }
@@ -35,16 +35,20 @@ export function buildAvlSeries(
 }
 
 // Para SensorMiniChart — aplica scale+offset (J1939 offset correcto).
-// Preserva puntos nulos (value: null) para que el eje temporal muestre huecos reales.
+// Ordena siempre ASC por bucket (el API devuelve DESC) para que injectGaps
+// y calcBrushRange reciban los datos en orden cronológico.
+// Excluye centinelas J1939 "not available" (0xFF, 0xFFFF, 0xFFFFFFFF).
 export function buildSensorSeries(
   raw: AvlPoint[],
   scale: number | undefined,
   offset: number | undefined,
 ): ChartPointTime[] {
-  return raw.map(d => {
+  const sorted = raw.slice().sort((a, b) => (a.bucket < b.bucket ? -1 : a.bucket > b.bucket ? 1 : 0))
+  return sorted.map(d => {
     const ts = new Date(d.bucket).getTime()
     const label = new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
     if (d.value === null) return { ts, label, value: null }
+    if (J1939_NA.has(d.value)) return { ts, label, value: null }
     const v = applyScaleOffset(d.value, scale, offset)
     if (v === null) return { ts, label, value: null }
     return { ts, label, value: Math.round(v * 100) / 100 }

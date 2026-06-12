@@ -1,5 +1,12 @@
 import type { SensorDef, VehicleStatus } from './types'
 
+// Valores "not available" del estándar J1939: 1-byte, 2-byte, 4-byte
+export const J1939_NA = new Set<number>([0xff, 0xffff, 0xffffffff])
+
+export function isJ1939NA(raw: number): boolean {
+  return J1939_NA.has(raw)
+}
+
 export function resolveRawValue(
   sensor: SensorDef,
   status: VehicleStatus,
@@ -15,7 +22,7 @@ export function resolveRawValue(
   if (sensor.avl_id != null) {
     const v = status.can_data?.[`avl_${sensor.avl_id}`]
     const raw = typeof v === 'number' ? v : null
-    if (raw !== null && sensor.invalid_values?.includes(raw)) return null
+    if (raw !== null && (sensor.invalid_values?.includes(raw) || J1939_NA.has(raw))) return null
     return raw
   }
   if (sensor.kpi_key) {

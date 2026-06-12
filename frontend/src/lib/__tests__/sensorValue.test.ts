@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRawValue, applyScaleOffset, bitValue } from '../sensorValue'
+import { resolveRawValue, applyScaleOffset, bitValue, isJ1939NA } from '../sensorValue'
 import type { SensorDef, VehicleStatus } from '../types'
 
 const baseStatus: VehicleStatus = {
@@ -142,5 +142,53 @@ describe('bitValue', () => {
   it('devuelve null si raw es null', () => {
     expect(bitValue(null, 2)).toBeNull()
     expect(bitValue(null)).toBeNull()
+  })
+})
+
+describe('isJ1939NA', () => {
+  it('0xFF (255) → true', () => {
+    expect(isJ1939NA(255)).toBe(true)
+  })
+
+  it('0xFFFF (65535) → true', () => {
+    expect(isJ1939NA(65535)).toBe(true)
+  })
+
+  it('0xFFFFFFFF (4294967295) → true', () => {
+    expect(isJ1939NA(4294967295)).toBe(true)
+  })
+
+  it('valor válido 254 → false', () => {
+    expect(isJ1939NA(254)).toBe(false)
+  })
+
+  it('valor 0 → false', () => {
+    expect(isJ1939NA(0)).toBe(false)
+  })
+})
+
+describe('resolveRawValue — J1939 NA universal (sin invalid_values)', () => {
+  it('raw=255 sin invalid_values → null (1-byte NA)', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145 }
+    const status = { ...baseStatus, can_data: { avl_145: 255 } }
+    expect(resolveRawValue(sensor, status, {})).toBeNull()
+  })
+
+  it('raw=65535 → null (2-byte NA)', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145 }
+    const status = { ...baseStatus, can_data: { avl_145: 65535 } }
+    expect(resolveRawValue(sensor, status, {})).toBeNull()
+  })
+
+  it('raw=4294967295 → null (4-byte NA)', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145 }
+    const status = { ...baseStatus, can_data: { avl_145: 4294967295 } }
+    expect(resolveRawValue(sensor, status, {})).toBeNull()
+  })
+
+  it('raw=250 (valor válido) no se filtra', () => {
+    const sensor: SensorDef = { ...baseSensor, avl_id: 145 }
+    const status = { ...baseStatus, can_data: { avl_145: 250 } }
+    expect(resolveRawValue(sensor, status, {})).toBe(250)
   })
 })

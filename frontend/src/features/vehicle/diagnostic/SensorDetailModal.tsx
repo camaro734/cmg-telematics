@@ -92,10 +92,6 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
   const isBoolean = sensor.gauge_type === 'led'
   const queryClient = useQueryClient()
 
-  // Brush range por índice sobre paddedData
-  const [brushStart, setBrushStart] = useState(0)
-  const [brushEnd, setBrushEnd] = useState(0)
-
   // Invalida la serie cuando llegan datos en vivo (solo rangos cortos ≤24h)
   useEffect(() => {
     if (hours > 24 || sensor.avl_id == null) return
@@ -133,12 +129,14 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raw, hours, sensor.scale, sensor.offset])
 
-  // Al cambiar datos o rango: recalcular auto-zoom
-  useEffect(() => {
-    const range = calcBrushRange(paddedData)
-    setBrushStart(range.start)
-    setBrushEnd(range.end)
-  }, [paddedData])
+  // Auto-zoom sincrónico desde paddedData — sin frame en blanco en el primer render.
+  // userBrush guarda el zoom manual; se resetea al cambiar horas.
+  const autoZoomRange = useMemo(() => calcBrushRange(paddedData), [paddedData])
+  const [userBrush, setUserBrush] = useState<{ start: number; end: number } | null>(null)
+  useEffect(() => { setUserBrush(null) }, [hours])
+  const effectiveBrush = userBrush ?? autoZoomRange
+  const brushStart = Math.min(effectiveBrush.start, paddedData.length - 1)
+  const brushEnd = Math.min(effectiveBrush.end, paddedData.length - 1)
 
   // Rango visible en timestamps (para ticks y dominio Y)
   const visStart = paddedData[brushStart]?.ts ?? domainStart
@@ -307,8 +305,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   endIndex={brushEnd}
                   onChange={({ startIndex, endIndex }) => {
                     if (startIndex != null && endIndex != null) {
-                      setBrushStart(startIndex)
-                      setBrushEnd(endIndex)
+                      setUserBrush({ start: startIndex, end: endIndex })
                     }
                   }}
                   fill="var(--bg-card)"
