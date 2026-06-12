@@ -5,7 +5,10 @@ import {
 } from 'recharts'
 import type { SensorDef } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
-import { buildSensorSeries, type AvlPoint, type ChartPointTime } from '../../../lib/avlSeries'
+import {
+  buildSensorSeries, injectGaps, buildChartTicks,
+  type AvlPoint, type ChartPointTime,
+} from '../../../lib/avlSeries'
 import { computeSensorStats } from '../../../lib/sensorStats'
 import { wsClient } from '../../../lib/wsClient'
 
@@ -38,13 +41,30 @@ function fmtTooltipLabel(ts: number, hours: number): string {
   return d.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function StatBox({ label, value }: { label: string; value: string }) {
+// Calcula dominio Y con cero como base y techo redondeado al múltiplo limpio.
+// Garantiza padding superior ~10% y ticks que caen en valores redondos.
+function niceYDomain(data: ChartPointTime[]): [number, number] {
+  const vals = data.filter(d => d.value !== null).map(d => d.value as number)
+  if (vals.length === 0) return [0, 100]
+  const mx = Math.max(...vals)
+  if (mx <= 0) return [Math.min(...vals) * 1.1, 1]
+  const mag = Math.pow(10, Math.floor(Math.log10(mx)))
+  const high = Math.ceil(mx * 1.1 / mag) * mag
+  const mn = Math.min(...vals)
+  const low = mn >= 0 ? 0 : Math.floor(mn / mag) * mag
+  return [low, high]
+}
+
+function StatBox({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
       background: 'var(--bg-elevated)', borderRadius: 8, padding: '8px 16px', minWidth: 80,
     }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--fg-primary)' }}>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700,
+        color: muted ? 'var(--fg-muted)' : 'var(--fg-primary)',
+      }}>
         {value}
       </span>
       <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-dim)' }}>
@@ -81,16 +101,20 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     enabled: sensor.avl_id != null,
   })
 
-  const chartData: ChartPointTime[] = buildSensorSeries(raw, sensor.scale, sensor.offset)
-  const hasData = chartData.filter(d => d.value !== null).length >= 2
-  const stats = computeSensorStats(chartData, isBoolean)
-
   const now = Date.now()
   const domainStart = now - hours * 60 * 60 * 1000
 
+  const chartData: ChartPointTime[] = injectGaps(
+    buildSensorSeries(raw, sensor.scale, sensor.offset),
+    hours,
+  )
+  const hasData = chartData.filter(d => d.value !== null).length >= 2
+  const stats = computeSensorStats(chartData, isBoolean)
+  const xTicks = buildChartTicks(domainStart, now, hours)
+  const yDomain = isBoolean ? ([0, 1] as [number, number]) : niceYDomain(chartData)
+
   const gradientId = `sdm-${sensor.key.replace(/[^a-z0-9]/gi, '_')}`
   const strokeColor = 'var(--cmg-teal)'
-
   const unitLabel = sensor.unit ? ` ${sensor.unit}` : ''
 
   return (
@@ -121,9 +145,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
         {/* Cabecera */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <span style={{
-              fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)',
-            }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 16, fontWeight: 700, color: 'var(--fg-primary)' }}>
               {sensor.label}
             </span>
             {sensor.unit && (
@@ -133,19 +155,14 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Selector de rango */}
             <div style={{ display: 'flex', gap: 4 }}>
               {RANGES.map(r => (
                 <button
                   key={r.hours}
                   onClick={() => setHours(r.hours)}
                   style={{
-                    padding: '4px 10px',
-                    fontSize: 12,
-                    fontFamily: 'var(--font-sans)',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    cursor: 'pointer',
+                    padding: '4px 10px', fontSize: 12, fontFamily: 'var(--font-sans)',
+                    borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
                     background: hours === r.hours ? 'var(--cmg-teal)' : 'var(--bg-elevated)',
                     color: hours === r.hours ? '#fff' : 'var(--fg-muted)',
                   }}
@@ -198,30 +215,34 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   type="number"
                   scale="time"
                   domain={[domainStart, now]}
+                  ticks={xTicks}
                   tick={{ fontSize: 10, fill: 'var(--fg-dim)' }}
                   tickLine={false}
                   axisLine={false}
-                  tickCount={hours <= 24 ? 6 : 7}
                   tickFormatter={(ts: number) => fmtTick(ts, hours)}
                 />
                 <YAxis
-                  domain={isBoolean ? ([0, 1] as [number, number]) : (['auto', 'auto'] as [string, string])}
+                  domain={yDomain}
                   tick={{ fontSize: 10, fill: 'var(--fg-dim)' }}
                   tickLine={false}
                   axisLine={false}
-                  width={40}
+                  width={42}
+                  tickCount={5}
                   tickFormatter={isBoolean ? (v: number) => (v === 1 ? 'ON' : v === 0 ? 'OFF' : '') : undefined}
                 />
                 <Tooltip
+                  cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
                   contentStyle={{
                     background: 'var(--bg-elevated)', border: '1px solid var(--border)',
                     borderRadius: 6, fontSize: 12,
                   }}
                   itemStyle={{ color: 'var(--fg-primary)' }}
-                  formatter={(v: number) =>
-                    isBoolean
-                      ? [v === 1 ? 'ON' : 'OFF', sensor.label]
-                      : [`${v}${unitLabel}`, sensor.label]
+                  formatter={(v: number | null) =>
+                    v === null
+                      ? ['sin datos', sensor.label]
+                      : isBoolean
+                        ? [v === 1 ? 'ON' : 'OFF', sensor.label]
+                        : [`${v}${unitLabel}`, sensor.label]
                   }
                   labelFormatter={(ts: number) => fmtTooltipLabel(ts, hours)}
                 />
@@ -257,10 +278,19 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   label="Máx"
                   value={stats.max !== null ? `${stats.max}${unitLabel}` : '—'}
                 />
+                {/* Media activa: excluye ceros de parado — nivel real de trabajo */}
                 <StatBox
-                  label="Media"
-                  value={stats.avg !== null ? `${stats.avg}${unitLabel}` : '—'}
+                  label="Media activa"
+                  value={stats.avgActive !== null ? `${stats.avgActive}${unitLabel}` : '—'}
                 />
+                {/* Media total solo si difiere de la activa (mezcla parado + trabajo) */}
+                {stats.avgActive !== null && stats.avg !== stats.avgActive && (
+                  <StatBox
+                    label="Media total"
+                    value={stats.avg !== null ? `${stats.avg}${unitLabel}` : '—'}
+                    muted
+                  />
+                )}
               </>
             ) : (
               <>

@@ -50,3 +50,80 @@ export function buildSensorSeries(
     return { ts, label, value: Math.round(v * 100) / 100 }
   })
 }
+
+/**
+ * Inserta un punto null en el medio de cada hueco real entre muestras.
+ * Criterio documentado:
+ *   ≤24h (raw, intervalo esperado ~1-5 min) → hueco si delta > 10 min
+ *   >24h (hourly AVG, intervalo esperado 1h) → hueco si delta > 2h
+ * Solo rompe cuando AMBOS extremos tienen valor; si uno ya es null, la línea
+ * ya está rota y no hace falta añadir otro null.
+ */
+export function injectGaps(data: ChartPointTime[], hours: number): ChartPointTime[] {
+  if (data.length < 2) return data
+  const gapMs = hours <= 24 ? 10 * 60_000 : 2 * 60 * 60_000
+  const out: ChartPointTime[] = []
+  for (let i = 0; i < data.length; i++) {
+    out.push(data[i])
+    if (
+      i < data.length - 1 &&
+      data[i].value !== null &&
+      data[i + 1].value !== null &&
+      data[i + 1].ts - data[i].ts > gapMs
+    ) {
+      const midTs = Math.round((data[i].ts + data[i + 1].ts) / 2)
+      out.push({ ts: midTs, label: '', value: null })
+    }
+  }
+  return out
+}
+
+/**
+ * Genera ticks redondos para el eje X según el rango seleccionado.
+ *   6h  → cada hora en punto
+ *   24h → cada 4 horas en punto (00:00, 04:00, 08:00…)
+ *   7d  → cada día a medianoche local
+ *   30d → cada semana (7 días) a medianoche local
+ * Todos los ticks caen dentro del dominio [domainStart, domainEnd].
+ */
+export function buildChartTicks(domainStart: number, domainEnd: number, hours: number): number[] {
+  const ticks: number[] = []
+  const d = new Date(domainStart)
+
+  if (hours <= 6) {
+    // Primer tick: siguiente hora en punto tras domainStart
+    d.setMinutes(0, 0, 0)
+    d.setHours(d.getHours() + 1)
+    while (d.getTime() <= domainEnd) {
+      ticks.push(d.getTime())
+      d.setHours(d.getHours() + 1)
+    }
+  } else if (hours <= 24) {
+    // Primer tick: siguiente múltiplo de 4h en punto tras domainStart
+    d.setMinutes(0, 0, 0)
+    while (d.getHours() % 4 !== 0 || d.getTime() <= domainStart) {
+      d.setHours(d.getHours() + 1)
+    }
+    while (d.getTime() <= domainEnd) {
+      ticks.push(d.getTime())
+      d.setHours(d.getHours() + 4)
+    }
+  } else if (hours <= 168) {
+    // Primer tick: medianoche local del día siguiente a domainStart
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + 1)
+    while (d.getTime() <= domainEnd) {
+      ticks.push(d.getTime())
+      d.setDate(d.getDate() + 1)
+    }
+  } else {
+    // 30d: cada semana desde la primera medianoche
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + 1)
+    while (d.getTime() <= domainEnd) {
+      ticks.push(d.getTime())
+      d.setDate(d.getDate() + 7)
+    }
+  }
+  return ticks
+}

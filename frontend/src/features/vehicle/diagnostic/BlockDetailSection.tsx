@@ -100,25 +100,30 @@ export function BlockDetailSection({
                 <div style={{ fontSize: 'var(--fs-sensor-name)', fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
                   {sensor.label}
                 </div>
-                <div style={{ fontSize: 'var(--fs-sensor-hero)', fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'], fontFamily: 'var(--font-mono)', color: valueColor, lineHeight: 1.1 }}>
-                  {formatted}
-                  {sensor.unit && (
-                    <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, marginLeft: 4, color: 'var(--fg-tertiary)' }}>
-                      {sensor.unit}
-                    </span>
-                  )}
-                </div>
                 {sensor.avl_id != null ? (
+                  // Sensores CAN: SensorMiniChart renderiza valor actual + sparkline
                   <SensorMiniChart
                     sensor={sensor}
                     vehicleId={vehicleId}
                     status={status}
                     derived={derived}
+                    isStale={isStale}
                   />
                 ) : (
-                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', marginTop: 4, fontStyle: 'italic' }}>
-                    Sin histórico
-                  </div>
+                  // Sensores de sistema (sin histórico CAN): valor + indicador
+                  <>
+                    <div style={{ fontSize: 'var(--fs-sensor-hero)', fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'], fontFamily: 'var(--font-mono)', color: valueColor, lineHeight: 1.1 }}>
+                      {formatted}
+                      {sensor.unit && (
+                        <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, marginLeft: 4, color: 'var(--fg-tertiary)' }}>
+                          {sensor.unit}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', marginTop: 4, fontStyle: 'italic' }}>
+                      Sin histórico
+                    </div>
+                  </>
                 )}
               </div>
             )

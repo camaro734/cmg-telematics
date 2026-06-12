@@ -1,7 +1,18 @@
 import type { ChartPointTime } from './avlSeries'
 
 export type SensorStats =
-  | { kind: 'numeric'; last: number | null; min: number | null; max: number | null; avg: number | null }
+  | {
+      kind: 'numeric'
+      last: number | null
+      min: number | null
+      max: number | null
+      // Media de todos los valores no-null (incluye ceros de parado)
+      avg: number | null
+      // Media de valores > 0 (excluye nulls y ceros).
+      // Criterio: valores = 0 en sensores de actividad (RPM, presión, caudal)
+      // corresponden a parado; esta media refleja el nivel real de funcionamiento.
+      avgActive: number | null
+    }
   | { kind: 'boolean'; pctActive: number; activations: number }
 
 export function computeSensorStats(data: ChartPointTime[], isBoolean: boolean): SensorStats {
@@ -21,10 +32,19 @@ export function computeSensorStats(data: ChartPointTime[], isBoolean: boolean): 
     return { kind: 'boolean', pctActive: Math.round((active / total) * 1000) / 10, activations }
   }
 
-  if (valid.length === 0) return { kind: 'numeric', last: null, min: null, max: null, avg: null }
+  if (valid.length === 0) {
+    return { kind: 'numeric', last: null, min: null, max: null, avg: null, avgActive: null }
+  }
+
   const last = valid[valid.length - 1]
   const min = Math.min(...valid)
   const max = Math.max(...valid)
   const avg = Math.round((valid.reduce((s, v) => s + v, 0) / valid.length) * 100) / 100
-  return { kind: 'numeric', last, min, max, avg }
+
+  const working = valid.filter(v => v > 0)
+  const avgActive = working.length > 0
+    ? Math.round((working.reduce((s, v) => s + v, 0) / working.length) * 100) / 100
+    : null
+
+  return { kind: 'numeric', last, min, max, avg, avgActive }
 }

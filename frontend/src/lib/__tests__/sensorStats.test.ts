@@ -95,3 +95,41 @@ describe('computeSensorStats — booleano', () => {
     }
   })
 })
+
+// avgActive: media excluyendo ceros y nulls (nivel real de trabajo)
+describe('computeSensorStats — avgActive numérico', () => {
+  it('avgActive excluye ceros (parado) y nulls (sin datos)', () => {
+    // 100, 200, 0, 0, null → avgActive de [100, 200] = 150; avg de [100,200,0,0] = 75
+    const s = computeSensorStats(pts([100, 200, 0, 0, null]), false)
+    expect(s.kind).toBe('numeric')
+    if (s.kind === 'numeric') {
+      expect(s.avg).toBeCloseTo(75)
+      expect(s.avgActive).toBeCloseTo(150)
+    }
+  })
+
+  it('avgActive es null cuando todos los valores son 0 o null', () => {
+    const s = computeSensorStats(pts([0, 0, null]), false)
+    expect(s.kind).toBe('numeric')
+    if (s.kind === 'numeric') {
+      expect(s.avgActive).toBeNull()
+    }
+  })
+
+  it('avgActive coincide con avg cuando no hay ceros', () => {
+    const s = computeSensorStats(pts([10, 20, 30]), false)
+    expect(s.kind).toBe('numeric')
+    if (s.kind === 'numeric') {
+      expect(s.avgActive).toBeCloseTo(20)
+      expect(s.avg).toBeCloseTo(20)
+    }
+  })
+
+  it('avgActive es null en lista vacía', () => {
+    const s = computeSensorStats([], false)
+    expect(s.kind).toBe('numeric')
+    if (s.kind === 'numeric') {
+      expect(s.avgActive).toBeNull()
+    }
+  })
+})
