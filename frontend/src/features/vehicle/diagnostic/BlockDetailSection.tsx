@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { alertSensorKey } from '../../../lib/blockDiagnostics'
 import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { SensorMiniChart } from './SensorMiniChart'
+import { SensorDetailModal } from './SensorDetailModal'
 
 interface BlockDetailSectionProps {
   block: SystemBlock
@@ -26,6 +28,8 @@ const ZONE_VALUE_COLOR: Record<string, string> = {
 export function BlockDetailSection({
   block, schema, status, derived, alerts, vehicleId, isStale,
 }: BlockDetailSectionProps) {
+  const [modalSensor, setModalSensor] = useState<SensorDef | null>(null)
+
   const sensors = block.sensor_keys
     .map(k => schema.find(s => s.key === k))
     .filter((s): s is SensorDef => s != null)
@@ -81,6 +85,7 @@ export function BlockDetailSection({
               <div
                 key={sensor.key}
                 data-testid="sensor-detail-card"
+                onClick={sensor.avl_id != null ? () => setModalSensor(sensor) : undefined}
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border)',
@@ -89,6 +94,7 @@ export function BlockDetailSection({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 6,
+                  cursor: sensor.avl_id != null ? 'pointer' : 'default',
                 }}
               >
                 <div style={{ fontSize: 'var(--fs-sensor-name)', fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
@@ -118,6 +124,14 @@ export function BlockDetailSection({
             )
           })}
         </div>
+      )}
+
+      {modalSensor && (
+        <SensorDetailModal
+          sensor={modalSensor}
+          vehicleId={vehicleId}
+          onClose={() => setModalSensor(null)}
+        />
       )}
 
       {/* Alertas del bloque — contador clicable */}
