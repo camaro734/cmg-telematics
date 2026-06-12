@@ -41,6 +41,7 @@ export default function MaintenancePage() {
   const { user } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
   const isAdmin = user?.role === 'admin'
+  const canManagePlans = isAdmin && (user?.tenant_tier === 'cmg' || user?.tenant_tier === 'manufacturer')
   const { activeTenantId } = useTenantContext()
 
   // ── Modal "Realizar" ─────────────────────────────────────────────────────
@@ -255,7 +256,7 @@ export default function MaintenancePage() {
               >
                 Exportar CSV
               </button>
-              {isAdmin && (
+              {canManagePlans && (
                 <button
                   onClick={() => openForm('new')}
                   style={{
@@ -412,7 +413,7 @@ export default function MaintenancePage() {
                               Realizar
                             </button>
                           )}
-                          {isAdmin && (
+                          {canManagePlans && (
                             <button
                               onClick={() => openForm(plan)}
                               title="Editar plan"

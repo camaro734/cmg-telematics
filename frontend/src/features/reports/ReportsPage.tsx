@@ -740,7 +740,7 @@ function MantenimientoTab({ vehicleId }: { vehicleId: string }) {
   const isOperatorOrAdmin = user?.role === 'admin' || user?.role === 'operator'
   const canManage = user?.role === 'admin' && (
     user.tenant_tier === 'cmg' ||
-    (selectedPlan != null && String(selectedPlan.owner_tenant_id) === String(user.tenant_id))
+    (user.tenant_tier === 'manufacturer' && selectedPlan != null && String(selectedPlan.owner_tenant_id) === String(user.tenant_id))
   )
 
   const worstOf = (plan: MaintenancePlanOut) =>

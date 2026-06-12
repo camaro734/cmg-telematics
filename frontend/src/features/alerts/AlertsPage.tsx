@@ -21,7 +21,7 @@ type AlertTab = 'activas' | 'historial' | 'reglas'
 
 export default function AlertsPage() {
   const user = useAuthStore(s => s.user)
-  const canManageRules = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
+  const canManageRules = user?.role === 'admin' && (user?.tenant_tier === 'cmg' || user?.tenant_tier === 'manufacturer')
   const { activeTenantId } = useTenantContext()
   const tenantQ = activeTenantId ? `&tenant_id=${activeTenantId}` : ''
   const location = useLocation()
