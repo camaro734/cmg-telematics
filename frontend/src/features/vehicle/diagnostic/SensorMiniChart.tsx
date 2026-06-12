@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { SensorDef, VehicleStatus } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
 import {
-  buildSensorSeries, injectGaps,
+  buildSensorSeries, buildDerivativeSeries, injectGaps,
   type AvlPoint, type ChartPointTime,
 } from '../../../lib/avlSeries'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
@@ -75,28 +75,34 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
 
   if (!sensor.avl_id) return null
 
-  const chartData: ChartPointTime[] = injectGaps(
-    buildSensorSeries(seriesRaw, sensor.scale, sensor.offset),
-    MINI_HOURS,
+  const chartData: ChartPointTime[] = sensor.derivative
+    ? buildDerivativeSeries(seriesRaw, sensor.scale, sensor.offset)
+    : injectGaps(buildSensorSeries(seriesRaw, sensor.scale, sensor.offset), MINI_HOURS)
+
+  // Para sensores derivativos el valor live es el último punto de la serie (tasa reciente)
+  const lastChartPoint = chartData.reduceRight<ChartPointTime | null>(
+    (acc, d) => acc ?? (d.value !== null ? d : null), null,
   )
 
-  // Valor actual desde el status en vivo
-  const liveRaw = resolveRawValue(sensor, status, derived)
-  const liveScaled = applyScaleOffset(liveRaw, sensor.scale, sensor.offset)
+  // Valor actual desde el status en vivo (solo para sensores no derivativos)
+  const liveRaw = sensor.derivative ? null : resolveRawValue(sensor, status, derived)
+  const liveScaled = sensor.derivative ? null : applyScaleOffset(liveRaw, sensor.scale, sensor.offset)
 
-  // Detectar centinela J1939 en el valor CAN en bruto (antes de escala)
-  const canRaw = sensor.avl_id != null
+  // Detectar centinela J1939 en el valor CAN en bruto (solo sensores no derivativos)
+  const canRaw = (!sensor.derivative && sensor.avl_id != null)
     ? (status.can_data?.[`avl_${sensor.avl_id}`] as number | undefined) ?? null
     : null
   const isNA = canRaw !== null && isJ1939NA(canRaw)
 
-  // Fallback: último valor histórico si el status no tiene dato CAN
-  const lastHistorical = liveScaled === null && !isNA
-    ? chartData.reduceRight<ChartPointTime | null>((acc, d) => acc ?? (d.value !== null ? d : null), null)
+  // Fallback: último punto histórico si el status no tiene dato CAN
+  const lastHistorical = (!sensor.derivative && liveScaled === null && !isNA)
+    ? lastChartPoint
     : null
   const lastHistoricalScaled = lastHistorical?.value ?? null
 
-  const displayScaled = liveScaled ?? lastHistoricalScaled
+  const displayScaled = sensor.derivative
+    ? (lastChartPoint?.value ?? null)
+    : (liveScaled ?? lastHistoricalScaled)
   const displayFormatted = isNA ? 'N/D' : (displayScaled !== null ? (formatSensorValue(displayScaled) ?? '—') : '—')
 
   // Edad del último dato conocido (para mostrar cuando offline)

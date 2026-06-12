@@ -132,6 +132,7 @@ export interface SensorDef {
   status_field?: string
   bit_index?: number
   invalid_values?: number[]
+  derivative?: boolean
   visible_in_detail?: boolean
   show_in_popup?: boolean
   icon?: SensorIcon

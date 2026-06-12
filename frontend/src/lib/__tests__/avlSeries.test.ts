@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { injectGaps, buildChartTicks, buildSensorSeries } from '../avlSeries'
+import { injectGaps, buildChartTicks, buildSensorSeries, buildDerivativeSeries } from '../avlSeries'
 import type { ChartPointTime, AvlPoint } from '../avlSeries'
 
 const avlPt = (bucket: string, value: number | null): AvlPoint => ({ bucket, value })
@@ -60,6 +60,74 @@ describe('buildSensorSeries — sentinels J1939', () => {
     const raw: AvlPoint[] = [avlPt(epoch(0), 250)]
     const result = buildSensorSeries(raw, 0.1, 0)
     expect(result[0].value).toBeCloseTo(25)
+  })
+})
+
+// ─── buildDerivativeSeries ───────────────────────────────────────────────────
+
+const H = 60 * 60_000  // 1 hora en ms
+
+describe('buildDerivativeSeries — consumo constante', () => {
+  it('0.5 L/h: contador sube 0.5L en 1h → tasa 0.5 L/h', () => {
+    // escala=0.5 como avl_10315; raw=2 → 1L, raw=3 → 1.5L en 1h = 0.5 L/h
+    const raw: AvlPoint[] = [
+      avlPt(epoch(0),     2),   // 1.0 L escalado
+      avlPt(epoch(H),     3),   // 1.5 L escalado → delta 0.5 L en 1h
+    ]
+    const result = buildDerivativeSeries(raw, 0.5, 0)
+    expect(result.length).toBeGreaterThan(0)
+    const last = result[result.length - 1]
+    expect(last.value).toBeCloseTo(0.5, 1)
+  })
+
+  it('1.0 L/h: contador sube 2L en 2h → tasa 1.0 L/h (ventana rodante)', () => {
+    const raw: AvlPoint[] = [
+      avlPt(epoch(0),     0),
+      avlPt(epoch(H),     2),   // +1L en 1h = 1 L/h
+      avlPt(epoch(2 * H), 4),   // +1L en 1h = 1 L/h
+    ]
+    const result = buildDerivativeSeries(raw, 0.5, 0)
+    result.forEach(p => {
+      if (p.value !== null) expect(p.value).toBeCloseTo(1.0, 1)
+    })
+  })
+
+  it('motor parado: contador sin cambio → tasa 0 L/h', () => {
+    const raw: AvlPoint[] = [
+      avlPt(epoch(0),     10),
+      avlPt(epoch(H),     10),  // sin cambio
+      avlPt(epoch(2 * H), 10),
+    ]
+    const result = buildDerivativeSeries(raw, 0.5, 0)
+    result.forEach(p => {
+      if (p.value !== null) expect(p.value).toBe(0)
+    })
+  })
+
+  it('devuelve vacío con menos de 2 puntos', () => {
+    expect(buildDerivativeSeries([], 1, 0)).toHaveLength(0)
+    expect(buildDerivativeSeries([avlPt(epoch(0), 5)], 1, 0)).toHaveLength(0)
+  })
+
+  it('descarta valores negativos (imposibles en contador acumulado)', () => {
+    const raw: AvlPoint[] = [
+      avlPt(epoch(0), 10),
+      avlPt(epoch(H), 8),   // retroceso (no debería ocurrir, pero defensivo)
+    ]
+    const result = buildDerivativeSeries(raw, 0.5, 0)
+    result.forEach(p => {
+      if (p.value !== null) expect(p.value).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  it('ordena entrada DESC correctamente antes de derivar', () => {
+    // API devuelve DESC; la derivada debe ser la misma que con ASC
+    const rawAsc: AvlPoint[] = [avlPt(epoch(0), 2), avlPt(epoch(H), 4)]
+    const rawDesc: AvlPoint[] = [avlPt(epoch(H), 4), avlPt(epoch(0), 2)]
+    const a = buildDerivativeSeries(rawAsc, 0.5, 0)
+    const b = buildDerivativeSeries(rawDesc, 0.5, 0)
+    expect(a.length).toBe(b.length)
+    if (a.length > 0) expect(a[0].value).toBeCloseTo(b[0].value as number, 1)
   })
 })
 

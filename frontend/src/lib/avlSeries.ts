@@ -56,6 +56,60 @@ export function buildSensorSeries(
 }
 
 /**
+ * Para sensores de contador acumulado (avl_10315, km totales…):
+ * calcula la tasa de variación en unidades/hora usando una ventana rodante de 1h.
+ *
+ * Ventana 1h: suaviza la cuantización gruesa (e.g. 0.5 L/bit del J1939) —
+ * con ventanas menores la tasa oscilaría entre 0 y valores pico por la resolución
+ * del sensor. Se requiere al menos 15 min de ventana efectiva para emitir un punto.
+ */
+export function buildDerivativeSeries(
+  raw: AvlPoint[],
+  scale: number | undefined,
+  offset: number | undefined,
+): ChartPointTime[] {
+  const sorted = raw
+    .filter(d => d.value !== null && !J1939_NA.has(d.value as number))
+    .slice()
+    .sort((a, b) => (a.bucket < b.bucket ? -1 : a.bucket > b.bucket ? 1 : 0))
+
+  if (sorted.length < 2) return []
+
+  const WINDOW_MS    = 60 * 60_000  // ventana rodante 1h
+  const MIN_WINDOW_MS = 15 * 60_000  // mínimo efectivo 15 min
+
+  const result: ChartPointTime[] = []
+
+  for (let i = 1; i < sorted.length; i++) {
+    const currTs = new Date(sorted[i].bucket).getTime()
+    const windowStart = currTs - WINDOW_MS
+
+    // Punto de referencia: el más antiguo dentro de la ventana 1h
+    let refIdx = -1
+    for (let j = 0; j < i; j++) {
+      if (new Date(sorted[j].bucket).getTime() >= windowStart) {
+        refIdx = j
+        break
+      }
+    }
+    if (refIdx === -1) continue
+
+    const refTs = new Date(sorted[refIdx].bucket).getTime()
+    const dtHours = (currTs - refTs) / 3_600_000
+    if (dtHours < MIN_WINDOW_MS / 3_600_000) continue
+
+    const currV = applyScaleOffset(sorted[i].value!, scale, offset) ?? sorted[i].value!
+    const refV  = applyScaleOffset(sorted[refIdx].value!, scale, offset) ?? sorted[refIdx].value!
+    const rate  = Math.max(0, (currV - refV) / dtHours)
+
+    const label = new Date(currTs).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    result.push({ ts: currTs, label, value: Math.round(rate * 10) / 10 })
+  }
+
+  return result
+}
+
+/**
  * Inserta un punto null en el medio de cada hueco real entre muestras.
  * Criterio documentado:
  *   ≤24h (raw, intervalo esperado ~1-5 min) → hueco si delta > 10 min

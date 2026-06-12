@@ -6,7 +6,7 @@ import {
 import type { SensorDef } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
 import {
-  buildSensorSeries, injectGaps, buildChartTicks,
+  buildSensorSeries, buildDerivativeSeries, injectGaps, buildChartTicks,
   type AvlPoint, type ChartPointTime,
 } from '../../../lib/avlSeries'
 import { computeSensorStats } from '../../../lib/sensorStats'
@@ -23,6 +23,11 @@ const RANGES: { label: string; hours: number }[] = [
   { label: '24h', hours: 24  },
   { label: '7d',  hours: 168 },
   { label: '30d', hours: 720 },
+]
+// Sensores derivativos (tasa/hora): limitados a 24h porque usan datos raw
+const RANGES_DERIVATIVE: { label: string; hours: number }[] = [
+  { label: '6h',  hours: 6  },
+  { label: '24h', hours: 24 },
 ]
 
 function fmtTick(ts: number, hours: number): string {
@@ -70,7 +75,8 @@ function StatBox({ label, value, muted }: { label: string; value: string; muted?
 }
 
 export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailModalProps) {
-  const [hours, setHours] = useState(24)
+  const activeRanges = sensor.derivative ? RANGES_DERIVATIVE : RANGES
+  const [hours, setHours] = useState(sensor.derivative ? 24 : 24)
   const isBoolean = sensor.gauge_type === 'led'
   const queryClient = useQueryClient()
 
@@ -96,12 +102,14 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     enabled: sensor.avl_id != null,
   })
 
-  // paddedData: null en domainStart + serie (ASC, huecos inyectados) + null en domainEnd.
-  // Los nulos de relleno forzan el dominio X al rango seleccionado completo.
+  // paddedData: null en domainStart + serie + null en domainEnd para forzar el dominio X completo.
+  // Sensores derivativos usan buildDerivativeSeries (tasa 1h rodante); resto injectGaps normal.
   const { paddedData, domainStart, domainEnd } = useMemo(() => {
     const domainEnd = Date.now()
     const domainStart = domainEnd - hours * 60 * 60 * 1000
-    const series = injectGaps(buildSensorSeries(raw, sensor.scale, sensor.offset), hours)
+    const series = sensor.derivative
+      ? buildDerivativeSeries(raw, sensor.scale, sensor.offset)
+      : injectGaps(buildSensorSeries(raw, sensor.scale, sensor.offset), hours)
     const paddedData: ChartPointTime[] = [
       { ts: domainStart, label: '', value: null },
       ...series,
@@ -109,7 +117,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     ]
     return { paddedData, domainStart, domainEnd }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raw, hours, sensor.scale, sensor.offset])
+  }, [raw, hours, sensor.scale, sensor.offset, sensor.derivative])
 
   const xTicks = useMemo(
     () => buildChartTicks(domainStart, domainEnd, hours),
@@ -165,7 +173,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ display: 'flex', gap: 4 }}>
-              {RANGES.map(r => (
+              {activeRanges.map(r => (
                 <button
                   key={r.hours}
                   onClick={() => setHours(r.hours)}
