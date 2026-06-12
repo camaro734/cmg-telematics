@@ -1,6 +1,7 @@
 # backend/app/api/v1/maintenance.py
 import csv
 import io
+import json
 import logging
 import re
 import uuid
@@ -576,7 +577,11 @@ async def delete_plan(
 @router.post("/maintenance/plans/{plan_id}/logs", response_model=MaintenanceLogOut, status_code=201)
 async def create_log(
     plan_id: uuid.UUID,
-    body: MaintenanceLogCreate,
+    file: UploadFile | None = File(None),
+    performed_at: str = Form(...),
+    description: str | None = Form(None),
+    reset_counters: str = Form("[]"),
+    cost_eur: float | None = Form(None),
     user: CurrentUser = Depends(get_current_user),
     _: None = Depends(require_module("maintenance")),
     db: AsyncSession = Depends(get_db),
@@ -586,20 +591,56 @@ async def create_log(
         raise HTTPException(status_code=404, detail="Plan no encontrado")
     await _require_admin_or_grant(user, db)
 
+    try:
+        reset_counters_list: list[str] = json.loads(reset_counters)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="reset_counters debe ser JSON array")
+
+    try:
+        performed_at_dt = datetime.fromisoformat(performed_at)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="performed_at inválido")
+
+    log_id = uuid.uuid4()
+    document_url: str | None = None
+
+    has_file = file is not None and file.filename
+    if has_file:
+        allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+        content_type = (file.content_type or "").split(";")[0].strip()
+        if content_type not in allowed_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Formato no válido. Use imagen (JPEG, PNG, WEBP) o PDF.",
+            )
+        contents = await file.read()
+        if len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El archivo supera el límite de 5 MB",
+            )
+        ext = Path(file.filename).suffix.lower() or ".pdf"
+        dest = Path("/app/uploads/maintenance_docs") / f"{log_id}{ext}"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(contents)
+        document_url = f"/uploads/maintenance_docs/{log_id}{ext}"
+
     _vehicle = await db.get(Vehicle, plan.vehicle_id)
     _vtype = await db.get(VehicleType, _vehicle.vehicle_type_id) if _vehicle else None
     counter_readings = await _snapshot_counter_values(
-        plan.vehicle_id, _vtype, body.reset_counters, db
+        plan.vehicle_id, _vtype, reset_counters_list, db
     )
 
     log = MaintenanceLog(
+        id=log_id,
         vehicle_id=plan.vehicle_id,
         plan_id=plan_id,
-        performed_at=body.performed_at,
+        performed_at=performed_at_dt,
         performed_by=uuid.UUID(str(user.user_id)),
-        description=body.description,
-        reset_counters=body.reset_counters,
-        cost_eur=body.cost_eur,
+        description=description,
+        reset_counters=reset_counters_list,
+        cost_eur=cost_eur,
+        document_url=document_url,
         counter_readings=counter_readings or None,
     )
     db.add(log)
@@ -614,6 +655,7 @@ async def create_log(
         description=log.description,
         reset_counters=log.reset_counters or [],
         cost_eur=float(log.cost_eur) if log.cost_eur is not None else None,
+        document_url=log.document_url,
         counter_readings=log.counter_readings,
     )
 
