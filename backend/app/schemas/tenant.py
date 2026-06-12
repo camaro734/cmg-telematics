@@ -35,6 +35,7 @@ class TenantCreate(BaseModel):
     brand_name: str | None = None
     brand_color: str | None = None
     logo_url: str | None = None
+    enabled_modules: list[str] | None = None
 
 
 class TenantUpdate(BaseModel):

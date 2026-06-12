@@ -16,7 +16,11 @@ from app.core.security import hash_password
 
 router = APIRouter(tags=["tenants"])
 
-ALLOWED_MODULES = {"fleet", "alerts", "maintenance", "reports"}
+ALLOWED_MODULES = {"fleet", "alerts", "maintenance", "reports", "work-orders"}
+
+# Módulos que se asignan automáticamente a tenants tier=client al crearlos.
+# Incluye todo lo que un cliente opera por defecto; el admin puede restringir después.
+DEFAULT_CLIENT_MODULES: list[str] = sorted(ALLOWED_MODULES)
 
 
 @router.get("/tenants", response_model=list[TenantOut])
@@ -101,6 +105,9 @@ async def create_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Un tenant tier='{body.tier}' requiere parent_id",
         )
+    # Siembra módulos por defecto para tenants cliente si no se especificaron.
+    if body.tier == "client" and not body.enabled_modules:
+        body = body.model_copy(update={"enabled_modules": DEFAULT_CLIENT_MODULES})
     tenant = Tenant(**body.model_dump())
     db.add(tenant)
     # Fix 2: handle slug uniqueness race condition

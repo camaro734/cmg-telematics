@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_module
 from app.schemas.auth import CurrentUser
 from app.schemas.work_order import (
     WorkOrderOut, WorkOrderCreate, WorkOrderUpdate, WorkOrderStatusPatch,
@@ -20,7 +20,7 @@ from app.models.driver import Driver
 from app.models.work_report import WorkReport
 from app.services.doc_numbers import assign_doc_number
 
-router = APIRouter(tags=["work_orders"])
+router = APIRouter(tags=["work_orders"], dependencies=[Depends(require_module("work-orders"))])
 
 _STATUS_TRANSITIONS: dict[str, list[str]] = {
     "pending":     ["in_progress", "cancelled"],
