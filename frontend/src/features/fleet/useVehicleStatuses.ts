@@ -19,7 +19,9 @@ export function useVehicleStatuses(vehicles: VehicleOut[]) {
     },
     enabled: vehicles.length > 0,
     staleTime: wsConnected ? Infinity : 0,      // WS fresco; polling si cae
-    refetchInterval: wsConnected ? false : 60_000,
+    // Refetch cada 60 s incluso con WS: garantiza re-render para que isOnline() recalcule
+    // con Date.now() actualizado, y recupera datos frescos si el WS perdió algún evento.
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
   })
 

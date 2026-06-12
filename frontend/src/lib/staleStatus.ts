@@ -7,11 +7,13 @@ export const ONLINE_PARKED_MIN = 60
 
 /** Online con umbral adaptativo según ignición.
  *  ignition=true  → umbral 5 min  (detección rápida de corte de corriente)
- *  ignition=false/undefined → umbral 60 min (vehículo aparcado en sleep mode) */
+ *  ignition=false/undefined → umbral 60 min (vehículo aparcado en sleep mode)
+ *
+ *  No se usa status.online=false como cortocircuito: el FMC650 cierra la conexión TCP
+ *  después de cada batch, lo que dispara set_vehicle_offline() en ingest aunque el dispositivo
+ *  siga activo. El check real es el timestamp device_last_seen. */
 export function isOnline(status: VehicleStatus | null | undefined): boolean {
   if (!status) return false
-  // Offline empujado explícitamente por el servidor (desconexión TCP o silencio)
-  if (status.online === false) return false
   const ts = status.device_last_seen ?? status.last_seen
   if (!ts) return false
   const limitMin = status.ignition === true ? ONLINE_ACTIVE_MIN : ONLINE_PARKED_MIN
