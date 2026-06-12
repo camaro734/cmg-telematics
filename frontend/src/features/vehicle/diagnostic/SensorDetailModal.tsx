@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
@@ -7,6 +7,7 @@ import type { SensorDef } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
 import { buildSensorSeries, type AvlPoint, type ChartPointTime } from '../../../lib/avlSeries'
 import { computeSensorStats } from '../../../lib/sensorStats'
+import { wsClient } from '../../../lib/wsClient'
 
 interface SensorDetailModalProps {
   sensor: SensorDef
@@ -56,6 +57,19 @@ function StatBox({ label, value }: { label: string; value: string }) {
 export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailModalProps) {
   const [hours, setHours] = useState(24)
   const isBoolean = sensor.gauge_type === 'led'
+  const queryClient = useQueryClient()
+
+  // Invalida la serie cuando llegan datos en vivo (solo en rangos cortos ≤24h)
+  useEffect(() => {
+    if (hours > 24 || sensor.avl_id == null) return
+    return wsClient.onTelemetry(data => {
+      if (data.vehicle_id === vehicleId) {
+        void queryClient.invalidateQueries({
+          queryKey: ['avl-series', vehicleId, sensor.avl_id, hours],
+        })
+      }
+    })
+  }, [hours, vehicleId, sensor.avl_id, queryClient])
 
   const { data: raw = [], isLoading } = useQuery<AvlPoint[]>({
     queryKey: ['avl-series', vehicleId, sensor.avl_id, hours],
