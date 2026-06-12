@@ -34,12 +34,17 @@ export default function VehicleDetailPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<'live' | 'historic' | 'cycles' | 'maintenance'>('live')
   const qc = useQueryClient()
-  const { user } = useAuthStore()
+  const { user, enabledModules } = useAuthStore()
   const isCmg = user?.tenant_tier === 'cmg'
+  const isManufacturer = user?.tenant_tier === 'manufacturer'
+  const isPrivileged = isCmg || isManufacturer
+  const canMaintenance = isPrivileged || enabledModules.includes('maintenance')
+  const canAlerts      = isPrivileged || enabledModules.includes('alerts')
+  const canReports     = isPrivileged || enabledModules.includes('reports')
   const isMobile = useIsMobile()
   const isCmgAdmin = isCmg && user?.role === 'admin'
   const setFleetSelected = useFleetStore(s => s.setSelected)
-  const PAGE_TABS = isCmgAdmin
+  const PAGE_TABS = canMaintenance
     ? [...BASE_TABS, { id: 'maintenance', label: 'MANTENIMIENTO' }]
     : BASE_TABS
 
@@ -123,7 +128,7 @@ export default function VehicleDetailPage() {
   const { data: maintenancePlans = [] } = useQuery({
     queryKey: keys.vehicleMaintenance(id ?? ''),
     queryFn: () => apiClient.get<MaintenancePlanOut[]>(`/api/v1/vehicles/${id}/maintenance`),
-    enabled: !!vehicle,
+    enabled: !!vehicle && canMaintenance,
   })
   const urgentCount = maintenancePlans.filter(
     p => p.progress.status === 'vencido' || p.progress.status === 'próximo'
@@ -136,7 +141,7 @@ export default function VehicleDetailPage() {
     queryKey: [...keys.alerts(), 'firing', id],
     queryFn: () => apiClient.get<AlertInstanceEnrichedOut[]>('/api/v1/alerts?status=firing'),
     refetchInterval: 30_000,
-    enabled: !!vehicle,
+    enabled: !!vehicle && canAlerts,
   })
 
   const { data: commandHistory = [] } = useQuery<CommandLogEntry[]>({
@@ -237,9 +242,11 @@ export default function VehicleDetailPage() {
           <div style={{ overflowX: 'auto', overflowY: 'hidden', flexShrink: 1, minWidth: 0 }}>
             <Tabs tabs={PAGE_TABS} activeTab={tab} onTabChange={(newTab) => setTab(newTab as 'live' | 'historic' | 'cycles' | 'maintenance')} />
           </div>
-          <div style={{ flexShrink: 0, marginLeft: 12, position: 'relative', zIndex: 100 }}>
-            <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
-          </div>
+          {canReports && (
+            <div style={{ flexShrink: 0, marginLeft: 12, position: 'relative', zIndex: 100 }}>
+              <PdfDownloadBtn vehicleId={id} vehicleName={vehicle.name} isCmg={isCmg} tenantId={vehicle.tenant_id} />
+            </div>
+          )}
         </div>
         <div ref={liveScrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', ...(tab !== 'live' && { padding: isMobile ? 12 : 24 }) }}>
 

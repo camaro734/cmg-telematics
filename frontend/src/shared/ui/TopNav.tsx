@@ -469,11 +469,17 @@ export default function TopNav() {
       ])
       return (firing?.length ?? 0) + (escalated?.length ?? 0)
     },
+    enabled: isCmg || isManufacturer || enabledModules.includes('alerts'),
     refetchInterval: 30_000,
     staleTime: 25_000,
   })
 
-  const visibleModules = MODULES.filter(m => isCmg || enabledModules.includes(m.key))
+  const visibleModules = MODULES.filter(m => isCmg || isManufacturer || enabledModules.includes(m.key))
+
+  // work-orders requiere módulo habilitado; conductores y geocercas son siempre visibles para operadores
+  const visibleOperatorBase = isCmg || isManufacturer
+    ? OPERATOR_ITEMS_BASE
+    : OPERATOR_ITEMS_BASE.filter(item => item.to !== '/work-orders' || enabledModules.includes('work-orders'))
 
   const btnBase: React.CSSProperties = {
     display: 'flex',
@@ -567,8 +573,8 @@ export default function TopNav() {
               adminLabel={isCmg ? 'Administración' : 'Cuenta'}
               operatorItems={
                 (isManufacturer && isAdmin
-                  ? [...OPERATOR_ITEMS_BASE, MIS_CLIENTES_ITEM]
-                  : OPERATOR_ITEMS_BASE
+                  ? [...visibleOperatorBase, MIS_CLIENTES_ITEM]
+                  : visibleOperatorBase
                 ) as unknown as typeof OPERATOR_ITEMS
               }
               showAdmin={canManageClients}
@@ -634,8 +640,8 @@ export default function TopNav() {
                   <DropdownMenu
                     items={
                       (isManufacturer && isAdmin
-                        ? [...OPERATOR_ITEMS_BASE, MIS_CLIENTES_ITEM]
-                        : OPERATOR_ITEMS_BASE
+                        ? [...visibleOperatorBase, MIS_CLIENTES_ITEM]
+                        : visibleOperatorBase
                       ) as unknown as typeof CMG_ADMIN_ITEMS
                     }
                     onClose={() => setOperatorOpen(false)}

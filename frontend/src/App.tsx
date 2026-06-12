@@ -129,7 +129,7 @@ export default function App() {
                 <Route path="devices"          element={<SectionErrorBoundary label="Devices"><DevicesPage /></SectionErrorBoundary>} />
                 <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
                 <Route path="drivers"          element={<SectionErrorBoundary label="Drivers"><DriversPage /></SectionErrorBoundary>} />
-                <Route path="work-orders"     element={<SectionErrorBoundary label="WorkOrders"><WorkOrdersPage /></SectionErrorBoundary>} />
+                <Route path="work-orders"     element={<RequireModule module="work-orders"><SectionErrorBoundary label="WorkOrders"><WorkOrdersPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="geofences"       element={<SectionErrorBoundary label="Geofences"><GeofencesPage /></SectionErrorBoundary>} />
                 <Route path="dashboard"       element={<Navigate to="/fleet" replace />} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
