@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
+import { getAlertDisplay } from './alertUtils'
 
 export type HistoryStatus = 'all' | 'acknowledged' | 'resolved'
 
@@ -27,7 +28,6 @@ interface AlertHistoryProps {
 
 export default function AlertHistory({ vehicles, rules, status, vehicleId, dateFrom, dateTo }: AlertHistoryProps) {
   const vehicleMap = Object.fromEntries(vehicles.map(v => [v.id, v.name]))
-  const ruleMap = Object.fromEntries(rules.map(r => [r.id, r.name]))
 
   const buildUrl = (s: string) => {
     const p = new URLSearchParams({ status: s, limit: '50' })
@@ -73,16 +73,17 @@ export default function AlertHistory({ vehicles, rules, status, vehicleId, dateF
             <tbody>
               {rows.map(a => {
                 const badge = STATUS_BADGE[a.status] ?? { label: a.status, color: 'var(--fg-muted)' }
-                const tv = a.trigger_value
-                const val = tv?.value != null ? String(tv.value) : '—'
+                const display = getAlertDisplay(a, rules)
                 return (
                   <tr key={a.id} style={{ borderBottom: '1px solid var(--bg-card)' }}>
                     <td style={{ ...TD, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                       {new Date(a.triggered_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td style={TD}>{vehicleMap[a.vehicle_id] ?? '—'}</td>
-                    <td style={TD}>{ruleMap[a.rule_id] ?? '—'}</td>
-                    <td style={{ ...TD, fontFamily: 'var(--font-mono)' }}>{val}</td>
+                    <td style={TD}>{display.title}</td>
+                    <td style={{ ...TD, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                      {display.detail ?? '—'}
+                    </td>
                     <td style={TD}>
                       <span style={{ color: badge.color, fontWeight: 600 }}>{badge.label}</span>
                     </td>

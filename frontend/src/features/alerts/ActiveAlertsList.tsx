@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { useState } from 'react'
 import type { AlertInstanceOut, VehicleOut, RuleOut } from '../../lib/types'
 import AckModal from './AckModal'
+import { getAlertDisplay } from './alertUtils'
 
 function timeAgo(iso: string): string {
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
@@ -29,7 +30,6 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
   const [ackAlert, setAckAlert] = useState<AlertInstanceOut | null>(null)
 
   const vehicleMap = Object.fromEntries(vehicles.map(v => [v.id, v.name]))
-  const ruleMap = Object.fromEntries(rules.map(r => [r.id, r]))
 
   if (alerts.length === 0) {
     return (
@@ -42,8 +42,8 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {alerts.map(alert => {
-        const rule = ruleMap[alert.rule_id]
-        const isCritical = rule?.severity === 'critical' || alert.status === 'escalated'
+        const display = getAlertDisplay(alert, rules)
+        const isCritical = display.severity === 'critical' || alert.status === 'escalated'
         const color = isCritical ? 'var(--danger)' : 'var(--warn)'
 
         return (
@@ -51,17 +51,17 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
-                {rule?.name ?? 'Regla desconocida'}
+                {display.title}
               </div>
               <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--fg-muted)' }}>
                 {vehicleMap[alert.vehicle_id] ?? 'Vehículo desconocido'}{' · '}{timeAgo(alert.triggered_at)}
               </div>
+              {display.detail && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
+                  {display.detail}
+                </div>
+              )}
             </div>
-            {alert.trigger_value != null && (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color, flexShrink: 0 }}>
-                {String(alert.trigger_value.value ?? JSON.stringify(alert.trigger_value))}
-              </div>
-            )}
             <button
               onClick={() => setAckAlert(alert)}
               style={{
@@ -78,7 +78,7 @@ export default function ActiveAlertsList({ alerts, vehicles, rules }: ActiveAler
       {ackAlert && (
         <AckModal
           alert={ackAlert}
-          ruleName={ruleMap[ackAlert.rule_id]?.name ?? 'Regla desconocida'}
+          ruleName={getAlertDisplay(ackAlert, rules).title}
           vehicleName={vehicleMap[ackAlert.vehicle_id] ?? 'Vehículo desconocido'}
           onClose={() => setAckAlert(null)}
           onSuccess={() => setAckAlert(null)}
