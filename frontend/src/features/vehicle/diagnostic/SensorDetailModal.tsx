@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Brush,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import type { SensorDef } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
@@ -25,15 +25,15 @@ const RANGES: { label: string; hours: number }[] = [
   { label: '30d', hours: 720 },
 ]
 
-function fmtTick(ts: number, visHours: number): string {
+function fmtTick(ts: number, hours: number): string {
   const d = new Date(ts)
-  if (visHours <= 24) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  if (hours <= 24) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })
 }
 
-function fmtTooltipLabel(ts: number, visHours: number): string {
+function fmtTooltipLabel(ts: number, hours: number): string {
   const d = new Date(ts)
-  if (visHours <= 24) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  if (hours <= 24) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   return d.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
 }
 
@@ -48,24 +48,6 @@ function niceYDomain(data: ChartPointTime[]): [number, number] {
   const high = Math.ceil(mx * 1.1 / mag) * mag
   const low = mn >= 0 ? 0 : Math.floor(mn / mag) * mag
   return [low, high]
-}
-
-// Auto-zoom: índices de inicio y fin del rango de datos dentro de paddedData.
-// Si los datos cubren >60% del rango total → vista completa (sin zoom).
-function calcBrushRange(padded: ChartPointTime[]): { start: number; end: number } {
-  const n = padded.length
-  if (n <= 2) return { start: 0, end: n - 1 }
-  const totalMs = padded[n - 1].ts - padded[0].ts
-  const firstValid = padded.findIndex(d => d.value !== null)
-  const lastValid = padded.reduceRight((acc, d, i) => acc === -1 && d.value !== null ? i : acc, -1)
-  if (firstValid === -1) return { start: 0, end: n - 1 }
-  const dataMs = padded[lastValid].ts - padded[firstValid].ts
-  if (totalMs > 0 && dataMs / totalMs > 0.6) return { start: 0, end: n - 1 }
-  const margin = Math.max(1, Math.floor((lastValid - firstValid) * 0.05))
-  return {
-    start: Math.max(0, firstValid - margin),
-    end: Math.min(n - 1, lastValid + margin),
-  }
 }
 
 function StatBox({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
@@ -114,8 +96,8 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     enabled: sensor.avl_id != null,
   })
 
-  // paddedData = null en domainStart + serie con huecos + null en domainEnd.
-  // El null inicial y final fuerza al Brush a mostrar el rango completo seleccionado.
+  // paddedData: null en domainStart + serie (ASC, huecos inyectados) + null en domainEnd.
+  // Los nulos de relleno forzan el dominio X al rango seleccionado completo.
   const { paddedData, domainStart, domainEnd } = useMemo(() => {
     const domainEnd = Date.now()
     const domainStart = domainEnd - hours * 60 * 60 * 1000
@@ -129,24 +111,11 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raw, hours, sensor.scale, sensor.offset])
 
-  // Auto-zoom sincrónico desde paddedData — sin frame en blanco en el primer render.
-  // userBrush guarda el zoom manual; se resetea al cambiar horas.
-  const autoZoomRange = useMemo(() => calcBrushRange(paddedData), [paddedData])
-  const [userBrush, setUserBrush] = useState<{ start: number; end: number } | null>(null)
-  useEffect(() => { setUserBrush(null) }, [hours])
-  const effectiveBrush = userBrush ?? autoZoomRange
-  const brushStart = Math.min(effectiveBrush.start, paddedData.length - 1)
-  const brushEnd = Math.min(effectiveBrush.end, paddedData.length - 1)
-
-  // Rango visible en timestamps (para ticks y dominio Y)
-  const visStart = paddedData[brushStart]?.ts ?? domainStart
-  const visEnd = paddedData[brushEnd]?.ts ?? domainEnd
-  const visHours = Math.max(0.5, (visEnd - visStart) / 3_600_000)
-  const xTicks = buildChartTicks(visStart, visEnd, visHours)
-
-  // Dominio Y sobre datos visibles únicamente
-  const visibleData = paddedData.slice(brushStart, brushEnd + 1)
-  const yDomain = isBoolean ? ([0, 1] as [number, number]) : niceYDomain(visibleData)
+  const xTicks = useMemo(
+    () => buildChartTicks(domainStart, domainEnd, hours),
+    [domainStart, domainEnd, hours],
+  )
+  const yDomain = isBoolean ? ([0, 1] as [number, number]) : niceYDomain(paddedData)
 
   const hasData = paddedData.filter(d => d.value !== null).length >= 2
   const stats = computeSensorStats(paddedData, isBoolean)
@@ -224,8 +193,8 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
           </div>
         </div>
 
-        {/* Gráfico + tira de contexto */}
-        <div style={{ height: 380 }}>
+        {/* Gráfica principal — mismo render que la mini pero a tamaño completo */}
+        <div style={{ height: 310 }}>
           {isLoading ? (
             <div style={{
               height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -257,11 +226,12 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   dataKey="ts"
                   type="number"
                   scale="time"
+                  domain={[domainStart, domainEnd]}
                   ticks={xTicks}
                   tick={{ fontSize: 10, fill: 'var(--fg-dim)' }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(ts: number) => fmtTick(ts, visHours)}
+                  tickFormatter={(ts: number) => fmtTick(ts, hours)}
                 />
                 <YAxis
                   domain={yDomain}
@@ -285,7 +255,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                     if (isBoolean) return [val === 1 ? 'ON' : 'OFF', sensor.label]
                     return [`${val}${unitLabel}`, sensor.label]
                   }}
-                  labelFormatter={(ts: number) => fmtTooltipLabel(ts, visHours)}
+                  labelFormatter={(ts: number) => fmtTooltipLabel(ts, hours)}
                 />
                 <Area
                   type={isBoolean ? 'stepAfter' : 'monotone'}
@@ -297,38 +267,6 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   isAnimationActive={false}
                   connectNulls={false}
                 />
-                {/* Tira de contexto: muestra el rango completo y la ventana activa */}
-                <Brush
-                  dataKey="ts"
-                  height={40}
-                  startIndex={brushStart}
-                  endIndex={brushEnd}
-                  onChange={({ startIndex, endIndex }) => {
-                    if (startIndex != null && endIndex != null) {
-                      setUserBrush({ start: startIndex, end: endIndex })
-                    }
-                  }}
-                  fill="var(--bg-card)"
-                  stroke="var(--border)"
-                  travellerWidth={8}
-                  tickFormatter={(ts: number) =>
-                    new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-                  }
-                >
-                  <AreaChart>
-                    <Area
-                      type={isBoolean ? 'stepAfter' : 'monotone'}
-                      dataKey="value"
-                      stroke={strokeColor}
-                      strokeWidth={1}
-                      fill={strokeColor}
-                      fillOpacity={0.15}
-                      dot={false}
-                      isAnimationActive={false}
-                      connectNulls={false}
-                    />
-                  </AreaChart>
-                </Brush>
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -351,7 +289,6 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   label="Máx"
                   value={stats.max !== null ? `${stats.max}${unitLabel}` : '—'}
                 />
-                {/* Media activa: excluye ceros de parado */}
                 <StatBox
                   label="Media activa"
                   value={stats.avgActive !== null ? `${stats.avgActive}${unitLabel}` : '—'}

@@ -33,8 +33,8 @@ interface SensorMiniChartProps {
 
 // Altura fija del sparkline — igual para todos los bloques
 const SPARKLINE_H = 56
-// Ventana histórica de la mini-tarjeta
-const MINI_HOURS = 24
+// Ventana histórica de la mini-tarjeta — 12h para que respire
+const MINI_HOURS = 12
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts
