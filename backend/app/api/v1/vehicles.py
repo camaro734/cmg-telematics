@@ -1860,6 +1860,37 @@ async def get_fmc_status(
     )
 
 
+class ManualCanSlotOut(BaseModel):
+    slot: int
+    param_id: int
+    description: str | None
+    active: bool
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/vehicles/{vehicle_id}/manual-can-slots", response_model=list[ManualCanSlotOut])
+async def list_manual_can_slots(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista los slots Manual CAN configurados para el vehículo (solo activos)."""
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    result = await db.execute(
+        select(VehicleManualCanSlot)
+        .where(
+            VehicleManualCanSlot.vehicle_id == vehicle_id,
+            VehicleManualCanSlot.active == True,
+        )
+        .order_by(VehicleManualCanSlot.slot)
+    )
+    return result.scalars().all()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # DOUT Commands (setdigout) — Fire-and-forget
 # ──────────────────────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import { useIsMobile } from '../../lib/useIsMobile'
 import { useUserPreferences, usePatchUserPreferences } from '../../lib/useUserPreferences'
 import { sortByOrder } from '../../lib/sensorOrder'
 import type { VehicleOut, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
+import ManualCanControl from './ManualCanControl'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
 import MaintenanceTab from './MaintenanceTab'
@@ -149,6 +150,13 @@ export default function VehicleDetailPage() {
     queryKey: keys.vehicleCommands(id ?? ''),
     queryFn: () => apiClient.get<CommandLogEntry[]>(`/api/v1/vehicles/${id}/commands?limit=10`),
     refetchInterval: 30_000,
+    enabled: !!vehicle,
+  })
+
+  const { data: manualCanSlots = [] } = useQuery<{ slot: number; description: string | null; param_id: number; active: boolean }[]>({
+    queryKey: ['manual-can-slots', id ?? ''],
+    queryFn: () => apiClient.get(`/api/v1/vehicles/${id}/manual-can-slots`),
+    staleTime: 300_000,
     enabled: !!vehicle,
   })
 
@@ -448,6 +456,11 @@ export default function VehicleDetailPage() {
                       })}
                     </div>
                   </div>
+                )}
+
+                {/* CONTROL CAN MANUAL — solo visible si el vehículo tiene slots configurados */}
+                {id && manualCanSlots.length > 0 && (
+                  <ManualCanControl vehicleId={id} slots={manualCanSlots} />
                 )}
 
                 {/* VER REPORTES */}

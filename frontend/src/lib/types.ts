@@ -66,10 +66,28 @@ export interface CommandLogEntry {
   vehicle_id: string
   tenant_id: string
   command: string
-  status: 'pending' | 'sent' | 'failed' | 'confirmed'
+  command_type?: 'DOUT' | 'MANUAL_CAN' | 'RAW'
+  status: 'pending' | 'sent' | 'failed' | 'confirmed' | 'timeout' | 'disconnected' | 'error'
   sent_at: string
   response: string | null
   error_message: string | null
+  latency_ms?: number | null
+}
+
+export interface FmcStatus {
+  connected: boolean
+  imei: string
+  last_seen: string | null
+}
+
+export interface ManualCanCommandResponse {
+  ok: boolean
+  command_log_id: string
+  imei: string
+  command_sent: string
+  fmc_response: string | null
+  latency_ms: number | null
+  status: 'confirmed' | 'timeout' | 'disconnected'
 }
 
 export interface KpiHour {
