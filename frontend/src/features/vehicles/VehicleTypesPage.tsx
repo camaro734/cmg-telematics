@@ -10,6 +10,7 @@ import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import { AVL_NAMES, AVL_OPTIONS } from '../../lib/avlNames'
+import { applyTransform, formatSensorValue } from '../../lib/sensorValue'
 import WorkCycleDefsSection from './WorkCycleDefsSection'
 import MaintenanceTemplatesSection from './MaintenanceTemplatesSection'
 import HistoricMetricsSection from './HistoricMetricsSection'
@@ -29,6 +30,9 @@ type SensorFormState = {
   gauge_type: SensorDef['gauge_type']
   bit_index: string; scale: string; offset: string; min: string; max: string
   warn_above: string; alert_above: string; warn_below: string; alert_below: string
+  // Transformación de la señal cruda al valor físico
+  transform_mode: 'scale_offset' | 'linear_range'
+  in_min: string; in_max: string; out_min: string; out_max: string
   visible_in_detail: boolean
   show_in_popup: boolean
 }
@@ -36,12 +40,15 @@ const emptySensorForm: SensorFormState = {
   avl_id: '', key: '', label: '', unit: '', mode: 'byte', gauge_type: 'numeric',
   bit_index: '', scale: '', offset: '', min: '', max: '',
   warn_above: '', alert_above: '', warn_below: '', alert_below: '',
+  transform_mode: 'scale_offset',
+  in_min: '', in_max: '', out_min: '', out_max: '',
   visible_in_detail: true,
   show_in_popup: false,
 }
 
 function sensorDefToForm(def: SensorDef): SensorFormState {
   const isBit = def.gauge_type === 'led' && def.bit_index !== undefined
+  const lin = def.transform?.type === 'linear_range' ? def.transform : null
   return {
     avl_id: def.avl_id?.toString() ?? '',
     key: def.key,
@@ -58,6 +65,11 @@ function sensorDefToForm(def: SensorDef): SensorFormState {
     alert_above: def.alert_above?.toString() ?? '',
     warn_below: def.warn_below?.toString() ?? '',
     alert_below: def.alert_below?.toString() ?? '',
+    transform_mode: lin ? 'linear_range' : 'scale_offset',
+    in_min: lin ? lin.in_min.toString() : '',
+    in_max: lin ? lin.in_max.toString() : '',
+    out_min: lin ? lin.out_min.toString() : '',
+    out_max: lin ? lin.out_max.toString() : '',
     visible_in_detail: def.visible_in_detail !== false,
     show_in_popup: def.show_in_popup === true,
   }
@@ -73,8 +85,20 @@ function formToSensorDef(f: SensorFormState): SensorDef {
     gauge_type,
   }
   if (f.mode === 'bit' && f.bit_index !== '') def.bit_index = parseInt(f.bit_index)
-  if (f.mode === 'byte' && f.scale !== '') def.scale = parseFloat(f.scale)
-  if (f.mode === 'byte' && f.offset !== '') def.offset = parseFloat(f.offset)
+  const hasRange = [f.in_min, f.in_max, f.out_min, f.out_max].every(v => v !== '')
+  if (f.mode === 'byte' && f.transform_mode === 'linear_range' && hasRange) {
+    // Rango lineal de 2 puntos: entrada → salida (4-20 mA, 0-10 V, …)
+    def.transform = {
+      type: 'linear_range',
+      in_min: parseFloat(f.in_min),
+      in_max: parseFloat(f.in_max),
+      out_min: parseFloat(f.out_min),
+      out_max: parseFloat(f.out_max),
+    }
+  } else {
+    if (f.mode === 'byte' && f.scale !== '') def.scale = parseFloat(f.scale)
+    if (f.mode === 'byte' && f.offset !== '') def.offset = parseFloat(f.offset)
+  }
   if (f.mode === 'byte' && ['circular', 'linear'].includes(gauge_type)) {
     if (f.min !== '') def.min = parseFloat(f.min)
     if (f.max !== '') def.max = parseFloat(f.max)
@@ -479,9 +503,11 @@ export default function VehicleTypesPage() {
                           <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', color: 'var(--info)' }}>
                             {def.bit_index !== undefined
                               ? `bit ${def.bit_index}`
-                              : (def.scale !== undefined || def.offset !== undefined)
-                                ? `${def.scale != null ? `×${def.scale}` : '×1'}${def.offset != null ? (def.offset >= 0 ? `+${def.offset}` : `${def.offset}`) : ''}`
-                                : '—'}
+                              : def.transform?.type === 'linear_range'
+                                ? `${def.transform.in_min}–${def.transform.in_max} → ${def.transform.out_min}–${def.transform.out_max}`
+                                : (def.scale !== undefined || def.offset !== undefined)
+                                  ? `${def.scale != null ? `×${def.scale}` : '×1'}${def.offset != null ? (def.offset >= 0 ? `+${def.offset}` : `${def.offset}`) : ''}`
+                                  : '—'}
                           </td>
                           <td style={{ padding: '6px 10px', color: 'var(--offline)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{def.key}</td>
                           <td style={{ padding: '6px 10px' }}>
@@ -726,7 +752,7 @@ export default function VehicleTypesPage() {
 
             {/* Opciones de byte: gauge type + scale + min/max + warn/alert */}
             {sensorForm.mode === 'byte' && (<>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>TIPO DE GAUGE</label>
                   <Select value={sensorForm.gauge_type}
@@ -735,16 +761,69 @@ export default function VehicleTypesPage() {
                   </Select>
                 </div>
                 <div>
-                  <label style={labelStyle}>MULTIPLICADOR (scale)</label>
-                  <Input type="number" step="any" value={sensorForm.scale}
-                    onChange={e => setSensorForm(f => ({ ...f, scale: e.target.value }))} placeholder="1" />
-                </div>
-                <div>
-                  <label style={labelStyle}>OFFSET (suma/resta)</label>
-                  <Input type="number" step="any" value={sensorForm.offset}
-                    onChange={e => setSensorForm(f => ({ ...f, offset: e.target.value }))} placeholder="0" />
+                  <label style={labelStyle}>TRANSFORMACIÓN</label>
+                  <Select value={sensorForm.transform_mode}
+                    onChange={e => setSensorForm(f => ({ ...f, transform_mode: e.target.value as SensorFormState['transform_mode'] }))}>
+                    <option value="scale_offset">Escala / offset</option>
+                    <option value="linear_range">Rango lineal (4-20 mA / 0-10 V)</option>
+                  </Select>
                 </div>
               </div>
+
+              {sensorForm.transform_mode === 'scale_offset' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>MULTIPLICADOR (scale)</label>
+                    <Input type="number" step="any" value={sensorForm.scale}
+                      onChange={e => setSensorForm(f => ({ ...f, scale: e.target.value }))} placeholder="1" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>OFFSET (suma/resta)</label>
+                    <Input type="number" step="any" value={sensorForm.offset}
+                      onChange={e => setSensorForm(f => ({ ...f, offset: e.target.value }))} placeholder="0" />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>ENTRADA MIN</label>
+                      <Input type="number" step="any" size="sm" value={sensorForm.in_min}
+                        onChange={e => setSensorForm(f => ({ ...f, in_min: e.target.value }))} placeholder="4000" />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>ENTRADA MAX</label>
+                      <Input type="number" step="any" size="sm" value={sensorForm.in_max}
+                        onChange={e => setSensorForm(f => ({ ...f, in_max: e.target.value }))} placeholder="20000" />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>SALIDA MIN</label>
+                      <Input type="number" step="any" size="sm" value={sensorForm.out_min}
+                        onChange={e => setSensorForm(f => ({ ...f, out_min: e.target.value }))} placeholder="-1" />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>SALIDA MAX</label>
+                      <Input type="number" step="any" size="sm" value={sensorForm.out_max}
+                        onChange={e => setSensorForm(f => ({ ...f, out_max: e.target.value }))} placeholder="10" />
+                    </div>
+                  </div>
+                  {(() => {
+                    const a = parseFloat(sensorForm.in_min), b = parseFloat(sensorForm.in_max)
+                    const c = parseFloat(sensorForm.out_min), d = parseFloat(sensorForm.out_max)
+                    if ([a, b, c, d].some(n => Number.isNaN(n)) || a === b) {
+                      return <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Define los 4 valores para ver la conversión.</div>
+                    }
+                    const t = { transform: { type: 'linear_range' as const, in_min: a, in_max: b, out_min: c, out_max: d } }
+                    const lo = applyTransform(a, t), hi = applyTransform(b, t)
+                    const u = sensorForm.unit ? ` ${sensorForm.unit}` : ''
+                    return (
+                      <div style={{ fontSize: 12, color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)' }}>
+                        {a} → {formatSensorValue(lo)}{u} · {b} → {formatSensorValue(hi)}{u}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
 
               {['circular', 'linear'].includes(sensorForm.gauge_type) && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
