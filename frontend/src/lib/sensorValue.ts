@@ -40,6 +40,24 @@ export function applyScaleOffset(
   return raw * (scale ?? 1) + (offset ?? 0)
 }
 
+// Campos de un sensor que definen su transformación. Subconjunto de SensorDef
+// para que cualquier consumidor (incluido buildSensorSeries) pueda transformar.
+export type TransformInput = Pick<SensorDef, 'scale' | 'offset' | 'transform'>
+
+// Transforma el valor crudo del sensor a su valor físico.
+// 'linear_range' = interpolación lineal de 2 puntos (entrada → salida);
+// sin transform cae al modo legado scale/offset. Sin recorte fuera de rango.
+export function applyTransform(raw: number | null, sensor: TransformInput): number | null {
+  if (raw == null) return null
+  const t = sensor.transform
+  if (t && t.type === 'linear_range') {
+    const span = t.in_max - t.in_min
+    if (span === 0) return null
+    return (raw - t.in_min) * (t.out_max - t.out_min) / span + t.out_min
+  }
+  return applyScaleOffset(raw, sensor.scale, sensor.offset)
+}
+
 export function bitValue(raw: number | null, bitIndex?: number): boolean | null {
   if (raw == null) return null
   if (bitIndex != null) return ((raw >> bitIndex) & 1) === 1

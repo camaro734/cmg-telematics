@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRawValue, applyScaleOffset, bitValue, isJ1939NA } from '../sensorValue'
+import { resolveRawValue, applyScaleOffset, applyTransform, bitValue, isJ1939NA } from '../sensorValue'
 import type { SensorDef, VehicleStatus } from '../types'
 
 const baseStatus: VehicleStatus = {
@@ -119,6 +119,51 @@ describe('applyScaleOffset', () => {
 
   it('devuelve null si raw es null', () => {
     expect(applyScaleOffset(null, 2, 10)).toBeNull()
+  })
+})
+
+describe('applyTransform — linear_range', () => {
+  // Caso real: sensor de vacío 4-20 mA (4000–20000 crudo) → −1..10 bar
+  const vacioSensor: SensorDef = {
+    ...baseSensor,
+    transform: { type: 'linear_range', in_min: 4000, in_max: 20000, out_min: -1, out_max: 10 },
+  }
+
+  it('mapea el extremo inferior del rango (4000 → −1)', () => {
+    expect(applyTransform(4000, vacioSensor)).toBeCloseTo(-1)
+  })
+
+  it('mapea el extremo superior del rango (20000 → 10)', () => {
+    expect(applyTransform(20000, vacioSensor)).toBeCloseTo(10)
+  })
+
+  it('mapea el punto medio (12000 → 4.5)', () => {
+    expect(applyTransform(12000, vacioSensor)).toBeCloseTo(4.5)
+  })
+
+  it('extrapola por debajo del rango sin recortar (2000 → −2.375)', () => {
+    expect(applyTransform(2000, vacioSensor)).toBeCloseTo(-2.375)
+  })
+
+  it('devuelve null si in_min == in_max (evita división por cero)', () => {
+    const degenerate: SensorDef = {
+      ...baseSensor,
+      transform: { type: 'linear_range', in_min: 5, in_max: 5, out_min: 0, out_max: 10 },
+    }
+    expect(applyTransform(5, degenerate)).toBeNull()
+  })
+
+  it('devuelve null si raw es null', () => {
+    expect(applyTransform(null, vacioSensor)).toBeNull()
+  })
+
+  it('sin transform: cae al fallback scale/offset', () => {
+    const legacy: SensorDef = { ...baseSensor, scale: 0.1, offset: 5 }
+    expect(applyTransform(100, legacy)).toBeCloseTo(15)
+  })
+
+  it('sin transform ni scale/offset: identidad', () => {
+    expect(applyTransform(42, baseSensor)).toBe(42)
   })
 })
 

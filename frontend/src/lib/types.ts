@@ -114,6 +114,14 @@ export interface TenantOut {
   enabled_modules: string[]
 }
 
+// Transformación de un sensor: mapeo de la señal cruda a su valor físico.
+// 'linear_range' = interpolación lineal de 2 puntos (entrada → salida),
+// p. ej. 4-20 mA (4000–20000 crudo) → −1..10 bar. Unión etiquetada
+// extensible a tablas multipunto no lineales sin migración.
+export type SensorTransform =
+  | { type: 'linear_range'; in_min: number; in_max: number; out_min: number; out_max: number }
+// futuro: | { type: 'points'; points: [number, number][] }
+
 export interface SensorDef {
   key: string
   label: string
@@ -135,6 +143,7 @@ export interface SensorDef {
   derivative?: boolean
   visible_in_detail?: boolean
   show_in_popup?: boolean
+  transform?: SensorTransform
   icon?: SensorIcon
   color?: string
   widget_size?: 'sm' | 'md' | 'lg'
