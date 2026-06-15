@@ -25,6 +25,7 @@ from app.schemas.vehicle import (
     SaveAsTemplateBody, SensorCatalogItem,
     TripPoint, Trip, DayTripTotals, DayTrips,
     VehicleReassignBody, VehicleReassignOut,
+    ManualCanCommandRequest, ManualCanCommandResponse, FmcStatusResponse,
 )
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
@@ -36,6 +37,8 @@ from app.models.tenant import Tenant
 from app.models.work_order import WorkOrder
 from app.models.alert_rule import AlertRule
 from app.models.permission_grant import PermissionGrant
+from app.models.command_log import CommandLog
+from app.models.vehicle_manual_can_slot import VehicleManualCanSlot
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
@@ -1639,6 +1642,227 @@ async def list_vehicle_maintenance(
     # Import here to avoid circular import at module level
     from app.api.v1.maintenance import _to_out as _maintenance_to_out
     return [await _maintenance_to_out(p, vehicle.name, db) for p in plans]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Manual CAN Commands (setparam) — Flujo síncrono con espera de respuesta
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post("/vehicles/{vehicle_id}/commands/manual-can", response_model=ManualCanCommandResponse)
+async def send_manual_can_command(
+    vehicle_id: uuid.UUID,
+    body: ManualCanCommandRequest,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Envía un comando setparam Manual CAN al FMC650 y espera respuesta.
+
+    Flujo:
+    1. Valida rol (admin/operator)
+    2. Verifica acceso multi-tenant
+    3. Busca config vehicle_manual_can_slot
+    4. Construye comando setparam
+    5. Publica en Redis channel cmg:manual_can_commands
+    6. Espera respuesta por BLPOP (timeout 18s)
+    7. Actualiza CommandLog y retorna resultado
+    """
+    # 1. Auth
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
+
+    # 2. Multi-tenant check
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    # 3. Device
+    result = await db.execute(
+        select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="No hay dispositivo activo vinculado al vehículo")
+
+    imei = device.imei
+
+    # 4. Buscar configuración Manual CAN slot
+    result = await db.execute(
+        select(VehicleManualCanSlot).where(
+            VehicleManualCanSlot.vehicle_id == vehicle_id,
+            VehicleManualCanSlot.slot == body.slot,
+            VehicleManualCanSlot.active == True,
+        )
+    )
+    slot_config = result.scalar_one_or_none()
+    if not slot_config:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Manual CAN no configurado para slot {body.slot}",
+        )
+
+    param_id = slot_config.param_id
+    redis = request.app.state.redis
+
+    # 5. Verificar FMC online (informativo, el check duro es la respuesta DISCONNECTED)
+    status_raw = await redis.hgetall(f"vehicle:{vehicle_id}:status")
+    if not status_raw or not status_raw.get("last_seen"):
+        # No es 503 automático; el DISCONNECTED lo lo hará. Pero es buena señal.
+        pass
+
+    # 6. Anti-concurrencia
+    pending_key = f"command:{imei}:pending_response"
+    exists = await redis.exists(pending_key)
+    if exists:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya hay un comando en vuelo para este dispositivo",
+        )
+
+    # 7. Construir comando setparam
+    value_hex = "01FFFFFFFFFFFFFF" if body.state else "00FFFFFFFFFFFFFF"
+    command_sent = f"setparam {param_id}:{value_hex}"
+
+    # 8. Crear CommandLog — UUID generado en Python para no depender del flush
+    now = datetime.now(timezone.utc)
+    command_log_id = uuid.uuid4()
+    command_log = CommandLog(
+        id=command_log_id,
+        device_id=device.id,
+        vehicle_id=vehicle_id,
+        tenant_id=vehicle.tenant_id,
+        user_id=user.user_id,
+        command=command_sent,
+        command_type="MANUAL_CAN",
+        status="pending",
+        param_id=param_id,
+        param_value=value_hex,
+        imei_snapshot=imei,
+        sent_at=now,
+    )
+    db.add(command_log)
+
+    # 9. Reservar el hueco anti-concurrencia
+    await redis.set(pending_key, "", ex=20)
+
+    # 10. Publicar comando
+    await redis.publish(
+        "cmg:manual_can_commands",
+        json.dumps({
+            "imei": imei,
+            "command": command_sent,
+            "log_id": str(command_log_id),
+        }),
+    )
+    logger.info(
+        "Manual CAN publicado → IMEI %s slot=%s state=%s param=%s",
+        imei, body.slot, body.state, param_id,
+    )
+
+    # 11. Esperar respuesta. redis.blpop con timeout>0 devuelve None tras el timeout,
+    #     nunca lanza excepción — un único camino de "sin respuesta".
+    try:
+        resp_data = await redis.blpop(f"command:{imei}:response", timeout=18)
+
+        # 12. Interpretar resultado
+        if resp_data is None:
+            # BLPOP timeout
+            command_log.status = "timeout"
+            command_log.response_at = datetime.now(timezone.utc)
+            await db.commit()
+            logger.warning("Manual CAN timeout para %s", imei)
+            raise HTTPException(
+                status_code=504,
+                detail="El FMC no respondió en 18 segundos",
+            )
+
+        # resp_data es (key, value) tuple de redis
+        _, fmc_response = resp_data
+
+        if fmc_response == "DISCONNECTED":
+            command_log.status = "disconnected"
+            command_log.response_at = datetime.now(timezone.utc)
+            await db.commit()
+            logger.warning("Manual CAN FMC desconectado para %s", imei)
+            raise HTTPException(status_code=503, detail="FMC desconectado")
+
+        # Respuesta válida
+        now_response = datetime.now(timezone.utc)
+        latency_ms = int((now_response - now).total_seconds() * 1000)
+
+        command_log.status = "confirmed"
+        command_log.response = fmc_response
+        command_log.response_at = now_response
+        command_log.latency_ms = latency_ms
+        await db.commit()
+
+        logger.info(
+            "Manual CAN confirmado para %s: latency=%sms response=%r",
+            imei, latency_ms, fmc_response,
+        )
+
+        return ManualCanCommandResponse(
+            ok=True,
+            command_log_id=command_log_id,
+            imei=imei,
+            command_sent=command_sent,
+            fmc_response=fmc_response,
+            latency_ms=latency_ms,
+            status="confirmed",
+        )
+    finally:
+        # 13. Liberar el hueco anti-concurrencia (SIEMPRE, incluso si hay error)
+        await redis.delete(pending_key)
+
+
+@router.get("/vehicles/{vehicle_id}/fmc-status", response_model=FmcStatusResponse)
+async def get_fmc_status(
+    vehicle_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Obtiene el estado de conexión del FMC650 para el vehículo."""
+    # Multi-tenant check
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    # Device
+    result = await db.execute(
+        select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="No hay dispositivo activo vinculado al vehículo")
+
+    redis = request.app.state.redis
+    status_raw = await redis.hgetall(f"vehicle:{vehicle_id}:status")
+
+    # El vehículo está "online" si last_seen < 60 min (patrón existente)
+    last_seen_str = status_raw.get("last_seen") if status_raw else None
+    last_seen = None
+    connected = False
+
+    if last_seen_str:
+        try:
+            last_seen = datetime.fromisoformat(last_seen_str)
+            now = datetime.now(timezone.utc)
+            connected = (now - last_seen).total_seconds() < 3600
+        except (ValueError, TypeError):
+            pass
+
+    return FmcStatusResponse(
+        connected=connected,
+        imei=device.imei,
+        last_seen=last_seen,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DOUT Commands (setdigout) — Fire-and-forget
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 class DoutCommand(BaseModel):

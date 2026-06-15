@@ -68,6 +68,7 @@ class CommandLogConfirm(BaseModel):
 async def list_vehicle_commands(
     vehicle_id: uuid.UUID,
     limit: int = Query(50, le=200),
+    command_type: str | None = Query(None, description="Filtrar por comando_type: DOUT | MANUAL_CAN | RAW"),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -76,9 +77,14 @@ async def list_vehicle_commands(
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     if user.tenant_tier != "cmg" and str(vehicle.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    where_clause = [CommandLog.vehicle_id == vehicle_id]
+    if command_type:
+        where_clause.append(CommandLog.command_type == command_type)
+
     result = await db.execute(
         select(CommandLog)
-        .where(CommandLog.vehicle_id == vehicle_id)
+        .where(*where_clause)
         .order_by(CommandLog.sent_at.desc())
         .limit(limit)
     )

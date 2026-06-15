@@ -281,3 +281,24 @@ class VehicleTypeUpdate(BaseModel):
     name: str | None = None
     slug: str | None = None
     pdf_metrics: list[PdfMetric] | None = None
+
+
+class ManualCanCommandRequest(BaseModel):
+    slot: int = Field(..., ge=0, le=9, description="Manual CAN slot 0-9")
+    state: bool = Field(..., description="True=ON (01...), False=OFF (00...)")
+
+
+class ManualCanCommandResponse(BaseModel):
+    ok: bool
+    command_log_id: uuid.UUID
+    imei: str
+    command_sent: str
+    fmc_response: str | None
+    latency_ms: int | None
+    status: str
+
+
+class FmcStatusResponse(BaseModel):
+    connected: bool
+    imei: str
+    last_seen: datetime | None
