@@ -73,6 +73,30 @@ describe('wsClient', () => {
     expect(cached).toMatchObject({ vehicle_id: 'v-abc', speed_kmh: 60 })
   })
 
+  it('preserva el último valor bueno cuando el WS envía un campo como null', async () => {
+    const client = await getClient()
+    const qc = new QueryClient()
+    client.connect('token', qc)
+    const ws = MockWebSocket.instances[0]
+
+    // Primer paquete: con tensión
+    ws.onmessage?.({ data: JSON.stringify({ type: 'telemetry', data: {
+      vehicle_id: 'v-abc', online: true, last_seen: '2026-06-15T08:00:00Z',
+      lat: 39.5, lon: -0.4, speed_kmh: 0, ignition: true, pto_active: true,
+      ext_voltage_mv: 13613, can_data: {},
+    } }) })
+    // Segundo paquete: sin tensión (ext_voltage_mv null) — no debe borrar el 13613
+    ws.onmessage?.({ data: JSON.stringify({ type: 'telemetry', data: {
+      vehicle_id: 'v-abc', online: true, last_seen: '2026-06-15T08:00:05Z',
+      lat: 39.5, lon: -0.4, speed_kmh: 0, ignition: true, pto_active: true,
+      ext_voltage_mv: null, can_data: {},
+    } }) })
+
+    const cached = qc.getQueryData(['vehicles', 'v-abc', 'status']) as { ext_voltage_mv: number; last_seen: string }
+    expect(cached.ext_voltage_mv).toBe(13613)
+    expect(cached.last_seen).toBe('2026-06-15T08:00:05Z')  // los campos no-null sí se actualizan
+  })
+
   it('llama a los callbacks de onTelemetry', async () => {
     const client = await getClient()
     const qc = new QueryClient()

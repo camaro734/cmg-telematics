@@ -6,6 +6,20 @@ import type { VehicleStatus } from './types'
 
 const RECONNECT_MAX_MS = 30_000
 
+// Fusiona un parche de status sobre el anterior preservando los campos que el
+// mensaje WS no aporta. Además NO sobrescribe con null/undefined: algunos campos
+// (p. ej. ext_voltage_mv) llegan como null en paquetes que no incluyen esa
+// lectura, pero el último valor bueno debe conservarse en lugar de borrarse en
+// pantalla. El status individual (detalle) no se autorrecupera tan rápido como
+// el bulk, así que sin esto el dato parpadea/desaparece.
+function mergeStatus(old: VehicleStatus, data: VehicleStatus): VehicleStatus {
+  const merged: Record<string, unknown> = { ...old }
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== null && value !== undefined) merged[key] = value
+  }
+  return merged as unknown as VehicleStatus
+}
+
 type TelemetryCallback = (data: VehicleStatus) => void
 type ConnectionCallback = (connected: boolean) => void
 
@@ -81,7 +95,7 @@ class WsClientImpl {
           // no los incluye (evita parpadeo de "sin señal" entre paquetes).
           this.queryClient?.setQueryData(
             keys.vehicleStatus(data.vehicle_id),
-            (old: VehicleStatus | undefined) => old ? { ...old, ...data } : data,
+            (old: VehicleStatus | undefined) => old ? mergeStatus(old, data) : data,
           )
           // Cache bulk — lo leen FleetMap y FleetDashboard.
           // Sin este patch, el bulk queda congelado (staleTime: Infinity) y
@@ -93,7 +107,7 @@ class WsClientImpl {
               const idx = old.findIndex(s => s.vehicle_id === data.vehicle_id)
               if (idx === -1) return [...old, data]
               const next = old.slice()
-              next[idx] = { ...next[idx], ...data }
+              next[idx] = mergeStatus(next[idx], data)
               return next
             },
           )
