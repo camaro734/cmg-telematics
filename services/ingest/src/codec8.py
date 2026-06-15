@@ -244,3 +244,56 @@ def build_setdigout(slot: int, state: bool) -> str:
     if 1 <= slot <= 4:
         chars[slot - 1] = "1" if state else "0"
     return f"setdigout {''.join(chars)} 0"
+
+
+def parse_codec12_response(data: bytes) -> str | None:
+    """
+    Parsea un paquete Codec 12 type 0x06 (respuesta del FMC650).
+
+    Devuelve el texto de respuesta tal cual, sin interpretar el contenido.
+    Cualquier paquete 0x0C/type=0x06 se considera respuesta válida — no se evalúa
+    el texto devuelto para determinar éxito/fallo (eso se hace en capa superior).
+
+    Devuelve None si el buffer no es una respuesta Codec 12 válida.
+    No lanza excepciones: el caller decide qué hacer con None.
+
+    Estructura del paquete (offsets):
+      [0..3]   Preamble         0x00000000
+      [4..7]   Data length      uint32 BE
+      [8]      Codec ID         0x0C
+      [9]      Quantity 1       normalmente 0x01
+      [10]     Type             0x06 = respuesta, 0x05 = comando
+      [11..14] Response length  uint32 BE
+      [15..]   Response text    ASCII
+      [15+N]   Quantity 2
+      [16+N..] CRC-16           uint32 BE
+    """
+    # Mínimo: 4+4+1+1+1+4+0+1+4 = 20 bytes
+    if len(data) < 20:
+        return None
+    if struct.unpack_from(">I", data, 0)[0] != 0x00000000:
+        return None
+    data_length = struct.unpack_from(">I", data, 4)[0]
+    if len(data) < 4 + 4 + data_length + 4:
+        return None
+    if data[8] != 0x0C:   # codec_id: debe ser Codec 12
+        return None
+    if data[10] != 0x06:  # type: solo respuesta, no comando
+        return None
+    text_len = struct.unpack_from(">I", data, 11)[0]
+    if len(data) < 15 + text_len:
+        return None
+    return data[15 : 15 + text_len].decode("ascii", errors="replace")
+
+
+def build_setparam(param_id: int, value_hex: str) -> str:
+    """
+    Construye el comando setparam para Manual CAN output.
+    param_id: ID del parámetro FMC (ej. 31412 para CAN slot 0).
+    value_hex: exactamente 16 caracteres hex (8 bytes de datos CAN en big-endian).
+    """
+    if len(value_hex) != 16 or not all(c in "0123456789abcdefABCDEF" for c in value_hex):
+        raise ValueError(
+            f"value_hex debe ser exactamente 16 caracteres hex, recibido: {value_hex!r}"
+        )
+    return f"setparam {param_id}:{value_hex}"
