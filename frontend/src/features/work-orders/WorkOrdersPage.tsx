@@ -173,9 +173,15 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
     refetchInterval: 15_000,
   })
 
+  // Título derivado: si no se escribe, usa dirección / cliente / "Parada N".
+  const derivedStopTitle = () =>
+    (newStop.title ?? '').trim() || (newStop.address ?? '').trim() || (newStop.client_name ?? '').trim() || `Parada ${stops.length + 1}`
+  // Se puede añadir si hay título, dirección o ubicación elegida en el mapa.
+  const canAddStop = !!((newStop.title ?? '').trim() || (newStop.address ?? '').trim() || pickedLat != null)
+
   const { mutate: createStop, isPending: creating } = useMutation({
     mutationFn: () => apiClient.post<WorkOrderStopOut>(`/api/v1/work-orders/${order.id}/stops`, {
-      ...newStop, lat: pickedLat, lon: pickedLon, order_index: stops.length,
+      ...newStop, title: derivedStopTitle(), lat: pickedLat, lon: pickedLon, order_index: stops.length,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['work-order-stops', order.id] })
@@ -439,13 +445,13 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
                 Cancelar
               </button>
               <button
-                disabled={creating || !newStop.title?.trim()}
+                disabled={creating || !canAddStop}
                 onClick={() => createStop()}
                 style={{
                   fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 700,
                   padding: '5px 14px', borderRadius: 6, border: 'none',
                   background: 'var(--cmg-teal)', color: '#fff', cursor: 'pointer',
-                  opacity: creating || !newStop.title?.trim() ? 0.6 : 1,
+                  opacity: creating || !canAddStop ? 0.6 : 1,
                 }}
               >
                 {creating ? 'Guardando…' : 'Añadir parada'}

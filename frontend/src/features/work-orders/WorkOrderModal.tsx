@@ -104,7 +104,14 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
     setDraftStops(ds => ds.filter(d => d._id !== _id))
   }
 
-  const validStops      = draftStops.filter(s => s.title.trim())
+  // Una parada "cuenta" si tiene algo que la identifique: título, dirección o
+  // ubicación en el mapa. Antes se exigía título y las paradas puestas solo en
+  // el mapa se descartaban en silencio → la ruta no se guardaba.
+  const stopHasContent = (s: DraftStop) =>
+    !!(s.title.trim() || (s.address ?? '').trim() || s.lat != null)
+  const stopTitle = (s: DraftStop, i: number) =>
+    s.title.trim() || (s.address ?? '').trim() || (s.client_name ?? '').trim() || `Parada ${i + 1}`
+  const validStops      = draftStops.filter(stopHasContent)
   const canEnableAC     = !!form.vehicle_id
   const signalRequired  = autoClose.enabled && !autoClose.service_signal_key
   const stopsForMap: RouteStop[] = draftStops
@@ -136,9 +143,9 @@ export function WorkOrderModal({ initial, vehicles, drivers, onClose, onSaved }:
         : await apiClient.post<WorkOrderOut>('/api/v1/work-orders', payload)
       for (let i = 0; i < draftStops.length; i++) {
         const s = draftStops[i]
-        if (!s.title.trim()) continue
+        if (!stopHasContent(s)) continue   // solo se omiten paradas totalmente vacías
         await apiClient.post(`/api/v1/work-orders/${order.id}/stops`, {
-          order_index: i, title: s.title,
+          order_index: i, title: stopTitle(s, i),
           client_name: s.client_name || null, address: s.address || null,
           lat: s.lat, lon: s.lon, arrival_radius_m: s.arrival_radius_m,
           notes: s.notes || null,
