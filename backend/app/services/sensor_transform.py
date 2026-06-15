@@ -22,6 +22,9 @@ def apply_transform(raw: float | None, sensor: dict) -> float | None:
         span = transform["in_max"] - transform["in_min"]
         if span == 0:
             return None
+        # 4-20 mA: raw=0 = 0 mA = lazo sin señal (p. ej. PLC arrancando) → sin lectura.
+        if transform["in_min"] > 0 and raw == 0:
+            return None
         return (raw - transform["in_min"]) * (transform["out_max"] - transform["out_min"]) / span + transform["out_min"]
     scale = sensor.get("scale")
     offset = sensor.get("offset")

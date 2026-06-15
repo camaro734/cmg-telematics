@@ -157,6 +157,18 @@ describe('applyTransform — linear_range', () => {
     expect(applyTransform(null, vacioSensor)).toBeNull()
   })
 
+  it('4-20 mA: raw=0 (0 mA, PLC arrancando) → null', () => {
+    expect(applyTransform(0, vacioSensor)).toBeNull()
+  })
+
+  it('rango con in_min=0: raw=0 es válido (no se filtra)', () => {
+    const zeroBased: SensorDef = {
+      ...baseSensor,
+      transform: { type: 'linear_range', in_min: 0, in_max: 100, out_min: 0, out_max: 10 },
+    }
+    expect(applyTransform(0, zeroBased)).toBeCloseTo(0)
+  })
+
   it('sin transform: cae al fallback scale/offset', () => {
     const legacy: SensorDef = { ...baseSensor, scale: 0.1, offset: 5 }
     expect(applyTransform(100, legacy)).toBeCloseTo(15)

@@ -784,25 +784,31 @@ export default function VehicleTypesPage() {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+                    Convierte la <b>señal cruda</b> del sensor (lo que envía el CAN, p. ej. 4-20 mA = 4000–20000)
+                    al <b>valor real</b> en su unidad{sensorForm.unit ? ` (${sensorForm.unit})` : ''}.
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 24px 1fr', gap: 8, alignItems: 'end' }}>
                     <div>
-                      <label style={{ ...labelStyle, fontSize: 10 }}>ENTRADA MIN</label>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>SEÑAL CRUDA — MÍNIMO</label>
                       <Input type="number" step="any" size="sm" value={sensorForm.in_min}
                         onChange={e => setSensorForm(f => ({ ...f, in_min: e.target.value }))} placeholder="4000" />
                     </div>
+                    <div style={{ textAlign: 'center', color: 'var(--cmg-teal)', fontWeight: 700, paddingBottom: 6 }}>→</div>
                     <div>
-                      <label style={{ ...labelStyle, fontSize: 10 }}>ENTRADA MAX</label>
-                      <Input type="number" step="any" size="sm" value={sensorForm.in_max}
-                        onChange={e => setSensorForm(f => ({ ...f, in_max: e.target.value }))} placeholder="20000" />
-                    </div>
-                    <div>
-                      <label style={{ ...labelStyle, fontSize: 10 }}>SALIDA MIN</label>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>VALOR REAL — MÍNIMO{sensorForm.unit ? ` (${sensorForm.unit})` : ''}</label>
                       <Input type="number" step="any" size="sm" value={sensorForm.out_min}
                         onChange={e => setSensorForm(f => ({ ...f, out_min: e.target.value }))} placeholder="-1" />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, fontSize: 10 }}>SALIDA MAX</label>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>SEÑAL CRUDA — MÁXIMO</label>
+                      <Input type="number" step="any" size="sm" value={sensorForm.in_max}
+                        onChange={e => setSensorForm(f => ({ ...f, in_max: e.target.value }))} placeholder="20000" />
+                    </div>
+                    <div style={{ textAlign: 'center', color: 'var(--cmg-teal)', fontWeight: 700, paddingBottom: 6 }}>→</div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: 10 }}>VALOR REAL — MÁXIMO{sensorForm.unit ? ` (${sensorForm.unit})` : ''}</label>
                       <Input type="number" step="any" size="sm" value={sensorForm.out_max}
                         onChange={e => setSensorForm(f => ({ ...f, out_max: e.target.value }))} placeholder="10" />
                     </div>
@@ -811,14 +817,15 @@ export default function VehicleTypesPage() {
                     const a = parseFloat(sensorForm.in_min), b = parseFloat(sensorForm.in_max)
                     const c = parseFloat(sensorForm.out_min), d = parseFloat(sensorForm.out_max)
                     if ([a, b, c, d].some(n => Number.isNaN(n)) || a === b) {
-                      return <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Define los 4 valores para ver la conversión.</div>
+                      return <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Rellena los 4 valores para ver la conversión.</div>
                     }
                     const t = { transform: { type: 'linear_range' as const, in_min: a, in_max: b, out_min: c, out_max: d } }
                     const lo = applyTransform(a, t), hi = applyTransform(b, t)
                     const u = sensorForm.unit ? ` ${sensorForm.unit}` : ''
                     return (
                       <div style={{ fontSize: 12, color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)' }}>
-                        {a} → {formatSensorValue(lo)}{u} · {b} → {formatSensorValue(hi)}{u}
+                        Ejemplo: {a} → {formatSensorValue(lo)}{u} · {b} → {formatSensorValue(hi)}{u}
+                        <span style={{ color: 'var(--fg-dim)', marginLeft: 8 }}>(señal 0 = sin lectura)</span>
                       </div>
                     )
                   })()}

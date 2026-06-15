@@ -53,6 +53,8 @@ export function applyTransform(raw: number | null, sensor: TransformInput): numb
   if (t && t.type === 'linear_range') {
     const span = t.in_max - t.in_min
     if (span === 0) return null
+    // 4-20 mA: raw=0 = 0 mA = lazo sin señal (p. ej. PLC arrancando) → sin lectura.
+    if (t.in_min > 0 && raw === 0) return null
     return (raw - t.in_min) * (t.out_max - t.out_min) / span + t.out_min
   }
   return applyScaleOffset(raw, sensor.scale, sensor.offset)

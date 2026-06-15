@@ -33,6 +33,16 @@ def test_raw_none_devuelve_none():
     assert apply_transform(None, sensor) is None
 
 
+def test_linear_range_4_20ma_raw_cero_es_sin_senal():
+    sensor = {"transform": {"type": "linear_range", "in_min": 4000, "in_max": 20000, "out_min": -1, "out_max": 10}}
+    assert apply_transform(0, sensor) is None
+
+
+def test_linear_range_in_min_cero_raw_cero_valido():
+    sensor = {"transform": {"type": "linear_range", "in_min": 0, "in_max": 100, "out_min": 0, "out_max": 10}}
+    assert apply_transform(0, sensor) == 0
+
+
 def test_fallback_scale_offset():
     sensor = {"scale": 0.1, "offset": 5}
     assert apply_transform(100, sensor) == 15.0
