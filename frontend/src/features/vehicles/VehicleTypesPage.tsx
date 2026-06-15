@@ -31,7 +31,7 @@ type SensorFormState = {
   bit_index: string; scale: string; offset: string; min: string; max: string
   warn_above: string; alert_above: string; warn_below: string; alert_below: string
   // Transformación de la señal cruda al valor físico
-  transform_mode: 'scale_offset' | 'linear_range'
+  transform_mode: 'scale_offset' | 'linear_range' | 'minutes_to_hours'
   in_min: string; in_max: string; out_min: string; out_max: string
   visible_in_detail: boolean
   show_in_popup: boolean
@@ -49,6 +49,10 @@ const emptySensorForm: SensorFormState = {
 function sensorDefToForm(def: SensorDef): SensorFormState {
   const isBit = def.gauge_type === 'led' && def.bit_index !== undefined
   const lin = def.transform?.type === 'linear_range' ? def.transform : null
+  const transform_mode: SensorFormState['transform_mode'] =
+    def.transform?.type === 'minutes_to_hours' ? 'minutes_to_hours'
+    : lin ? 'linear_range'
+    : 'scale_offset'
   return {
     avl_id: def.avl_id?.toString() ?? '',
     key: def.key,
@@ -65,7 +69,7 @@ function sensorDefToForm(def: SensorDef): SensorFormState {
     alert_above: def.alert_above?.toString() ?? '',
     warn_below: def.warn_below?.toString() ?? '',
     alert_below: def.alert_below?.toString() ?? '',
-    transform_mode: lin ? 'linear_range' : 'scale_offset',
+    transform_mode,
     in_min: lin ? lin.in_min.toString() : '',
     in_max: lin ? lin.in_max.toString() : '',
     out_min: lin ? lin.out_min.toString() : '',
@@ -86,7 +90,10 @@ function formToSensorDef(f: SensorFormState): SensorDef {
   }
   if (f.mode === 'bit' && f.bit_index !== '') def.bit_index = parseInt(f.bit_index)
   const hasRange = [f.in_min, f.in_max, f.out_min, f.out_max].every(v => v !== '')
-  if (f.mode === 'byte' && f.transform_mode === 'linear_range' && hasRange) {
+  if (f.mode === 'byte' && f.transform_mode === 'minutes_to_hours') {
+    def.transform = { type: 'minutes_to_hours' }
+    def.unit = 'h'
+  } else if (f.mode === 'byte' && f.transform_mode === 'linear_range' && hasRange) {
     // Rango lineal de 2 puntos: entrada → salida (4-20 mA, 0-10 V, …)
     def.transform = {
       type: 'linear_range',
@@ -503,7 +510,9 @@ export default function VehicleTypesPage() {
                           <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', color: 'var(--info)' }}>
                             {def.bit_index !== undefined
                               ? `bit ${def.bit_index}`
-                              : def.transform?.type === 'linear_range'
+                              : def.transform?.type === 'minutes_to_hours'
+                                ? 'min → h (÷60)'
+                                : def.transform?.type === 'linear_range'
                                 ? `${def.transform.in_min}–${def.transform.in_max} → ${def.transform.out_min}–${def.transform.out_max}`
                                 : (def.scale !== undefined || def.offset !== undefined)
                                   ? `${def.scale != null ? `×${def.scale}` : '×1'}${def.offset != null ? (def.offset >= 0 ? `+${def.offset}` : `${def.offset}`) : ''}`
@@ -763,14 +772,23 @@ export default function VehicleTypesPage() {
                 <div>
                   <label style={labelStyle}>TRANSFORMACIÓN</label>
                   <Select value={sensorForm.transform_mode}
-                    onChange={e => setSensorForm(f => ({ ...f, transform_mode: e.target.value as SensorFormState['transform_mode'] }))}>
+                    onChange={e => {
+                      const m = e.target.value as SensorFormState['transform_mode']
+                      setSensorForm(f => ({ ...f, transform_mode: m, ...(m === 'minutes_to_hours' ? { unit: 'h' } : {}) }))
+                    }}>
                     <option value="scale_offset">Escala / offset</option>
                     <option value="linear_range">Rango lineal (4-20 mA / 0-10 V)</option>
+                    <option value="minutes_to_hours">Minutos → horas (÷60)</option>
                   </Select>
                 </div>
               </div>
 
-              {sensorForm.transform_mode === 'scale_offset' ? (
+              {sensorForm.transform_mode === 'minutes_to_hours' ? (
+                <div style={{ fontSize: 12, color: 'var(--fg-muted)', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px' }}>
+                  El valor (en minutos) se divide entre 60 y se muestra en <b>horas decimales</b> (unidad <b>h</b>).
+                  <span style={{ color: 'var(--cmg-teal)', fontFamily: 'var(--font-mono)', marginLeft: 8 }}>ej.: 150 → 2.5 h</span>
+                </div>
+              ) : sensorForm.transform_mode === 'scale_offset' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={labelStyle}>MULTIPLICADOR (scale)</label>

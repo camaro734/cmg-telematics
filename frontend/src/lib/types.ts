@@ -120,6 +120,7 @@ export interface TenantOut {
 // extensible a tablas multipunto no lineales sin migración.
 export type SensorTransform =
   | { type: 'linear_range'; in_min: number; in_max: number; out_min: number; out_max: number }
+  | { type: 'minutes_to_hours' }   // contador en minutos → horas decimales (÷60)
 // futuro: | { type: 'points'; points: [number, number][] }
 
 export interface SensorDef {

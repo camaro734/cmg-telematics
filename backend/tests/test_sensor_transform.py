@@ -52,6 +52,21 @@ def test_sin_transform_ni_scale_offset_identidad():
     assert apply_transform(42, {}) == 42
 
 
+def test_minutes_to_hours():
+    sensor = {"transform": {"type": "minutes_to_hours"}}
+    assert apply_transform(150, sensor) == 2.5
+    assert apply_transform(None, sensor) is None
+
+
+def test_schema_acepta_minutes_to_hours():
+    from app.schemas.vehicle import VehicleTypeSensorSchemaUpdate
+    payload = {"sensor_schema": [
+        {"key": "min_t", "label": "Min transfer", "gauge_type": "numeric",
+         "transform": {"type": "minutes_to_hours"}},
+    ]}
+    assert VehicleTypeSensorSchemaUpdate.model_validate(payload)
+
+
 # ── Validación de schema ─────────────────────────────────────────────────────
 import pytest
 from pydantic import ValidationError

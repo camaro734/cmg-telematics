@@ -18,6 +18,8 @@ def apply_transform(raw: float | None, sensor: dict) -> float | None:
     if raw is None:
         return None
     transform = sensor.get("transform")
+    if isinstance(transform, dict) and transform.get("type") == "minutes_to_hours":
+        return raw / 60
     if isinstance(transform, dict) and transform.get("type") == "linear_range":
         span = transform["in_max"] - transform["in_min"]
         if span == 0:

@@ -177,6 +177,16 @@ describe('applyTransform — linear_range', () => {
   it('sin transform ni scale/offset: identidad', () => {
     expect(applyTransform(42, baseSensor)).toBe(42)
   })
+
+  it('minutes_to_hours: 150 min → 2.5 h', () => {
+    const s: SensorDef = { ...baseSensor, transform: { type: 'minutes_to_hours' } }
+    expect(applyTransform(150, s)).toBeCloseTo(2.5)
+  })
+
+  it('minutes_to_hours: raw null → null', () => {
+    const s: SensorDef = { ...baseSensor, transform: { type: 'minutes_to_hours' } }
+    expect(applyTransform(null, s)).toBeNull()
+  })
 })
 
 describe('bitValue', () => {

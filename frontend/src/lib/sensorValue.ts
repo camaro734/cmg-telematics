@@ -50,6 +50,9 @@ export type TransformInput = Pick<SensorDef, 'scale' | 'offset' | 'transform'>
 export function applyTransform(raw: number | null, sensor: TransformInput): number | null {
   if (raw == null) return null
   const t = sensor.transform
+  if (t && t.type === 'minutes_to_hours') {
+    return raw / 60
+  }
   if (t && t.type === 'linear_range') {
     const span = t.in_max - t.in_min
     if (span === 0) return null

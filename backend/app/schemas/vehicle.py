@@ -265,6 +265,8 @@ class VehicleTypeSensorSchemaUpdate(BaseModel):
                 raise ValueError("transform debe ser un objeto")
             if transform.get('type') == 'linear_range':
                 SensorLinearRange.model_validate(transform)
+            elif transform.get('type') == 'minutes_to_hours':
+                pass  # sin parámetros adicionales
             else:
                 raise ValueError(f"transform.type no soportado: {transform.get('type')!r}")
         return sensors
