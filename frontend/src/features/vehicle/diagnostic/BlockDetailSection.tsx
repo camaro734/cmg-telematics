@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { alertSensorKey } from '../../../lib/blockDiagnostics'
-import { resolveRawValue, applyTransform, formatSensorValue } from '../../../lib/sensorValue'
+import { resolveRawValue, applyTransform, formatSensorValue, bitValue } from '../../../lib/sensorValue'
 import { sortByOrder, moveItem } from '../../../lib/sensorOrder'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { SensorMiniChart } from './SensorMiniChart'
@@ -130,7 +130,33 @@ export function BlockDetailSection({
                   {editMode && <span style={{ color: 'var(--fg-dim)', cursor: 'grab' }}>⠿</span>}
                   {sensor.label}
                 </div>
-                {sensor.avl_id != null ? (
+                {sensor.gauge_type === 'led' ? (() => {
+                  // Sensor on/off → piloto LED (verde ON / gris OFF). Clic abre la
+                  // gráfica de escalón (veces en ON + tiempo) si tiene histórico.
+                  const on = bitValue(raw, sensor.bit_index)
+                  const lit = !isStale && on === true
+                  const dotColor = lit ? 'var(--ok)' : (isStale || on === null ? 'var(--offline)' : 'var(--fg-dim)')
+                  const label = on === null ? '—' : on ? 'ON' : 'OFF'
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                      <span style={{
+                        width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                        background: dotColor,
+                        boxShadow: lit ? '0 0 8px var(--ok)' : 'none',
+                        border: '1px solid var(--border)',
+                      }} />
+                      <span style={{
+                        fontSize: 'var(--fs-sensor-hero)', fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        color: lit ? 'var(--ok)' : 'var(--fg-dim)', lineHeight: 1,
+                      }}>
+                        {label}
+                      </span>
+                      {sensor.avl_id != null && !editMode && (
+                        <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)' }}>ver gráfica →</span>
+                      )}
+                    </div>
+                  )
+                })() : sensor.avl_id != null ? (
                   // Sensores CAN: SensorMiniChart renderiza valor actual + sparkline
                   <SensorMiniChart
                     sensor={sensor}

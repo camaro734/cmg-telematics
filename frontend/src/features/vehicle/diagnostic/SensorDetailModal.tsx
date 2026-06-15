@@ -36,6 +36,16 @@ function fmtTick(ts: number, hours: number): string {
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })
 }
 
+// Formatea una duración en ms a "Xh Ym" / "Xm" / "Xs" para el tiempo en ON.
+function fmtDuration(ms: number): string {
+  const totalMin = Math.round(ms / 60000)
+  if (totalMin <= 0) return ms > 0 ? '<1 min' : '0 min'
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
 function fmtTooltipLabel(ts: number, hours: number): string {
   const d = new Date(ts)
   if (hours <= 24) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -311,8 +321,9 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
               </>
             ) : (
               <>
-                <StatBox label="% activo" value={`${stats.pctActive}%`} />
-                <StatBox label="Activaciones" value={String(stats.activations)} />
+                <StatBox label="Veces en ON" value={String(stats.activations)} />
+                <StatBox label="Tiempo en ON" value={fmtDuration(stats.activeMs)} />
+                <StatBox label="% del tiempo ON" value={`${stats.pctActive}%`} muted />
               </>
             )}
           </div>

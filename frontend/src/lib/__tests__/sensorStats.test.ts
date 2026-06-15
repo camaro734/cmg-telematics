@@ -94,6 +94,20 @@ describe('computeSensorStats — booleano', () => {
       expect(s.pctActive).toBeCloseTo(50)
     }
   })
+
+  it('activeMs = suma de duración de tramos en ON (escalón)', () => {
+    // ts = i*1000; [0,1,1,0]: ON en i=1 (1000ms) e i=2 (1000ms) = 2000ms
+    const s = computeSensorStats(pts([0, 1, 1, 0]), true)
+    expect(s.kind).toBe('boolean')
+    if (s.kind === 'boolean') {
+      expect(s.activeMs).toBe(2000)
+    }
+  })
+
+  it('activeMs = 0 si nunca está en ON', () => {
+    const s = computeSensorStats(pts([0, 0, 0]), true)
+    if (s.kind === 'boolean') expect(s.activeMs).toBe(0)
+  })
 })
 
 // avgActive: media excluyendo ceros y nulls (nivel real de trabajo)
