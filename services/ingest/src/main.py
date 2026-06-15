@@ -5,7 +5,7 @@ import logging
 import asyncpg
 from redis.asyncio import Redis
 from src.config import settings
-from src.server import run_server, command_listener
+from src.server import run_server, command_listener, manual_can_listener
 
 logging.basicConfig(
     level=logging.DEBUG if settings.environment == "development" else logging.INFO,
@@ -35,6 +35,7 @@ async def main() -> None:
 
     try:
         asyncio.create_task(command_listener(redis))
+        asyncio.create_task(manual_can_listener(redis))
         await run_server(db_pool, redis)
     finally:
         await db_pool.close()

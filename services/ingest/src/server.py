@@ -10,7 +10,7 @@ import json
 import logging
 import struct
 from redis.asyncio import Redis
-from src.codec8 import decode_packet, build_ack, build_codec12_command
+from src.codec8 import decode_packet, build_ack, build_codec12_command, parse_codec12_response
 from src.writer import write_record, get_device_info, update_device_online, update_device_last_packet
 from src.publisher import publish_record, set_vehicle_offline
 from src.config import settings
@@ -214,20 +214,29 @@ class TeltonikaConnection:
 
             codec_id = packet[8] if len(packet) > 8 else 0
 
-            # Codec 12: respuesta del dispositivo a un comando enviado.
+            # Codec 12: respuesta del dispositivo a un comando enviado (DOUT o Manual CAN).
             # Se intercepta ANTES del decode_packet porque decode_packet solo
             # entiende Codec 8/8E y lanzaría ValueError a propósito.
             if codec_id == 0x0C:
-                try:
-                    resp_size = struct.unpack_from(">I", packet, 11)[0]
-                    resp_text = packet[15:15 + resp_size].decode("ascii", errors="replace").strip()
-                    logger.info("Codec 12 ACK de %s: %r", self.imei, resp_text)
-                    last_log_id = await self.redis.get(f"command:{self.imei}:last_log_id")
-                    if last_log_id:
-                        await _confirm_command(last_log_id, resp_text)
-                        await self.redis.delete(f"command:{self.imei}:last_log_id")
-                except Exception:
-                    logger.info("Codec 12 ACK de %s (sin texto)", self.imei)
+                # Éxito por presencia: cualquier respuesta Codec 12 que llegue es válida.
+                # No se interpreta el contenido del texto para decidir OK/error.
+                resp_text = parse_codec12_response(packet)
+                if resp_text is None:
+                    resp_text = ""  # 0x0C sin texto parseable; sigue siendo respuesta presente
+                logger.info("Codec 12 respuesta de %s: %r", self.imei, resp_text)
+
+                last_log_id = await self.redis.get(f"command:{self.imei}:last_log_id")
+                if last_log_id:
+                    # Entregar al endpoint que espera por BLPOP (flujo síncrono Manual CAN)
+                    # y confirmar en BD (preserva el comportamiento DOUT existente).
+                    await self.redis.lpush(f"command:{self.imei}:response", resp_text)
+                    await self.redis.expire(f"command:{self.imei}:response", 20)
+                    await _confirm_command(last_log_id, resp_text)
+                    await self.redis.delete(f"command:{self.imei}:last_log_id")
+                else:
+                    # Sin comando pendiente: respuesta espontánea o de un comando ya
+                    # expirado. Descartar para no emparejarla con el comando equivocado.
+                    logger.warning("Codec 12 huérfano de %s, descartado", self.imei)
                 continue
 
             try:
@@ -306,6 +315,52 @@ async def command_listener(redis: Redis) -> None:
                     logger.error("Error procesando comando DOUT: %s", e)
         except Exception as e:
             logger.error("command_listener: error en pubsub, reintentando en 5s: %s", e)
+            await asyncio.sleep(5)
+
+
+async def manual_can_listener(redis: Redis) -> None:
+    """Escucha el canal Redis 'cmg:manual_can_commands' y envía comandos Codec 12
+    (setparam Manual CAN) al dispositivo. Mismo patrón de reconexión que command_listener.
+
+    A diferencia del DOUT (fire-and-forget), aquí el API espera la respuesta por BLPOP:
+    - dispositivo no conectado → LPUSH 'DISCONNECTED' para que el API responda 503
+      de inmediato, sin agotar el timeout completo.
+    - enviado OK → SET command:{imei}:last_log_id (TTL 20s) para emparejar la respuesta.
+    El log_id lo crea el API antes de publicar; aquí solo se reenvía."""
+    while True:
+        try:
+            pubsub = redis.pubsub()
+            await pubsub.subscribe("cmg:manual_can_commands")
+            logger.info("manual_can_listener suscrito a cmg:manual_can_commands")
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                try:
+                    data = json.loads(message["data"])
+                    imei: str = data["imei"]
+                    command: str = data["command"]
+                    log_id: str | None = data.get("log_id")
+
+                    writer = _active_writers.get(imei)
+                    if writer is None:
+                        logger.warning("Manual CAN: dispositivo %s no está conectado", imei)
+                        # Respuesta inmediata: el API contesta 503 sin esperar el timeout.
+                        await redis.lpush(f"command:{imei}:response", "DISCONNECTED")
+                        await redis.expire(f"command:{imei}:response", 20)
+                        continue
+
+                    packet = build_codec12_command(command)
+                    writer.write(packet)
+                    await writer.drain()
+                    logger.info("Manual CAN enviado a %s: %s", imei, command)
+
+                    if log_id:
+                        # TTL 20s — ventana para emparejar la respuesta Codec 12 entrante.
+                        await redis.set(f"command:{imei}:last_log_id", log_id, ex=20)
+                except Exception as e:
+                    logger.error("Error procesando comando Manual CAN: %s", e)
+        except Exception as e:
+            logger.error("manual_can_listener: error en pubsub, reintentando en 5s: %s", e)
             await asyncio.sleep(5)
 
 
