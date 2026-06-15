@@ -18,6 +18,7 @@ import { useUserPreferences, usePatchUserPreferences } from '../../lib/useUserPr
 import { sortByOrder } from '../../lib/sensorOrder'
 import type { VehicleOut, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
 import ManualCanControl from './ManualCanControl'
+import ManualCanSlotManager from './ManualCanSlotManager'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
 import MaintenanceTab from './MaintenanceTab'
@@ -462,6 +463,9 @@ export default function VehicleDetailPage() {
                 {id && manualCanSlots.length > 0 && (
                   <ManualCanControl vehicleId={id} slots={manualCanSlots} />
                 )}
+
+                {/* CONFIGURACIÓN MANUAL CAN — solo visible para admin */}
+                {id && <ManualCanSlotManager vehicleId={id} />}
 
                 {/* VER REPORTES */}
                 <button
