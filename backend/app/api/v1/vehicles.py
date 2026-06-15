@@ -1861,6 +1861,8 @@ async def get_fmc_status(
 
 
 class ManualCanSlotOut(BaseModel):
+    id: uuid.UUID
+    vehicle_id: uuid.UUID
     slot: int
     param_id: int
     description: str | None
@@ -1869,26 +1871,153 @@ class ManualCanSlotOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ManualCanSlotCreate(BaseModel):
+    slot: int = Field(..., ge=0, le=9)
+    param_id: int = Field(..., gt=0)
+    description: str = Field(..., max_length=100)
+    active: bool = True
+
+
+class ManualCanSlotUpdate(BaseModel):
+    param_id: int | None = None
+    description: str | None = Field(None, max_length=100)
+    active: bool | None = None
+
+
 @router.get("/vehicles/{vehicle_id}/manual-can-slots", response_model=list[ManualCanSlotOut])
 async def list_manual_can_slots(
     vehicle_id: uuid.UUID,
+    include_inactive: bool = Query(False, description="Incluir slots desactivados"),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lista los slots Manual CAN configurados para el vehículo (solo activos)."""
+    """Lista los slots Manual CAN del vehículo. Por defecto solo activos."""
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
     if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
+    filters = [VehicleManualCanSlot.vehicle_id == vehicle_id]
+    if not include_inactive:
+        filters.append(VehicleManualCanSlot.active == True)
+
     result = await db.execute(
         select(VehicleManualCanSlot)
-        .where(
-            VehicleManualCanSlot.vehicle_id == vehicle_id,
-            VehicleManualCanSlot.active == True,
-        )
+        .where(*filters)
         .order_by(VehicleManualCanSlot.slot)
     )
     return result.scalars().all()
+
+
+@router.post("/vehicles/{vehicle_id}/manual-can-slots", response_model=ManualCanSlotOut, status_code=201)
+async def create_manual_can_slot(
+    vehicle_id: uuid.UUID,
+    body: ManualCanSlotCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea un slot Manual CAN para el vehículo. Solo admin."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    existing = await db.execute(
+        select(VehicleManualCanSlot).where(
+            VehicleManualCanSlot.vehicle_id == vehicle_id,
+            VehicleManualCanSlot.slot == body.slot,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail=f"El slot {body.slot} ya está configurado para este vehículo",
+        )
+
+    slot = VehicleManualCanSlot(
+        id=uuid.uuid4(),
+        vehicle_id=vehicle_id,
+        tenant_id=vehicle.tenant_id,
+        slot=body.slot,
+        param_id=body.param_id,
+        description=body.description,
+        active=body.active,
+    )
+    db.add(slot)
+    await db.commit()
+    await db.refresh(slot)
+    return slot
+
+
+@router.patch(
+    "/vehicles/{vehicle_id}/manual-can-slots/{slot_id}",
+    response_model=ManualCanSlotOut,
+)
+async def update_manual_can_slot(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    body: ManualCanSlotUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita un slot Manual CAN. Solo admin."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    result = await db.execute(
+        select(VehicleManualCanSlot).where(
+            VehicleManualCanSlot.id == slot_id,
+            VehicleManualCanSlot.vehicle_id == vehicle_id,
+        )
+    )
+    slot = result.scalar_one_or_none()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot no encontrado")
+
+    if body.param_id is not None:
+        slot.param_id = body.param_id
+    if body.description is not None:
+        slot.description = body.description
+    if body.active is not None:
+        slot.active = body.active
+
+    await db.commit()
+    await db.refresh(slot)
+    return slot
+
+
+@router.delete("/vehicles/{vehicle_id}/manual-can-slots/{slot_id}", status_code=204)
+async def delete_manual_can_slot(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Elimina un slot Manual CAN (hard delete). Solo admin."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    result = await db.execute(
+        select(VehicleManualCanSlot).where(
+            VehicleManualCanSlot.id == slot_id,
+            VehicleManualCanSlot.vehicle_id == vehicle_id,
+        )
+    )
+    slot = result.scalar_one_or_none()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot no encontrado")
+
+    await db.delete(slot)
+    await db.commit()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
