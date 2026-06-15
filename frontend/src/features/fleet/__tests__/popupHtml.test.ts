@@ -42,6 +42,15 @@ describe('sensorDisplayValue', () => {
     const noData = { ...status, can_data: {} }
     expect(sensorDisplayValue(vacioSensor, noData)).toBe('—')
   })
+
+  it('batería por status_field (ext_voltage_mv 13613 → 13.6 V)', () => {
+    const battery: SensorDef = {
+      key: 'ext_voltage', label: 'Batería', unit: 'V', gauge_type: 'numeric',
+      status_field: 'ext_voltage_mv', scale: 0.001, visible_in_detail: true,
+    }
+    const st = { ...status, ext_voltage_mv: 13613 } as VehicleStatus
+    expect(sensorDisplayValue(battery, st)).toBe('13.6 V')
+  })
 })
 
 describe('buildPopupHtml — desplegable "Ver más"', () => {
@@ -59,5 +68,20 @@ describe('buildPopupHtml — desplegable "Ver más"', () => {
 
   it('conserva el botón "Ver más"', () => {
     expect(html).toContain('data-popup-action="toggle-more"')
+  })
+
+  it('ya no incluye el bloque "Equipo industrial"', () => {
+    expect(html).not.toContain('Equipo industrial')
+  })
+
+  it('omite sensores sin lectura actual (no muestra "—" en la lista)', () => {
+    const sinDato: SensorDef = {
+      key: 'led_x', label: 'Bomba', unit: null, gauge_type: 'led',
+      avl_id: 383, visible_in_detail: true,
+    }
+    const vt = { sensor_schema: [vacioSensor, sinDato] } as unknown as VehicleTypeOut
+    const out = buildPopupHtml(vehicle, status, [], new Map(), new Map(), vt)
+    expect(out).toContain('Vacío depresor')   // con dato → presente
+    expect(out).not.toContain('Bomba')        // sin dato → omitido
   })
 })

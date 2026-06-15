@@ -82,22 +82,23 @@ export function buildPopupHtml(
     ? `<table style="width:100%;border-collapse:collapse;margin-bottom:10px">${sensorRows}</table>`
     : ''
 
-  // Sensores numéricos del tipo (visibles en detalle) — bloque desplegable "Ver más".
-  // Resuelve y transforma cada valor (rango lineal / scale-offset).
-  const detailSensors = (vehicleType?.sensor_schema ?? []).filter(
-    s => s.visible_in_detail !== false && s.gauge_type !== 'led'
-  )
-  const detailRows = detailSensors.map(s => {
-    const val = sensorDisplayValue(s, status)
-    const col = stale ? T_OFF : sensorColor(s, status)
-    return `<tr>
+  // Sensores del tipo visibles en detalle — bloque desplegable "Ver más".
+  // Unifica numéricos y booleanos (LED), aplica la transformación del valor
+  // y OMITE los que no tienen lectura actual ("—") para no mostrar ruido.
+  const detailRows = (vehicleType?.sensor_schema ?? [])
+    .filter(s => s.visible_in_detail !== false)
+    .map(s => ({ s, val: sensorDisplayValue(s, status) }))
+    .filter(({ val }) => val !== '—')
+    .map(({ s, val }) => {
+      const col = stale ? T_OFF : sensorColor(s, status)
+      return `<tr>
       <td style="padding:2px 8px 2px 0;font-size:12px;color:#6b7280;white-space:nowrap">${s.label}</td>
       <td style="padding:2px 0;font-size:12px;font-family:var(--font-mono,monospace);font-weight:600;color:${col};text-align:right">${val}</td>
     </tr>`
-  }).join('')
+    }).join('')
   const detailBlock = detailRows
     ? `<div style="font-size:10px;color:${T_MUTED};font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin:0 0 6px">Sensores</div><table style="width:100%;border-collapse:collapse;margin-bottom:10px">${detailRows}</table>`
-    : ''
+    : `<div style="font-size:11px;color:${T_MUTED};font-style:italic">Sin lecturas de sensores</div>`
 
   // Tabla compacta — fondo blanco del popup nativo de Leaflet: usar colores oscuros para contraste
   const driverCell = vehicle.driver_name
@@ -106,27 +107,6 @@ export function buildPopupHtml(
   const stateCell = online
     ? `<span style="color:var(--ok);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-antenna-bars-5" style="font-size:13px"></i>En línea</span>`
     : `<span style="color:#9ca3af;font-size:12px;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-antenna-bars-off" style="font-size:13px"></i>Sin señal</span>`
-
-  // Equipo industrial (Bloque 4) — sin color "activo" si datos no actuales
-  const ledSensors: SensorDef[] = (vehicleType?.sensor_schema ?? []).filter(
-    s => s.gauge_type === 'led' && (s.category ?? 'maquina') === 'maquina'
-  )
-  const equipRows: string[] = []
-  if (status.pto_active != null) {
-    const a = status.pto_active
-    const ptoCol = stale ? T_MUTED : (a ? 'var(--ok)' : T_MUTED)
-    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">PTO</td><td style="padding:3px 0;font-size:12px;color:${ptoCol};font-weight:${(!stale && a) ? 500 : 400}">${a ? 'Activo' : 'Inactivo'}</td></tr>`)
-  }
-  for (const s of ledSensors) {
-    const raw = resolveRawValue(s, status, {})
-    const a: boolean | null = raw == null ? null : s.bit_index !== undefined ? ((Number(raw) >> s.bit_index) & 1) === 1 : Boolean(raw)
-    const ledCol = stale ? T_MUTED : (a === true ? 'var(--ok)' : T_MUTED)
-    equipRows.push(`<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:${T_MUTED}">${s.label}</td><td style="padding:3px 0;font-size:12px;color:${ledCol};font-weight:${(!stale && a === true) ? 500 : 400}">${a === null ? '—' : a ? 'Activo' : 'Inactivo'}</td></tr>`)
-  }
-  const equipHtml = equipRows.length === 0
-    ? `<div style="font-size:11px;color:${T_MUTED};font-style:italic">Sin equipo configurado</div>`
-    : `<table style="width:100%;border-collapse:collapse">${equipRows.join('')}</table>`
-  const equipSection = `<div style="font-size:10px;color:${T_MUTED};font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px">Equipo industrial</div>${equipHtml}`
 
   return `
     <div data-popup-root style="min-width:280px;max-width:340px;font-family:var(--font-sans,sans-serif);border-left:3px solid ${borderColor};overflow:hidden">
@@ -169,7 +149,7 @@ export function buildPopupHtml(
           </a>
         </div>
         <div data-popup-section="more" style="display:none;border-top:1px solid #e2e8f0;margin-top:10px;padding-top:10px">
-          ${detailBlock}${equipSection}
+          ${detailBlock}
         </div>
       </div>
     </div>
