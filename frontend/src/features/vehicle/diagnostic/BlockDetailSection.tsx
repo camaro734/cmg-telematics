@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { alertSensorKey } from '../../../lib/blockDiagnostics'
 import { resolveRawValue, applyTransform, formatSensorValue } from '../../../lib/sensorValue'
+import { sortByOrder, moveItem } from '../../../lib/sensorOrder'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { SensorMiniChart } from './SensorMiniChart'
 import { SensorDetailModal } from './SensorDetailModal'
@@ -15,6 +16,12 @@ interface BlockDetailSectionProps {
   alerts: AlertInstanceEnrichedOut[]
   vehicleId: string
   isStale?: boolean
+  /** Orden de tarjetas guardado por el usuario (keys de sensor). */
+  order?: string[]
+  /** Modo "Ordenar": activa arrastrar y soltar las tarjetas. */
+  editMode?: boolean
+  /** Se llama al soltar con el nuevo orden de keys de ESTE bloque. */
+  onReorder?: (keys: string[]) => void
 }
 
 const ZONE_VALUE_COLOR: Record<string, string> = {
@@ -27,12 +34,28 @@ const ZONE_VALUE_COLOR: Record<string, string> = {
 
 export function BlockDetailSection({
   block, schema, status, derived, alerts, vehicleId, isStale,
+  order, editMode, onReorder,
 }: BlockDetailSectionProps) {
   const [modalSensor, setModalSensor] = useState<SensorDef | null>(null)
+  const [dragKey, setDragKey] = useState<string | null>(null)
 
-  const sensors = block.sensor_keys
-    .map(k => schema.find(s => s.key === k))
-    .filter((s): s is SensorDef => s != null)
+  const sensors = sortByOrder(
+    block.sensor_keys
+      .map(k => schema.find(s => s.key === k))
+      .filter((s): s is SensorDef => s != null),
+    order,
+    s => s.key,
+  )
+
+  function handleDrop(targetKey: string) {
+    if (!dragKey || dragKey === targetKey || !onReorder) { setDragKey(null); return }
+    const keys = sensors.map(s => s.key)
+    const from = keys.indexOf(dragKey)
+    const to = keys.indexOf(targetKey)
+    setDragKey(null)
+    if (from === -1 || to === -1) return
+    onReorder(moveItem(keys, from, to))
+  }
 
   const blockAlerts = alerts.filter(a => {
     const key = alertSensorKey(a, schema)
@@ -85,19 +108,26 @@ export function BlockDetailSection({
               <div
                 key={sensor.key}
                 data-testid="sensor-detail-card"
-                onClick={sensor.avl_id != null ? () => setModalSensor(sensor) : undefined}
+                draggable={editMode === true}
+                onClick={editMode ? undefined : (sensor.avl_id != null ? () => setModalSensor(sensor) : undefined)}
+                onDragStart={editMode ? () => setDragKey(sensor.key) : undefined}
+                onDragOver={editMode ? (e) => e.preventDefault() : undefined}
+                onDrop={editMode ? () => handleDrop(sensor.key) : undefined}
+                onDragEnd={editMode ? () => setDragKey(null) : undefined}
                 style={{
                   background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
+                  border: dragKey === sensor.key ? '1px dashed var(--cmg-teal)' : '1px solid var(--border)',
                   borderRadius: 8,
                   padding: '10px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 6,
-                  cursor: sensor.avl_id != null ? 'pointer' : 'default',
+                  cursor: editMode ? 'grab' : (sensor.avl_id != null ? 'pointer' : 'default'),
+                  opacity: editMode && dragKey === sensor.key ? 0.5 : 1,
                 }}
               >
-                <div style={{ fontSize: 'var(--fs-sensor-name)', fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ fontSize: 'var(--fs-sensor-name)', fontWeight: 600, color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {editMode && <span style={{ color: 'var(--fg-dim)', cursor: 'grab' }}>⠿</span>}
                   {sensor.label}
                 </div>
                 {sensor.avl_id != null ? (

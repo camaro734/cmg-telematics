@@ -745,6 +745,8 @@ export interface MetricTypePreferences {
 
 export interface UserPreferences {
   historic_metrics: Record<string, MetricTypePreferences>
+  // Orden de tarjetas de sensores por tipo de vehículo: {vehicle_type_id: [keys]}
+  sensor_order?: Record<string, string[]>
 }
 
 export interface MetricTypePatch {
@@ -752,5 +754,6 @@ export interface MetricTypePatch {
 }
 
 export interface PreferencesPatch {
-  historic_metrics: Record<string, MetricTypePatch>
+  historic_metrics?: Record<string, MetricTypePatch>
+  sensor_order?: Record<string, string[] | null>
 }

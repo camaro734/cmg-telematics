@@ -10,10 +10,14 @@ class MetricPreferences(BaseModel):
 
 class UserPreferencesIn(BaseModel):
     historic_metrics: dict[str, MetricPreferences] = {}
+    # Orden de tarjetas de sensores por tipo de vehículo: {vehicle_type_id: [keys]}.
+    # Una lista None borra el orden guardado para ese tipo.
+    sensor_order: dict[str, list[str] | None] = {}
 
 
 class UserPreferencesOut(BaseModel):
     historic_metrics: dict[str, MetricPreferences] = {}
+    sensor_order: dict[str, list[str]] = {}
 
 
 class UserOut(BaseModel):

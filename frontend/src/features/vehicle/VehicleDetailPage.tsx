@@ -14,6 +14,8 @@ import KpiChart from './KpiChart'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
+import { useUserPreferences, usePatchUserPreferences } from '../../lib/useUserPreferences'
+import { sortByOrder } from '../../lib/sensorOrder'
 import type { VehicleOut, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
@@ -192,6 +194,28 @@ export default function VehicleDetailPage() {
 
   const activeAlerts = firingAlerts.filter(a => a.vehicle_id === id)
   const activeAlertsCount = activeAlerts.length
+
+  // ── Orden de tarjetas de sensores (preferencia por usuario, por tipo) ──
+  const { data: userPrefs } = useUserPreferences()
+  const patchPrefs = usePatchUserPreferences()
+  const [orderEdit, setOrderEdit] = useState(false)
+  const savedSensorOrder = (vehicleType && userPrefs?.sensor_order?.[vehicleType.id]) || []
+
+  const handleReorderBlock = (blockId: string, newKeys: string[]) => {
+    if (!vehicleType) return
+    // Reconstruye el orden plano de TODO el tipo: el bloque editado usa el nuevo
+    // orden; el resto conserva su orden guardado actual.
+    const flat = liveBlocks.flatMap(b =>
+      b.id === blockId ? newKeys : sortByOrder(b.sensor_keys, savedSensorOrder, k => k),
+    )
+    patchPrefs.mutate({ sensor_order: { [vehicleType.id]: flat } })
+  }
+
+  const handleResetOrder = () => {
+    if (!vehicleType) return
+    patchPrefs.mutate({ sensor_order: { [vehicleType.id]: null } })
+    setOrderEdit(false)
+  }
 
   if (!id) return <Navigate to="/fleet" replace />
 
@@ -487,12 +511,35 @@ export default function VehicleDetailPage() {
               )}
               </>) : (
               <>
-                <button
-                  onClick={() => setSelectedBlockId(null)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--cmg-teal)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontFamily: 'var(--font-sans)' }}
-                >
-                  ← Volver al panel
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => { setSelectedBlockId(null); setOrderEdit(false) }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--cmg-teal)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontFamily: 'var(--font-sans)' }}
+                  >
+                    ← Volver al panel
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {orderEdit && (
+                      <button
+                        onClick={handleResetOrder}
+                        style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 10px' }}
+                      >
+                        Restablecer
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setOrderEdit(v => !v)}
+                      style={{ background: orderEdit ? 'var(--cmg-teal)' : 'transparent', border: '1px solid var(--cmg-teal)', borderRadius: 6, color: orderEdit ? '#fff' : 'var(--cmg-teal)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}
+                    >
+                      {orderEdit ? '✓ Hecho' : '⠿ Ordenar'}
+                    </button>
+                  </div>
+                </div>
+                {orderEdit && (
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: -2 }}>
+                    Arrastra las tarjetas para ordenarlas a tu gusto. El orden se guarda solo para ti.
+                  </div>
+                )}
                 {(() => {
                   const block = liveBlocks.find(b => b.id === selectedBlockId)
                   if (!block || !status || !id) return null
@@ -505,6 +552,9 @@ export default function VehicleDetailPage() {
                       alerts={activeAlerts}
                       vehicleId={id}
                       isStale={isStale}
+                      order={savedSensorOrder}
+                      editMode={orderEdit}
+                      onReorder={(newKeys) => handleReorderBlock(block.id, newKeys)}
                     />
                   )
                 })()}

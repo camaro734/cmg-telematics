@@ -183,13 +183,20 @@ async def get_preferences(
     user = await db.get(User, current_user.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    hm = (user.preferences or {}).get("historic_metrics", {})
+    prefs = user.preferences or {}
+    hm = prefs.get("historic_metrics", {})
+    so = prefs.get("sensor_order", {})
     return UserPreferencesOut(
         historic_metrics={
             type_id: MetricPreferences(keys=entry["keys"])
             for type_id, entry in hm.items()
             if isinstance(entry, dict) and entry.get("keys") is not None
-        }
+        },
+        sensor_order={
+            type_id: keys
+            for type_id, keys in so.items()
+            if isinstance(keys, list)
+        },
     )
 
 
@@ -202,13 +209,23 @@ async def patch_preferences(
     user = await db.get(User, current_user.user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    existing_hm: dict = dict((user.preferences or {}).get("historic_metrics", {}))
+    prefs = user.preferences or {}
+    existing_hm: dict = dict(prefs.get("historic_metrics", {}))
     for type_id, metric_pref in body.historic_metrics.items():
         if metric_pref.keys is None:
             existing_hm.pop(type_id, None)
         else:
             existing_hm[type_id] = {"keys": metric_pref.keys}
-    user.preferences = {"historic_metrics": existing_hm}
+
+    existing_so: dict = dict(prefs.get("sensor_order", {}))
+    for type_id, keys in body.sensor_order.items():
+        if keys is None:
+            existing_so.pop(type_id, None)
+        else:
+            existing_so[type_id] = keys
+
+    # Merge de ambas claves: nunca pisar una preferencia con la otra.
+    user.preferences = {"historic_metrics": existing_hm, "sensor_order": existing_so}
     attributes.flag_modified(user, "preferences")
     await db.commit()
     return UserPreferencesOut(
@@ -216,5 +233,10 @@ async def patch_preferences(
             type_id: MetricPreferences(keys=entry["keys"])
             for type_id, entry in existing_hm.items()
             if isinstance(entry, dict) and entry.get("keys") is not None
-        }
+        },
+        sensor_order={
+            type_id: keys
+            for type_id, keys in existing_so.items()
+            if isinstance(keys, list)
+        },
     )
