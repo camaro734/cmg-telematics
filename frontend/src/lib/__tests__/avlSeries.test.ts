@@ -17,7 +17,7 @@ describe('buildSensorSeries — orden', () => {
       avlPt(epoch(10 * 60_000), 200),  // ts +10 min
       avlPt(epoch(0), 100),            // ts base (más antiguo)
     ]
-    const result = buildSensorSeries(raw, 1, 0)
+    const result = buildSensorSeries(raw, { scale: 1, offset: 0 })
     expect(result[0].ts).toBeLessThan(result[1].ts)
     expect(result[1].ts).toBeLessThan(result[2].ts)
     // Valores en el orden ascendente
@@ -31,7 +31,7 @@ describe('buildSensorSeries — orden', () => {
       avlPt(epoch(0), 100),
       avlPt(epoch(10 * 60_000), 200),
     ]
-    const result = buildSensorSeries(raw, 1, 0)
+    const result = buildSensorSeries(raw, { scale: 1, offset: 0 })
     expect(result[0].value).toBe(100)
     expect(result[1].value).toBe(200)
   })
@@ -40,26 +40,34 @@ describe('buildSensorSeries — orden', () => {
 describe('buildSensorSeries — sentinels J1939', () => {
   it('raw=255 (0xFF) → null en la serie', () => {
     const raw: AvlPoint[] = [avlPt(epoch(0), 255)]
-    const result = buildSensorSeries(raw, 1, 0)
+    const result = buildSensorSeries(raw, { scale: 1, offset: 0 })
     expect(result[0].value).toBeNull()
   })
 
   it('raw=65535 (0xFFFF) → null en la serie', () => {
     const raw: AvlPoint[] = [avlPt(epoch(0), 65535)]
-    const result = buildSensorSeries(raw, 1, 0)
+    const result = buildSensorSeries(raw, { scale: 1, offset: 0 })
     expect(result[0].value).toBeNull()
   })
 
   it('raw=4294967295 (0xFFFFFFFF) → null en la serie', () => {
     const raw: AvlPoint[] = [avlPt(epoch(0), 4294967295)]
-    const result = buildSensorSeries(raw, 1, 0)
+    const result = buildSensorSeries(raw, { scale: 1, offset: 0 })
     expect(result[0].value).toBeNull()
   })
 
   it('raw=250 (válido) pasa por scale+offset', () => {
     const raw: AvlPoint[] = [avlPt(epoch(0), 250)]
-    const result = buildSensorSeries(raw, 0.1, 0)
+    const result = buildSensorSeries(raw, { scale: 0.1, offset: 0 })
     expect(result[0].value).toBeCloseTo(25)
+  })
+
+  it('aplica transform linear_range (12000 → 4.5 bar)', () => {
+    const raw: AvlPoint[] = [avlPt(epoch(0), 12000)]
+    const result = buildSensorSeries(raw, {
+      transform: { type: 'linear_range', in_min: 4000, in_max: 20000, out_min: -1, out_max: 10 },
+    })
+    expect(result[0].value).toBeCloseTo(4.5)
   })
 })
 
@@ -74,7 +82,7 @@ describe('buildDerivativeSeries — consumo constante', () => {
       avlPt(epoch(0),     2),   // 1.0 L escalado
       avlPt(epoch(H),     3),   // 1.5 L escalado → delta 0.5 L en 1h
     ]
-    const result = buildDerivativeSeries(raw, 0.5, 0)
+    const result = buildDerivativeSeries(raw, { scale: 0.5, offset: 0 })
     expect(result.length).toBeGreaterThan(0)
     const last = result[result.length - 1]
     expect(last.value).toBeCloseTo(0.5, 1)
@@ -86,7 +94,7 @@ describe('buildDerivativeSeries — consumo constante', () => {
       avlPt(epoch(H),     2),   // +1L en 1h = 1 L/h
       avlPt(epoch(2 * H), 4),   // +1L en 1h = 1 L/h
     ]
-    const result = buildDerivativeSeries(raw, 0.5, 0)
+    const result = buildDerivativeSeries(raw, { scale: 0.5, offset: 0 })
     result.forEach(p => {
       if (p.value !== null) expect(p.value).toBeCloseTo(1.0, 1)
     })
@@ -98,15 +106,15 @@ describe('buildDerivativeSeries — consumo constante', () => {
       avlPt(epoch(H),     10),  // sin cambio
       avlPt(epoch(2 * H), 10),
     ]
-    const result = buildDerivativeSeries(raw, 0.5, 0)
+    const result = buildDerivativeSeries(raw, { scale: 0.5, offset: 0 })
     result.forEach(p => {
       if (p.value !== null) expect(p.value).toBe(0)
     })
   })
 
   it('devuelve vacío con menos de 2 puntos', () => {
-    expect(buildDerivativeSeries([], 1, 0)).toHaveLength(0)
-    expect(buildDerivativeSeries([avlPt(epoch(0), 5)], 1, 0)).toHaveLength(0)
+    expect(buildDerivativeSeries([], { scale: 1, offset: 0 })).toHaveLength(0)
+    expect(buildDerivativeSeries([avlPt(epoch(0), 5)], { scale: 1, offset: 0 })).toHaveLength(0)
   })
 
   it('descarta valores negativos (imposibles en contador acumulado)', () => {
@@ -114,7 +122,7 @@ describe('buildDerivativeSeries — consumo constante', () => {
       avlPt(epoch(0), 10),
       avlPt(epoch(H), 8),   // retroceso (no debería ocurrir, pero defensivo)
     ]
-    const result = buildDerivativeSeries(raw, 0.5, 0)
+    const result = buildDerivativeSeries(raw, { scale: 0.5, offset: 0 })
     result.forEach(p => {
       if (p.value !== null) expect(p.value).toBeGreaterThanOrEqual(0)
     })
@@ -124,8 +132,8 @@ describe('buildDerivativeSeries — consumo constante', () => {
     // API devuelve DESC; la derivada debe ser la misma que con ASC
     const rawAsc: AvlPoint[] = [avlPt(epoch(0), 2), avlPt(epoch(H), 4)]
     const rawDesc: AvlPoint[] = [avlPt(epoch(H), 4), avlPt(epoch(0), 2)]
-    const a = buildDerivativeSeries(rawAsc, 0.5, 0)
-    const b = buildDerivativeSeries(rawDesc, 0.5, 0)
+    const a = buildDerivativeSeries(rawAsc, { scale: 0.5, offset: 0 })
+    const b = buildDerivativeSeries(rawDesc, { scale: 0.5, offset: 0 })
     expect(a.length).toBe(b.length)
     if (a.length > 0) expect(a[0].value).toBeCloseTo(b[0].value as number, 1)
   })

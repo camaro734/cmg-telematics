@@ -108,8 +108,8 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     const domainEnd = Date.now()
     const domainStart = domainEnd - hours * 60 * 60 * 1000
     const series = sensor.derivative
-      ? buildDerivativeSeries(raw, sensor.scale, sensor.offset)
-      : injectGaps(buildSensorSeries(raw, sensor.scale, sensor.offset), hours)
+      ? buildDerivativeSeries(raw, sensor)
+      : injectGaps(buildSensorSeries(raw, sensor), hours)
     const paddedData: ChartPointTime[] = [
       { ts: domainStart, label: '', value: null },
       ...series,
@@ -117,7 +117,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     ]
     return { paddedData, domainStart, domainEnd }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raw, hours, sensor.scale, sensor.offset, sensor.derivative])
+  }, [raw, hours, sensor.scale, sensor.offset, sensor.transform, sensor.derivative])
 
   const xTicks = useMemo(
     () => buildChartTicks(domainStart, domainEnd, hours),

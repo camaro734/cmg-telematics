@@ -1,4 +1,4 @@
-import { applyScaleOffset, J1939_NA } from './sensorValue'
+import { applyTransform, J1939_NA, type TransformInput } from './sensorValue'
 
 export type Period = 'dia' | 'semana' | 'mes'
 export type AvlPoint = { bucket: string; value: number | null }
@@ -40,8 +40,7 @@ export function buildAvlSeries(
 // Excluye centinelas J1939 "not available" (0xFF, 0xFFFF, 0xFFFFFFFF).
 export function buildSensorSeries(
   raw: AvlPoint[],
-  scale: number | undefined,
-  offset: number | undefined,
+  sensor: TransformInput,
 ): ChartPointTime[] {
   const sorted = raw.slice().sort((a, b) => (a.bucket < b.bucket ? -1 : a.bucket > b.bucket ? 1 : 0))
   return sorted.map(d => {
@@ -49,7 +48,7 @@ export function buildSensorSeries(
     const label = new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
     if (d.value === null) return { ts, label, value: null }
     if (J1939_NA.has(d.value)) return { ts, label, value: null }
-    const v = applyScaleOffset(d.value, scale, offset)
+    const v = applyTransform(d.value, sensor)
     if (v === null) return { ts, label, value: null }
     return { ts, label, value: Math.round(v * 100) / 100 }
   })
@@ -65,8 +64,7 @@ export function buildSensorSeries(
  */
 export function buildDerivativeSeries(
   raw: AvlPoint[],
-  scale: number | undefined,
-  offset: number | undefined,
+  sensor: TransformInput,
 ): ChartPointTime[] {
   const sorted = raw
     .filter(d => d.value !== null && !J1939_NA.has(d.value as number))
@@ -98,8 +96,8 @@ export function buildDerivativeSeries(
     const dtHours = (currTs - refTs) / 3_600_000
     if (dtHours < MIN_WINDOW_MS / 3_600_000) continue
 
-    const currV = applyScaleOffset(sorted[i].value!, scale, offset) ?? sorted[i].value!
-    const refV  = applyScaleOffset(sorted[refIdx].value!, scale, offset) ?? sorted[refIdx].value!
+    const currV = applyTransform(sorted[i].value!, sensor) ?? sorted[i].value!
+    const refV  = applyTransform(sorted[refIdx].value!, sensor) ?? sorted[refIdx].value!
     const rate  = Math.max(0, (currV - refV) / dtHours)
 
     const label = new Date(currTs).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })

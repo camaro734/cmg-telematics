@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
 import { alertSensorKey } from '../../../lib/blockDiagnostics'
-import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
+import { resolveRawValue, applyTransform, formatSensorValue } from '../../../lib/sensorValue'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { SensorMiniChart } from './SensorMiniChart'
 import { SensorDetailModal } from './SensorDetailModal'
@@ -77,7 +77,7 @@ export function BlockDetailSection({
         }}>
           {sensors.map(sensor => {
             const raw = resolveRawValue(sensor, status, derived)
-            const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
+            const scaled = applyTransform(raw, sensor)
             const zone = sensorSeverity(sensor, scaled) ?? 'nodata'
             const valueColor = isStale ? ZONE_VALUE_COLOR.nodata : (ZONE_VALUE_COLOR[zone] ?? ZONE_VALUE_COLOR.nodata)
             const formatted = formatSensorValue(scaled) ?? '—'

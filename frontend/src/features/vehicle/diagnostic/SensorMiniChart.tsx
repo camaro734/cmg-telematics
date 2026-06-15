@@ -8,7 +8,7 @@ import {
   type AvlPoint, type ChartPointTime,
 } from '../../../lib/avlSeries'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
-import { resolveRawValue, applyScaleOffset, formatSensorValue, isJ1939NA } from '../../../lib/sensorValue'
+import { resolveRawValue, applyTransform, formatSensorValue, isJ1939NA } from '../../../lib/sensorValue'
 
 const ZONE_COLOR: Record<string, string> = {
   ok: 'var(--ok)',
@@ -76,8 +76,8 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
   if (!sensor.avl_id) return null
 
   const chartData: ChartPointTime[] = sensor.derivative
-    ? buildDerivativeSeries(seriesRaw, sensor.scale, sensor.offset)
-    : injectGaps(buildSensorSeries(seriesRaw, sensor.scale, sensor.offset), MINI_HOURS)
+    ? buildDerivativeSeries(seriesRaw, sensor)
+    : injectGaps(buildSensorSeries(seriesRaw, sensor), MINI_HOURS)
 
   // Para sensores derivativos el valor live es el último punto de la serie (tasa reciente)
   const lastChartPoint = chartData.reduceRight<ChartPointTime | null>(
@@ -86,7 +86,7 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
 
   // Valor actual desde el status en vivo (solo para sensores no derivativos)
   const liveRaw = sensor.derivative ? null : resolveRawValue(sensor, status, derived)
-  const liveScaled = sensor.derivative ? null : applyScaleOffset(liveRaw, sensor.scale, sensor.offset)
+  const liveScaled = sensor.derivative ? null : applyTransform(liveRaw, sensor)
 
   // Detectar centinela J1939 en el valor CAN en bruto (solo sensores no derivativos)
   const canRaw = (!sensor.derivative && sensor.avl_id != null)
