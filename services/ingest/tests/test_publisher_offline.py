@@ -1,10 +1,19 @@
 """Tests para set_vehicle_offline: verifica hset + xadd al stream."""
 import json
 import pytest
+from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, call
 
 VEHICLE_ID = "aaaa0000-0000-0000-0000-000000000001"
 TENANT_ID  = "bbbb0000-0000-0000-0000-000000000002"
+
+
+def _fake_avl(ts: datetime):
+    return SimpleNamespace(
+        datetime_utc=ts, io_elements={}, latitude=None, longitude=None,
+        speed_kmh=0.0, heading=None,
+    )
 
 
 @pytest.fixture()
@@ -42,6 +51,26 @@ async def test_offline_xadds_to_stream(redis_mock):
     assert payload["tenant_id"] == TENANT_ID
     assert payload["online"] is False
     assert "received_at" in payload
+
+
+@pytest.mark.asyncio
+async def test_status_guard_skips_older_record(redis_mock):
+    """Un registro más antiguo que el last_seen guardado NO debe pisar el hash."""
+    from src.publisher import _update_status_hash
+    redis_mock.hget = AsyncMock(return_value="2026-06-15T11:00:00+00:00")
+    avl = _fake_avl(datetime(2026, 6, 15, 10, 15, tzinfo=timezone.utc))  # más antiguo
+    await _update_status_hash(redis_mock, avl, VEHICLE_ID, {}, "2026-06-15T11:05:00+00:00")
+    redis_mock.hset.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_status_guard_allows_newer_record(redis_mock):
+    """Un registro más reciente que el last_seen guardado SÍ actualiza el hash."""
+    from src.publisher import _update_status_hash
+    redis_mock.hget = AsyncMock(return_value="2026-06-15T10:00:00+00:00")
+    avl = _fake_avl(datetime(2026, 6, 15, 11, 0, tzinfo=timezone.utc))  # más reciente
+    await _update_status_hash(redis_mock, avl, VEHICLE_ID, {}, "2026-06-15T11:00:05+00:00")
+    redis_mock.hset.assert_awaited_once()
 
 
 @pytest.mark.asyncio

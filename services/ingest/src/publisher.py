@@ -5,6 +5,7 @@ vehicle:{vehicle_id}:status que consume el core-api para el mapa y estado online
 """
 import json
 import logging
+from datetime import datetime
 from redis.asyncio import Redis
 from src.codec8 import AVLRecord
 from src.config import settings
@@ -118,6 +119,20 @@ async def _update_status_hash(
         mapping["heading"] = str(avl.heading)
 
     key = f"vehicle:{vehicle_id}:status"
+
+    # Guardia temporal: no pisar el estado "en vivo" con un registro más antiguo.
+    # Al reconectar, el FMC650 vuelca su buffer offline; si un registro viejo llega
+    # después de uno más reciente, no debe sobrescribir el último estado conocido.
+    # El histórico (telemetry_record) sí guarda todos con su timestamp real.
+    try:
+        prev = await redis.hget(key, "last_seen")
+        if prev is not None:
+            prev_str = prev.decode() if isinstance(prev, bytes) else prev
+            if avl.datetime_utc < datetime.fromisoformat(prev_str):
+                return
+    except Exception:
+        pass  # ante cualquier error de comparación, seguir con la actualización
+
     await redis.hset(key, mapping=mapping)
     await redis.expire(key, STATUS_TTL)
 
