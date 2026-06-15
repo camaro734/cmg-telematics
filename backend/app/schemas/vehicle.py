@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import Any, Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.maintenance import MaintenanceTemplateItem, MaintenanceCounter
 
 
@@ -241,8 +241,33 @@ class KpiHour(BaseModel):
     record_count: int | None = None
 
 
+class SensorLinearRange(BaseModel):
+    """Transformación lineal de 2 puntos: entrada (crudo) → salida (físico)."""
+    type: Literal['linear_range']
+    in_min: float
+    in_max: float
+    out_min: float
+    out_max: float
+
+
 class VehicleTypeSensorSchemaUpdate(BaseModel):
     sensor_schema: list[dict[str, Any]]
+
+    @field_validator('sensor_schema')
+    @classmethod
+    def _validate_transforms(cls, sensors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Si un sensor trae `transform`, valida su forma (tolerante con el resto)."""
+        for sensor in sensors:
+            transform = sensor.get('transform')
+            if transform is None:
+                continue
+            if not isinstance(transform, dict):
+                raise ValueError("transform debe ser un objeto")
+            if transform.get('type') == 'linear_range':
+                SensorLinearRange.model_validate(transform)
+            else:
+                raise ValueError(f"transform.type no soportado: {transform.get('type')!r}")
+        return sensors
 
 
 class VehicleTypeCreate(BaseModel):
