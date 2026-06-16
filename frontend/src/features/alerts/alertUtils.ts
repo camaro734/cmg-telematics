@@ -42,6 +42,16 @@ export function getAlertDisplay(alert: AlertInstanceOut, rules: RuleOut[]): Aler
     }
   }
 
+  // GPS congelado: trigger_value tiene jump_count + max_jump_m + lat + lon
+  if (tv && 'jump_count' in tv && 'max_jump_m' in tv) {
+    const count = Number(tv.jump_count)
+    return {
+      title: 'GPS congelado — Static Navigation activo',
+      detail: `${count} saltos imposibles a velocidad 0 en 30 min`,
+      severity: 'warning',
+    }
+  }
+
   // Regla de usuario: buscar por rule_id en la lista de reglas pasada
   const rule = rules.find(r => r.id === alert.rule_id)
   if (rule) {
