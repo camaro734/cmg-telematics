@@ -19,6 +19,7 @@ import { sortByOrder } from '../../lib/sensorOrder'
 import type { VehicleOut, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
 import ManualCanControl from './ManualCanControl'
 import ManualCanSlotManager from './ManualCanSlotManager'
+import ManualCanButtonManager from './ManualCanButtonManager'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
 import MaintenanceTab from './MaintenanceTab'
@@ -154,7 +155,7 @@ export default function VehicleDetailPage() {
     enabled: !!vehicle,
   })
 
-  const { data: manualCanSlots = [] } = useQuery<{ slot: number; description: string | null; param_id: number; active: boolean }[]>({
+  const { data: manualCanSlots = [] } = useQuery<{ id: string; slot: number; description: string | null; param_id: number; active: boolean }[]>({
     queryKey: ['manual-can-slots', id ?? ''],
     queryFn: () => apiClient.get(`/api/v1/vehicles/${id}/manual-can-slots`),
     staleTime: 300_000,
@@ -466,6 +467,7 @@ export default function VehicleDetailPage() {
 
                 {/* CONFIGURACIÓN MANUAL CAN — solo visible para admin */}
                 {id && <ManualCanSlotManager vehicleId={id} />}
+                {id && <ManualCanButtonManager vehicleId={id} />}
 
                 {/* VER REPORTES */}
                 <button

@@ -5,8 +5,20 @@ import { toast } from '../../shared/ui/Toast'
 import type { CommandLogEntry, FmcStatus, ManualCanCommandResponse } from '../../lib/types'
 
 interface ManualCanSlot {
+  id: string
   slot: number
   description: string | null
+}
+
+interface CanButton {
+  id: string
+  slot_id: string
+  label: string
+  byte_index: number
+  bit_index: number
+  active: boolean
+  sort_order: number
+  current_bit: boolean
 }
 
 interface Props {
@@ -39,9 +51,104 @@ function StatusDot({ status }: { status: CommandStatus }) {
   )
 }
 
+function SlotButtonsPanel({
+  vehicleId,
+  slotId,
+  connected,
+}: {
+  vehicleId: string
+  slotId: string
+  connected: boolean
+}) {
+  const qc = useQueryClient()
+  const [toggling, setToggling] = useState<Record<string, boolean>>({})
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
+
+  const { data: buttons = [] } = useQuery<CanButton[]>({
+    queryKey: ['can-buttons', slotId],
+    queryFn: () =>
+      apiClient.get<CanButton[]>(
+        `/api/v1/vehicles/${vehicleId}/can-slots/${slotId}/buttons`,
+      ),
+    refetchInterval: 30_000,
+  })
+
+  const active = buttons.filter(b => b.active)
+  if (active.length === 0) return null
+
+  async function handleToggle(btn: CanButton) {
+    if (toggling[btn.id] || !connected) return
+    const prev = optimistic[btn.id] ?? btn.current_bit
+    const next = !prev
+    setOptimistic(o => ({ ...o, [btn.id]: next }))
+    setToggling(t => ({ ...t, [btn.id]: true }))
+    try {
+      await apiClient.post(
+        `/api/v1/vehicles/${vehicleId}/can-slots/${slotId}/buttons/${btn.id}/toggle`,
+        {},
+      )
+      qc.invalidateQueries({ queryKey: ['can-buttons', slotId] })
+    } catch (e) {
+      setOptimistic(o => ({ ...o, [btn.id]: prev }))
+      toast.error(e instanceof Error ? e.message : 'Error al cambiar el botón')
+    } finally {
+      setToggling(t => ({ ...t, [btn.id]: false }))
+    }
+  }
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)',
+        letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6,
+      }}>Salidas CR2530</div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
+        gap: 6,
+      }}>
+        {active.map(btn => {
+          const on = optimistic[btn.id] ?? btn.current_bit
+          const loading = toggling[btn.id]
+          const disabled = !connected || !!loading
+          return (
+            <button
+              key={btn.id}
+              data-testid={`btn-toggle-${btn.id}`}
+              onClick={() => handleToggle(btn)}
+              disabled={disabled}
+              style={{
+                background: on
+                  ? 'color-mix(in srgb, var(--cmg-teal) 20%, transparent)'
+                  : 'var(--bg-elevated)',
+                border: `1px solid ${on ? 'var(--cmg-teal)' : disabled ? 'var(--border)' : 'var(--fg-tertiary)'}`,
+                borderRadius: 6, padding: '8px 6px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                transition: 'all 0.15s', minHeight: 56,
+              }}
+            >
+              <span style={{ fontSize: 16, color: on ? 'var(--cmg-teal)' : 'var(--fg-tertiary)' }}>
+                {on ? '●' : '○'}
+              </span>
+              <span style={{
+                fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-sans)',
+                color: on ? 'var(--cmg-teal)' : 'var(--fg-muted)',
+                textAlign: 'center', lineHeight: 1.2,
+              }}>
+                {loading ? '…' : btn.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function ManualCanControl({ vehicleId, slots }: Props) {
   const qc = useQueryClient()
-  // loading por slot: slot → 'on' | 'off' | null
   const [slotLoading, setSlotLoading] = useState<Record<number, 'on' | 'off' | null>>({})
   const [open, setOpen] = useState(true)
 
@@ -74,7 +181,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
       if (res.status === 'confirmed') {
         toast.error === undefined
           ? console.info('OK')
-          : (() => {})() // toast.success si existe
+          : (() => {})()
       }
       qc.invalidateQueries({ queryKey: ['manual-can-history', vehicleId] })
     } catch (e) {
@@ -89,7 +196,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
       background: 'var(--bg-surface)', border: '1px solid var(--border)',
       borderRadius: 8, overflow: 'hidden',
     }}>
-      {/* Cabecera colapsable */}
       <button
         onClick={() => setOpen(v => !v)}
         style={{
@@ -109,7 +215,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
             color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase',
           }}>Control CAN Manual</span>
         </div>
-        {/* Indicador de conexión FMC */}
         <span style={{
           fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
           color: connected ? 'var(--ok)' : 'var(--danger)',
@@ -120,7 +225,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
 
       {open && (
         <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Botones por slot */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {slots.map(s => {
               const loading = slotLoading[s.slot] != null
@@ -145,8 +249,8 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                       </span>
                     )}
                   </div>
+                  {/* Botones arrancar/parar — control genérico del slot */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    {/* ARRANCAR */}
                     <button
                       data-testid={`btn-arrancar-slot-${s.slot}`}
                       onClick={() => sendCommand(s.slot, true)}
@@ -166,7 +270,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                     >
                       {slotLoading[s.slot] === 'on' ? '…' : '▶ Arrancar'}
                     </button>
-                    {/* PARAR */}
                     <button
                       data-testid={`btn-parar-slot-${s.slot}`}
                       onClick={() => sendCommand(s.slot, false)}
@@ -185,12 +288,17 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                       {slotLoading[s.slot] === 'off' ? '…' : '■ Parar'}
                     </button>
                   </div>
+                  {/* Botones de bit configurados para este slot */}
+                  <SlotButtonsPanel
+                    vehicleId={vehicleId}
+                    slotId={s.id}
+                    connected={connected}
+                  />
                 </div>
               )
             })}
           </div>
 
-          {/* Historial de los últimos 5 comandos Manual CAN */}
           {history.length > 0 && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
               <div style={{
