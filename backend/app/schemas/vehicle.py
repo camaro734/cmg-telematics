@@ -108,6 +108,8 @@ class VehicleTypeOut(BaseModel):
     dout_config: list[DoutSlot] = []
     pdf_metrics: list[PdfMetric] = []
     system_blocks: list[SystemBlock] = []
+    manual_can_slots: list[dict[str, Any]] = []
+    manual_can_buttons: list[dict[str, Any]] = []
 
 
 class VehicleOut(BaseModel):

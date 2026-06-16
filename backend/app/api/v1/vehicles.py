@@ -1,9 +1,11 @@
 # backend/app/api/v1/vehicles.py
 import re
+import asyncio
 import unicodedata
 import uuid
 import json
 import logging
+from typing import Literal
 from math import radians, sin, cos, sqrt, asin
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -40,6 +42,7 @@ from app.models.permission_grant import PermissionGrant
 from app.models.command_log import CommandLog
 from app.models.vehicle_manual_can_slot import VehicleManualCanSlot
 from app.models.manual_can_button import ManualCanButton
+from app.services import manual_can_config
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
@@ -238,6 +241,68 @@ async def update_vehicle_type_sensor_schema(
         )
     vtype.sensor_schema = body.sensor_schema
     flag_modified(vtype, "sensor_schema")
+    await db.commit()
+    await db.refresh(vtype)
+    return vtype
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Config Manual CAN a nivel plantilla (FMC650 → CR2530): slots + botones + roles
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class ManualCanSlotCfg(BaseModel):
+    id: uuid.UUID
+    slot: int = Field(..., ge=0, le=9)
+    param_id: int = Field(..., gt=0)
+    description: str = Field("", max_length=100)
+
+
+class ManualCanButtonCfg(BaseModel):
+    id: uuid.UUID
+    slot_id: uuid.UUID
+    byte_index: int = Field(..., ge=0, le=7)
+    bit_index: int = Field(..., ge=0, le=7)
+    label: str = Field(..., max_length=100)
+    function: Literal["toggle", "hold"] = "toggle"
+    allowed_roles: list[str] = Field(default_factory=list)
+    sort_order: int = Field(0, ge=0)
+    active: bool = True
+
+
+class ManualCanConfigIn(BaseModel):
+    manual_can_slots: list[ManualCanSlotCfg]
+    manual_can_buttons: list[ManualCanButtonCfg]
+
+
+@router.patch("/vehicle-types/{type_id}/manual-can", response_model=VehicleTypeOut)
+async def update_vehicle_type_manual_can(
+    type_id: uuid.UUID,
+    body: ManualCanConfigIn,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Configura slots + botones Manual CAN de una plantilla. Solo CMG admin."""
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo CMG admin puede modificar tipos de vehículo",
+        )
+    vtype = await db.get(VehicleType, type_id)
+    if not vtype:
+        raise HTTPException(status_code=404, detail="Tipo de vehículo no encontrado")
+
+    slots = [s.model_dump(mode="json") for s in body.manual_can_slots]
+    buttons = [b.model_dump(mode="json") for b in body.manual_can_buttons]
+    try:
+        manual_can_config.validate_config(slots, buttons)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    vtype.manual_can_slots = slots
+    vtype.manual_can_buttons = buttons
+    flag_modified(vtype, "manual_can_slots")
+    flag_modified(vtype, "manual_can_buttons")
     await db.commit()
     await db.refresh(vtype)
     return vtype
