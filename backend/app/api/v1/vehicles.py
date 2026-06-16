@@ -2272,7 +2272,7 @@ async def toggle_manual_can_button(
 
     # Adquirir lock exclusivo (SET NX atómico) — mismo mecanismo que send_manual_can_command
     pending_key = f"command:{imei}:pending_response"
-    acquired = await redis.set(pending_key, "", nx=True, ex=20)
+    acquired = await redis.set(pending_key, "", nx=True, ex=25)
     if not acquired:
         raise HTTPException(status_code=409, detail="Ya hay un comando en vuelo para este dispositivo")
 
