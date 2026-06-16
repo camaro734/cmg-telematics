@@ -11,7 +11,7 @@ Diferenciador: CAN bus profundo vía IFM CR2530 + mantenimiento predictivo por c
 - IFM CR2530 — CANopen 250 kbps / J1939
 - CAN Manual slots 0–19: AVL IDs 145–154 (Codec 8), 380–389 (Codec 8E)
 - Buffer offline: flash 10 MB (~130k registros) o microSD hasta 32 GB
-- Ignición: RPM primario (`avl_30/36/85/269/10309` > 200 raw = ON); DIN2 (`avl_2`) fallback si no hay RPM CAN; DIN1 reservado para PTO (junto a `avl_179`)
+- Ignición: RPM primario (`avl_30/36/85/269/10309` > 200 raw = ON); DIN1 (`avl_1`) fallback si no hay RPM CAN; DIN2 reservado para PTO (junto a `avl_179`) — toda la flota cablea el PTO a DIN2
 - `_compute_ignition()` en `ingest/src/{writer,publisher}.py` y `_ignition_from_can()` en `backend/app/api/v1/vehicles.py` — misma lógica en los tres puntos
 
 ## STACK
