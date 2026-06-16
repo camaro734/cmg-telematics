@@ -12,6 +12,7 @@ from src.config import settings
 from src.loader import load_rules, load_vehicle_type_map, Rule
 from src.evaluator import process_message, TelemetryMsg, RuleMatch
 from src.field_ops import handle_field_operations
+from src.frozen_gps import sweep_frozen_gps
 from src.silence import sweep_silent_vehicles, maybe_resolve_silence
 from src.stop_autoclose import sweep_stop_autoclose
 
@@ -234,6 +235,13 @@ async def _run_stop_autoclose_sweep(db_pool: asyncpg.Pool, redis: Redis) -> None
         await sweep_stop_autoclose(db_pool, redis)
 
 
+async def _run_frozen_gps_sweep(db_pool: asyncpg.Pool, redis: Redis) -> None:
+    """Barrido periódico de GPS congelado (Static Navigation) — corre cada 2 min."""
+    while True:
+        await asyncio.sleep(120)
+        await sweep_frozen_gps(db_pool, redis)
+
+
 async def main() -> None:
     global _rules, _vehicle_type_map
 
@@ -268,6 +276,7 @@ async def main() -> None:
         _listen_rule_changes(db_pool),
         _run_silence_sweep(db_pool, redis),
         _run_stop_autoclose_sweep(db_pool, redis),
+        _run_frozen_gps_sweep(db_pool, redis),
     )
 
 
