@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
@@ -19,6 +19,7 @@ interface CanButton {
   active: boolean
   sort_order: number
   current_bit: boolean
+  function: 'toggle' | 'hold'
 }
 
 interface Props {
@@ -63,6 +64,9 @@ function SlotButtonsPanel({
   const qc = useQueryClient()
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
+  // Botones hold actualmente pulsados; sirve para garantizar el OFF de soltar
+  // aunque el componente se desmonte o la pestaña pierda el foco.
+  const heldRef = useRef<Set<string>>(new Set())
 
   const { data: buttons = [] } = useQuery<CanButton[]>({
     queryKey: ['can-buttons', slotId],
@@ -73,28 +77,68 @@ function SlotButtonsPanel({
     refetchInterval: 30_000,
   })
 
-  const active = buttons.filter(b => b.active)
-  if (active.length === 0) return null
-
-  async function handleToggle(btn: CanButton) {
-    if (toggling[btn.id] || !connected) return
-    const prev = optimistic[btn.id] ?? btn.current_bit
-    const next = !prev
-    setOptimistic(o => ({ ...o, [btn.id]: next }))
+  // Envía un valor concreto (o alterna si value=null) al backend.
+  async function sendValue(btn: CanButton, value: boolean | null) {
+    const optimisticNext = value === null ? !(optimistic[btn.id] ?? btn.current_bit) : value
+    setOptimistic(o => ({ ...o, [btn.id]: optimisticNext }))
     setToggling(t => ({ ...t, [btn.id]: true }))
     try {
       await apiClient.post(
         `/api/v1/vehicles/${vehicleId}/can-slots/${slotId}/buttons/${btn.id}/toggle`,
-        {},
+        value === null ? {} : { value },
       )
       qc.invalidateQueries({ queryKey: ['can-buttons', slotId] })
     } catch (e) {
-      setOptimistic(o => ({ ...o, [btn.id]: prev }))
+      qc.invalidateQueries({ queryKey: ['can-buttons', slotId] })
       toast.error(e instanceof Error ? e.message : 'Error al cambiar el botón')
     } finally {
       setToggling(t => ({ ...t, [btn.id]: false }))
     }
   }
+
+  function handleToggleClick(btn: CanButton) {
+    if (toggling[btn.id] || !connected) return
+    void sendValue(btn, null)
+  }
+
+  function handleHoldStart(btn: CanButton) {
+    if (!connected || heldRef.current.has(btn.id)) return
+    heldRef.current.add(btn.id)
+    void sendValue(btn, true)
+  }
+
+  // El OFF de soltar NO se bloquea por el guard de pending del ON: el backend
+  // reintenta el lock para no dejar la salida físicamente encendida.
+  function handleHoldEnd(btn: CanButton) {
+    if (!heldRef.current.has(btn.id)) return
+    heldRef.current.delete(btn.id)
+    void sendValue(btn, false)
+  }
+
+  // OFF de seguridad: al desmontar o perder visibilidad/foco, soltar todo lo pulsado.
+  useEffect(() => {
+    function releaseAll() {
+      for (const btn of buttons) {
+        if (heldRef.current.has(btn.id)) {
+          heldRef.current.delete(btn.id)
+          void apiClient.post(
+            `/api/v1/vehicles/${vehicleId}/can-slots/${slotId}/buttons/${btn.id}/toggle`,
+            { value: false },
+          )
+        }
+      }
+    }
+    window.addEventListener('visibilitychange', releaseAll)
+    window.addEventListener('blur', releaseAll)
+    return () => {
+      window.removeEventListener('visibilitychange', releaseAll)
+      window.removeEventListener('blur', releaseAll)
+      releaseAll()
+    }
+  }, [buttons, vehicleId, slotId])
+
+  const active = buttons.filter(b => b.active)
+  if (active.length === 0) return null
 
   return (
     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
@@ -110,13 +154,25 @@ function SlotButtonsPanel({
         {active.map(btn => {
           const on = optimistic[btn.id] ?? btn.current_bit
           const loading = toggling[btn.id]
-          const disabled = !connected || !!loading
+          const isHold = btn.function === 'hold'
+          // En hold el botón no se deshabilita por loading: el soltar debe poder
+          // disparar el OFF aunque el ON siga en vuelo.
+          const disabled = isHold ? !connected : (!connected || !!loading)
+          const holdHandlers = isHold
+            ? {
+                onPointerDown: () => handleHoldStart(btn),
+                onPointerUp: () => handleHoldEnd(btn),
+                onPointerLeave: () => handleHoldEnd(btn),
+                onPointerCancel: () => handleHoldEnd(btn),
+              }
+            : { onClick: () => handleToggleClick(btn) }
           return (
             <button
               key={btn.id}
               data-testid={`btn-toggle-${btn.id}`}
-              onClick={() => handleToggle(btn)}
               disabled={disabled}
+              title={isHold ? 'Mantener pulsado' : undefined}
+              {...holdHandlers}
               style={{
                 background: on
                   ? 'color-mix(in srgb, var(--cmg-teal) 20%, transparent)'
@@ -127,17 +183,18 @@ function SlotButtonsPanel({
                 cursor: disabled ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.6 : 1,
                 transition: 'all 0.15s', minHeight: 56,
+                touchAction: 'none', userSelect: 'none',
               }}
             >
               <span style={{ fontSize: 16, color: on ? 'var(--cmg-teal)' : 'var(--fg-tertiary)' }}>
-                {on ? '●' : '○'}
+                {isHold ? '⊙' : (on ? '●' : '○')}
               </span>
               <span style={{
                 fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-sans)',
                 color: on ? 'var(--cmg-teal)' : 'var(--fg-muted)',
                 textAlign: 'center', lineHeight: 1.2,
               }}>
-                {loading ? '…' : btn.label}
+                {loading && !isHold ? '…' : btn.label}
               </span>
             </button>
           )

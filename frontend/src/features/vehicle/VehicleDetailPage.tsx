@@ -18,8 +18,6 @@ import { useUserPreferences, usePatchUserPreferences } from '../../lib/useUserPr
 import { sortByOrder } from '../../lib/sensorOrder'
 import type { VehicleOut, TrackPoint, VehicleTypeOut, KpiHour, MaintenancePlanOut, AlertInstanceEnrichedOut, TenantOut, CommandLogEntry, SystemBlock } from '../../lib/types'
 import ManualCanControl from './ManualCanControl'
-import ManualCanSlotManager from './ManualCanSlotManager'
-import ManualCanButtonManager from './ManualCanButtonManager'
 import ActivityDrawer from './ActivityDrawer'
 import WorkCyclesTab from './WorkCyclesTab'
 import MaintenanceTab from './MaintenanceTab'
@@ -460,14 +458,11 @@ export default function VehicleDetailPage() {
                   </div>
                 )}
 
-                {/* CONTROL CAN MANUAL — solo visible si el vehículo tiene slots configurados */}
+                {/* CONTROL CAN MANUAL — botones definidos en la plantilla del tipo.
+                    La configuración se hace en /tipos-vehiculo (CMG admin). */}
                 {id && manualCanSlots.length > 0 && (
                   <ManualCanControl vehicleId={id} slots={manualCanSlots} />
                 )}
-
-                {/* CONFIGURACIÓN MANUAL CAN — solo visible para admin */}
-                {id && <ManualCanSlotManager vehicleId={id} />}
-                {id && <ManualCanButtonManager vehicleId={id} />}
 
                 {/* VER REPORTES */}
                 <button
