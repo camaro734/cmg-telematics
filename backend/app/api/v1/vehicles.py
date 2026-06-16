@@ -39,6 +39,7 @@ from app.models.alert_rule import AlertRule
 from app.models.permission_grant import PermissionGrant
 from app.models.command_log import CommandLog
 from app.models.vehicle_manual_can_slot import VehicleManualCanSlot
+from app.models.manual_can_button import ManualCanButton
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
@@ -2018,6 +2019,324 @@ async def delete_manual_can_slot(
 
     await db.delete(slot)
     await db.commit()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Manual CAN Buttons — CRUD + toggle bitmask (trama 6B8, fire-and-forget)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class ManualCanButtonOut(BaseModel):
+    id: uuid.UUID
+    slot_id: uuid.UUID
+    label: str
+    byte_index: int
+    bit_index: int
+    active: bool
+    sort_order: int
+    current_bit: bool
+
+    model_config = {"from_attributes": True}
+
+
+class ManualCanButtonCreate(BaseModel):
+    label: str = Field(..., max_length=100)
+    byte_index: int = Field(..., ge=0, le=7)
+    bit_index: int = Field(..., ge=0, le=7)
+    sort_order: int = Field(0, ge=0)
+    active: bool = True
+
+
+class ManualCanButtonUpdate(BaseModel):
+    label: str | None = Field(None, max_length=100)
+    sort_order: int | None = Field(None, ge=0)
+    active: bool | None = None
+
+
+class ManualCanButtonToggleIn(BaseModel):
+    value: bool | None = None
+
+
+class ManualCanButtonToggleResponse(BaseModel):
+    button_id: uuid.UUID
+    label: str
+    new_value: bool
+    current_value: str  # hex 16 chars
+
+
+async def _get_slot_checked(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    user: CurrentUser,
+    db: AsyncSession,
+    operation: str = "read",
+) -> VehicleManualCanSlot:
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation=operation)
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    result = await db.execute(
+        select(VehicleManualCanSlot).where(
+            VehicleManualCanSlot.id == slot_id,
+            VehicleManualCanSlot.vehicle_id == vehicle_id,
+        )
+    )
+    slot = result.scalar_one_or_none()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot no encontrado")
+    return slot
+
+
+def _current_bit(current_value: bytes | None, byte_index: int, bit_index: int) -> bool:
+    if not current_value or len(current_value) <= byte_index:
+        return False
+    return bool(current_value[byte_index] & (1 << bit_index))
+
+
+def _button_to_out(btn: ManualCanButton, current_value: bytes | None) -> ManualCanButtonOut:
+    return ManualCanButtonOut(
+        id=btn.id,
+        slot_id=btn.slot_id,
+        label=btn.label,
+        byte_index=btn.byte_index,
+        bit_index=btn.bit_index,
+        active=btn.active,
+        sort_order=btn.sort_order,
+        current_bit=_current_bit(current_value, btn.byte_index, btn.bit_index),
+    )
+
+
+@router.get(
+    "/vehicles/{vehicle_id}/can-slots/{slot_id}/buttons",
+    response_model=list[ManualCanButtonOut],
+)
+async def list_manual_can_buttons(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    slot = await _get_slot_checked(vehicle_id, slot_id, user, db, operation="read")
+    result = await db.execute(
+        select(ManualCanButton)
+        .where(ManualCanButton.slot_id == slot_id)
+        .order_by(ManualCanButton.sort_order, ManualCanButton.byte_index, ManualCanButton.bit_index)
+    )
+    buttons = result.scalars().all()
+    return [_button_to_out(b, slot.current_value) for b in buttons]
+
+
+@router.post(
+    "/vehicles/{vehicle_id}/can-slots/{slot_id}/buttons",
+    response_model=ManualCanButtonOut,
+    status_code=201,
+)
+async def create_manual_can_button(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    body: ManualCanButtonCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+    slot = await _get_slot_checked(vehicle_id, slot_id, user, db, operation="write")
+
+    existing = await db.execute(
+        select(ManualCanButton).where(
+            ManualCanButton.slot_id == slot_id,
+            ManualCanButton.byte_index == body.byte_index,
+            ManualCanButton.bit_index == body.bit_index,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un botón en byte {body.byte_index} bit {body.bit_index}",
+        )
+
+    btn = ManualCanButton(
+        slot_id=slot_id,
+        tenant_id=slot.tenant_id,
+        label=body.label,
+        byte_index=body.byte_index,
+        bit_index=body.bit_index,
+        active=body.active,
+        sort_order=body.sort_order,
+    )
+    db.add(btn)
+    await db.commit()
+    await db.refresh(btn)
+    return _button_to_out(btn, slot.current_value)
+
+
+@router.patch(
+    "/vehicles/{vehicle_id}/can-slots/{slot_id}/buttons/{button_id}",
+    response_model=ManualCanButtonOut,
+)
+async def update_manual_can_button(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    button_id: uuid.UUID,
+    body: ManualCanButtonUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+    slot = await _get_slot_checked(vehicle_id, slot_id, user, db, operation="write")
+    result = await db.execute(
+        select(ManualCanButton).where(
+            ManualCanButton.id == button_id,
+            ManualCanButton.slot_id == slot_id,
+        )
+    )
+    btn = result.scalar_one_or_none()
+    if not btn:
+        raise HTTPException(status_code=404, detail="Botón no encontrado")
+    if body.label is not None:
+        btn.label = body.label
+    if body.sort_order is not None:
+        btn.sort_order = body.sort_order
+    if body.active is not None:
+        btn.active = body.active
+    await db.commit()
+    await db.refresh(btn)
+    return _button_to_out(btn, slot.current_value)
+
+
+@router.delete(
+    "/vehicles/{vehicle_id}/can-slots/{slot_id}/buttons/{button_id}",
+    status_code=204,
+)
+async def delete_manual_can_button(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    button_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+    await _get_slot_checked(vehicle_id, slot_id, user, db, operation="write")
+    result = await db.execute(
+        select(ManualCanButton).where(
+            ManualCanButton.id == button_id,
+            ManualCanButton.slot_id == slot_id,
+        )
+    )
+    btn = result.scalar_one_or_none()
+    if not btn:
+        raise HTTPException(status_code=404, detail="Botón no encontrado")
+    await db.delete(btn)
+    await db.commit()
+
+
+@router.post(
+    "/vehicles/{vehicle_id}/can-slots/{slot_id}/buttons/{button_id}/toggle",
+    response_model=ManualCanButtonToggleResponse,
+)
+async def toggle_manual_can_button(
+    vehicle_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    button_id: uuid.UUID,
+    body: ManualCanButtonToggleIn,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
+
+    slot = await _get_slot_checked(vehicle_id, slot_id, user, db, operation="write")
+
+    result = await db.execute(
+        select(ManualCanButton).where(
+            ManualCanButton.id == button_id,
+            ManualCanButton.slot_id == slot_id,
+            ManualCanButton.active == True,
+        )
+    )
+    btn = result.scalar_one_or_none()
+    if not btn:
+        raise HTTPException(status_code=404, detail="Botón no encontrado o inactivo")
+
+    result = await db.execute(
+        select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="No hay dispositivo activo vinculado al vehículo")
+
+    imei = device.imei
+    redis = request.app.state.redis
+
+    # Verificar online (last_seen < 60 min)
+    status_raw = await redis.hgetall(f"vehicle:{vehicle_id}:status")
+    last_seen_str = status_raw.get("last_seen") if status_raw else None
+    if not last_seen_str:
+        raise HTTPException(status_code=503, detail="El vehículo está offline")
+    try:
+        last_seen_dt = datetime.fromisoformat(last_seen_str)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() >= 3600:
+            raise HTTPException(status_code=503, detail="El vehículo está offline")
+    except ValueError:
+        raise HTTPException(status_code=503, detail="El vehículo está offline")
+
+    # No interferir con comandos síncronos en vuelo
+    if await redis.exists(f"command:{imei}:pending_response"):
+        raise HTTPException(status_code=409, detail="Hay un comando en vuelo para este dispositivo")
+
+    # Calcular nuevo bitmask
+    raw = slot.current_value if slot.current_value and len(slot.current_value) == 8 else b"\x00" * 8
+    data = bytearray(raw)
+    current_state = bool(data[btn.byte_index] & (1 << btn.bit_index))
+    new_state = (not current_state) if body.value is None else body.value
+    if new_state:
+        data[btn.byte_index] |= 1 << btn.bit_index
+    else:
+        data[btn.byte_index] &= ~(1 << btn.bit_index)
+
+    new_bytes = bytes(data)
+    value_hex = new_bytes.hex().upper()
+    command_sent = f"setparam {slot.param_id}:{value_hex}"
+
+    # Persistir fuente de verdad antes de publicar
+    slot.current_value = new_bytes
+    now = datetime.now(timezone.utc)
+    command_log_id = uuid.uuid4()
+    command_log = CommandLog(
+        id=command_log_id,
+        device_id=device.id,
+        vehicle_id=vehicle_id,
+        tenant_id=slot.tenant_id,
+        user_id=user.user_id,
+        command=command_sent,
+        command_type="MANUAL_CAN",
+        status="sent",
+        param_id=slot.param_id,
+        param_value=value_hex,
+        imei_snapshot=imei,
+        sent_at=now,
+    )
+    db.add(command_log)
+    await db.commit()
+
+    # Publicar fire-and-forget
+    await redis.publish(
+        "cmg:manual_can_commands",
+        json.dumps({"imei": imei, "command": command_sent, "log_id": str(command_log_id)}),
+    )
+    logger.info(
+        "Toggle Manual CAN: vehicle=%s slot=%s button=%s new_state=%s",
+        vehicle_id, slot_id, button_id, new_state,
+    )
+
+    return ManualCanButtonToggleResponse(
+        button_id=button_id,
+        label=btn.label,
+        new_value=new_state,
+        current_value=value_hex,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

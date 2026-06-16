@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Integer, Boolean, ForeignKey, SmallInteger
+from sqlalchemy import String, Integer, Boolean, ForeignKey, SmallInteger, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
@@ -15,3 +15,4 @@ class VehicleManualCanSlot(Base):
     param_id: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(String(100), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    current_value: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
