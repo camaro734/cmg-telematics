@@ -46,7 +46,7 @@ def _compute_ignition(io: dict) -> bool:
     """Detecta ignición. Prioridad:
     1) Cualquier AVL conocido de RPM > umbral → motor en marcha.
     2) Si la trama trae RPM pero está en 0 → motor parado (return False).
-    3) Si NO trae ningún AVL de RPM → fallback DIN2 (avl_2) o CAN ignition (avl_239).
+    3) Si NO trae ningún AVL de RPM → fallback DIN1 (avl_1) o CAN ignition (avl_239).
     """
     has_rpm_data = False
     for key in _RPM_AVL_IDS:

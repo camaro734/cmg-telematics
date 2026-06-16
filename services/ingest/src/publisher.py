@@ -15,7 +15,7 @@ STREAM_KEY = "telemetry.raw"
 STATUS_TTL = 7 * 24 * 3600  # 7 días — se actualiza en cada paquete
 
 # AVL IDs reportando RPM. Cualquiera > umbral → motor en marcha. Si la trama no
-# trae ninguno, caemos a DIN2 (avl_2) o CAN ignition (avl_239) como fallback.
+# trae ninguno, caemos a DIN1 (avl_1) o CAN ignition (avl_239) como fallback.
 _RPM_AVL_IDS = (30, 36, 85, 269, 10309)
 _RPM_IGNITION_THRESHOLD = 200
 _AVL_DIN1 = 1     # Ignición via entrada digital
@@ -25,7 +25,7 @@ _AVL_PTO = 179
 
 
 def _compute_ignition(io: dict) -> bool:
-    """RPM primario; DIN2 o avl_239 como fallback sólo si no llega RPM."""
+    """RPM primario; DIN1 o avl_239 como fallback sólo si no llega RPM."""
     has_rpm_data = False
     for key in _RPM_AVL_IDS:
         v = io.get(key)

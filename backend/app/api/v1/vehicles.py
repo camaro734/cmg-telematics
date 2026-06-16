@@ -163,9 +163,9 @@ def _ignition_from_can(can_data: dict) -> bool:
     """Detecta ignición a partir de CAN data. Prioridad:
     1) Cualquier AVL conocido de RPM > umbral → motor en marcha.
     2) Si la trama trae RPM pero está en 0 → motor parado (return False).
-    3) Si NO trae ningún AVL de RPM → fallback DIN2 (avl_2) o CAN ignition (avl_239).
+    3) Si NO trae ningún AVL de RPM → fallback DIN1 (avl_1) o CAN ignition (avl_239).
 
-    DIN1 (avl_1) ya NO es señal de ignición; se reserva para el fallback de PTO.
+    DIN2 (avl_2) ya NO es señal de ignición; se reserva para el fallback de PTO.
     """
     has_rpm_data = False
     for key in _RPM_AVL_IDS:
@@ -1304,14 +1304,14 @@ async def get_vehicle_status(
     pto_active = _parse_bool(pto_str)
     ignition_val = _parse_bool(ignition_str)
 
-    # Fallback ignición: RPM > umbral (primario); si no llega RPM, DIN2 (avl_2) o avl_239.
+    # Fallback ignición: RPM > umbral (primario); si no llega RPM, DIN1 (avl_1) o avl_239.
     if not ignition_val and can_data:
         if _ignition_from_can(can_data):
             ignition_val = True
 
-    # Fallback PTO: si Redis tiene pto_active=false pero DIN1 (avl_1) o avl_179 = 1.
+    # Fallback PTO: si Redis tiene pto_active=false pero DIN2 (avl_2) o avl_179 = 1.
     if not pto_active and can_data:
-        if can_data.get("avl_1") == 1 or can_data.get("avl_179") == 1:
+        if can_data.get("avl_2") == 1 or can_data.get("avl_179") == 1:
             pto_active = True
 
     # Recalcular online basado en last_seen (< 5 min = online real)
