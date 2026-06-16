@@ -1706,11 +1706,13 @@ async def send_manual_can_command(
     param_id = slot_config.param_id
     redis = request.app.state.redis
 
-    # 5. Verificar FMC online (informativo, el check duro es la respuesta DISCONNECTED)
-    status_raw = await redis.hgetall(f"vehicle:{vehicle_id}:status")
-    if not status_raw or not status_raw.get("last_seen"):
-        # No es 503 automático; el DISCONNECTED lo lo hará. Pero es buena señal.
-        pass
+    # 5. Verificar conexión TCP viva (la pone ingest-svc, TTL 90s). Falla rápido
+    #    y con mensaje claro en vez de esperar el DISCONNECTED del listener.
+    if not await redis.exists(f"ingest:conn:{imei}"):
+        raise HTTPException(
+            status_code=503,
+            detail="El FMC no está conectado en este momento. Reintenta cuando el dispositivo transmita.",
+        )
 
     # 6. Anti-concurrencia
     pending_key = f"command:{imei}:pending_response"
@@ -1841,18 +1843,19 @@ async def get_fmc_status(
     redis = request.app.state.redis
     status_raw = await redis.hgetall(f"vehicle:{vehicle_id}:status")
 
-    # El vehículo está "online" si last_seen < 60 min (patrón existente)
+    # last_seen es solo informativo (última transmisión). NO determina "online":
+    # el FMC650 cierra el socket entre lotes, así que puede haber transmitido hace
+    # 2 min y tener la conexión TCP cerrada. Un comando Codec 12 solo es entregable
+    # con conexión viva, por eso connected se deriva de ingest:conn (ver ingest-svc).
     last_seen_str = status_raw.get("last_seen") if status_raw else None
     last_seen = None
-    connected = False
-
     if last_seen_str:
         try:
             last_seen = datetime.fromisoformat(last_seen_str)
-            now = datetime.now(timezone.utc)
-            connected = (now - last_seen).total_seconds() < 3600
         except (ValueError, TypeError):
             pass
+
+    connected = bool(await redis.exists(f"ingest:conn:{device.imei}"))
 
     return FmcStatusResponse(
         connected=connected,
@@ -2269,6 +2272,13 @@ async def toggle_manual_can_button(
 
     imei = device.imei
     redis = request.app.state.redis
+
+    # Comando entregable solo con conexión TCP viva ahora (ingest:conn, la pone ingest-svc)
+    if not await redis.exists(f"ingest:conn:{imei}"):
+        raise HTTPException(
+            status_code=503,
+            detail="El FMC no está conectado en este momento. Reintenta cuando el dispositivo transmita.",
+        )
 
     # Adquirir lock exclusivo (SET NX atómico) — mismo mecanismo que send_manual_can_command
     pending_key = f"command:{imei}:pending_response"
