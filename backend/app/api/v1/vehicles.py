@@ -2270,73 +2270,89 @@ async def toggle_manual_can_button(
     imei = device.imei
     redis = request.app.state.redis
 
-    # Verificar online (last_seen < 60 min)
-    status_raw = await redis.hgetall(f"vehicle:{vehicle_id}:status")
-    last_seen_str = status_raw.get("last_seen") if status_raw else None
-    if not last_seen_str:
-        raise HTTPException(status_code=503, detail="El vehículo está offline")
+    # Adquirir lock exclusivo (SET NX atómico) — mismo mecanismo que send_manual_can_command
+    pending_key = f"command:{imei}:pending_response"
+    acquired = await redis.set(pending_key, "", nx=True, ex=20)
+    if not acquired:
+        raise HTTPException(status_code=409, detail="Ya hay un comando en vuelo para este dispositivo")
+
     try:
-        last_seen_dt = datetime.fromisoformat(last_seen_str)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() >= 3600:
-            raise HTTPException(status_code=503, detail="El vehículo está offline")
-    except ValueError:
-        raise HTTPException(status_code=503, detail="El vehículo está offline")
+        # Calcular nuevo bitmask
+        raw = slot.current_value if slot.current_value and len(slot.current_value) == 8 else b"\x00" * 8
+        data = bytearray(raw)
+        current_state = bool(data[btn.byte_index] & (1 << btn.bit_index))
+        new_state = (not current_state) if body.value is None else body.value
+        if new_state:
+            data[btn.byte_index] |= 1 << btn.bit_index
+        else:
+            data[btn.byte_index] &= ~(1 << btn.bit_index)
 
-    # No interferir con comandos síncronos en vuelo
-    if await redis.exists(f"command:{imei}:pending_response"):
-        raise HTTPException(status_code=409, detail="Hay un comando en vuelo para este dispositivo")
+        new_bytes = bytes(data)
+        value_hex = new_bytes.hex().upper()
+        command_sent = f"setparam {slot.param_id}:{value_hex}"
 
-    # Calcular nuevo bitmask
-    raw = slot.current_value if slot.current_value and len(slot.current_value) == 8 else b"\x00" * 8
-    data = bytearray(raw)
-    current_state = bool(data[btn.byte_index] & (1 << btn.bit_index))
-    new_state = (not current_state) if body.value is None else body.value
-    if new_state:
-        data[btn.byte_index] |= 1 << btn.bit_index
-    else:
-        data[btn.byte_index] &= ~(1 << btn.bit_index)
+        # Crear CommandLog en pending; se actualiza según la respuesta del FMC
+        now = datetime.now(timezone.utc)
+        command_log_id = uuid.uuid4()
+        command_log = CommandLog(
+            id=command_log_id,
+            device_id=device.id,
+            vehicle_id=vehicle_id,
+            tenant_id=slot.tenant_id,
+            user_id=user.user_id,
+            command=command_sent,
+            command_type="MANUAL_CAN",
+            status="pending",
+            param_id=slot.param_id,
+            param_value=value_hex,
+            imei_snapshot=imei,
+            sent_at=now,
+        )
+        db.add(command_log)
 
-    new_bytes = bytes(data)
-    value_hex = new_bytes.hex().upper()
-    command_sent = f"setparam {slot.param_id}:{value_hex}"
+        # Publicar y esperar ack del FMC (mismo flujo que send_manual_can_command)
+        await redis.publish(
+            "cmg:manual_can_commands",
+            json.dumps({"imei": imei, "command": command_sent, "log_id": str(command_log_id)}),
+        )
+        logger.info("Toggle Manual CAN publicado → IMEI %s button=%s state=%s", imei, button_id, new_state)
 
-    # Persistir fuente de verdad antes de publicar
-    slot.current_value = new_bytes
-    now = datetime.now(timezone.utc)
-    command_log_id = uuid.uuid4()
-    command_log = CommandLog(
-        id=command_log_id,
-        device_id=device.id,
-        vehicle_id=vehicle_id,
-        tenant_id=slot.tenant_id,
-        user_id=user.user_id,
-        command=command_sent,
-        command_type="MANUAL_CAN",
-        status="sent",
-        param_id=slot.param_id,
-        param_value=value_hex,
-        imei_snapshot=imei,
-        sent_at=now,
-    )
-    db.add(command_log)
-    await db.commit()
+        resp_data = await redis.blpop(f"command:{imei}:response", timeout=18)
 
-    # Publicar fire-and-forget
-    await redis.publish(
-        "cmg:manual_can_commands",
-        json.dumps({"imei": imei, "command": command_sent, "log_id": str(command_log_id)}),
-    )
-    logger.info(
-        "Toggle Manual CAN: vehicle=%s slot=%s button=%s new_state=%s",
-        vehicle_id, slot_id, button_id, new_state,
-    )
+        if resp_data is None:
+            command_log.status = "timeout"
+            command_log.response_at = datetime.now(timezone.utc)
+            await db.commit()
+            raise HTTPException(status_code=504, detail="El FMC no respondió en 18 segundos")
 
-    return ManualCanButtonToggleResponse(
-        button_id=button_id,
-        label=btn.label,
-        new_value=new_state,
-        current_value=value_hex,
-    )
+        _, fmc_response = resp_data
+
+        if fmc_response == "DISCONNECTED":
+            command_log.status = "disconnected"
+            command_log.response_at = datetime.now(timezone.utc)
+            await db.commit()
+            raise HTTPException(status_code=503, detail="FMC desconectado")
+
+        # Ack OK — persistir current_value solo tras confirmación
+        now_response = datetime.now(timezone.utc)
+        latency_ms = int((now_response - now).total_seconds() * 1000)
+        command_log.status = "confirmed"
+        command_log.response = fmc_response
+        command_log.response_at = now_response
+        command_log.latency_ms = latency_ms
+        slot.current_value = new_bytes
+        await db.commit()
+
+        logger.info("Toggle Manual CAN confirmado: IMEI %s latency=%dms", imei, latency_ms)
+
+        return ManualCanButtonToggleResponse(
+            button_id=button_id,
+            label=btn.label,
+            new_value=new_state,
+            current_value=value_hex,
+        )
+    finally:
+        await redis.delete(pending_key)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
