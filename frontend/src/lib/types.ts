@@ -224,6 +224,27 @@ export interface VehicleTypeOut {
   dout_config: DoutSlot[]
   pdf_metrics: PdfMetricItem[]
   system_blocks: SystemBlock[]
+  manual_can_slots: ManualCanSlotCfg[]
+  manual_can_buttons: ManualCanButtonCfg[]
+}
+
+export interface ManualCanSlotCfg {
+  id: string
+  slot: number
+  param_id: number
+  description: string
+}
+
+export interface ManualCanButtonCfg {
+  id: string
+  slot_id: string
+  byte_index: number
+  bit_index: number
+  label: string
+  function: 'toggle' | 'hold'
+  allowed_roles: string[]
+  sort_order: number
+  active: boolean
 }
 
 export interface AlertInstanceOut {

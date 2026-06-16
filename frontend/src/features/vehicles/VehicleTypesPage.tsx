@@ -16,6 +16,7 @@ import MaintenanceTemplatesSection from './MaintenanceTemplatesSection'
 import HistoricMetricsSection from './HistoricMetricsSection'
 import PdfMetricsSection from './PdfMetricsSection'
 import DoutConfigSection from './DoutConfigSection'
+import ManualCanConfigSection from './ManualCanConfigSection'
 import AlertRulesSection from './AlertRulesSection'
 import SystemBlocksSection from './SystemBlocksSection'
 
@@ -567,6 +568,9 @@ export default function VehicleTypesPage() {
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <DoutConfigSection typeId={selectedType.id} selectedType={selectedType} />
+                )}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <ManualCanConfigSection typeId={selectedType.id} selectedType={selectedType} />
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <WorkCycleDefsSection
