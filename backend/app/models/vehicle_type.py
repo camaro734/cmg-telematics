@@ -18,5 +18,9 @@ class VehicleType(Base):
     dout_config: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     pdf_metrics: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
     system_blocks: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
+    # Config Manual CAN (FMC650 → CR2530) a nivel plantilla: slots y botones.
+    # El estado runtime de las salidas vive en Redis por vehículo, no aquí.
+    manual_can_slots: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
+    manual_can_buttons: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]", default=list)
 
     vehicles = relationship("Vehicle", back_populates="vehicle_type")
