@@ -1753,22 +1753,16 @@ async def send_manual_can_command(
 
     imei = device.imei
 
-    # 4. Buscar configuración Manual CAN slot
-    result = await db.execute(
-        select(VehicleManualCanSlot).where(
-            VehicleManualCanSlot.vehicle_id == vehicle_id,
-            VehicleManualCanSlot.slot == body.slot,
-            VehicleManualCanSlot.active == True,
-        )
-    )
-    slot_config = result.scalar_one_or_none()
+    # 4. Buscar configuración Manual CAN slot en la plantilla del vehículo
+    slots, _ = await _vehicle_manual_can_cfg(vehicle, db)
+    slot_config = next((s for s in slots if s["slot"] == body.slot), None)
     if not slot_config:
         raise HTTPException(
             status_code=404,
             detail=f"Manual CAN no configurado para slot {body.slot}",
         )
 
-    param_id = slot_config.param_id
+    param_id = slot_config["param_id"]
     redis = request.app.state.redis
 
     # 5. Verificar conexión TCP viva (la pone ingest-svc, TTL 90s). Falla rápido
@@ -1953,28 +1947,38 @@ class ManualCanSlotUpdate(BaseModel):
     active: bool | None = None
 
 
+async def _vehicle_manual_can_cfg(vehicle, db: AsyncSession) -> tuple[list[dict], list[dict]]:
+    """Devuelve (slots, buttons) de la plantilla (vehicle_type) del vehículo."""
+    vtype = await db.get(VehicleType, vehicle.vehicle_type_id)
+    if not vtype:
+        return [], []
+    return (vtype.manual_can_slots or [], vtype.manual_can_buttons or [])
+
+
 @router.get("/vehicles/{vehicle_id}/manual-can-slots", response_model=list[ManualCanSlotOut])
 async def list_manual_can_slots(
     vehicle_id: uuid.UUID,
-    include_inactive: bool = Query(False, description="Incluir slots desactivados"),
+    include_inactive: bool = Query(False, description="(compat) no aplica a plantilla"),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lista los slots Manual CAN del vehículo. Por defecto solo activos."""
+    """Lista los slots Manual CAN definidos en la plantilla del vehículo."""
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
     if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
-    filters = [VehicleManualCanSlot.vehicle_id == vehicle_id]
-    if not include_inactive:
-        filters.append(VehicleManualCanSlot.active == True)
-
-    result = await db.execute(
-        select(VehicleManualCanSlot)
-        .where(*filters)
-        .order_by(VehicleManualCanSlot.slot)
-    )
-    return result.scalars().all()
+    slots, _ = await _vehicle_manual_can_cfg(vehicle, db)
+    return [
+        ManualCanSlotOut(
+            id=s["id"],
+            vehicle_id=vehicle_id,
+            slot=s["slot"],
+            param_id=s["param_id"],
+            description=s.get("description", ""),
+            active=True,
+        )
+        for s in sorted(slots, key=lambda s: s["slot"])
+    ]
 
 
 @router.post("/vehicles/{vehicle_id}/manual-can-slots", response_model=ManualCanSlotOut, status_code=201)
@@ -2103,6 +2107,7 @@ class ManualCanButtonOut(BaseModel):
     active: bool
     sort_order: int
     current_bit: bool
+    function: str = "toggle"
 
     model_config = {"from_attributes": True}
 
@@ -2180,17 +2185,46 @@ def _button_to_out(btn: ManualCanButton, current_value: bytes | None) -> ManualC
 async def list_manual_can_buttons(
     vehicle_id: uuid.UUID,
     slot_id: uuid.UUID,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    slot = await _get_slot_checked(vehicle_id, slot_id, user, db, operation="read")
-    result = await db.execute(
-        select(ManualCanButton)
-        .where(ManualCanButton.slot_id == slot_id)
-        .order_by(ManualCanButton.sort_order, ManualCanButton.byte_index, ManualCanButton.bit_index)
-    )
-    buttons = result.scalars().all()
-    return [_button_to_out(b, slot.current_value) for b in buttons]
+    """Botones de un slot, definidos en la plantilla, filtrados por el rol del
+    usuario. El estado actual de cada bit se lee del hash Redis del vehículo."""
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    slots, buttons = await _vehicle_manual_can_cfg(vehicle, db)
+    slot = next((s for s in slots if str(s["id"]) == str(slot_id)), None)
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot no encontrado")
+
+    redis = request.app.state.redis
+    raw_hex = await redis.hget(manual_can_config.state_key(vehicle_id), str(slot["slot"]))
+    state = bytes.fromhex(raw_hex) if raw_hex else None
+
+    visible = [
+        b for b in buttons
+        if str(b["slot_id"]) == str(slot_id)
+        and b.get("active", True)
+        and manual_can_config.role_can_press(b, user.role)
+    ]
+    visible.sort(key=lambda b: (b.get("sort_order", 0), b["byte_index"], b["bit_index"]))
+    return [
+        ManualCanButtonOut(
+            id=b["id"],
+            slot_id=b["slot_id"],
+            label=b["label"],
+            byte_index=b["byte_index"],
+            bit_index=b["bit_index"],
+            active=b.get("active", True),
+            sort_order=b.get("sort_order", 0),
+            current_bit=manual_can_config.current_bit(state, b["byte_index"], b["bit_index"]),
+            function=b.get("function", "toggle"),
+        )
+        for b in visible
+    ]
 
 
 @router.post(
