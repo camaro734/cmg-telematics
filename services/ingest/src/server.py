@@ -27,6 +27,16 @@ _connection_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_CONNECTIONS)
 # Máximo tamaño de paquete Codec 8 — previene ataques de memoria
 _MAX_PACKET_BYTES = 65_536
 
+# Estado de conexión TCP en Redis: refleja qué dispositivos están conectados AHORA
+# (no "visto hace <60 min"). core-api lo usa para saber si un comando Codec 12 es
+# entregable en este instante. TTL como backstop si el proceso muere sin limpiar;
+# refresh_connections() lo renueva mientras la conexión siga viva.
+_CONN_TTL_S = 90
+
+
+def _conn_key(imei: str) -> str:
+    return f"ingest:conn:{imei}"
+
 
 def _internal_headers() -> dict[str, str]:
     """Cabecera de autenticación interna para llamadas a core-api /internal."""
@@ -115,6 +125,12 @@ class TeltonikaConnection:
                 # del mismo IMEI habría registrado un writer nuevo que no debemos borrar.
                 if _active_writers.get(self.imei) is self.writer:
                     _active_writers.pop(self.imei, None)
+                    # Borrar el marcador de conexión TCP solo si seguía siendo el nuestro;
+                    # una reconexión rápida ya habría puesto la key de nuevo.
+                    try:
+                        await self.redis.delete(_conn_key(self.imei))
+                    except Exception as e:
+                        logger.warning("No se pudo limpiar ingest:conn de %s: %s", self.imei, e)
                 async with self.db_pool.acquire() as conn:
                     await update_device_online(conn, self.imei, False)
                 if self.device_info:
@@ -164,6 +180,12 @@ class TeltonikaConnection:
         logger.info("IMEI aceptado: %s → vehicle %s", self.imei, self.device_info["vehicle_id"])
 
         _active_writers[self.imei] = self.writer
+
+        # Marcar conexión TCP viva en Redis (refrescada por refresh_connections).
+        try:
+            await self.redis.set(_conn_key(self.imei), "1", ex=_CONN_TTL_S)
+        except Exception as e:
+            logger.warning("No se pudo marcar ingest:conn de %s: %s", self.imei, e)
 
         async with self.db_pool.acquire() as conn:
             await update_device_online(conn, self.imei, True)
@@ -362,6 +384,27 @@ async def manual_can_listener(redis: Redis) -> None:
         except Exception as e:
             logger.error("manual_can_listener: error en pubsub, reintentando en 5s: %s", e)
             await asyncio.sleep(5)
+
+
+async def refresh_connections(redis: Redis) -> None:
+    """Refresca el TTL de las conexiones TCP activas en Redis cada 30 s.
+
+    Mantiene viva la key ingest:conn:{imei} mientras el writer siga en
+    _active_writers, para que core-api distinga "conectado ahora" de
+    "visto hace rato". TTL 90 s da margen 3x sobre el período de refresco.
+    """
+    while True:
+        await asyncio.sleep(30)
+        try:
+            imeis = list(_active_writers.keys())
+            if not imeis:
+                continue
+            pipe = redis.pipeline()
+            for imei in imeis:
+                pipe.set(_conn_key(imei), "1", ex=_CONN_TTL_S)
+            await pipe.execute()
+        except Exception as e:
+            logger.warning("refresh_connections falló: %s", e)
 
 
 async def run_server(db_pool: asyncpg.Pool, redis: Redis) -> None:
