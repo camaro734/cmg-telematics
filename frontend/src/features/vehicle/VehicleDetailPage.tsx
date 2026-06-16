@@ -746,10 +746,13 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
 
 function CommandStatusBadge({ status }: { status: CommandLogEntry['status'] }) {
   const map: Record<CommandLogEntry['status'], { label: string; color: string }> = {
-    pending:   { label: 'Pendiente',  color: 'var(--offline)' },
-    sent:      { label: 'Enviado',    color: 'var(--info)' },
-    failed:    { label: 'Fallido',    color: 'var(--danger)' },
-    confirmed: { label: 'Confirmado', color: 'var(--ok)' },
+    pending:      { label: 'Pendiente',    color: 'var(--offline)' },
+    sent:         { label: 'Enviado',      color: 'var(--info)' },
+    failed:       { label: 'Fallido',      color: 'var(--danger)' },
+    confirmed:    { label: 'Confirmado',   color: 'var(--ok)' },
+    timeout:      { label: 'Timeout',      color: 'var(--danger)' },
+    disconnected: { label: 'Desconectado', color: 'var(--danger)' },
+    error:        { label: 'Error',        color: 'var(--danger)' },
   }
   const { label, color } = map[status] ?? map.pending
   return (

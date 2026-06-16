@@ -10,10 +10,13 @@ function relativeTime(iso: string): string {
 }
 
 const STATUS_COLOR: Record<CommandLogEntry['status'], string> = {
-  confirmed: 'var(--ok)',
-  sent:      'var(--cmg-teal)',
-  pending:   'var(--warn)',
-  failed:    'var(--danger)',
+  confirmed:    'var(--ok)',
+  sent:         'var(--cmg-teal)',
+  pending:      'var(--warn)',
+  failed:       'var(--danger)',
+  timeout:      'var(--danger)',
+  disconnected: 'var(--danger)',
+  error:        'var(--danger)',
 }
 
 interface Props {
