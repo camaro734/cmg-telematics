@@ -2346,21 +2346,30 @@ async def toggle_manual_can_button(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
+    """Acciona un botón Manual CAN definido en la plantilla del vehículo.
 
-    slot = await _get_slot_checked(vehicle_id, slot_id, user, db, operation="write")
+    body.value: None = alterna (toggle); True/False = fija (los botones `hold`
+    envían True al pulsar y False al soltar). El OFF de soltar de un botón `hold`
+    tiene prioridad: si el lock del dispositivo está ocupado, reintenta hasta
+    entrar para no dejar la salida físicamente encendida.
+    """
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
-    result = await db.execute(
-        select(ManualCanButton).where(
-            ManualCanButton.id == button_id,
-            ManualCanButton.slot_id == slot_id,
-            ManualCanButton.active == True,
-        )
+    slots, buttons = await _vehicle_manual_can_cfg(vehicle, db)
+    slot = next((s for s in slots if str(s["id"]) == str(slot_id)), None)
+    btn = next(
+        (b for b in buttons
+         if str(b["id"]) == str(button_id)
+         and str(b["slot_id"]) == str(slot_id)
+         and b.get("active", True)),
+        None,
     )
-    btn = result.scalar_one_or_none()
-    if not btn:
+    if not slot or not btn:
         raise HTTPException(status_code=404, detail="Botón no encontrado o inactivo")
+    if not manual_can_config.role_can_press(btn, user.role):
+        raise HTTPException(status_code=403, detail="Tu rol no puede accionar este botón")
 
     result = await db.execute(
         select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
@@ -2379,26 +2388,30 @@ async def toggle_manual_can_button(
             detail="El FMC no está conectado en este momento. Reintenta cuando el dispositivo transmita.",
         )
 
-    # Adquirir lock exclusivo (SET NX atómico) — mismo mecanismo que send_manual_can_command
+    # Adquirir lock exclusivo (SET NX atómico) — mismo mecanismo que send_manual_can_command.
+    # El OFF de soltar de un botón hold es prioritario: reintenta hasta ~20s.
+    is_hold_off = btn.get("function") == "hold" and body.value is False
     pending_key = f"command:{imei}:pending_response"
     acquired = await redis.set(pending_key, "", nx=True, ex=25)
+    if not acquired and is_hold_off:
+        for _ in range(40):
+            await asyncio.sleep(0.5)
+            acquired = await redis.set(pending_key, "", nx=True, ex=25)
+            if acquired:
+                break
     if not acquired:
         raise HTTPException(status_code=409, detail="Ya hay un comando en vuelo para este dispositivo")
 
     try:
-        # Calcular nuevo bitmask
-        raw = slot.current_value if slot.current_value and len(slot.current_value) == 8 else b"\x00" * 8
-        data = bytearray(raw)
-        current_state = bool(data[btn.byte_index] & (1 << btn.bit_index))
+        # Calcular nuevo bitmask a partir del estado en Redis
+        state_k = manual_can_config.state_key(vehicle_id)
+        raw_hex = await redis.hget(state_k, str(slot["slot"]))
+        raw = bytes.fromhex(raw_hex) if raw_hex else bytes(8)
+        current_state = manual_can_config.current_bit(raw, btn["byte_index"], btn["bit_index"])
         new_state = (not current_state) if body.value is None else body.value
-        if new_state:
-            data[btn.byte_index] |= 1 << btn.bit_index
-        else:
-            data[btn.byte_index] &= ~(1 << btn.bit_index)
-
-        new_bytes = bytes(data)
+        new_bytes = manual_can_config.apply_bit(raw, btn["byte_index"], btn["bit_index"], new_state)
         value_hex = new_bytes.hex().upper()
-        command_sent = f"setparam {slot.param_id}:{value_hex}"
+        command_sent = f"setparam {slot['param_id']}:{value_hex}"
 
         # Crear CommandLog en pending; se actualiza según la respuesta del FMC
         now = datetime.now(timezone.utc)
@@ -2407,12 +2420,12 @@ async def toggle_manual_can_button(
             id=command_log_id,
             device_id=device.id,
             vehicle_id=vehicle_id,
-            tenant_id=slot.tenant_id,
+            tenant_id=vehicle.tenant_id,
             user_id=user.user_id,
             command=command_sent,
             command_type="MANUAL_CAN",
             status="pending",
-            param_id=slot.param_id,
+            param_id=slot["param_id"],
             param_value=value_hex,
             imei_snapshot=imei,
             sent_at=now,
@@ -2442,21 +2455,21 @@ async def toggle_manual_can_button(
             await db.commit()
             raise HTTPException(status_code=503, detail="FMC desconectado")
 
-        # Ack OK — persistir current_value solo tras confirmación
+        # Ack OK — persistir el estado en Redis solo tras confirmación
         now_response = datetime.now(timezone.utc)
         latency_ms = int((now_response - now).total_seconds() * 1000)
         command_log.status = "confirmed"
         command_log.response = fmc_response
         command_log.response_at = now_response
         command_log.latency_ms = latency_ms
-        slot.current_value = new_bytes
         await db.commit()
+        await redis.hset(state_k, str(slot["slot"]), value_hex)
 
         logger.info("Toggle Manual CAN confirmado: IMEI %s latency=%dms", imei, latency_ms)
 
         return ManualCanButtonToggleResponse(
             button_id=button_id,
-            label=btn.label,
+            label=btn["label"],
             new_value=new_state,
             current_value=value_hex,
         )
