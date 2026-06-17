@@ -132,7 +132,7 @@ export default function ManualCanConfigSection({ typeId, selectedType }: Props) 
                       onChange={e => patchSlot(s.id, { slot: num(e.target.value) })} />
                   </td>
                   <td style={{ ...td, width: 120 }}>
-                    <Input type="number" min={1} data-testid={`slot-param-id-${i}`} value={String(s.param_id)}
+                    <Input type="number" min={0} data-testid={`slot-param-id-${i}`} value={String(s.param_id)}
                       onChange={e => patchSlot(s.id, { param_id: num(e.target.value, 0) })} />
                   </td>
                   <td style={td}>

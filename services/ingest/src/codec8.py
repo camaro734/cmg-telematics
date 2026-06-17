@@ -299,7 +299,7 @@ def build_setparam(param_id: int, value_hex: str) -> str:
     return f"setparam {param_id}:{value_hex}"
 
 
-_FMC_ERROR_MARKERS = ("WARNING", "ERROR", "NOT SUPPORTED", "UNKNOWN", "FAIL")
+_FMC_ERROR_MARKERS = ("WARNING", "ERROR", "NOT SUPPORTED", "UNKNOWN")
 
 
 def is_fmc_error_response(text: str | None) -> bool:

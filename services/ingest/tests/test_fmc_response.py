@@ -11,3 +11,7 @@ def test_new_value_ack_is_ok():
 
 def test_empty_is_ok():
     assert is_fmc_error_response("") is False
+
+
+def test_none_is_ok():
+    assert is_fmc_error_response(None) is False

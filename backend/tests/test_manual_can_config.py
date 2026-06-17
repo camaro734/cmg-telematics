@@ -111,3 +111,7 @@ def test_is_fmc_error_response_accepts_new_value_ack():
 def test_is_fmc_error_response_empty_is_not_error():
     # ACK Codec 12 presente sin texto (caso DOUT): no es un rechazo.
     assert is_fmc_error_response("") is False
+
+
+def test_is_fmc_error_response_none_is_not_error():
+    assert is_fmc_error_response(None) is False

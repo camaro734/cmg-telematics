@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -23,13 +23,15 @@ function renderSection() {
 }
 
 describe('ManualCanConfigSection', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   it('un slot recién añadido NO trae param_id 16000 por defecto y bloquea guardado', async () => {
     const user = userEvent.setup()
     renderSection()
     await user.click(screen.getByRole('button', { name: /\+ slot/i }))
     // El input de param_id debe estar vacío o 0, nunca 16000.
     const paramInput = screen.getByTestId('slot-param-id-0') as HTMLInputElement
-    expect(paramInput.value === '' || paramInput.value === '0').toBe(true)
+    expect(['', '0']).toContain(paramInput.value)
     // Guardar con param_id inválido no debe llamar al API.
     await user.click(screen.getByRole('button', { name: /guardar configuración/i }))
     expect(apiClient.patch).not.toHaveBeenCalled()
