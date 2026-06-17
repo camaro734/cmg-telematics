@@ -2,6 +2,7 @@
 import pytest
 
 from app.services import manual_can_config as mc
+from app.services.manual_can_config import is_fmc_error_response
 
 
 def test_compute_bitmask_sets_and_clears_bit():
@@ -92,8 +93,6 @@ def test_validate_config_rejects_slot_out_of_range():
 
 
 # ── Tests de clasificación de respuesta FMC ──────────────────────────────────
-
-from app.services.manual_can_config import is_fmc_error_response  # noqa: E402
 
 
 def test_is_fmc_error_response_detects_warning():
