@@ -71,3 +71,17 @@ def validate_config(slots: list[dict], buttons: list[dict]) -> None:
         if key in seen_bits:
             raise ValueError(f"bit duplicado en slot {b['slot_id']}: {key}")
         seen_bits.add(key)
+
+
+# Marcadores de rechazo en la respuesta Codec 12 del FMC. El FMC confirma un
+# setparam aceptado con "New value <id>:<valor>;"; cualquiera de estos textos
+# significa que NO aplicó el comando aunque el ACK Codec 12 haya llegado.
+_FMC_ERROR_MARKERS = ("WARNING", "ERROR", "NOT SUPPORTED", "UNKNOWN", "FAIL")
+
+
+def is_fmc_error_response(text: str | None) -> bool:
+    """True si la respuesta del FMC indica que rechazó el comando."""
+    if not text:
+        return False
+    upper = text.upper()
+    return any(marker in upper for marker in _FMC_ERROR_MARKERS)

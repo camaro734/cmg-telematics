@@ -89,3 +89,26 @@ def test_validate_config_rejects_slot_out_of_range():
     slots = [{"id": "s1", "slot": 15, "param_id": 16002, "description": "x"}]
     with pytest.raises(ValueError):
         mc.validate_config(slots, [])
+
+
+# ── Tests de clasificación de respuesta FMC ──────────────────────────────────
+
+from app.services.manual_can_config import is_fmc_error_response  # noqa: E402
+
+
+def test_is_fmc_error_response_detects_warning():
+    assert is_fmc_error_response("WARNING: Not supported Param ID or Value detected") is True
+
+
+def test_is_fmc_error_response_detects_error_and_unknown():
+    assert is_fmc_error_response("ERROR: bad command") is True
+    assert is_fmc_error_response("Unknown parameter") is True
+
+
+def test_is_fmc_error_response_accepts_new_value_ack():
+    assert is_fmc_error_response("New value 16002:00FFFFFFFFFFFFFF;") is False
+
+
+def test_is_fmc_error_response_empty_is_not_error():
+    # ACK Codec 12 presente sin texto (caso DOUT): no es un rechazo.
+    assert is_fmc_error_response("") is False

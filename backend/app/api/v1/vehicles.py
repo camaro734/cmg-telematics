@@ -43,6 +43,7 @@ from app.models.command_log import CommandLog
 from app.models.vehicle_manual_can_slot import VehicleManualCanSlot
 from app.models.manual_can_button import ManualCanButton
 from app.services import manual_can_config
+from app.services.manual_can_config import is_fmc_error_response
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
 from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
 
@@ -1849,6 +1850,14 @@ async def send_manual_can_command(
             logger.warning("Manual CAN FMC desconectado para %s", imei)
             raise HTTPException(status_code=503, detail="FMC desconectado")
 
+        if is_fmc_error_response(fmc_response):
+            command_log.status = "failed"
+            command_log.response = fmc_response
+            command_log.response_at = datetime.now(timezone.utc)
+            await db.commit()
+            logger.warning("Manual CAN rechazado por FMC %s: %r", imei, fmc_response)
+            raise HTTPException(status_code=502, detail=f"El FMC rechazó el comando: {fmc_response}")
+
         # Respuesta válida
         now_response = datetime.now(timezone.utc)
         latency_ms = int((now_response - now).total_seconds() * 1000)
@@ -2454,6 +2463,14 @@ async def toggle_manual_can_button(
             command_log.response_at = datetime.now(timezone.utc)
             await db.commit()
             raise HTTPException(status_code=503, detail="FMC desconectado")
+
+        if is_fmc_error_response(fmc_response):
+            command_log.status = "failed"
+            command_log.response = fmc_response
+            command_log.response_at = datetime.now(timezone.utc)
+            await db.commit()
+            logger.warning("Toggle Manual CAN rechazado por FMC %s: %r", imei, fmc_response)
+            raise HTTPException(status_code=502, detail=f"El FMC rechazó el comando: {fmc_response}")
 
         # Ack OK — persistir el estado en Redis solo tras confirmación
         now_response = datetime.now(timezone.utc)
