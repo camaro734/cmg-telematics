@@ -9,6 +9,7 @@ import type { DeviceOut, TenantOut, DeviceCreate, DeviceTransfer } from '../../l
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import { formatBytes } from '../../lib/format'
+import { DataUsageModal } from './DataUsageModal'
 
 function formatLastSeen(last_seen: string | null): string {
   if (!last_seen) return '—'
@@ -38,6 +39,9 @@ export default function DevicesPage() {
   const [newOwnerTenantId, setNewOwnerTenantId] = useState('')
   const [newSimPhone, setNewSimPhone] = useState('')
   const [modalError, setModalError] = useState<string | null>(null)
+
+  // Estado del modal de histórico de consumo SIM
+  const [usageDevice, setUsageDevice] = useState<DeviceOut | null>(null)
 
   // Estado del modal de transferencia
   const [transferDevice, setTransferDevice] = useState<DeviceOut | null>(null)
@@ -269,6 +273,11 @@ export default function DevicesPage() {
                           </span>
                           <span style={{ color: 'var(--fg-muted)' }}> / {formatBytes(device.total_bytes)}</span>
                           <span style={{ color: 'var(--fg-muted)', fontSize: 10 }} title="Estimación basada en los datos recibidos; la factura real del operador es algo mayor"> ℹ</span>
+                          <button
+                            onClick={() => setUsageDevice(device)}
+                            title="Ver histórico mensual"
+                            style={{ background: 'none', border: 'none', color: 'var(--accent-info)', cursor: 'pointer', marginLeft: 6 }}
+                          >📊</button>
                         </td>
                         <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', color: device.firmware_ver ? 'var(--fg-primary)' : 'var(--fg-muted)', fontSize: 12 }}>
                           {device.firmware_ver ?? '—'}
@@ -330,6 +339,15 @@ export default function DevicesPage() {
           </div>
         )}
       </div>
+
+      {/* Modal — Histórico consumo SIM */}
+      {usageDevice && (
+        <DataUsageModal
+          deviceId={usageDevice.id}
+          imei={usageDevice.imei}
+          onClose={() => setUsageDevice(null)}
+        />
+      )}
 
       {/* Modal — Nuevo dispositivo */}
       {showModal && (
