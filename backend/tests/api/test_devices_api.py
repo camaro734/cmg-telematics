@@ -254,3 +254,30 @@ def test_devices_assign_vehicle_cross_tenant():
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.patch(f"/api/v1/devices/{DEVICE_ID}/vehicle", json=payload)
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — GET /devices/{id}/data-usage → 200 con serie mensual
+# ---------------------------------------------------------------------------
+def test_device_data_usage_history_returns_series():
+    _override_user(CMG_USER)
+
+    device = _make_device(CMG_TENANT_ID)
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=device)
+
+    rows_result = MagicMock()
+    r1 = MagicMock(); r1.year_month = "2026-05"; r1.bytes = 4000
+    r2 = MagicMock(); r2.year_month = "2026-06"; r2.bytes = 1200
+    rows_result.all.return_value = [r1, r2]
+    db.execute = AsyncMock(return_value=rows_result)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/devices/{DEVICE_ID}/data-usage")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data == [
+        {"year_month": "2026-05", "bytes": 4000},
+        {"year_month": "2026-06", "bytes": 1200},
+    ]

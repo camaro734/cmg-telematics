@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
 from app.schemas.auth import CurrentUser
-from app.schemas.device import DeviceOut, DeviceCreate, DeviceUpdate, DeviceAssignVehicle, DeviceTransfer
+from app.schemas.device import DeviceOut, DeviceCreate, DeviceUpdate, DeviceAssignVehicle, DeviceTransfer, DataUsageMonth
 from app.models.device import Device
 from app.models.vehicle import Vehicle
 from app.models.tenant import Tenant
@@ -123,6 +123,26 @@ async def list_devices(
                     pass
         out.append(item)
     return out
+
+
+@router.get("/{device_id}/data-usage", response_model=list[DataUsageMonth])
+async def device_data_usage(
+    device_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Serie mensual de bytes transmitidos por el dispositivo (estimación SIM)."""
+    device = await db.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
+    _check_device_access(device, user)
+
+    rows = await db.execute(
+        select(DeviceDataUsage.year_month, DeviceDataUsage.bytes)
+        .where(DeviceDataUsage.device_id == device_id)
+        .order_by(DeviceDataUsage.year_month)
+    )
+    return [DataUsageMonth(year_month=r.year_month, bytes=int(r.bytes)) for r in rows.all()]
 
 
 @router.post("", response_model=DeviceOut, status_code=status.HTTP_201_CREATED)
