@@ -91,19 +91,30 @@ def test_devices_unauthenticated():
 # ---------------------------------------------------------------------------
 def test_devices_cmg_admin_lists_all():
     _override_user(CMG_USER)
+
+    devices_result = MagicMock()
+    devices_result.scalars.return_value.all.return_value = [_make_device()]
+
+    # Segunda query: filas de agregación de uso (device_id, total_bytes, month_bytes)
+    usage_result = MagicMock()
+    usage_row = MagicMock()
+    usage_row.device_id = DEVICE_ID
+    usage_row.total_bytes = 5000
+    usage_row.month_bytes = 1200
+    usage_result.all.return_value = [usage_row]
+
     db = AsyncMock()
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = [_make_device()]
-    db.execute = AsyncMock(return_value=result)
+    db.execute = AsyncMock(side_effect=[devices_result, usage_result])
     _override_db(db)
 
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.get("/api/v1/devices")
     assert resp.status_code == 200
     data = resp.json()
-    assert isinstance(data, list)
     assert len(data) == 1
     assert data[0]["imei"] == "123456789012345"
+    assert data[0]["total_bytes"] == 5000
+    assert data[0]["month_bytes"] == 1200
 
 
 # ---------------------------------------------------------------------------
@@ -169,9 +180,12 @@ def test_devices_duplicate_imei():
 def test_devices_client_scoped_to_own_tenant():
     _override_user(CLIENT_USER)
     db = AsyncMock()
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = []
-    db.execute = AsyncMock(return_value=result)
+    devices_result = MagicMock()
+    devices_result.scalars.return_value.all.return_value = []
+    # Segunda query de uso: lista vacía porque no hay dispositivos
+    usage_result = MagicMock()
+    usage_result.all.return_value = []
+    db.execute = AsyncMock(side_effect=[devices_result, usage_result])
     _override_db(db)
 
     client = TestClient(app, raise_server_exceptions=False)

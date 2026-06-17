@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, case
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
@@ -13,6 +13,7 @@ from app.schemas.device import DeviceOut, DeviceCreate, DeviceUpdate, DeviceAssi
 from app.models.device import Device
 from app.models.vehicle import Vehicle
 from app.models.tenant import Tenant
+from app.models.device_data_usage import DeviceDataUsage
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,38 @@ async def list_devices(
     result = await db.execute(query.order_by(Device.created_at.desc()))
     devices = result.scalars().all()
 
+    # Consumo SIM estimado: total acumulado + bytes del mes en curso, agregados
+    # desde device_data_usage en una sola query (sin N+1). El mes en curso se
+    # calcula en hora local de Madrid para casar con el corte de facturación.
+    usage_map: dict[uuid.UUID, tuple[int, int]] = {}
+    device_ids = [d.id for d in devices]
+    if device_ids:
+        current_month = func.to_char(
+            func.timezone("Europe/Madrid", func.now()), "YYYY-MM"
+        )
+        usage_q = (
+            select(
+                DeviceDataUsage.device_id,
+                func.coalesce(func.sum(DeviceDataUsage.bytes), 0).label("total_bytes"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (DeviceDataUsage.year_month == current_month, DeviceDataUsage.bytes),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("month_bytes"),
+            )
+            .where(DeviceDataUsage.device_id.in_(device_ids))
+            .group_by(DeviceDataUsage.device_id)
+        )
+        usage_rows = await db.execute(usage_q)
+        usage_map = {
+            row.device_id: (int(row.total_bytes), int(row.month_bytes))
+            for row in usage_rows.all()
+        }
+
     # device.online y device.last_seen en BD solo se actualizan en handshake/disconnect.
     # Redis vehicle:{id}:status sí refleja cada paquete de telemetría — superponemos
     # ese estado real cuando exista, manteniendo BD como fallback.
@@ -66,6 +99,9 @@ async def list_devices(
 
     for d in devices:
         item = DeviceOut.model_validate(d)
+        total_b, month_b = usage_map.get(d.id, (0, 0))
+        item.total_bytes = total_b
+        item.month_bytes = month_b
         if d.vehicle_id:
             hash_data = redis_states.get(str(d.vehicle_id)) or {}
             online_raw = _decode(hash_data.get(b"online") if hash_data and isinstance(next(iter(hash_data), None), bytes) else hash_data.get("online"))
