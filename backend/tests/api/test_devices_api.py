@@ -124,7 +124,7 @@ def test_devices_cmg_admin_creates_device():
     _override_user(CMG_USER)
     db = AsyncMock()
     # db.get(Tenant, ...) debe devolver un tenant válido
-    db.get = AsyncMock(return_value=MagicMock(id=CLIENT_TENANT_ID))
+    db.get = AsyncMock(return_value=MagicMock(id=CLIENT_TENANT_ID, tier="cmg"))
     # db.refresh rellena el objeto con datos simulados
     created_device = _make_device()
 
@@ -160,7 +160,7 @@ def test_devices_cmg_admin_creates_device():
 def test_devices_duplicate_imei():
     _override_user(CMG_USER)
     db = AsyncMock()
-    db.get = AsyncMock(return_value=MagicMock(id=CLIENT_TENANT_ID))
+    db.get = AsyncMock(return_value=MagicMock(id=CLIENT_TENANT_ID, tier="cmg"))
     db.commit = AsyncMock(side_effect=IntegrityError(None, None, None))
     _override_db(db)
 
