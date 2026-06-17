@@ -297,3 +297,17 @@ def build_setparam(param_id: int, value_hex: str) -> str:
             f"value_hex debe ser exactamente 16 caracteres hex, recibido: {value_hex!r}"
         )
     return f"setparam {param_id}:{value_hex}"
+
+
+_FMC_ERROR_MARKERS = ("WARNING", "ERROR", "NOT SUPPORTED", "UNKNOWN", "FAIL")
+
+
+def is_fmc_error_response(text: str | None) -> bool:
+    """True si la respuesta Codec 12 del FMC indica rechazo del comando.
+
+    El FMC confirma con 'New value <id>:<valor>;'; cualquier WARNING/ERROR
+    significa que no aplicó el comando aunque el ACK Codec 12 haya llegado."""
+    if not text:
+        return False
+    upper = text.upper()
+    return any(marker in upper for marker in _FMC_ERROR_MARKERS)

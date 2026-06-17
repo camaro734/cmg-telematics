@@ -10,7 +10,7 @@ import json
 import logging
 import struct
 from redis.asyncio import Redis
-from src.codec8 import decode_packet, build_ack, build_codec12_command, parse_codec12_response
+from src.codec8 import decode_packet, build_ack, build_codec12_command, parse_codec12_response, is_fmc_error_response
 from src.writer import write_record, get_device_info, update_device_online, update_device_last_packet
 from src.data_usage import record_device_data_usage
 from src.publisher import publish_record, set_vehicle_offline
@@ -78,13 +78,16 @@ async def _log_command(
 
 
 async def _confirm_command(log_id: str, response: str) -> None:
-    """Actualiza un registro de comando a status=confirmed con el ACK del dispositivo."""
+    """Actualiza un registro de comando con el ACK del dispositivo.
+
+    Si el FMC respondió con WARNING/ERROR, el comando NO se aplicó: status=failed."""
+    status = "failed" if is_fmc_error_response(response) else "confirmed"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.patch(
                 f"{settings.core_api_url}/internal/commands/{log_id}/confirm",
                 headers=_internal_headers(),
-                json={"response": response, "status": "confirmed"},
+                json={"response": response, "status": status},
             )
     except Exception as e:
         logger.warning("No se pudo confirmar comando %s: %s", log_id, e)
