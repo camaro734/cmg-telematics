@@ -9,6 +9,7 @@ import type { DeviceOut, TenantOut, DeviceCreate, DeviceTransfer } from '../../l
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import { formatBytes } from '../../lib/format'
+import { isFresh } from '../../lib/staleStatus'
 import { DataUsageModal } from './DataUsageModal'
 
 function formatLastSeen(last_seen: string | null): string {
@@ -232,6 +233,10 @@ export default function DevicesPage() {
                 <tbody>
                   {devices.map(device => {
                     const linked = device.vehicle_id !== null
+                    // Estado real por frescor del último dato (regla unificada), no por el
+                    // flag crudo `online`: el FMC650 cierra el TCP tras cada batch y ese flag
+                    // queda en false aunque el dispositivo transmita cada hora.
+                    const online = isFresh(device.last_seen)
                     return (
                       <tr key={device.id} style={{ transition: 'background 0.1s' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
@@ -253,11 +258,11 @@ export default function DevicesPage() {
                               width: 8,
                               height: 8,
                               borderRadius: '50%',
-                              background: device.online ? 'var(--ok)' : 'var(--offline)',
+                              background: online ? 'var(--ok)' : 'var(--offline)',
                               flexShrink: 0,
                             }} />
-                            <span style={{ color: device.online ? 'var(--ok)' : 'var(--offline)' }}>
-                              {device.online ? 'Online' : 'Offline'}
+                            <span style={{ color: online ? 'var(--ok)' : 'var(--offline)' }}>
+                              {online ? 'Online' : 'Offline'}
                             </span>
                           </span>
                         </td>

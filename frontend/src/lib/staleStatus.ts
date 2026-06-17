@@ -5,19 +5,24 @@ export const ONLINE_ACTIVE_MIN = 5
 /** Parado/sleep: el dispositivo puede silenciarse hasta 60 min y seguir siendo válido. */
 export const ONLINE_PARKED_MIN = 60
 
-/** Online con umbral adaptativo según ignición.
+/** Frescor de un timestamp con umbral adaptativo según ignición — fuente única de la regla.
  *  ignition=true  → umbral 5 min  (detección rápida de corte de corriente)
  *  ignition=false/undefined → umbral 60 min (vehículo aparcado en sleep mode)
  *
- *  No se usa status.online=false como cortocircuito: el FMC650 cierra la conexión TCP
- *  después de cada batch, lo que dispara set_vehicle_offline() en ingest aunque el dispositivo
- *  siga activo. El check real es el timestamp device_last_seen. */
+ *  No se mira ningún flag `online`: el FMC650 cierra la conexión TCP después de cada batch,
+ *  lo que dispara set_vehicle_offline() en ingest aunque el dispositivo siga activo.
+ *  El único check fiable es la antigüedad del último dato recibido. */
+export function isFresh(lastSeen: string | null | undefined, ignition?: boolean | null): boolean {
+  if (!lastSeen) return false
+  const limitMin = ignition === true ? ONLINE_ACTIVE_MIN : ONLINE_PARKED_MIN
+  return Date.now() - new Date(lastSeen).getTime() < limitMin * 60_000
+}
+
+/** Online con umbral adaptativo según ignición. Deriva del frescor de
+ *  device_last_seen (preferido) o last_seen — ver isFresh(). */
 export function isOnline(status: VehicleStatus | null | undefined): boolean {
   if (!status) return false
-  const ts = status.device_last_seen ?? status.last_seen
-  if (!ts) return false
-  const limitMin = status.ignition === true ? ONLINE_ACTIVE_MIN : ONLINE_PARKED_MIN
-  return Date.now() - new Date(ts).getTime() < limitMin * 60_000
+  return isFresh(status.device_last_seen ?? status.last_seen, status.ignition)
 }
 
 /** Alias para compatibilidad con los consumidores existentes. */
