@@ -657,6 +657,13 @@ export interface DeviceOut {
   sim_phone: string | null
   active: boolean
   created_at: string
+  total_bytes: number
+  month_bytes: number
+}
+
+export interface DataUsageMonth {
+  year_month: string
+  bytes: number
 }
 
 export interface DeviceCreate {
