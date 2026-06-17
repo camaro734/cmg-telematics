@@ -5,6 +5,7 @@ import { keys } from '../../lib/queryKeys'
 import type { VehicleTypeOut, ManualCanSlotCfg, ManualCanButtonCfg } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
+import { toast } from '../../shared/ui/Toast'
 
 // Roles que pueden accionar un botón (admin siempre puede, no se lista aquí).
 const PRESSABLE_ROLES: { value: string; label: string }[] = [
@@ -52,7 +53,9 @@ export default function ManualCanConfigSection({ typeId, selectedType }: Props) 
 
   // ── Slots ──────────────────────────────────────────────────────────────
   function addSlot() {
-    setSlots(s => [...s, { id: crypto.randomUUID(), slot: 0, param_id: 16000, description: '' }])
+    // Sin valor por defecto: el param_id del FMC debe introducirse a propósito
+    // (16000 era un escalar inválido para salida CAN — ver plan 2026-06-17).
+    setSlots(s => [...s, { id: crypto.randomUUID(), slot: 0, param_id: 0, description: '' }])
   }
   function patchSlot(id: string, patch: Partial<ManualCanSlotCfg>) {
     setSlots(s => s.map(x => (x.id === id ? { ...x, ...patch } : x)))
@@ -87,13 +90,23 @@ export default function ManualCanConfigSection({ typeId, selectedType }: Props) 
 
   const num = (v: string, fallback = 0) => (v === '' ? fallback : Number(v))
 
+  // Valida que todos los slots tengan param_id > 0 antes de persistir.
+  function handleSave() {
+    const bad = slots.find(s => !s.param_id || s.param_id <= 0)
+    if (bad) {
+      toast.error(`El slot ${bad.slot} no tiene un param_id válido del FMC`)
+      return
+    }
+    mutation.mutate()
+  }
+
   return (
     <div style={{ marginTop: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Botones CAN manual (FMC650 → CR2530)
         </span>
-        <button style={btnPrimary} onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+        <button style={btnPrimary} onClick={handleSave} disabled={mutation.isPending}>
           {mutation.isPending ? 'Guardando…' : 'Guardar configuración'}
         </button>
       </div>
@@ -112,15 +125,15 @@ export default function ManualCanConfigSection({ typeId, selectedType }: Props) 
               {['SLOT (0-9)', 'PARAM ID', 'DESCRIPCIÓN', ''].map(h => <th key={h} style={th}>{h}</th>)}
             </tr></thead>
             <tbody>
-              {slots.map(s => (
+              {slots.map((s, i) => (
                 <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, width: 90 }}>
                     <Input type="number" min={0} max={9} value={String(s.slot)}
                       onChange={e => patchSlot(s.id, { slot: num(e.target.value) })} />
                   </td>
                   <td style={{ ...td, width: 120 }}>
-                    <Input type="number" min={1} value={String(s.param_id)}
-                      onChange={e => patchSlot(s.id, { param_id: num(e.target.value, 1) })} />
+                    <Input type="number" min={1} data-testid={`slot-param-id-${i}`} value={String(s.param_id)}
+                      onChange={e => patchSlot(s.id, { param_id: num(e.target.value, 0) })} />
                   </td>
                   <td style={td}>
                     <Input value={s.description} placeholder="Hidráulica"
