@@ -224,7 +224,20 @@ class TeltonikaConnection:
     async def _receive_loop(self) -> None:
         """Recibe paquetes Codec 8 en bucle hasta que la conexión se cierre."""
         while True:
-            header = await self.reader.readexactly(8)
+            # Timeout solo sobre el inicio del siguiente paquete (header): un socket
+            # medio-abierto (pérdida de señal/corriente) dejaría el bucle colgado para
+            # siempre y el flag `online` pegado en true. Al saltar el timeout salimos
+            # limpiamente y handle() ejecuta el cleanup (set_vehicle_offline).
+            try:
+                header = await asyncio.wait_for(
+                    self.reader.readexactly(8), timeout=settings.idle_timeout_s
+                )
+            except asyncio.TimeoutError:
+                logger.info(
+                    "Conexión inactiva %s — sin datos en %ds, cerrando para marcar offline",
+                    self.imei or self.peer, settings.idle_timeout_s,
+                )
+                return
             data_length = struct.unpack_from(">I", header, 4)[0]
             if data_length > _MAX_PACKET_BYTES:
                 logger.warning(
