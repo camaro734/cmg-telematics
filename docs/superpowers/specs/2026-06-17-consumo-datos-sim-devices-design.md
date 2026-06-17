@@ -31,13 +31,16 @@ Opción futura (no en este alcance): aplicar un factor de sobrecarga configurabl
 - **Sin límites ni alertas** por ahora. Solo visualización (con color suave si el
   consumo del mes es alto). Los límites/alertas por SIM quedan como trabajo futuro.
 
+## Principio de diseño: feature completamente independiente
+
+Esta funcionalidad es **autocontenida**. No reutiliza, modifica ni depende de nada del
+contaje existente (`device.total_messages`, `update_device_last_packet`, campos de la
+migración 031, etc.). Vive en su propia tabla, con su propia función de captura en el
+ingest y sus propios campos en la API.
+
 ## Modelo de datos
 
-### `device.total_bytes` (nueva columna)
-- `BIGINT NOT NULL DEFAULT 0`
-- Acumulado total de bytes de siempre. Espejo del ya existente `device.total_messages`.
-
-### `device_data_usage` (nueva tabla — histórico mensual)
+### `device_data_usage` (única tabla nueva — histórico mensual)
 | Columna     | Tipo         | Notas                                  |
 |-------------|--------------|----------------------------------------|
 | `device_id` | UUID         | FK → `device.id`, ON DELETE CASCADE    |
@@ -47,30 +50,34 @@ Opción futura (no en este alcance): aplicar un factor de sobrecarga configurabl
 - PK compuesta `(device_id, year_month)`.
 - El "mes en curso" es la fila `(device_id, mes_actual)`; las filas anteriores son el
   histórico comparativo.
+- El **total acumulado** = `SUM(bytes)` de todas las filas del dispositivo. No hay
+  columna de total separada; **no se toca la tabla `device`**.
 - Volumen estimado: 1000 dispositivos × 12 meses ≈ 12k filas/año. Trivial.
 
 ### Migración
-- Nueva migración Alembic **054** (la última aplicada es 053). Añade la columna y la
-  tabla. Requiere confirmación explícita antes de `alembic upgrade` (producción).
+- Nueva migración Alembic **054** (la última aplicada es 053). Crea únicamente la tabla
+  `device_data_usage`. Requiere confirmación explícita antes de `alembic upgrade`
+  (producción).
 
 ## Captura en ingest-svc
 
 En `services/ingest/src/server.py`, el `_receive_loop` ya conoce el tamaño del frame
-recibido (`packet`). Hoy llama a
-`update_device_last_packet(conn, imei, codec_id, len(records))`.
+recibido (`packet`). Se añade una **llamada nueva e independiente** a una función
+dedicada (módulo nuevo del ingest, p.ej. `data_usage.py`), separada por completo de
+`update_device_last_packet`:
 
-Se amplía esa función (en el writer del ingest) para recibir también `len(packet)` y, en
-la **misma transacción** que ya actualiza el dispositivo:
+```python
+await record_device_data_usage(conn, self.imei, len(packet))
+```
 
-1. `UPDATE device SET total_bytes = total_bytes + :n, total_messages = ...`
-   (se suma al UPDATE existente, sin consulta extra).
-2. UPSERT en el histórico mensual:
-   ```sql
-   INSERT INTO device_data_usage (device_id, year_month, bytes)
-   VALUES (:device_id, :year_month, :n)
-   ON CONFLICT (device_id, year_month)
-   DO UPDATE SET bytes = device_data_usage.bytes + :n
-   ```
+Esa función hace **solo** el UPSERT del histórico mensual:
+
+```sql
+INSERT INTO device_data_usage (device_id, year_month, bytes)
+VALUES (:device_id, :year_month, :n)
+ON CONFLICT (device_id, year_month)
+DO UPDATE SET bytes = device_data_usage.bytes + :n
+```
 
 El `year_month` se calcula en el ingest con la hora del servidor (`"%Y-%m"`). Un
 dispositivo silencioso a fin de mes simplemente abre su fila del mes nuevo en el
@@ -82,14 +89,14 @@ siguiente paquete.
 ## Backend — API
 
 ### `DeviceOut` (schema)
-Dos campos nuevos:
-- `total_bytes: int` — acumulado total.
+Dos campos nuevos (calculados desde `device_data_usage`, no desde `device`):
+- `total_bytes: int` — acumulado total = `SUM(bytes)` de todas las filas del dispositivo.
 - `month_bytes: int` — bytes del mes en curso (0 si no hay fila del mes actual).
 
-El listado `GET /api/v1/devices` ya carga la fila `device`; se añade `total_bytes`
-directo y un **LEFT JOIN** ligero a `device_data_usage` filtrando por el mes actual para
-`month_bytes`. Una sola consulta, sin N+1. Mantiene el filtrado `tenant_id` y la
-jerarquía multi-tenant existentes.
+El listado `GET /api/v1/devices` añade una agregación ligera contra `device_data_usage`
+(`SUM(bytes)` total y `SUM` filtrado por mes actual, agrupado por `device_id`), unida por
+LEFT JOIN al listado de dispositivos. Una sola consulta, sin N+1. Mantiene el filtrado
+`tenant_id` y la jerarquía multi-tenant existentes.
 
 ### Nuevo endpoint de detalle
 `GET /api/v1/devices/{id}/data-usage`
@@ -111,10 +118,10 @@ Archivo: `frontend/src/features/devices/DevicesPage.tsx`.
 
 ## Escalabilidad (N=1000)
 
-- Captura: 1 UPDATE (ya existente, ampliado) + 1 UPSERT por paquete. A ~16-33 paquetes/s
-  en toda la flota, carga trivial.
-- Listado: una sola consulta con LEFT JOIN, sin N+1. El refetch cada 15s no escanea el
-  hypertable (lee tablas pequeñas `device` + `device_data_usage`).
+- Captura: 1 UPSERT independiente por paquete. A ~16-33 paquetes/s en toda la flota,
+  carga trivial.
+- Listado: una sola consulta con agregación + LEFT JOIN, sin N+1. El refetch cada 15s no
+  escanea el hypertable (lee la tabla pequeña `device_data_usage`).
 
 ## Fuera de alcance (futuro)
 
