@@ -18,6 +18,8 @@ class DeviceOut(BaseModel):
     sim_phone: str | None = None
     active: bool
     created_at: datetime
+    total_bytes: int = 0   # acumulado total estimado (SUM de device_data_usage)
+    month_bytes: int = 0   # bytes del mes en curso
 
 
 class DeviceCreate(BaseModel):
@@ -51,3 +53,8 @@ class DeviceUpdate(BaseModel):
 
 class DeviceAssignVehicle(BaseModel):
     vehicle_id: uuid.UUID | None
+
+
+class DataUsageMonth(BaseModel):
+    year_month: str   # 'YYYY-MM'
+    bytes: int
