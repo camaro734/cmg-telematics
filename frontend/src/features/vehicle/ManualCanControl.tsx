@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
-import type { CommandLogEntry, FmcStatus, ManualCanCommandResponse } from '../../lib/types'
+import type { CommandLogEntry, FmcStatus } from '../../lib/types'
 
 interface ManualCanSlot {
   id: string
@@ -55,10 +55,12 @@ function StatusDot({ status }: { status: CommandStatus }) {
 function SlotButtonsPanel({
   vehicleId,
   slotId,
+  slotLabel,
   connected,
 }: {
   vehicleId: string
   slotId: string
+  slotLabel: string
   connected: boolean
 }) {
   const qc = useQueryClient()
@@ -141,15 +143,15 @@ function SlotButtonsPanel({
   if (active.length === 0) return null
 
   return (
-    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{
         fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)',
-        letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6,
-      }}>Salidas CR2530</div>
+        letterSpacing: '0.07em', textTransform: 'uppercase',
+      }}>{slotLabel}</div>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
-        gap: 6,
+        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+        gap: 8,
       }}>
         {active.map(btn => {
           const on = optimistic[btn.id] ?? btn.current_bit
@@ -166,37 +168,48 @@ function SlotButtonsPanel({
                 onPointerCancel: () => handleHoldEnd(btn),
               }
             : { onClick: () => handleToggleClick(btn) }
+          // Texto del botón inferior según modo (toggle/hold) y estado actual.
+          const btnText = loading && !isHold
+            ? '…'
+            : isHold
+              ? (on ? 'Enviando…' : 'Mantener pulsado')
+              : (on ? 'Desactivar' : 'Activar')
           return (
-            <button
-              key={btn.id}
-              data-testid={`btn-toggle-${btn.id}`}
-              disabled={disabled}
-              title={isHold ? 'Mantener pulsado' : undefined}
-              {...holdHandlers}
-              style={{
-                background: on
-                  ? 'color-mix(in srgb, var(--cmg-teal) 20%, transparent)'
-                  : 'var(--bg-elevated)',
-                border: `1px solid ${on ? 'var(--cmg-teal)' : disabled ? 'var(--border)' : 'var(--fg-tertiary)'}`,
-                borderRadius: 6, padding: '8px 6px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                transition: 'all 0.15s', minHeight: 56,
-                touchAction: 'none', userSelect: 'none',
-              }}
-            >
-              <span style={{ fontSize: 16, color: on ? 'var(--cmg-teal)' : 'var(--fg-tertiary)' }}>
-                {isHold ? '⊙' : (on ? '●' : '○')}
-              </span>
-              <span style={{
-                fontSize: 9, fontWeight: 600, fontFamily: 'var(--font-sans)',
-                color: on ? 'var(--cmg-teal)' : 'var(--fg-muted)',
-                textAlign: 'center', lineHeight: 1.2,
-              }}>
-                {loading && !isHold ? '…' : btn.label}
-              </span>
-            </button>
+            // Misma tarjeta que los controles DOUT del FMC650 (ver VehicleDetailPage):
+            // cabecera con etiqueta + estado ● ON/○ OFF y un único botón ancho debajo.
+            <div key={btn.id} style={{
+              background: on ? 'var(--ok-soft)' : 'var(--bg-card)',
+              border: `1px solid ${on ? 'var(--ok)' : 'var(--border)'}`,
+              borderRadius: 8, padding: '10px 12px',
+              display: 'flex', flexDirection: 'column', gap: 6,
+              transition: 'background 0.2s, border-color 0.2s',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)' }}>
+                  {btn.label}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: on ? 'var(--ok)' : 'var(--offline)' }}>
+                  {on ? '● ON' : '○ OFF'}
+                </span>
+              </div>
+              <button
+                data-testid={`btn-toggle-${btn.id}`}
+                disabled={disabled}
+                title={isHold ? 'Mantener pulsado para enviar; soltar para parar' : undefined}
+                {...holdHandlers}
+                style={{
+                  background: on ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
+                  border: `1px solid ${on ? 'var(--ok)' : 'var(--border)'}`,
+                  borderRadius: 6, padding: '5px 0', fontSize: 11, fontWeight: 600,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  color: on ? 'var(--ok)' : 'var(--fg-tertiary)',
+                  opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.15s', touchAction: 'none', userSelect: 'none',
+                }}
+              >
+                {btnText}
+              </button>
+            </div>
           )
         })}
       </div>
@@ -205,8 +218,6 @@ function SlotButtonsPanel({
 }
 
 export default function ManualCanControl({ vehicleId, slots }: Props) {
-  const qc = useQueryClient()
-  const [slotLoading, setSlotLoading] = useState<Record<number, 'on' | 'off' | null>>({})
   const [open, setOpen] = useState(true)
 
   const { data: fmcStatus } = useQuery<FmcStatus>({
@@ -225,28 +236,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   })
 
   const connected = fmcStatus?.connected ?? false
-
-  async function sendCommand(slot: number, state: boolean) {
-    const direction = state ? 'on' : 'off'
-    if (slotLoading[slot] != null) return
-    setSlotLoading(prev => ({ ...prev, [slot]: direction }))
-    try {
-      const res = await apiClient.post<ManualCanCommandResponse>(
-        `/api/v1/vehicles/${vehicleId}/commands/manual-can`,
-        { slot, state },
-      )
-      if (res.status === 'confirmed') {
-        toast.error === undefined
-          ? console.info('OK')
-          : (() => {})()
-      }
-      qc.invalidateQueries({ queryKey: ['manual-can-history', vehicleId] })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al enviar el comando')
-    } finally {
-      setSlotLoading(prev => ({ ...prev, [slot]: null }))
-    }
-  }
 
   return (
     <div style={{
@@ -282,78 +271,18 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
 
       {open && (
         <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {slots.map(s => {
-              const loading = slotLoading[s.slot] != null
-              const disabled = !connected || loading
-              const label = s.description ?? `Slot ${s.slot}`
-              return (
-                <div key={s.slot} style={{
-                  background: 'var(--bg-card)', border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '10px 12px',
-                  display: 'flex', flexDirection: 'column', gap: 8,
-                }}>
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}>
-                    <span style={{
-                      fontSize: 12, fontWeight: 600,
-                      color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)',
-                    }}>{label}</span>
-                    {loading && (
-                      <span style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                        Esperando FMC…
-                      </span>
-                    )}
-                  </div>
-                  {/* Botones arrancar/parar — control genérico del slot */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    <button
-                      data-testid={`btn-arrancar-slot-${s.slot}`}
-                      onClick={() => sendCommand(s.slot, true)}
-                      disabled={disabled}
-                      style={{
-                        background: disabled
-                          ? 'var(--bg-elevated)'
-                          : 'color-mix(in srgb, var(--cmg-teal) 20%, transparent)',
-                        border: `1px solid ${disabled ? 'var(--border)' : 'var(--cmg-teal)'}`,
-                        borderRadius: 6, padding: '6px 0', fontSize: 11, fontWeight: 600,
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        color: disabled ? 'var(--fg-tertiary)' : 'var(--cmg-teal)',
-                        opacity: loading ? 0.6 : 1,
-                        fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                      }}
-                    >
-                      {slotLoading[s.slot] === 'on' ? '…' : '▶ Arrancar'}
-                    </button>
-                    <button
-                      data-testid={`btn-parar-slot-${s.slot}`}
-                      onClick={() => sendCommand(s.slot, false)}
-                      disabled={disabled}
-                      style={{
-                        background: 'var(--bg-elevated)',
-                        border: `1px solid ${disabled ? 'var(--border)' : 'var(--accent-crit)'}`,
-                        borderRadius: 6, padding: '6px 0', fontSize: 11, fontWeight: 600,
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        color: disabled ? 'var(--fg-tertiary)' : 'var(--accent-crit)',
-                        opacity: loading ? 0.6 : 1,
-                        fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                      }}
-                    >
-                      {slotLoading[s.slot] === 'off' ? '…' : '■ Parar'}
-                    </button>
-                  </div>
-                  {/* Botones de bit configurados para este slot */}
-                  <SlotButtonsPanel
-                    vehicleId={vehicleId}
-                    slotId={s.id}
-                    connected={connected}
-                  />
-                </div>
-              )
-            })}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Cada slot renderiza sus botones de bit configurados (estilo DOUT).
+                Toggle = un clic alterna; hold = activo mientras se mantiene pulsado. */}
+            {slots.map(s => (
+              <SlotButtonsPanel
+                key={s.slot}
+                vehicleId={vehicleId}
+                slotId={s.id}
+                slotLabel={s.description ?? `Slot ${s.slot}`}
+                connected={connected}
+              />
+            ))}
           </div>
 
           {history.length > 0 && (
