@@ -12,6 +12,7 @@ import struct
 from redis.asyncio import Redis
 from src.codec8 import decode_packet, build_ack, build_codec12_command, parse_codec12_response
 from src.writer import write_record, get_device_info, update_device_online, update_device_last_packet
+from src.data_usage import record_device_data_usage
 from src.publisher import publish_record, set_vehicle_offline
 from src.config import settings
 
@@ -278,6 +279,8 @@ class TeltonikaConnection:
                 await update_device_last_packet(
                     conn, self.imei, codec_id, len(records)
                 )
+                # Consumo SIM: suma los bytes del frame recibido (feature independiente)
+                await record_device_data_usage(conn, self.imei, len(packet))
 
             for avl in records:
                 await publish_record(
