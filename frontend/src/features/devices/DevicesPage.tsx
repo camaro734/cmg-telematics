@@ -8,6 +8,7 @@ import { useAuthStore } from '../auth/useAuthStore'
 import type { DeviceOut, TenantOut, DeviceCreate, DeviceTransfer } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
+import { formatBytes } from '../../lib/format'
 
 function formatLastSeen(last_seen: string | null): string {
   if (!last_seen) return '—'
@@ -219,6 +220,7 @@ export default function DevicesPage() {
                     <th style={thStyle}>Estado</th>
                     <th style={thStyle}>Última señal</th>
                     <th style={thStyle}>Teléfono SIM</th>
+                    <th style={thStyle}>Datos (mes / total)</th>
                     <th style={thStyle}>Firmware</th>
                     <th style={thStyle}></th>
                   </tr>
@@ -260,6 +262,13 @@ export default function DevicesPage() {
                         </td>
                         <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 12, color: device.sim_phone ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
                           {device.sim_phone ?? '—'}
+                        </td>
+                        <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                          <span style={{ color: device.month_bytes > 50 * 1024 * 1024 ? 'var(--gauge-fill)' : 'var(--fg-primary)' }}>
+                            {formatBytes(device.month_bytes)}
+                          </span>
+                          <span style={{ color: 'var(--fg-muted)' }}> / {formatBytes(device.total_bytes)}</span>
+                          <span style={{ color: 'var(--fg-muted)', fontSize: 10 }} title="Estimación basada en los datos recibidos; la factura real del operador es algo mayor"> ℹ</span>
                         </td>
                         <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', color: device.firmware_ver ? 'var(--fg-primary)' : 'var(--fg-muted)', fontSize: 12 }}>
                           {device.firmware_ver ?? '—'}
