@@ -27,6 +27,43 @@ def _check_device_access(device: Device, user: CurrentUser) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
 
 
+async def _fetch_usage_map(
+    db: AsyncSession, device_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """Retorna {device_id: (total_bytes, month_bytes)} para los IDs dados.
+
+    Una sola query agregada sobre device_data_usage (sin N+1). El mes en curso
+    se calcula en hora local de Madrid para casar con el corte de facturación.
+    """
+    if not device_ids:
+        return {}
+    current_month = func.to_char(
+        func.timezone("Europe/Madrid", func.now()), "YYYY-MM"
+    )
+    q = (
+        select(
+            DeviceDataUsage.device_id,
+            func.coalesce(func.sum(DeviceDataUsage.bytes), 0).label("total_bytes"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (DeviceDataUsage.year_month == current_month, DeviceDataUsage.bytes),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("month_bytes"),
+        )
+        .where(DeviceDataUsage.device_id.in_(device_ids))
+        .group_by(DeviceDataUsage.device_id)
+    )
+    rows = await db.execute(q)
+    return {
+        row.device_id: (int(row.total_bytes), int(row.month_bytes))
+        for row in rows.all()
+    }
+
+
 @router.get("", response_model=list[DeviceOut])
 async def list_devices(
     request: Request,
@@ -42,37 +79,8 @@ async def list_devices(
     result = await db.execute(query.order_by(Device.created_at.desc()))
     devices = result.scalars().all()
 
-    # Consumo SIM estimado: total acumulado + bytes del mes en curso, agregados
-    # desde device_data_usage en una sola query (sin N+1). El mes en curso se
-    # calcula en hora local de Madrid para casar con el corte de facturación.
-    usage_map: dict[uuid.UUID, tuple[int, int]] = {}
-    device_ids = [d.id for d in devices]
-    if device_ids:
-        current_month = func.to_char(
-            func.timezone("Europe/Madrid", func.now()), "YYYY-MM"
-        )
-        usage_q = (
-            select(
-                DeviceDataUsage.device_id,
-                func.coalesce(func.sum(DeviceDataUsage.bytes), 0).label("total_bytes"),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (DeviceDataUsage.year_month == current_month, DeviceDataUsage.bytes),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ).label("month_bytes"),
-            )
-            .where(DeviceDataUsage.device_id.in_(device_ids))
-            .group_by(DeviceDataUsage.device_id)
-        )
-        usage_rows = await db.execute(usage_q)
-        usage_map = {
-            row.device_id: (int(row.total_bytes), int(row.month_bytes))
-            for row in usage_rows.all()
-        }
+    # Consumo SIM estimado (total acumulado + mes en curso) por dispositivo.
+    usage_map = await _fetch_usage_map(db, [d.id for d in devices])
 
     # device.online y device.last_seen en BD solo se actualizan en handshake/disconnect.
     # Redis vehicle:{id}:status sí refleja cada paquete de telemetría — superponemos

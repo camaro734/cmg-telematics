@@ -182,10 +182,7 @@ def test_devices_client_scoped_to_own_tenant():
     db = AsyncMock()
     devices_result = MagicMock()
     devices_result.scalars.return_value.all.return_value = []
-    # Segunda query de uso: lista vacía porque no hay dispositivos
-    usage_result = MagicMock()
-    usage_result.all.return_value = []
-    db.execute = AsyncMock(side_effect=[devices_result, usage_result])
+    db.execute = AsyncMock(return_value=devices_result)
     _override_db(db)
 
     client = TestClient(app, raise_server_exceptions=False)
