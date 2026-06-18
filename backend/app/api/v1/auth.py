@@ -80,6 +80,31 @@ async def _check_reset_rate_limit(request: Request, suffix: str) -> None:
         )
 
 
+@router.post("/reset-password")
+async def reset_password(request: Request, body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    ip = request.client.host if request.client else "unknown"
+    await _check_reset_rate_limit(request, f"ip:{ip}")
+
+    redis = getattr(request.app.state, "redis", None)
+    key = reset_key_for(body.token)
+    user_id = await redis.get(key) if redis is not None else None
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El enlace no es válido o ha caducado.")
+    if isinstance(user_id, bytes):
+        user_id = user_id.decode()
+
+    user = await db.get(User, uuid.UUID(user_id))
+    if user is None:
+        await redis.delete(key)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El enlace no es válido o ha caducado.")
+
+    user.hashed_password = hash_password(body.new_password)
+    user.pwd_version = (user.pwd_version or 0) + 1  # invalida todos los JWT activos
+    await db.commit()
+    await redis.delete(key)  # token de un solo uso
+    return {"detail": "Contraseña actualizada."}
+
+
 @router.post("/forgot-password")
 async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
