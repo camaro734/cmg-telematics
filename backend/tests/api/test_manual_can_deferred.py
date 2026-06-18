@@ -128,3 +128,62 @@ def test_online_set_still_confirms_200():
     assert state_hset, "debe actualizar el bitmask de estado tras confirmación"
     # El CommandLog debe persistirse en BD
     db.commit.assert_awaited()
+
+
+HOLD_BUTTONS = [{"id": str(BUTTON_A), "slot_id": str(SLOT_A), "label": "Reset horas",
+                 "byte_index": 0, "bit_index": 2, "function": "hold",
+                 "active": True, "allowed_roles": []}]
+
+
+def test_offline_pulse_queues_on_off():
+    """pulse offline → 202, pending type=pulse con ON y OFF."""
+    db = _setup_db()
+    _setup(ADMIN_A, db)
+    redis = AsyncMock()
+    redis.exists.return_value = 0
+    redis.hget.return_value = None
+
+    with patch("app.api.v1.vehicles.assert_can_access_vehicle",
+               new_callable=AsyncMock, return_value=_MockVehicle()), \
+         patch("app.api.v1.vehicles._vehicle_manual_can_cfg",
+               new_callable=AsyncMock, return_value=(SLOTS, HOLD_BUTTONS)):
+        with TestClient(app) as c:
+            app.state.redis = redis
+            r = c.post(URL, json={"pulse": True})
+
+    assert r.status_code == 202
+    assert r.json()["queued"] is True
+    hset_calls = [c for c in redis.hset.await_args_list
+                  if c.args and c.args[0] == f"vehicle:{VEHICLE_A}:manual_can_pending"]
+    payload = json.loads(hset_calls[0].args[2])
+    assert payload["type"] == "pulse"
+    # bit_index=2 → ON=0x04, OFF=0x00
+    assert payload["commands"] == [f"setparam {PARAM_ID}:0400000000000000",
+                                   f"setparam {PARAM_ID}:0000000000000000"]
+
+
+def test_online_pulse_sends_on_then_off():
+    """pulse online → 200; publica DOS comandos (ON y OFF)."""
+    db = _setup_db()
+    _setup(ADMIN_A, db)
+    redis = AsyncMock()
+    redis.exists.return_value = 1
+    redis.hget.return_value = None
+    redis.set.return_value = True
+    redis.blpop.side_effect = [
+        (f"command:{IMEI}:response", f"setparam {PARAM_ID}:0400000000000000"),
+        (f"command:{IMEI}:response", f"setparam {PARAM_ID}:0000000000000000"),
+    ]
+
+    with patch("app.api.v1.vehicles.assert_can_access_vehicle",
+               new_callable=AsyncMock, return_value=_MockVehicle()), \
+         patch("app.api.v1.vehicles._vehicle_manual_can_cfg",
+               new_callable=AsyncMock, return_value=(SLOTS, HOLD_BUTTONS)):
+        with TestClient(app) as c:
+            app.state.redis = redis
+            r = c.post(URL, json={"pulse": True})
+
+    assert r.status_code == 200
+    publishes = [c for c in redis.publish.await_args_list
+                 if c.args and c.args[0] == "cmg:manual_can_commands"]
+    assert len(publishes) == 2, "pulse online publica ON y OFF"

@@ -2471,6 +2471,55 @@ async def toggle_manual_can_button(
     raw = bytes.fromhex(raw_hex) if raw_hex else bytes(8)
     online = bool(await redis.exists(f"ingest:conn:{imei}"))
 
+    # ── Rama PULSE (botón reset): pulso ON+OFF, ignora body.value ──────────
+    if body.pulse:
+        on_hex = manual_can_config.apply_bit(
+            raw, btn["byte_index"], btn["bit_index"], True).hex().upper()
+        off_hex = manual_can_config.apply_bit(
+            raw, btn["byte_index"], btn["bit_index"], False).hex().upper()
+        cmd_on = f"setparam {slot['param_id']}:{on_hex}"
+        cmd_off = f"setparam {slot['param_id']}:{off_hex}"
+
+        if not online:
+            log_id = uuid.uuid4()
+            db.add(CommandLog(
+                id=log_id, device_id=device.id, vehicle_id=vehicle_id,
+                tenant_id=vehicle.tenant_id, user_id=user.user_id, command=cmd_on,
+                command_type="MANUAL_CAN", status="queued", param_id=slot["param_id"],
+                param_value=on_hex, imei_snapshot=imei,
+                sent_at=datetime.now(timezone.utc),
+            ))
+            await db.commit()
+            await redis.hset(
+                f"vehicle:{vehicle_id}:manual_can_pending", str(slot["param_id"]),
+                json.dumps({"type": "pulse", "commands": [cmd_on, cmd_off],
+                            "log_id": str(log_id), "slot": slot["slot"], "value_hex": off_hex}),
+            )
+            logger.info("Manual CAN pulse encolado (offline) → IMEI %s button=%s", imei, button_id)
+            response.status_code = 202
+            return ManualCanButtonToggleResponse(
+                button_id=button_id, label=btn["label"], new_value=False,
+                current_value=off_hex, queued=True)
+
+        pending_key = f"command:{imei}:pending_response"
+        if not await redis.set(pending_key, "", nx=True, ex=25):
+            raise HTTPException(status_code=409, detail="Ya hay un comando en vuelo para este dispositivo")
+        try:
+            now = datetime.now(timezone.utc)
+            await _send_manual_can_once(
+                redis, db, imei=imei, command=cmd_on, param_id=slot["param_id"],
+                value_hex=on_hex, vehicle=vehicle, device=device, user=user, sent_at=now)
+            await _send_manual_can_once(
+                redis, db, imei=imei, command=cmd_off, param_id=slot["param_id"],
+                value_hex=off_hex, vehicle=vehicle, device=device, user=user,
+                sent_at=datetime.now(timezone.utc))
+            await redis.hset(state_k, str(slot["slot"]), off_hex)
+            logger.info("Pulse Manual CAN OK: IMEI %s button=%s", imei, button_id)
+            return ManualCanButtonToggleResponse(
+                button_id=button_id, label=btn["label"], new_value=False, current_value=off_hex)
+        finally:
+            await redis.delete(pending_key)
+
     # ── Rama SET (toggle): un único setparam ─────────────────────────────────
     current_state = manual_can_config.current_bit(raw, btn["byte_index"], btn["bit_index"])
     new_state = (not current_state) if body.value is None else body.value
