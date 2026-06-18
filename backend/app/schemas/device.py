@@ -17,6 +17,8 @@ class DeviceOut(BaseModel):
     last_seen: datetime | None
     sim_phone: str | None = None
     active: bool
+    out_of_service: bool = False
+    out_of_service_since: datetime | None = None
     created_at: datetime
     total_bytes: int = 0   # acumulado total estimado (SUM de device_data_usage)
     month_bytes: int = 0   # bytes del mes en curso
@@ -49,6 +51,7 @@ class DeviceUpdate(BaseModel):
     active: bool | None = None
     model: str | None = None
     sim_phone: str | None = None
+    out_of_service: bool | None = None
 
 
 class DeviceAssignVehicle(BaseModel):

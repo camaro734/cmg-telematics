@@ -1,9 +1,9 @@
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
@@ -14,6 +14,8 @@ from app.models.device import Device
 from app.models.vehicle import Vehicle
 from app.models.tenant import Tenant
 from app.models.device_data_usage import DeviceDataUsage
+from app.models.alert_instance import AlertInstance
+from app.models.alert_rule import AlertRule
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +201,7 @@ async def get_device(
 async def update_device(
     device_id: uuid.UUID,
     body: DeviceUpdate,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -210,8 +213,40 @@ async def update_device(
     if body.tenant_id is not None and body.tenant_id != device.tenant_id:
         if not await db.get(Tenant, body.tenant_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
-    for field, value in body.model_dump(exclude_unset=True).items():
+
+    data = body.model_dump(exclude_unset=True)
+    new_oos = data.pop("out_of_service", None)
+    for field, value in data.items():
         setattr(device, field, value)
+
+    if new_oos is not None and new_oos != device.out_of_service:
+        device.out_of_service = new_oos
+        if new_oos:
+            device.out_of_service_since = datetime.now(timezone.utc)
+            # Resolver alertas de silencio firing del vehículo vinculado (si las hay)
+            if device.vehicle_id is not None:
+                await db.execute(
+                    update(AlertInstance)
+                    .where(
+                        AlertInstance.vehicle_id == device.vehicle_id,
+                        AlertInstance.status == "firing",
+                        AlertInstance.rule_id.in_(
+                            select(AlertRule.id).where(
+                                AlertRule.condition["type"].as_string() == "silence"
+                            )
+                        ),
+                    )
+                    .values(status="resolved", resolved_at=datetime.now(timezone.utc))
+                )
+                redis = getattr(request.app.state, "redis", None)
+                if redis is not None:
+                    try:
+                        await redis.delete(f"silence:firing:{device.vehicle_id}")
+                    except Exception as exc:
+                        logger.warning("No se pudo limpiar silence key en Redis: %s", exc)
+        else:
+            device.out_of_service_since = None
+
     await db.commit()
     await db.refresh(device)
     return device
