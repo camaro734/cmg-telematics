@@ -24,8 +24,14 @@ export default function TenantsPage() {
   const isAdmin = user?.role === 'admin'
   const isCmgAdmin = isAdmin && user?.tenant_tier === 'cmg'
 
-  // CMG ve todos excepto sí mismo; client ve solo sus subclientes (filtra su propio tenant)
-  const allClients = tenants.filter(t => t.tier !== 'cmg' && (isClient ? t.tier === 'subclient' : true))
+  // CMG ve todos excepto sí mismo; client ve solo sus subclientes; manufacturer ve sus
+  // clientes. En todos los casos se excluye el propio tenant (GET /tenants lo incluye, pero
+  // nadie debe verse a sí mismo ni editar sus propios permisos en la lista de clientes).
+  const allClients = tenants.filter(t =>
+    t.tier !== 'cmg' &&
+    t.id !== user?.tenant_id &&
+    (isClient ? t.tier === 'subclient' : true),
+  )
   const visible = showInactive ? allClients : allClients.filter(t => t.active)
   const hiddenCount = allClients.filter(t => !t.active).length
 
