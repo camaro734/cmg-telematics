@@ -8,6 +8,7 @@ import { useTenantContext } from '../../lib/useTenantContext'
 import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
+import { isFresh } from '../../lib/staleStatus'
 
 
 
@@ -356,6 +357,10 @@ export default function VehiclesPage() {
                 <tbody>
                   {vehicles.map(v => {
                     const dev = deviceByVehicle.get(v.id)
+                    // Estado real por frescor del último dato (regla unificada isFresh),
+                    // no por el flag crudo `dev.online`: el FMC650 cierra el TCP tras cada
+                    // batch y ese flag queda obsoleto (false aunque transmita, o true colgado).
+                    const devOnline = dev ? isFresh(dev.last_seen) : false
                     return (
                       <tr
                         key={v.id}
@@ -380,11 +385,11 @@ export default function VehiclesPage() {
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <span style={{
                                 width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                                background: dev.online ? 'var(--ok)' : 'var(--offline)',
+                                background: devOnline ? 'var(--ok)' : 'var(--offline)',
                               }} />
                               <span style={{
                                 fontFamily: 'var(--font-mono)', fontSize: 12,
-                                color: dev.online ? 'var(--ok)' : 'var(--fg-muted)',
+                                color: devOnline ? 'var(--ok)' : 'var(--fg-muted)',
                               }}>
                                 {dev.imei}
                               </span>
