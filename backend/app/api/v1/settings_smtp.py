@@ -1,5 +1,6 @@
 """Endpoints de configuración SMTP — solo tier=cmg, role=admin."""
 import smtplib
+import ssl
 import logging
 from email.message import EmailMessage
 from fastapi import APIRouter, Depends, HTTPException
@@ -132,19 +133,32 @@ async def test_smtp(
         "la configuración SMTP."
     )
 
+    smtp_port = int(cfg.get("port", 587))
+    smtp_user = cfg.get("user", "")
+    smtp_password = cfg.get("password", "")
     try:
-        with smtplib.SMTP(smtp_host, cfg.get("port", 587), timeout=15) as s:
-            if cfg.get("tls", True):
-                s.starttls()
-            if cfg.get("user"):
-                s.login(cfg["user"], cfg.get("password", ""))
-            s.send_message(msg)
+        if smtp_port == 465:
+            # Puerto 465 = SSL/TLS implícito desde el inicio (SMTPS).
+            # Hostinger y la mayoría de proveedores cierran/timeout si se intenta
+            # STARTTLS aquí: hay que abrir ya cifrado con SMTP_SSL.
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15, context=ssl.create_default_context()) as s:
+                if smtp_user:
+                    s.login(smtp_user, smtp_password)
+                s.send_message(msg)
+        else:
+            # Puerto 587 (u otros) = conexión en claro + STARTTLS opcional.
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
+                if cfg.get("tls", True):
+                    s.starttls(context=ssl.create_default_context())
+                if smtp_user:
+                    s.login(smtp_user, smtp_password)
+                s.send_message(msg)
         logger.info("SMTP test OK — sent to %s", body.to)
         return {"ok": True}
     except smtplib.SMTPAuthenticationError as e:
         return {"ok": False, "error": f"Error de autenticación: {e.smtp_error.decode('utf-8', errors='ignore')}"}
     except smtplib.SMTPConnectError as e:
-        return {"ok": False, "error": f"No se pudo conectar a {smtp_host}:{cfg.get('port', 587)} — {e}"}
+        return {"ok": False, "error": f"No se pudo conectar a {smtp_host}:{smtp_port} — {e}"}
     except Exception as e:
         logger.error("SMTP test failed: %s", e)
         return {"ok": False, "error": str(e)}

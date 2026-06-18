@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import smtplib
+import ssl
 import time
 from email.message import EmailMessage
 import httpx
@@ -112,16 +113,24 @@ async def _send_email(action: dict, context: dict, db_pool: asyncpg.Pool | None 
 
 def _smtp_send(msg: EmailMessage, cfg: dict) -> None:
     host = cfg.get("host", settings.smtp_host)
-    port = cfg.get("port", settings.smtp_port)
+    port = int(cfg.get("port", settings.smtp_port))
     user = cfg.get("user", settings.smtp_user)
     password = cfg.get("password", settings.smtp_password)
     tls = cfg.get("tls", True)
-    with smtplib.SMTP(host, port, timeout=30) as s:
-        if tls or user:
-            s.starttls()
-        if user:
-            s.login(user, password)
-        s.send_message(msg)
+    if port == 465:
+        # Puerto 465 = SSL/TLS implícito (SMTPS). STARTTLS aquí da timeout.
+        with smtplib.SMTP_SSL(host, port, timeout=30, context=ssl.create_default_context()) as s:
+            if user:
+                s.login(user, password)
+            s.send_message(msg)
+    else:
+        # Puerto 587 (u otros) = conexión en claro + STARTTLS.
+        with smtplib.SMTP(host, port, timeout=30) as s:
+            if tls or user:
+                s.starttls(context=ssl.create_default_context())
+            if user:
+                s.login(user, password)
+            s.send_message(msg)
 
 
 async def _send_webhook(action: dict, context: dict) -> None:
