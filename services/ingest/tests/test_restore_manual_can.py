@@ -38,7 +38,7 @@ async def test_restore_set_writes_and_confirms():
     writer.write.assert_called_once_with(b"PKT")
     mock_confirm.assert_awaited_once_with("log-1", "OK (entrega diferida)")
     redis.hset.assert_awaited()  # actualiza vehicle:{id}:can_outputs
-    redis.delete.assert_awaited_with(f"vehicle:{VEHICLE_ID}:manual_can_pending")
+    redis.hdel.assert_awaited_with(f"vehicle:{VEHICLE_ID}:manual_can_pending", "31412")
 
 
 @pytest.mark.asyncio
@@ -61,4 +61,4 @@ async def test_restore_empty_is_noop():
     conn, writer, redis = _make_conn({})
     await conn._restore_manual_can_state()
     writer.write.assert_not_called()
-    redis.delete.assert_not_awaited()
+    redis.hdel.assert_not_awaited()

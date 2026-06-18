@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ManualCanControl from '../ManualCanControl'
@@ -12,7 +12,11 @@ vi.mock('../../../lib/apiClient', () => ({
 }))
 
 vi.mock('../../../shared/ui/Toast', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+}))
+
+vi.mock('../../auth/useAuthStore', () => ({
+  useAuthStore: vi.fn(() => false),
 }))
 
 import { apiClient } from '../../../lib/apiClient'
@@ -39,14 +43,9 @@ function mockButtons(buttons: unknown[]) {
   )
 }
 
-function renderComponent(fmcConnected: boolean) {
+function renderComponent() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-  })
-  queryClient.setQueryData(['fmc-status', VEHICLE_ID], {
-    connected: fmcConnected,
-    imei: '862272089079729',
-    last_seen: fmcConnected ? new Date().toISOString() : null,
   })
   queryClient.setQueryData(['manual-can-history', VEHICLE_ID], [] as never[])
 
@@ -63,23 +62,17 @@ describe('ManualCanControl', () => {
     vi.mocked(apiClient.post).mockReset()
   })
 
-  it('1. FMC conectado → botón de la salida habilitado', async () => {
+  it('1. Botón de salida siempre habilitado (no depende de estado FMC)', async () => {
     mockButtons([TOGGLE_BTN])
-    renderComponent(true)
+    renderComponent()
     expect(await screen.findByTestId(`btn-toggle-${TOGGLE_BTN.id}`)).not.toBeDisabled()
   })
 
-  it('2. FMC desconectado → botón de la salida deshabilitado', async () => {
-    mockButtons([TOGGLE_BTN])
-    renderComponent(false)
-    expect(await screen.findByTestId(`btn-toggle-${TOGGLE_BTN.id}`)).toBeDisabled()
-  })
-
-  it('3. Botón toggle → POST al endpoint toggle (alterna valor)', async () => {
+  it('2. Botón toggle → POST al endpoint toggle (alterna valor)', async () => {
     mockButtons([TOGGLE_BTN])
     vi.mocked(apiClient.post).mockResolvedValue({})
     const user = userEvent.setup()
-    renderComponent(true)
+    renderComponent()
 
     await user.click(await screen.findByTestId(`btn-toggle-${TOGGLE_BTN.id}`))
 
@@ -89,17 +82,22 @@ describe('ManualCanControl', () => {
     )
   })
 
-  it('4. Botón hold → pulsar envía value:true y soltar envía value:false', async () => {
+  it('3. Botón hold → click abre modal, Enviar hace POST con pulse:true', async () => {
     mockButtons([HOLD_BTN])
     vi.mocked(apiClient.post).mockResolvedValue({})
-    renderComponent(true)
+    const user = userEvent.setup()
+    renderComponent()
 
-    const btn = await screen.findByTestId(`btn-toggle-${HOLD_BTN.id}`)
-    fireEvent.pointerDown(btn)
-    fireEvent.pointerUp(btn)
+    // Click en el botón hold abre modal de confirmación
+    await user.click(await screen.findByTestId(`btn-toggle-${HOLD_BTN.id}`))
+
+    // Modal debe estar visible con botón "Enviar"
+    expect(await screen.findByText('Enviar')).toBeInTheDocument()
+
+    // Click en Enviar dispara el POST con pulse:true
+    await user.click(screen.getByText('Enviar'))
 
     const url = `/api/v1/vehicles/${VEHICLE_ID}/can-slots/${SLOT_ID}/buttons/${HOLD_BTN.id}/toggle`
-    expect(apiClient.post).toHaveBeenNthCalledWith(1, url, { value: true })
-    expect(apiClient.post).toHaveBeenNthCalledWith(2, url, { value: false })
+    expect(apiClient.post).toHaveBeenCalledWith(url, { pulse: true })
   })
 })

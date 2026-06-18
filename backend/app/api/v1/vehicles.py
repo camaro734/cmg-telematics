@@ -2503,7 +2503,8 @@ async def toggle_manual_can_button(
                 current_value=off_hex, queued=True, command_log_id=log_id)
 
         pending_key = f"command:{imei}:pending_response"
-        if not await redis.set(pending_key, "", nx=True, ex=25):
+        # ex=40: cubre dos round-trips BLPOP (timeout=18s cada uno) con margen ante ACK lento.
+        if not await redis.set(pending_key, "", nx=True, ex=40):
             raise HTTPException(status_code=409, detail="Ya hay un comando en vuelo para este dispositivo")
         try:
             now = datetime.now(timezone.utc)

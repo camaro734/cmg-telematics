@@ -238,7 +238,8 @@ class TeltonikaConnection:
         if not pending:
             return
         outputs_key = f"vehicle:{vehicle_id}:can_outputs"
-        for _param_id, raw in pending.items():
+        processed_keys: list[str] = []
+        for param_id, raw in pending.items():
             try:
                 entry = json.loads(raw)
             except (ValueError, TypeError):
@@ -252,7 +253,11 @@ class TeltonikaConnection:
                 # Entregado a un socket vivo → confirmado (best-effort para el ACK real).
                 await _confirm_command(entry["log_id"], "OK (entrega diferida)")
             logger.info("Manual CAN diferido entregado a %s: %s", self.imei, entry.get("commands"))
-        await self.redis.delete(pending_key)
+            processed_keys.append(param_id)
+        # Borra solo los campos efectivamente procesados para evitar perder un nuevo pendiente
+        # escrito por el API entre el hgetall y este punto.
+        if processed_keys:
+            await self.redis.hdel(pending_key, *processed_keys)
 
     async def _receive_loop(self) -> None:
         """Recibe paquetes Codec 8 en bucle hasta que la conexión se cierre."""
