@@ -53,7 +53,6 @@ export default function VehicleDetailPage() {
   const [doutOverride, setDoutOverride] = useState<Record<number, boolean>>({})
   const [showFullTelemetry, setShowFullTelemetry] = useState(false)
   const [doutLoading, setDoutLoading] = useState<Record<number, boolean>>({})
-  const [showBottomPanel, setShowBottomPanel] = useState(false)
   const [mapExpanded, setMapExpanded] = useState<boolean>(() => {
     try { return localStorage.getItem('vd_map_expanded') === 'true' } catch { return false }
   })
@@ -476,53 +475,6 @@ export default function VehicleDetailPage() {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
 
-              {/* HISTORIAL DE COMANDOS */}
-              <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-                <button onClick={() => setShowBottomPanel(v => !v)}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: 'none', padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 11 }}>
-                  <span style={{ transform: showBottomPanel ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
-                  {showBottomPanel ? 'Ocultar historial técnico' : 'Historial de comandos e incidencias'}
-                </button>
-              </div>
-              {showBottomPanel && (
-                <div style={isMobile ? { display: 'flex', flexDirection: 'column' } : { display: 'grid', gridTemplateColumns: '2fr 1fr', borderTop: '1px solid var(--border)', height: 180, overflow: 'hidden' }}>
-                  <div style={{ borderRight: isMobile ? 'none' : '1px solid var(--border)', borderBottom: isMobile ? '1px solid var(--border)' : 'none', padding: '10px 14px', overflowY: 'auto' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>HISTORIAL DE COMANDOS</div>
-                    {commandHistory.length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontStyle: 'italic' }}>Sin historial disponible</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {commandHistory.map(entry => (
-                          <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'start', borderBottom: '1px solid var(--border)', paddingBottom: 4 }}>
-                            <div>
-                              <div style={{ fontSize: 10, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                                {new Date(entry.sent_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                              </div>
-                              <div style={{ fontSize: 11, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>{entry.command}</div>
-                              {(entry.response || entry.error_message) && (
-                                <div style={{ fontSize: 10, color: 'var(--fg-muted)' }}>{entry.response ?? entry.error_message}</div>
-                              )}
-                            </div>
-                            <CommandStatusBadge status={entry.status} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ padding: '10px 14px', overflowY: 'auto' }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>INCIDENCIAS</div>
-                    {firingAlerts.filter(a => a.vehicle_id === id).length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--ok)' }}>✓ Sin incidencias</div>
-                    ) : (
-                      firingAlerts.filter(a => a.vehicle_id === id).slice(0, 5).map(a => (
-                        <div key={a.id} style={{ fontSize: 11, color: 'var(--warn)', borderBottom: '1px solid var(--border)', paddingBottom: 4, marginBottom: 4 }}>
-                          {a.rule_id.slice(0, 8)}… {new Date(a.triggered_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
               </>) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -739,27 +691,6 @@ function FullTelemetryModal({ canData, sensorSchema, onClose }: {
   )
 }
 
-function CommandStatusBadge({ status }: { status: CommandLogEntry['status'] }) {
-  const map: Record<CommandLogEntry['status'], { label: string; color: string }> = {
-    pending:      { label: 'Pendiente',    color: 'var(--offline)' },
-    sent:         { label: 'Enviado',      color: 'var(--info)' },
-    failed:       { label: 'Fallido',      color: 'var(--danger)' },
-    confirmed:    { label: 'Confirmado',   color: 'var(--ok)' },
-    timeout:      { label: 'Timeout',      color: 'var(--danger)' },
-    disconnected: { label: 'Desconectado', color: 'var(--danger)' },
-    error:        { label: 'Error',        color: 'var(--danger)' },
-  }
-  const { label, color } = map[status] ?? map.pending
-  return (
-    <span style={{
-      fontSize: 9, padding: '2px 6px', borderRadius: 8, fontWeight: 600,
-      background: `color-mix(in srgb, ${color} 15%, transparent)`,
-      color, border: `1px solid ${color}`, whiteSpace: 'nowrap',
-    }}>
-      {label}
-    </span>
-  )
-}
 
 
 function PdfDownloadBtn({ vehicleId, vehicleName, isCmg, tenantId }: {
