@@ -72,6 +72,7 @@ const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPag
 const GeofencesPage    = lazy(() => import('./features/geofences/GeofencesPage'))
 const ClientPortalPage    = lazy(() => import('./features/portal/ClientPortalPage'))
 const ForgotPasswordPage  = lazy(() => import('./features/auth/ForgotPasswordPage'))
+const ResetPasswordPage   = lazy(() => import('./features/auth/ResetPasswordPage'))
 
 function Loading() {
   return (
@@ -104,6 +105,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/portal/:token" element={<Suspense fallback={<Loading />}><ClientPortalPage /></Suspense>} />
       <Route path="/forgot-password" element={<Suspense fallback={<Loading />}><ForgotPasswordPage /></Suspense>} />
+      <Route path="/reset-password/:token" element={<Suspense fallback={<Loading />}><ResetPasswordPage /></Suspense>} />
       <Route
         path="/*"
         element={
