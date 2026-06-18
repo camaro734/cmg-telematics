@@ -20,6 +20,10 @@ class Device(Base):
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sim_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)  # Teléfono SIM
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Fuera de servicio: dispositivo desmontado/parado a propósito. No genera alerta
+    # de inactividad. Ortogonal a `active` (baja/oculto). Se reactiva solo al transmitir.
+    out_of_service: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    out_of_service_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tenant = relationship("Tenant", back_populates="devices")
