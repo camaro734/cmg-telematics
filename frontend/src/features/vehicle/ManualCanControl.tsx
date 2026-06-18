@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
@@ -61,9 +61,9 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   const [confirmBtn, setConfirmBtn] = useState<CanButton | null>(null)
   // Estado de feedback por botón: 'queued' = encolado en backend; 'sent' = confirmado
   const [queuedBtns, setQueuedBtns] = useState<Record<string, 'queued' | 'sent'>>({})
-  // Instante (ms) en que se realizó el último encole; evita que comandos confirmed
-  // anteriores al encole se detecten como entrega (falso positivo).
-  const queuedAtRef = useRef<number>(0)
+  // Mapa btn.id → command_log_id devuelto por el backend al encolar; permite rastrear
+  // la entrega exacta sin depender de comparaciones de timestamp.
+  const [queuedLogIds, setQueuedLogIds] = useState<Record<string, string>>({})
 
   const { data: history = [] } = useQuery<CommandLogEntry[]>({
     queryKey: ['manual-can-history', vehicleId],
@@ -108,33 +108,44 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
     enabled: hasQueued,
   })
 
-  // Cuando hay algún MANUAL_CAN confirmado cuyo sent_at sea POSTERIOR al último
-  // encole, marca todos los 'queued' como 'sent'. Filtrar por timestamp evita que
-  // un confirmed anterior al encole dispare el toast como falso positivo.
+  // Para cada botón encolado, busca en `recent` el log con el id exacto devuelto por
+  // el backend al encolar. Empareja por log_id (no por timestamp) para evitar falsos
+  // positivos/negativos al comparar relojes de navegador y servidor.
   useEffect(() => {
     if (!recent.length || !hasQueued) return
-    const lastConfirmed = recent.find(
-      r => r.status === 'confirmed' && new Date(r.sent_at).getTime() > queuedAtRef.current,
-    )
-    if (!lastConfirmed) return
     setQueuedBtns(prev => {
-      const next: Record<string, 'queued' | 'sent'> = {}
+      const next: Record<string, 'queued' | 'sent'> = { ...prev }
       let changed = false
-      for (const [id, st] of Object.entries(prev)) {
-        if (st === 'queued') { next[id] = 'sent'; changed = true } else next[id] = st
+      for (const [btnId, st] of Object.entries(prev)) {
+        if (st !== 'queued') continue
+        const logId = queuedLogIds[btnId]
+        if (!logId) continue
+        const match = recent.find(r => r.id === logId && (r.status === 'confirmed' || r.status === 'failed'))
+        if (!match) continue
+        next[btnId] = 'sent'
+        changed = true
+        if (match.status === 'confirmed') {
+          toast.success('Comando entregado al FMC')
+        } else {
+          toast.error('El FMC rechazó el comando encolado')
+        }
       }
       return changed ? next : prev
     })
-    toast.success('Comando entregado al FMC')
-  }, [recent, hasQueued])
+  }, [recent, hasQueued, queuedLogIds])
 
-  // Auto-limpiar badges 'sent' a los 5 segundos.
+  // Auto-limpiar badges 'sent' a los 5 segundos; limpia también queuedLogIds para no acumular.
   useEffect(() => {
     const sent = Object.entries(queuedBtns).filter(([, s]) => s === 'sent').map(([id]) => id)
     if (!sent.length) return
-    const t = setTimeout(() => setQueuedBtns(q => {
-      const next = { ...q }; sent.forEach(id => delete next[id]); return next
-    }), 5_000)
+    const t = setTimeout(() => {
+      setQueuedBtns(q => {
+        const next = { ...q }; sent.forEach(id => delete next[id]); return next
+      })
+      setQueuedLogIds(m => {
+        const next = { ...m }; sent.forEach(id => delete next[id]); return next
+      })
+    }, 5_000)
     return () => clearTimeout(t)
   }, [queuedBtns])
 
@@ -144,13 +155,13 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
     setOptimistic(o => ({ ...o, [btn.id]: optimisticNext }))
     setToggling(t => ({ ...t, [btn.id]: true }))
     try {
-      const res = await apiClient.post<{ queued?: boolean }>(
+      const res = await apiClient.post<{ queued?: boolean; command_log_id?: string }>(
         `/api/v1/vehicles/${vehicleId}/can-slots/${btn.slot_id}/buttons/${btn.id}/toggle`,
         value === null ? {} : { value },
       )
       if (res?.queued) {
-        queuedAtRef.current = Date.now()
         setQueuedBtns(q => ({ ...q, [btn.id]: 'queued' }))
+        if (res.command_log_id) setQueuedLogIds(m => ({ ...m, [btn.id]: res.command_log_id! }))
         toast.info('Comando encolado: se enviará cuando el FMC reconecte')
       }
       qc.invalidateQueries({ queryKey: ['can-buttons', btn.slot_id] })
@@ -166,13 +177,13 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   async function sendPulse(btn: CanButton) {
     setToggling(t => ({ ...t, [btn.id]: true }))
     try {
-      const res = await apiClient.post<{ queued?: boolean }>(
+      const res = await apiClient.post<{ queued?: boolean; command_log_id?: string }>(
         `/api/v1/vehicles/${vehicleId}/can-slots/${btn.slot_id}/buttons/${btn.id}/toggle`,
         { pulse: true },
       )
       if (res?.queued) {
-        queuedAtRef.current = Date.now()
         setQueuedBtns(q => ({ ...q, [btn.id]: 'queued' }))
+        if (res.command_log_id) setQueuedLogIds(m => ({ ...m, [btn.id]: res.command_log_id! }))
         toast.info('Comando encolado: se enviará cuando el FMC reconecte')
       } else {
         toast.success('Comando enviado al FMC')

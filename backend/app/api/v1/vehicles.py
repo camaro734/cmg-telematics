@@ -2164,6 +2164,7 @@ class ManualCanButtonToggleResponse(BaseModel):
     new_value: bool
     current_value: str  # hex 16 chars
     queued: bool = False  # True si el comando quedó encolado (FMC offline)
+    command_log_id: uuid.UUID | None = None  # id del CommandLog, para que el frontend rastree la entrega de un comando encolado
 
 
 async def _get_slot_checked(
@@ -2499,7 +2500,7 @@ async def toggle_manual_can_button(
             response.status_code = 202
             return ManualCanButtonToggleResponse(
                 button_id=button_id, label=btn["label"], new_value=False,
-                current_value=off_hex, queued=True)
+                current_value=off_hex, queued=True, command_log_id=log_id)
 
         pending_key = f"command:{imei}:pending_response"
         if not await redis.set(pending_key, "", nx=True, ex=25):
@@ -2565,6 +2566,7 @@ async def toggle_manual_can_button(
             new_value=new_state,
             current_value=value_hex,
             queued=True,
+            command_log_id=log_id,
         )
 
     # ── Online: enviar ya (lock anti-concurrencia) ────────────────────────────
