@@ -1,6 +1,6 @@
 # backend/app/schemas/auth.py
 import uuid
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
@@ -31,3 +31,12 @@ class CurrentUser(BaseModel):
     tenant_tier: str
     role: str
     email: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
