@@ -63,6 +63,8 @@ def _mock_device(tenant_id: uuid.UUID = VPS_TENANT_ID) -> MagicMock:
     d.last_seen = None
     d.sim_phone = None
     d.active = True
+    d.out_of_service = False
+    d.out_of_service_since = None
     d.created_at = datetime.now(timezone.utc)
     return d
 
@@ -109,6 +111,8 @@ def test_manufacturer_admin_can_create_device_201():
         obj.last_seen = None
         obj.sim_phone = None
         obj.active = True
+        obj.out_of_service = False
+        obj.out_of_service_since = None
         obj.created_at = datetime.now(timezone.utc)
 
     db.refresh = _fake_refresh

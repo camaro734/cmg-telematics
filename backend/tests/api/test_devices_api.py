@@ -63,6 +63,8 @@ def _make_device(tenant_id: uuid.UUID = CLIENT_TENANT_ID) -> MagicMock:
     device.last_seen = None
     device.sim_phone = None
     device.active = True
+    device.out_of_service = False
+    device.out_of_service_since = None
     device.created_at = datetime.now(timezone.utc)
     return device
 
@@ -138,6 +140,8 @@ def test_devices_cmg_admin_creates_device():
         obj.online = False
         obj.last_seen = None
         obj.active = True
+        obj.out_of_service = False
+        obj.out_of_service_since = None
         obj.created_at = datetime.now(timezone.utc)
 
     db.refresh = _fake_refresh

@@ -73,6 +73,8 @@ class _MockDevice:
         self.last_seen = None
         self.sim_phone = None
         self.active = True
+        self.out_of_service = False
+        self.out_of_service_since = None
         self.created_at = "2026-06-11T00:00:00Z"
 
     def model_dump(self):
@@ -102,6 +104,10 @@ def _make_db(get_side_effects: list, execute_side_effects: list | None = None) -
             obj.online = False
         if getattr(obj, 'active', None) is None:
             obj.active = True
+        if getattr(obj, 'out_of_service', None) is None:
+            obj.out_of_service = False
+        if not hasattr(obj, 'out_of_service_since'):
+            obj.out_of_service_since = None
         if not getattr(obj, 'created_at', None):
             obj.created_at = datetime.now(timezone.utc)
 
