@@ -70,7 +70,8 @@ const BlockTemplatesPage = lazy(() => import('./features/templates/BlockTemplate
 const DriversPage      = lazy(() => import('./features/drivers/DriversPage'))
 const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPage'))
 const GeofencesPage    = lazy(() => import('./features/geofences/GeofencesPage'))
-const ClientPortalPage = lazy(() => import('./features/portal/ClientPortalPage'))
+const ClientPortalPage    = lazy(() => import('./features/portal/ClientPortalPage'))
+const ForgotPasswordPage  = lazy(() => import('./features/auth/ForgotPasswordPage'))
 
 function Loading() {
   return (
@@ -102,6 +103,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/portal/:token" element={<Suspense fallback={<Loading />}><ClientPortalPage /></Suspense>} />
+      <Route path="/forgot-password" element={<Suspense fallback={<Loading />}><ForgotPasswordPage /></Suspense>} />
       <Route
         path="/*"
         element={

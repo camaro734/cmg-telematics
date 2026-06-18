@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from './useAuthStore'
 import { apiClient } from '../../lib/apiClient'
 import type { BrandTokens } from '../../lib/types'
@@ -145,7 +145,7 @@ export default function LoginPage() {
         </form>
 
         <p style={{ marginTop: 24, fontSize: 12, color: 'var(--fg-muted)', textAlign: 'center' }}>
-          ¿Olvidaste tu contraseña? Contacta con tu administrador.
+          <Link to="/forgot-password" style={{ color: 'var(--cmg-teal)' }}>¿Olvidaste tu contraseña?</Link>
         </p>
       </div>
     </div>
