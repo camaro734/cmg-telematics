@@ -140,7 +140,9 @@ async def sweep_silent_vehicles(db_pool: asyncpg.Pool, redis: Redis) -> None:
                        v.tenant_id::text AS tenant_id,
                        d.last_seen
                 FROM   vehicle v
-                JOIN   device  d ON d.vehicle_id = v.id AND d.active = true
+                JOIN   device  d ON d.vehicle_id = v.id
+                                 AND d.active = true
+                                 AND d.out_of_service = false
                 WHERE  v.active       = true
                   AND  d.last_seen   IS NOT NULL
                 """
