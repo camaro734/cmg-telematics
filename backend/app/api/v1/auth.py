@@ -22,10 +22,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import attributes
 
 from app.core.database import get_db
-from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token, hash_password
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutRequest, CurrentUser
+from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutRequest, CurrentUser, ForgotPasswordRequest, ResetPasswordRequest
+from app.core.reset_token import generate_reset_token, reset_key_for
+from app.core.reset_mailer import enqueue_reset_email
 from app.schemas.user import MetricPreferences, UserPreferencesIn, UserPreferencesOut
 from app.api.v1.deps import get_current_user
 
@@ -54,6 +56,45 @@ async def _check_login_rate_limit(request: Request) -> None:
             detail=f"Demasiados intentos. Inténtalo de nuevo en {minutes} minuto{'s' if minutes != 1 else ''}.",
             headers={"Retry-After": retry_after},
         )
+
+
+_RESET_TOKEN_TTL = 3600  # 1 hora
+_RESET_MAX_ATTEMPTS = 5
+_RESET_WINDOW_SECONDS = 900
+_RESET_GENERIC_MSG = "Si el correo está registrado, recibirás un enlace para restablecer la contraseña."
+
+
+async def _check_reset_rate_limit(request: Request, suffix: str) -> None:
+    """Rate limit para recuperación: máx 5 solicitudes por clave en 15 min."""
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        return
+    key = f"ratelimit:pwreset:{suffix}"
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.expire(key, _RESET_WINDOW_SECONDS)
+    if count > _RESET_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas solicitudes. Inténtalo de nuevo más tarde.",
+        )
+
+
+@router.post("/forgot-password")
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    ip = request.client.host if request.client else "unknown"
+    await _check_reset_rate_limit(request, f"ip:{ip}")
+    await _check_reset_rate_limit(request, f"email:{body.email}")
+
+    result = await db.execute(select(User).where(User.email == body.email, User.active == True))
+    user = result.scalar_one_or_none()
+    redis = getattr(request.app.state, "redis", None)
+    if user is not None and redis is not None:
+        token, key = generate_reset_token()
+        await redis.set(key, str(user.id), ex=_RESET_TOKEN_TTL)
+        await enqueue_reset_email(redis, body.email, token)
+    # Respuesta SIEMPRE genérica (no revela si el email existe)
+    return {"detail": _RESET_GENERIC_MSG}
 
 
 async def _check_jti_revoked(request: Request, jti: str | None) -> None:
