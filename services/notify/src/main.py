@@ -29,16 +29,18 @@ async def _process_alert(db_pool: asyncpg.Pool, redis: Redis, fields: dict) -> N
     actions = json.loads(fields.get("actions", "[]"))
     escalation = json.loads(fields.get("escalation", "[]"))
 
+    # Los ids pueden venir vacíos en mensajes genéricos (p. ej. correo de
+    # recuperación de contraseña, sin vehículo/tenant): no castear '' a UUID.
     async with db_pool.acquire() as conn:
         rule_row = await conn.fetchrow(
             "SELECT name FROM alert_rule WHERE id = $1::uuid", rule_id
-        )
+        ) if rule_id else None
         vehicle_row = await conn.fetchrow(
             "SELECT name FROM vehicle WHERE id = $1::uuid", vehicle_id
-        )
+        ) if vehicle_id else None
         tenant_row = await conn.fetchrow(
             "SELECT notification_email FROM tenant WHERE id = $1::uuid", tenant_id
-        )
+        ) if tenant_id else None
 
     rule_name = rule_row["name"] if rule_row else "unknown"
     vehicle_name = vehicle_row["name"] if vehicle_row else vehicle_id
