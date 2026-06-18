@@ -2363,8 +2363,8 @@ async def delete_manual_can_button(
 
 
 async def _send_manual_can_once(
-    redis, db, *, imei: str, command: str, param_id: int, value_hex: str,
-    vehicle, device, user, sent_at: datetime,
+    redis, db: AsyncSession, *, imei: str, command: str, param_id: int, value_hex: str,
+    vehicle, device, user: CurrentUser, sent_at: datetime,
 ) -> CommandLog:
     """Publica un comando Manual CAN y espera el ACK (BLPOP 18s). El caller posee
     el lock anti-concurrencia. Lanza HTTPException en timeout/disconnected/failed."""

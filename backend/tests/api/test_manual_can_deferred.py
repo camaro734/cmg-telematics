@@ -96,6 +96,9 @@ def test_offline_set_queues_and_returns_202():
     payload = json.loads(hset_calls[0].args[2])
     assert payload["type"] == "set"
     assert payload["commands"] == [f"setparam {PARAM_ID}:0100000000000000"]
+    assert "log_id" in payload
+    assert payload["slot"] == 0
+    assert payload["value_hex"] == "0100000000000000"
 
 
 def test_online_set_still_confirms_200():
@@ -119,3 +122,9 @@ def test_online_set_still_confirms_200():
 
     assert r.status_code == 200
     assert r.json()["queued"] is False
+    # Tras el ACK debe actualizar el bitmask de estado del slot (hset con key distinta del pending hash)
+    state_hset = [c for c in redis.hset.await_args_list
+                  if c.args and "manual_can_pending" not in c.args[0]]
+    assert state_hset, "debe actualizar el bitmask de estado tras confirmación"
+    # El CommandLog debe persistirse en BD
+    db.commit.assert_awaited()
