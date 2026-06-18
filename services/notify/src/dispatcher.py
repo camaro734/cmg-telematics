@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import smtplib
 import ssl
@@ -24,11 +25,16 @@ async def _load_smtp_from_db(db_pool: asyncpg.Pool) -> dict:
         row = await db_pool.fetchrow(
             "SELECT value FROM system_settings WHERE key = 'smtp'"
         )
-        if row and row["value"].get("host"):
-            _smtp_cache = row["value"]
-            _smtp_cache_ts = now
-            logger.debug("SMTP config loaded from DB: host=%s", _smtp_cache.get("host"))
-            return _smtp_cache
+        if row and row["value"]:
+            value = row["value"]
+            # asyncpg devuelve JSONB como str; SQLAlchemy (core-api) lo da como dict.
+            if isinstance(value, str):
+                value = json.loads(value)
+            if value.get("host"):
+                _smtp_cache = value
+                _smtp_cache_ts = now
+                logger.debug("SMTP config loaded from DB: host=%s", _smtp_cache.get("host"))
+                return _smtp_cache
     except Exception as exc:
         logger.warning("Could not load SMTP from DB (%s) — using env fallback", exc)
 
