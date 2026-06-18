@@ -10,7 +10,7 @@ from math import radians, sin, cos, sqrt, asin
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -2155,6 +2155,7 @@ class ManualCanButtonUpdate(BaseModel):
 
 class ManualCanButtonToggleIn(BaseModel):
     value: bool | None = None
+    pulse: bool = False  # botones reset: dispara un pulso ON+OFF, ignora `value`
 
 
 class ManualCanButtonToggleResponse(BaseModel):
@@ -2162,6 +2163,7 @@ class ManualCanButtonToggleResponse(BaseModel):
     label: str
     new_value: bool
     current_value: str  # hex 16 chars
+    queued: bool = False  # True si el comando quedó encolado (FMC offline)
 
 
 async def _get_slot_checked(
@@ -2360,6 +2362,59 @@ async def delete_manual_can_button(
     await db.commit()
 
 
+async def _send_manual_can_once(
+    redis, db, *, imei: str, command: str, param_id: int, value_hex: str,
+    vehicle, device, user, sent_at: datetime,
+) -> CommandLog:
+    """Publica un comando Manual CAN y espera el ACK (BLPOP 18s). El caller posee
+    el lock anti-concurrencia. Lanza HTTPException en timeout/disconnected/failed."""
+    log_id = uuid.uuid4()
+    log = CommandLog(
+        id=log_id,
+        device_id=device.id,
+        vehicle_id=vehicle.id,
+        tenant_id=vehicle.tenant_id,
+        user_id=user.user_id,
+        command=command,
+        command_type="MANUAL_CAN",
+        status="pending",
+        param_id=param_id,
+        param_value=value_hex,
+        imei_snapshot=imei,
+        sent_at=sent_at,
+    )
+    db.add(log)
+    await redis.publish(
+        "cmg:manual_can_commands",
+        json.dumps({"imei": imei, "command": command, "log_id": str(log_id)}),
+    )
+    resp_data = await redis.blpop(f"command:{imei}:response", timeout=18)
+    if resp_data is None:
+        log.status = "timeout"
+        log.response_at = datetime.now(timezone.utc)
+        await db.commit()
+        raise HTTPException(status_code=504, detail="El FMC no respondió en 18 segundos")
+    _, fmc_response = resp_data
+    if fmc_response == "DISCONNECTED":
+        log.status = "disconnected"
+        log.response_at = datetime.now(timezone.utc)
+        await db.commit()
+        raise HTTPException(status_code=503, detail="FMC desconectado")
+    if is_fmc_error_response(fmc_response):
+        log.status = "failed"
+        log.response = fmc_response
+        log.response_at = datetime.now(timezone.utc)
+        await db.commit()
+        raise HTTPException(status_code=502, detail=f"El FMC rechazó el comando: {fmc_response}")
+    now_response = datetime.now(timezone.utc)
+    log.status = "confirmed"
+    log.response = fmc_response
+    log.response_at = now_response
+    log.latency_ms = int((now_response - sent_at).total_seconds() * 1000)
+    await db.commit()
+    return log
+
+
 @router.post(
     "/vehicles/{vehicle_id}/can-slots/{slot_id}/buttons/{button_id}/toggle",
     response_model=ManualCanButtonToggleResponse,
@@ -2370,6 +2425,7 @@ async def toggle_manual_can_button(
     button_id: uuid.UUID,
     body: ManualCanButtonToggleIn,
     request: Request,
+    response: Response,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -2379,6 +2435,7 @@ async def toggle_manual_can_button(
     envían True al pulsar y False al soltar). El OFF de soltar de un botón `hold`
     tiene prioridad: si el lock del dispositivo está ocupado, reintenta hasta
     entrar para no dejar la salida físicamente encendida.
+    Si el FMC está offline el comando queda encolado en Redis (202 queued).
     """
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
     if not vehicle.active:
@@ -2408,15 +2465,60 @@ async def toggle_manual_can_button(
     imei = device.imei
     redis = request.app.state.redis
 
-    # Comando entregable solo con conexión TCP viva ahora (ingest:conn, la pone ingest-svc)
-    if not await redis.exists(f"ingest:conn:{imei}"):
-        raise HTTPException(
-            status_code=503,
-            detail="El FMC no está conectado en este momento. Reintenta cuando el dispositivo transmita.",
+    # Estado actual del slot (bitmask 8 bytes en hex)
+    state_k = manual_can_config.state_key(vehicle_id)
+    raw_hex = await redis.hget(state_k, str(slot["slot"]))
+    raw = bytes.fromhex(raw_hex) if raw_hex else bytes(8)
+    online = bool(await redis.exists(f"ingest:conn:{imei}"))
+
+    # ── Rama SET (toggle): un único setparam ─────────────────────────────────
+    current_state = manual_can_config.current_bit(raw, btn["byte_index"], btn["bit_index"])
+    new_state = (not current_state) if body.value is None else body.value
+    value_hex = manual_can_config.apply_bit(
+        raw, btn["byte_index"], btn["bit_index"], new_state
+    ).hex().upper()
+    command_sent = f"setparam {slot['param_id']}:{value_hex}"
+
+    if not online:
+        # Encolar: se entregará en _restore_manual_can_state al reconectar.
+        log_id = uuid.uuid4()
+        db.add(CommandLog(
+            id=log_id,
+            device_id=device.id,
+            vehicle_id=vehicle_id,
+            tenant_id=vehicle.tenant_id,
+            user_id=user.user_id,
+            command=command_sent,
+            command_type="MANUAL_CAN",
+            status="queued",
+            param_id=slot["param_id"],
+            param_value=value_hex,
+            imei_snapshot=imei,
+            sent_at=datetime.now(timezone.utc),
+        ))
+        await db.commit()
+        await redis.hset(
+            f"vehicle:{vehicle_id}:manual_can_pending",
+            str(slot["param_id"]),
+            json.dumps({
+                "type": "set",
+                "commands": [command_sent],
+                "log_id": str(log_id),
+                "slot": slot["slot"],
+                "value_hex": value_hex,
+            }),
+        )
+        logger.info("Manual CAN encolado (offline) → IMEI %s button=%s", imei, button_id)
+        response.status_code = 202
+        return ManualCanButtonToggleResponse(
+            button_id=button_id,
+            label=btn["label"],
+            new_value=new_state,
+            current_value=value_hex,
+            queued=True,
         )
 
-    # Adquirir lock exclusivo (SET NX atómico) — mismo mecanismo que send_manual_can_command.
-    # El OFF de soltar de un botón hold es prioritario: reintenta hasta ~20s.
+    # ── Online: enviar ya (lock anti-concurrencia) ────────────────────────────
     is_hold_off = btn.get("function") == "hold" and body.value is False
     pending_key = f"command:{imei}:pending_response"
     acquired = await redis.set(pending_key, "", nx=True, ex=25)
@@ -2428,80 +2530,15 @@ async def toggle_manual_can_button(
                 break
     if not acquired:
         raise HTTPException(status_code=409, detail="Ya hay un comando en vuelo para este dispositivo")
-
     try:
-        # Calcular nuevo bitmask a partir del estado en Redis
-        state_k = manual_can_config.state_key(vehicle_id)
-        raw_hex = await redis.hget(state_k, str(slot["slot"]))
-        raw = bytes.fromhex(raw_hex) if raw_hex else bytes(8)
-        current_state = manual_can_config.current_bit(raw, btn["byte_index"], btn["bit_index"])
-        new_state = (not current_state) if body.value is None else body.value
-        new_bytes = manual_can_config.apply_bit(raw, btn["byte_index"], btn["bit_index"], new_state)
-        value_hex = new_bytes.hex().upper()
-        command_sent = f"setparam {slot['param_id']}:{value_hex}"
-
-        # Crear CommandLog en pending; se actualiza según la respuesta del FMC
-        now = datetime.now(timezone.utc)
-        command_log_id = uuid.uuid4()
-        command_log = CommandLog(
-            id=command_log_id,
-            device_id=device.id,
-            vehicle_id=vehicle_id,
-            tenant_id=vehicle.tenant_id,
-            user_id=user.user_id,
-            command=command_sent,
-            command_type="MANUAL_CAN",
-            status="pending",
-            param_id=slot["param_id"],
-            param_value=value_hex,
-            imei_snapshot=imei,
-            sent_at=now,
+        await _send_manual_can_once(
+            redis, db,
+            imei=imei, command=command_sent, param_id=slot["param_id"],
+            value_hex=value_hex, vehicle=vehicle, device=device, user=user,
+            sent_at=datetime.now(timezone.utc),
         )
-        db.add(command_log)
-
-        # Publicar y esperar ack del FMC (mismo flujo que send_manual_can_command)
-        await redis.publish(
-            "cmg:manual_can_commands",
-            json.dumps({"imei": imei, "command": command_sent, "log_id": str(command_log_id)}),
-        )
-        logger.info("Toggle Manual CAN publicado → IMEI %s button=%s state=%s", imei, button_id, new_state)
-
-        resp_data = await redis.blpop(f"command:{imei}:response", timeout=18)
-
-        if resp_data is None:
-            command_log.status = "timeout"
-            command_log.response_at = datetime.now(timezone.utc)
-            await db.commit()
-            raise HTTPException(status_code=504, detail="El FMC no respondió en 18 segundos")
-
-        _, fmc_response = resp_data
-
-        if fmc_response == "DISCONNECTED":
-            command_log.status = "disconnected"
-            command_log.response_at = datetime.now(timezone.utc)
-            await db.commit()
-            raise HTTPException(status_code=503, detail="FMC desconectado")
-
-        if is_fmc_error_response(fmc_response):
-            command_log.status = "failed"
-            command_log.response = fmc_response
-            command_log.response_at = datetime.now(timezone.utc)
-            await db.commit()
-            logger.warning("Toggle Manual CAN rechazado por FMC %s: %r", imei, fmc_response)
-            raise HTTPException(status_code=502, detail=f"El FMC rechazó el comando: {fmc_response}")
-
-        # Ack OK — persistir el estado en Redis solo tras confirmación
-        now_response = datetime.now(timezone.utc)
-        latency_ms = int((now_response - now).total_seconds() * 1000)
-        command_log.status = "confirmed"
-        command_log.response = fmc_response
-        command_log.response_at = now_response
-        command_log.latency_ms = latency_ms
-        await db.commit()
         await redis.hset(state_k, str(slot["slot"]), value_hex)
-
-        logger.info("Toggle Manual CAN confirmado: IMEI %s latency=%dms", imei, latency_ms)
-
+        logger.info("Toggle Manual CAN confirmado: IMEI %s button=%s", imei, button_id)
         return ManualCanButtonToggleResponse(
             button_id=button_id,
             label=btn["label"],
