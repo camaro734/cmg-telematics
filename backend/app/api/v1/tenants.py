@@ -420,8 +420,9 @@ async def create_tenant_user(
     db: AsyncSession = Depends(get_db),
 ):
     await assert_can_manage_tenant(user, tenant_id, db)
-    # Fabricante necesita el flag manage_clients habilitado por CMG para gestionar usuarios
-    if user.tenant_tier == "manufacturer":
+    # El flag manage_clients solo gobierna la gestión de usuarios de los CLIENTES del
+    # fabricante, no de su propia organización (su propio tenant siempre puede gestionarlo).
+    if user.tenant_tier == "manufacturer" and str(tenant_id) != str(user.tenant_id):
         mfr = await db.get(Tenant, user.tenant_id)
         if not mfr or not mfr.manufacturer_can_manage_clients:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CMG no ha habilitado la gestión de clientes para este fabricante")

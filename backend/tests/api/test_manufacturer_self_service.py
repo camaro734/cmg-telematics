@@ -113,6 +113,97 @@ def test_cmg_can_set_manufacturer_flags():
     assert body["manufacturer_can_manage_clients"] is True
 
 
+def test_manufacturer_without_flag_can_create_user_in_own_tenant_201():
+    """
+    Fabricante admin SIN el flag manage_clients puede crear usuarios en su PROPIO tenant.
+    La puerta del flag solo aplica cuando target_tenant_id != user.tenant_id.
+
+    Mock realista: db.get despacha por UUID mediante side_effect.
+    assert_can_manage_tenant hace early-return en línea 66 de deps.py (target == propio
+    tenant) sin llamar a db.get, así que el único db.get del endpoint es para verificar
+    que el tenant destino está activo (línea ~429 de tenants.py).
+
+    Se usa MagicMock con spec=None para el User porque SQLAlchemy impide instanciar
+    modelos ORM mediante __new__ sin _sa_instance_state; db.refresh rellena los campos
+    mínimos que UserOut requiere para serializar.
+    """
+    mfr = _MfrTenant()
+    mfr.manufacturer_can_manage_clients = False  # flag desactivado deliberadamente
+
+    async def _db_get(model, pk):
+        # assert_can_manage_tenant no llega a db.get (early-return); solo llega la
+        # llamada para verificar el tenant activo y, tras db.add, el db.refresh del User.
+        if pk == MFR_ID:
+            return mfr
+        return None
+
+    db = AsyncMock()
+    db.get = AsyncMock(side_effect=_db_get)
+    db.add = MagicMock()
+
+    async def _refresh(obj):
+        # Rellena atributos mínimos que UserOut necesita para serializar.
+        # obj es el User ORM real creado por create_tenant_user; modificamos sus
+        # atributos directamente (SQLAlchemy permite setattr sobre objetos en estado
+        # transient/pending sin sesión activa real).
+        if not obj.id:
+            obj.id = uuid.uuid4()
+        obj.active = True
+        if not getattr(obj, "created_at", None):
+            obj.created_at = datetime.now(timezone.utc)
+
+    db.refresh = _refresh
+    _setup(MFR_ADMIN, db)
+
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        f"/api/v1/tenants/{MFR_ID}/users",
+        json={"email": "nuevo@fabricante.com", "password": "Passw0rd!", "full_name": "Nuevo Usuario", "role": "operator"},
+    )
+    # Sin el fix → 403; con el fix → 201
+    assert resp.status_code == 201
+
+
+def test_manufacturer_without_flag_cannot_create_user_in_client_tenant_403():
+    """
+    Fabricante admin SIN el flag manage_clients NO puede crear usuarios en un tenant
+    cliente (target_tenant_id != MFR_ID), y debe recibir 403.
+
+    assert_can_manage_tenant llega hasta la comprobación manufacturer (línea 74-78 de
+    deps.py) y llama a db.get(Tenant, CLIENT_ID) para verificar parent_manufacturer_id.
+    Luego create_tenant_user comprueba el flag y lanza 403.
+    """
+    mfr = _MfrTenant()
+    mfr.manufacturer_can_manage_clients = False
+
+    # Tenant cliente cuyo parent_manufacturer_id apunta al fabricante
+    client_tenant = _MfrTenant()
+    client_tenant.id = CLIENT_ID
+    client_tenant.tier = "client"
+    client_tenant.parent_id = None
+    client_tenant.parent_manufacturer_id = MFR_ID
+    client_tenant.name = "ClienteCo"
+    client_tenant.slug = "clienteco"
+    client_tenant.manufacturer_can_manage_clients = False
+
+    async def _db_get(model, pk):
+        if pk == MFR_ID:
+            return mfr
+        if pk == CLIENT_ID:
+            return client_tenant
+        return None
+
+    db = AsyncMock()
+    db.get = AsyncMock(side_effect=_db_get)
+    _setup(MFR_ADMIN, db)
+
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        f"/api/v1/tenants/{CLIENT_ID}/users",
+        json={"email": "nuevo@cliente.com", "password": "Passw0rd!", "full_name": "Nuevo Usuario", "role": "operator"},
+    )
+    assert resp.status_code == 403
+    assert "fabricante" in resp.json()["detail"].lower()
+
+
 def test_auth_me_returns_self_service_flags():
     mfr = _MfrTenant()
     mfr.manufacturer_can_manage_clients = True
