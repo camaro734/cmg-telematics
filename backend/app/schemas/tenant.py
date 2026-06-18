@@ -23,6 +23,11 @@ class TenantOut(BaseModel):
     enabled_modules: list[str] = []
     business_cif: str | None = None
     business_address: str | None = None
+    manufacturer_can_view_operations: bool = True
+    manufacturer_can_view_can_data: bool = True
+    manufacturer_can_create_rules: bool = True
+    manufacturer_can_manage_clients: bool = False
+    manufacturer_can_transfer_vehicles: bool = False
     created_at: datetime
 
 
@@ -45,6 +50,11 @@ class TenantUpdate(BaseModel):
     enabled_modules: list[str] | None = None
     business_cif: str | None = None
     business_address: str | None = None
+    manufacturer_can_view_operations: bool | None = None
+    manufacturer_can_view_can_data: bool | None = None
+    manufacturer_can_create_rules: bool | None = None
+    manufacturer_can_manage_clients: bool | None = None
+    manufacturer_can_transfer_vehicles: bool | None = None
 
 
 class BrandTokensUpdate(BaseModel):

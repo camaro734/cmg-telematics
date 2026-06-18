@@ -212,8 +212,17 @@ async def patch_tenant(
                     )
         tenant.enabled_modules = body.enabled_modules
 
-    # update remaining fields (exclude enabled_modules — already handled above)
-    for field, value in body.model_dump(exclude_unset=True, exclude={"enabled_modules"}).items():
+    # Los flags de fabricante solo los puede tocar CMG; un cliente/fabricante que
+    # edite otros campos no debe poder auto-concederse permisos.
+    update_data = body.model_dump(exclude_unset=True, exclude={"enabled_modules"})
+    if user.tenant_tier != "cmg":
+        for f in (
+            "manufacturer_can_view_operations", "manufacturer_can_view_can_data",
+            "manufacturer_can_create_rules", "manufacturer_can_manage_clients",
+            "manufacturer_can_transfer_vehicles",
+        ):
+            update_data.pop(f, None)
+    for field, value in update_data.items():
         setattr(tenant, field, value)
 
     try:
