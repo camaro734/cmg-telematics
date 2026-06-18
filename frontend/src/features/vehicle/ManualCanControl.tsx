@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
@@ -61,6 +61,9 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   const [confirmBtn, setConfirmBtn] = useState<CanButton | null>(null)
   // Estado de feedback por botón: 'queued' = encolado en backend; 'sent' = confirmado
   const [queuedBtns, setQueuedBtns] = useState<Record<string, 'queued' | 'sent'>>({})
+  // Instante (ms) en que se realizó el último encole; evita que comandos confirmed
+  // anteriores al encole se detecten como entrega (falso positivo).
+  const queuedAtRef = useRef<number>(0)
 
   const { data: history = [] } = useQuery<CommandLogEntry[]>({
     queryKey: ['manual-can-history', vehicleId],
@@ -105,11 +108,14 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
     enabled: hasQueued,
   })
 
-  // Alternativa simple: cuando hay algún MANUAL_CAN confirmado reciente, marca todos
-  // los 'queued' como 'sent' (heurística suficiente para el feedback de UI).
+  // Cuando hay algún MANUAL_CAN confirmado cuyo sent_at sea POSTERIOR al último
+  // encole, marca todos los 'queued' como 'sent'. Filtrar por timestamp evita que
+  // un confirmed anterior al encole dispare el toast como falso positivo.
   useEffect(() => {
     if (!recent.length || !hasQueued) return
-    const lastConfirmed = recent.find(r => r.status === 'confirmed')
+    const lastConfirmed = recent.find(
+      r => r.status === 'confirmed' && new Date(r.sent_at).getTime() > queuedAtRef.current,
+    )
     if (!lastConfirmed) return
     setQueuedBtns(prev => {
       const next: Record<string, 'queued' | 'sent'> = {}
@@ -143,6 +149,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
         value === null ? {} : { value },
       )
       if (res?.queued) {
+        queuedAtRef.current = Date.now()
         setQueuedBtns(q => ({ ...q, [btn.id]: 'queued' }))
         toast.info('Comando encolado: se enviará cuando el FMC reconecte')
       }
@@ -164,6 +171,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
         { pulse: true },
       )
       if (res?.queued) {
+        queuedAtRef.current = Date.now()
         setQueuedBtns(q => ({ ...q, [btn.id]: 'queued' }))
         toast.info('Comando encolado: se enviará cuando el FMC reconecte')
       } else {
@@ -227,7 +235,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                   const loading = toggling[btn.id]
                   const isHold = btn.function === 'hold'
                   // Online envía ya; offline encola en backend. Solo bloqueamos toggles en vuelo.
-                  const disabled = isHold ? !!loading : !!loading
+                  const disabled = !!loading
                   const clickHandler = isHold
                     ? { onClick: () => setConfirmBtn(btn) }
                     : { onClick: () => handleToggleClick(btn) }
