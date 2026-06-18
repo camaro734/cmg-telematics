@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
-import type { CommandLogEntry, FmcStatus } from '../../lib/types'
+import type { CommandLogEntry } from '../../lib/types'
 
 interface ManualCanSlot {
   id: string
@@ -61,12 +61,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   // aunque el componente se desmonte o la pestaña pierda el foco.
   const heldRef = useRef<Map<string, string>>(new Map())
 
-  const { data: fmcStatus } = useQuery<FmcStatus>({
-    queryKey: ['fmc-status', vehicleId],
-    queryFn: () => apiClient.get<FmcStatus>(`/api/v1/vehicles/${vehicleId}/fmc-status`),
-    refetchInterval: 10_000,
-  })
-
   const { data: history = [] } = useQuery<CommandLogEntry[]>({
     queryKey: ['manual-can-history', vehicleId],
     queryFn: () =>
@@ -75,8 +69,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
       ),
     refetchInterval: 15_000,
   })
-
-  const connected = fmcStatus?.connected ?? false
 
   // Una query por slot; aplanamos todos los botones en una única rejilla.
   const buttonQueries = useQueries({
@@ -120,12 +112,12 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   }
 
   function handleToggleClick(btn: CanButton) {
-    if (toggling[btn.id] || !connected) return
+    if (toggling[btn.id]) return
     void sendValue(btn, null)
   }
 
   function handleHoldStart(btn: CanButton) {
-    if (!connected || heldRef.current.has(btn.id)) return
+    if (heldRef.current.has(btn.id)) return
     heldRef.current.set(btn.id, btn.slot_id)
     void sendValue(btn, true)
   }
@@ -182,12 +174,6 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
             color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase',
           }}>Control CAN Manual</span>
         </div>
-        <span style={{
-          fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
-          color: connected ? 'var(--ok)' : 'var(--danger)',
-        }}>
-          {connected ? '● FMC Online' : '○ FMC Offline'}
-        </span>
       </button>
 
       {open && (
@@ -209,9 +195,8 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                   const on = optimistic[btn.id] ?? btn.current_bit
                   const loading = toggling[btn.id]
                   const isHold = btn.function === 'hold'
-                  // En hold el botón no se deshabilita por loading: el soltar debe poder
-                  // disparar el OFF aunque el ON siga en vuelo.
-                  const disabled = isHold ? !connected : (!connected || !!loading)
+                  // Online envía ya; offline encola en backend. Solo bloqueamos toggles en vuelo.
+                  const disabled = isHold ? false : !!loading
                   const holdHandlers = isHold
                     ? {
                         onPointerDown: () => handleHoldStart(btn),
