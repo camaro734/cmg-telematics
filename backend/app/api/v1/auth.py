@@ -238,6 +238,8 @@ async def get_me(
         "tenant_id": str(current_user.tenant_id),
         "tier": current_user.tenant_tier,
         "enabled_modules": tenant.enabled_modules if tenant else [],
+        "manufacturer_can_manage_clients": bool(getattr(tenant, "manufacturer_can_manage_clients", False)) if tenant else False,
+        "manufacturer_can_transfer_vehicles": bool(getattr(tenant, "manufacturer_can_transfer_vehicles", False)) if tenant else False,
     }
 
 

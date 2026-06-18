@@ -111,3 +111,17 @@ def test_cmg_can_set_manufacturer_flags():
     assert tenant.manufacturer_can_transfer_vehicles is True
     body = resp.json()
     assert body["manufacturer_can_manage_clients"] is True
+
+
+def test_auth_me_returns_self_service_flags():
+    mfr = _MfrTenant()
+    mfr.manufacturer_can_manage_clients = True
+    mfr.manufacturer_can_transfer_vehicles = False
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=mfr)
+    _setup(MFR_ADMIN, db)
+    resp = TestClient(app, raise_server_exceptions=False).get("/api/v1/auth/me")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["manufacturer_can_manage_clients"] is True
+    assert body["manufacturer_can_transfer_vehicles"] is False
