@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
@@ -57,9 +57,10 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
   const [open, setOpen] = useState(true)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
-  // Botones hold actualmente pulsados (id → slot_id); garantiza el OFF de soltar
-  // aunque el componente se desmonte o la pestaña pierda el foco.
-  const heldRef = useRef<Map<string, string>>(new Map())
+  // Botón hold pendiente de confirmación en el modal
+  const [confirmBtn, setConfirmBtn] = useState<CanButton | null>(null)
+  // Estado de feedback por botón: 'queued' = encolado en backend; 'sent' = confirmado
+  const [queuedBtns, setQueuedBtns] = useState<Record<string, 'queued' | 'sent'>>({})
 
   const { data: history = [] } = useQuery<CommandLogEntry[]>({
     queryKey: ['manual-can-history', vehicleId],
@@ -92,16 +93,59 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
         a.sort_order - b.sort_order,
     )
 
+  // Query ligera de comandos recientes: activa solo si hay algún botón encolado.
+  const hasQueued = Object.values(queuedBtns).some(s => s === 'queued')
+  const { data: recent = [] } = useQuery<CommandLogEntry[]>({
+    queryKey: ['manual-can-recent', vehicleId],
+    queryFn: () =>
+      apiClient.get<CommandLogEntry[]>(
+        `/api/v1/vehicles/${vehicleId}/commands?command_type=MANUAL_CAN&limit=10`,
+      ),
+    refetchInterval: hasQueued ? 8_000 : false,
+    enabled: hasQueued,
+  })
+
+  // Alternativa simple: cuando hay algún MANUAL_CAN confirmado reciente, marca todos
+  // los 'queued' como 'sent' (heurística suficiente para el feedback de UI).
+  useEffect(() => {
+    if (!recent.length || !hasQueued) return
+    const lastConfirmed = recent.find(r => r.status === 'confirmed')
+    if (!lastConfirmed) return
+    setQueuedBtns(prev => {
+      const next: Record<string, 'queued' | 'sent'> = {}
+      let changed = false
+      for (const [id, st] of Object.entries(prev)) {
+        if (st === 'queued') { next[id] = 'sent'; changed = true } else next[id] = st
+      }
+      return changed ? next : prev
+    })
+    toast.success('Comando entregado al FMC')
+  }, [recent, hasQueued])
+
+  // Auto-limpiar badges 'sent' a los 5 segundos.
+  useEffect(() => {
+    const sent = Object.entries(queuedBtns).filter(([, s]) => s === 'sent').map(([id]) => id)
+    if (!sent.length) return
+    const t = setTimeout(() => setQueuedBtns(q => {
+      const next = { ...q }; sent.forEach(id => delete next[id]); return next
+    }), 5_000)
+    return () => clearTimeout(t)
+  }, [queuedBtns])
+
   // Envía un valor concreto (o alterna si value=null) al backend.
   async function sendValue(btn: CanButton, value: boolean | null) {
     const optimisticNext = value === null ? !(optimistic[btn.id] ?? btn.current_bit) : value
     setOptimistic(o => ({ ...o, [btn.id]: optimisticNext }))
     setToggling(t => ({ ...t, [btn.id]: true }))
     try {
-      await apiClient.post(
+      const res = await apiClient.post<{ queued?: boolean }>(
         `/api/v1/vehicles/${vehicleId}/can-slots/${btn.slot_id}/buttons/${btn.id}/toggle`,
         value === null ? {} : { value },
       )
+      if (res?.queued) {
+        setQueuedBtns(q => ({ ...q, [btn.id]: 'queued' }))
+        toast.info('Comando encolado: se enviará cuando el FMC reconecte')
+      }
       qc.invalidateQueries({ queryKey: ['can-buttons', btn.slot_id] })
     } catch (e) {
       qc.invalidateQueries({ queryKey: ['can-buttons', btn.slot_id] })
@@ -111,44 +155,31 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
     }
   }
 
+  // Envía un pulso ON+OFF (reset de contador/horas) al backend.
+  async function sendPulse(btn: CanButton) {
+    setToggling(t => ({ ...t, [btn.id]: true }))
+    try {
+      const res = await apiClient.post<{ queued?: boolean }>(
+        `/api/v1/vehicles/${vehicleId}/can-slots/${btn.slot_id}/buttons/${btn.id}/toggle`,
+        { pulse: true },
+      )
+      if (res?.queued) {
+        setQueuedBtns(q => ({ ...q, [btn.id]: 'queued' }))
+        toast.info('Comando encolado: se enviará cuando el FMC reconecte')
+      } else {
+        toast.success('Comando enviado al FMC')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al enviar el comando')
+    } finally {
+      setToggling(t => ({ ...t, [btn.id]: false }))
+    }
+  }
+
   function handleToggleClick(btn: CanButton) {
     if (toggling[btn.id]) return
     void sendValue(btn, null)
   }
-
-  function handleHoldStart(btn: CanButton) {
-    if (heldRef.current.has(btn.id)) return
-    heldRef.current.set(btn.id, btn.slot_id)
-    void sendValue(btn, true)
-  }
-
-  // El OFF de soltar NO se bloquea por el guard de pending del ON: el backend
-  // reintenta el lock para no dejar la salida físicamente encendida.
-  function handleHoldEnd(btn: CanButton) {
-    if (!heldRef.current.has(btn.id)) return
-    heldRef.current.delete(btn.id)
-    void sendValue(btn, false)
-  }
-
-  // OFF de seguridad: al desmontar o perder visibilidad/foco, soltar todo lo pulsado.
-  useEffect(() => {
-    function releaseAll() {
-      for (const [btnId, slotId] of heldRef.current) {
-        void apiClient.post(
-          `/api/v1/vehicles/${vehicleId}/can-slots/${slotId}/buttons/${btnId}/toggle`,
-          { value: false },
-        )
-      }
-      heldRef.current.clear()
-    }
-    window.addEventListener('visibilitychange', releaseAll)
-    window.addEventListener('blur', releaseAll)
-    return () => {
-      window.removeEventListener('visibilitychange', releaseAll)
-      window.removeEventListener('blur', releaseAll)
-      releaseAll()
-    }
-  }, [vehicleId])
 
   return (
     <div style={{
@@ -196,19 +227,14 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                   const loading = toggling[btn.id]
                   const isHold = btn.function === 'hold'
                   // Online envía ya; offline encola en backend. Solo bloqueamos toggles en vuelo.
-                  const disabled = isHold ? false : !!loading
-                  const holdHandlers = isHold
-                    ? {
-                        onPointerDown: () => handleHoldStart(btn),
-                        onPointerUp: () => handleHoldEnd(btn),
-                        onPointerLeave: () => handleHoldEnd(btn),
-                        onPointerCancel: () => handleHoldEnd(btn),
-                      }
+                  const disabled = isHold ? !!loading : !!loading
+                  const clickHandler = isHold
+                    ? { onClick: () => setConfirmBtn(btn) }
                     : { onClick: () => handleToggleClick(btn) }
-                  const btnText = loading && !isHold
+                  const btnText = loading
                     ? '…'
                     : isHold
-                      ? (on ? 'Enviando…' : 'Mantener')
+                      ? 'Reset'
                       : (on ? 'Desactivar' : 'Activar')
                   return (
                     <div key={btn.id} style={{
@@ -236,8 +262,8 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                       <button
                         data-testid={`btn-toggle-${btn.id}`}
                         disabled={disabled}
-                        title={isHold ? 'Mantener pulsado para enviar; soltar para parar' : undefined}
-                        {...holdHandlers}
+                        title={isHold ? 'Envía un pulso de reset (ON+OFF) al equipo' : undefined}
+                        {...clickHandler}
                         style={{
                           background: on ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
                           border: `1px solid ${on ? 'var(--ok)' : 'var(--border)'}`,
@@ -245,11 +271,18 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                           cursor: disabled ? 'not-allowed' : 'pointer',
                           color: on ? 'var(--ok)' : 'var(--fg-tertiary)',
                           opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
-                          transition: 'all 0.15s', touchAction: 'none', userSelect: 'none',
+                          transition: 'all 0.15s', userSelect: 'none',
                         }}
                       >
                         {btnText}
                       </button>
+                      {/* Badge de estado de encolado/entrega */}
+                      {queuedBtns[btn.id] === 'queued' && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warn)' }}>⏳ Encolado</span>
+                      )}
+                      {queuedBtns[btn.id] === 'sent' && (
+                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--ok)' }}>✓ Enviado OK</span>
+                      )}
                     </div>
                   )
                 })}
@@ -294,6 +327,37 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal de confirmación para botones hold (reset de contador/horas) */}
+      {confirmBtn && (
+        <div onClick={() => setConfirmBtn(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10,
+            padding: 18, maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <div style={{ fontWeight: 700, color: 'var(--fg-primary)' }}>Confirmar envío</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+              Vas a enviar un dato al equipo «{confirmBtn.label}» (reset de contador/horas).
+              Si el FMC está offline, se enviará al reconectar. ¿Confirmar?
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmBtn(null)} style={{
+                padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)',
+                background: 'var(--bg-elevated)', color: 'var(--fg-muted)', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={() => { const b = confirmBtn; setConfirmBtn(null); void sendPulse(b) }}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--cmg-teal)',
+                background: 'var(--cmg-teal)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+                Enviar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
