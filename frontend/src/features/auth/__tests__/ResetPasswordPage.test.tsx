@@ -28,6 +28,15 @@ describe('ResetPasswordPage', () => {
     expect(apiClient.post).not.toHaveBeenCalled()
   })
 
+  it('no envía si la contraseña es demasiado corta', async () => {
+    renderAt('tok')
+    fireEvent.change(screen.getByLabelText(/nueva contraseña/i), { target: { value: 'abc' } })
+    fireEvent.change(screen.getByLabelText(/repetir/i), { target: { value: 'abc' } })
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }))
+    expect(await screen.findByText(/al menos 8/i)).toBeInTheDocument()
+    expect(apiClient.post).not.toHaveBeenCalled()
+  })
+
   it('envía token y nueva contraseña cuando es válida', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ detail: 'ok' })
     renderAt('tok')

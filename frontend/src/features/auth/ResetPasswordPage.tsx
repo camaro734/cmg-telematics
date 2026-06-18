@@ -17,6 +17,7 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     if (loading) return
     setError(null)
+    if (!token) { setError('El enlace no es válido o ha caducado.'); return }
     if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return }
     if (password !== repeat) { setError('Las contraseñas no coinciden.'); return }
     setLoading(true)
