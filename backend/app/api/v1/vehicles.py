@@ -942,6 +942,9 @@ async def create_vehicle(
         plan = MaintenancePlan(
             vehicle_id=vehicle.id,
             tenant_id=vehicle.tenant_id,
+            # owner_tenant_id = dueño original (NOT NULL); en alta coincide con el tenant.
+            # La reasignación migra tenant_id pero conserva owner_tenant_id.
+            owner_tenant_id=vehicle.tenant_id,
             name=tmpl["name"],
             trigger_condition={
                 "thresholds": tmpl["thresholds"],
