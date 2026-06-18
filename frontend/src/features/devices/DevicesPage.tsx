@@ -99,6 +99,12 @@ export default function DevicesPage() {
     },
   })
 
+  const outOfServiceMutation = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
+      apiClient.patch<DeviceOut>(`/api/v1/devices/${id}`, { out_of_service: value }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['devices'] }) },
+  })
+
   async function handleDelete(device: DeviceOut) {
     const ok = await confirmAsk({
       title: 'Eliminar dispositivo',
@@ -253,18 +259,22 @@ export default function DevicesPage() {
                           {linked ? '✓ vinculado' : '—'}
                         </td>
                         <td style={tdStyle}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              background: online ? 'var(--ok)' : 'var(--offline)',
-                              flexShrink: 0,
-                            }} />
-                            <span style={{ color: online ? 'var(--ok)' : 'var(--offline)' }}>
-                              {online ? 'Online' : 'Offline'}
+                          {device.out_of_service ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--accent-off)' }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-off)', flexShrink: 0 }} />
+                              Fuera de servicio
+                              {device.out_of_service_since && (
+                                <span style={{ color: 'var(--fg-muted)', fontSize: 11 }}>
+                                  {' · desde '}{new Date(device.out_of_service_since).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                                </span>
+                              )}
                             </span>
-                          </span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: online ? 'var(--ok)' : 'var(--offline)', flexShrink: 0 }} />
+                              <span style={{ color: online ? 'var(--ok)' : 'var(--offline)' }}>{online ? 'Online' : 'Offline'}</span>
+                            </span>
+                          )}
                         </td>
                         <td style={{ ...tdStyle, color: device.last_seen ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>
                           {formatLastSeen(device.last_seen)}
@@ -310,6 +320,20 @@ export default function DevicesPage() {
                                 </button>
                               </span>
                             )}
+                            {isAdmin && <button
+                              onClick={() => outOfServiceMutation.mutate({ id: device.id, value: !device.out_of_service })}
+                              disabled={outOfServiceMutation.isPending}
+                              title={device.out_of_service ? 'Volver a poner en servicio' : 'Marcar como fuera de servicio (no alertar inactividad)'}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid var(--accent-off)',
+                                color: 'var(--accent-off)',
+                                borderRadius: 4, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+                                opacity: outOfServiceMutation.isPending ? 0.5 : 1,
+                              }}
+                            >
+                              {device.out_of_service ? 'Poner en servicio' : 'Fuera de servicio'}
+                            </button>}
                             {isAdmin && <button
                               onClick={() => handleDelete(device)}
                               disabled={deleteMutation.isPending}
