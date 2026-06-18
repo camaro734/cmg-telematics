@@ -130,8 +130,19 @@ export default function VehiclesPage() {
   const deviceTargetTenant = modal === 'edit'
     ? (editingVehicle?.tenant_id ?? null)
     : (form.tenant_id || userTenantId || null)
-  const availableDevices = devices.filter(
-    d => !d.vehicle_id && !d.out_of_service && (!d.tenant_id || d.tenant_id === deviceTargetTenant),
+  // El fabricante del vehículo objetivo también puede montar SUS dispositivos (mfr_cross):
+  // device.tenant_id == vehicle.manufacturer_tenant_id. Lo deducimos del parent_manufacturer
+  // del cliente destino (o, si el usuario es fabricante, de su propio tenant).
+  const deviceTargetManufacturer = modal === 'edit'
+    ? (editingVehicle?.manufacturer_tenant_id ?? null)
+    : (tenants.find(t => t.id === deviceTargetTenant)?.parent_manufacturer_id
+        ?? (userTier === 'manufacturer' ? (userTenantId ?? null) : null))
+  const availableDevices = devices.filter(d =>
+    !d.vehicle_id && !d.out_of_service && (
+      !d.tenant_id ||
+      d.tenant_id === deviceTargetTenant ||
+      (deviceTargetManufacturer != null && d.tenant_id === deviceTargetManufacturer)
+    ),
   )
 
   const reassignableTargets = userTier === 'cmg'
