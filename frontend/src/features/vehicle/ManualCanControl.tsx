@@ -3,6 +3,7 @@ import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../shared/ui/Toast'
 import type { CommandLogEntry } from '../../lib/types'
+import { useAuthStore } from '../auth/useAuthStore'
 
 interface ManualCanSlot {
   id: string
@@ -54,6 +55,7 @@ function StatusDot({ status }: { status: CommandStatus }) {
 
 export default function ManualCanControl({ vehicleId, slots }: Props) {
   const qc = useQueryClient()
+  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [open, setOpen] = useState(true)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
@@ -72,6 +74,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
         `/api/v1/vehicles/${vehicleId}/commands?command_type=MANUAL_CAN&limit=5`,
       ),
     refetchInterval: 15_000,
+    enabled: isAdmin,
   })
 
   // Una query por slot; aplanamos todos los botones en una única rejilla.
@@ -309,7 +312,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
             </div>
           )}
 
-          {history.length > 0 && (
+          {isAdmin && history.length > 0 && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
               <div style={{
                 fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)',
