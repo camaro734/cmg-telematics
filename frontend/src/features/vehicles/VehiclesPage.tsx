@@ -44,7 +44,7 @@ interface FormState {
   name: string
   year: string
   tenant_id: string
-  imei: string
+  device_id: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -55,7 +55,7 @@ const EMPTY_FORM: FormState = {
   name: '',
   year: '',
   tenant_id: '',
-  imei: '',
+  device_id: '',
 }
 
 // ─── Componente principal ────────────────────────────────────────────────────
@@ -125,6 +125,15 @@ export default function VehiclesPage() {
   const deviceByVehicle = new Map(devices.filter(d => d.vehicle_id).map(d => [d.vehicle_id!, d]))
   const clientTenants = tenants.filter(t => t.tier !== 'cmg')
 
+  // Dispositivos disponibles para montar: sin vehículo y compatibles con el tenant del
+  // vehículo (mismo tenant, o sin dueño → adoptará el tenant del vehículo al montarse).
+  const deviceTargetTenant = modal === 'edit'
+    ? (editingVehicle?.tenant_id ?? null)
+    : (form.tenant_id || userTenantId || null)
+  const availableDevices = devices.filter(
+    d => !d.vehicle_id && !d.out_of_service && (!d.tenant_id || d.tenant_id === deviceTargetTenant),
+  )
+
   const reassignableTargets = userTier === 'cmg'
     ? tenants.filter(t => t.tier !== 'cmg')
     : tenants.filter(t => t.id === userTenantId || t.parent_manufacturer_id === userTenantId)
@@ -149,7 +158,7 @@ export default function VehiclesPage() {
       name: v.name,
       year: v.year?.toString() ?? '',
       tenant_id: '',
-      imei: '',
+      device_id: '',
     })
     setError(null)
     setModal('edit')
@@ -288,23 +297,6 @@ export default function VehiclesPage() {
 
   async function handleCreate() {
     const effectiveName = form.name.trim() || form.license_plate.trim()
-    const imei = form.imei.trim()
-
-    // Si hay IMEI, validar antes de crear el vehículo: ¿existe ya el dispositivo?
-    // Si existe sin vehículo asignado, lo reutilizamos. Si está asignado a otro,
-    // abortamos para evitar dejar un vehículo huérfano sin dispositivo.
-    let existingDevice: DeviceOut | null = null
-    if (imei) {
-      const tenantForDevice = form.tenant_id || activeTenantId || undefined
-      const url = tenantForDevice
-        ? `/api/v1/devices?tenant_id=${tenantForDevice}`
-        : '/api/v1/devices'
-      const all = await apiClient.get<DeviceOut[]>(url)
-      existingDevice = all.find(d => d.imei === imei) ?? null
-      if (existingDevice && existingDevice.vehicle_id) {
-        throw new Error(`El IMEI ${imei} ya está asignado a otro vehículo`)
-      }
-    }
 
     const vehicle = await apiClient.post<VehicleOut>('/api/v1/vehicles', {
       vehicle_type_id: form.vehicle_type_id,
@@ -316,13 +308,9 @@ export default function VehiclesPage() {
       tenant_id: form.tenant_id || null,
     })
 
-    if (imei) {
-      const device = existingDevice ?? await apiClient.post<DeviceOut>('/api/v1/devices', {
-        imei,
-        model: 'FMC650',
-        tenant_id: vehicle.tenant_id,
-      })
-      await apiClient.patch(`/api/v1/devices/${device.id}/vehicle`, { vehicle_id: vehicle.id })
+    // Vincular el dispositivo elegido (si lo hay) al vehículo recién creado.
+    if (form.device_id) {
+      await apiClient.patch(`/api/v1/devices/${form.device_id}/vehicle`, { vehicle_id: vehicle.id })
     }
   }
 
@@ -337,24 +325,9 @@ export default function VehiclesPage() {
       driver_name: form.driver_name.trim() || null,
       year: form.year ? parseInt(form.year) : null,
     })
-    // Si no tenía dispositivo y se ha introducido un IMEI, crear/reutilizar y asignar
-    const imei = form.imei.trim()
-    if (!editingDevice && imei) {
-      const tenantForDevice = vehicle.tenant_id
-      const url = `/api/v1/devices?tenant_id=${tenantForDevice}`
-      const all = await apiClient.get<DeviceOut[]>(url)
-      const existing = all.find(d => d.imei === imei) ?? null
-      if (existing && existing.vehicle_id && existing.vehicle_id !== vehicle.id) {
-        throw new Error(`El IMEI ${imei} ya está asignado a otro vehículo`)
-      }
-      const device = existing ?? await apiClient.post<DeviceOut>('/api/v1/devices', {
-        imei,
-        model: 'FMC650',
-        tenant_id: vehicle.tenant_id,
-      })
-      if (device.vehicle_id !== vehicle.id) {
-        await apiClient.patch(`/api/v1/devices/${device.id}/vehicle`, { vehicle_id: vehicle.id })
-      }
+    // Si no tenía dispositivo y se ha elegido uno, vincularlo.
+    if (!editingDevice && form.device_id) {
+      await apiClient.patch(`/api/v1/devices/${form.device_id}/vehicle`, { vehicle_id: vehicle.id })
     }
   }
 
@@ -706,18 +679,25 @@ export default function VehiclesPage() {
                       — Para cambiar el dispositivo usa la página de Dispositivos
                     </span>
                   </div>
+                ) : availableDevices.length > 0 ? (
+                  /* Sin dispositivo — elegir uno de los disponibles (sin asignar) */
+                  <Select
+                    label="Dispositivo disponible"
+                    value={form.device_id}
+                    onChange={e => setField('device_id', e.target.value)}
+                    helperText="Solo se listan dispositivos sin asignar. Se vinculará al guardar."
+                  >
+                    <option value="">— Sin dispositivo —</option>
+                    {availableDevices.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.imei}{d.model ? ` · ${d.model}` : ''}
+                      </option>
+                    ))}
+                  </Select>
                 ) : (
-                  /* Sin dispositivo — campo para asignar */
-                  <Input
-                    label="IMEI del FMC650"
-                    type="text"
-                    value={form.imei}
-                    onChange={e => setField('imei', e.target.value.replace(/\D/g, ''))}
-                    placeholder="15 dígitos (opcional)"
-                    maxLength={15}
-                    mono
-                    helperText="El dispositivo quedará vinculado automáticamente al guardar."
-                  />
+                  <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+                    No hay dispositivos disponibles para este cliente. Regístralos o libéralos desde la página de Dispositivos.
+                  </div>
                 )}
               </div>
 

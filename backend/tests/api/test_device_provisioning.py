@@ -252,3 +252,33 @@ def test_cmg_provisions_device_to_vps_and_vps_sees_it():
     # Verificamos que el endpoint list_devices filtra por tenant_id para manufacturer
     # (list_devices usa: query.where(Device.tenant_id == user.tenant_id) para non-cmg)
     # VPS verá el device en su lista porque su tenant_id = VPS_ID
+
+
+# ---------------------------------------------------------------------------
+# Montaje: device sin dueño adopta el tenant del vehículo
+# ---------------------------------------------------------------------------
+
+VEH_ID = uuid.UUID("ae500000-0000-0000-0000-000000000001")
+
+
+class _MockVehicle:
+    def __init__(self, tenant_id, manufacturer_tenant_id=None):
+        self.id = VEH_ID
+        self.tenant_id = tenant_id
+        self.manufacturer_tenant_id = manufacturer_tenant_id
+        self.active = True
+
+
+def test_assign_unowned_device_adopts_vehicle_tenant():
+    """Montar un device sin dueño (tenant_id None) adopta el tenant del vehículo."""
+    dev = _MockDevice(tenant_id=None, vehicle_id=None)
+    veh = _MockVehicle(tenant_id=VPS_ID)
+    no_existing = MagicMock()
+    no_existing.scalar_one_or_none.return_value = None
+    db = _make_db(get_side_effects=[dev, veh], execute_side_effects=[no_existing])
+    _setup(CMG_ADMIN, db)
+    with TestClient(app) as c:
+        r = c.patch(f"/api/v1/devices/{DEV_ID}/vehicle", json={"vehicle_id": str(VEH_ID)})
+    assert r.status_code == 200
+    assert dev.tenant_id == VPS_ID   # adoptó el tenant del vehículo
+    assert dev.vehicle_id == VEH_ID

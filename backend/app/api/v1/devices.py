@@ -288,14 +288,18 @@ async def assign_vehicle(
     vehicle = await db.get(Vehicle, body.vehicle_id)
     if not vehicle or not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
-    same_tenant = str(vehicle.tenant_id) == str(device.tenant_id)
-    # El fabricante puede vincular un device suyo a un vehicle de su cliente
-    mfr_cross = (
-        vehicle.manufacturer_tenant_id is not None
-        and str(vehicle.manufacturer_tenant_id) == str(device.tenant_id)
-    )
-    if not same_tenant and not mfr_cross:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El vehículo no pertenece al tenant del dispositivo")
+    if device.tenant_id is None:
+        # Dispositivo sin dueño (stock libre): adopta el tenant del vehículo al montarlo.
+        device.tenant_id = vehicle.tenant_id
+    else:
+        same_tenant = str(vehicle.tenant_id) == str(device.tenant_id)
+        # El fabricante puede vincular un device suyo a un vehicle de su cliente
+        mfr_cross = (
+            vehicle.manufacturer_tenant_id is not None
+            and str(vehicle.manufacturer_tenant_id) == str(device.tenant_id)
+        )
+        if not same_tenant and not mfr_cross:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El vehículo no pertenece al tenant del dispositivo")
     existing = await db.execute(
         select(Device).where(Device.vehicle_id == body.vehicle_id, Device.id != device_id, Device.active == True)
     )
