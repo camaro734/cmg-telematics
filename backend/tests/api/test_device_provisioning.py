@@ -83,6 +83,8 @@ class _MockDevice:
             "imei": self.imei, "model": self.model, "firmware_ver": self.firmware_ver,
             "online": self.online, "last_seen": self.last_seen, "sim_phone": self.sim_phone,
             "active": self.active, "created_at": self.created_at,
+            "out_of_service": self.out_of_service,
+            "out_of_service_since": self.out_of_service_since,
         }
 
 

@@ -149,6 +149,8 @@ def test_patch_out_of_service_true_with_vehicle_resolves_alert():
     assert resp.json()["out_of_service"] is True
     # db.execute fue llamado (UPDATE AlertInstance)
     db.execute.assert_awaited()
+    # Redis eliminó la silence key del vehículo
+    redis_mock.delete.assert_awaited_once_with(f"silence:firing:{VEHICLE_ID}")
 
 
 # ---------------------------------------------------------------------------
