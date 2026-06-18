@@ -18,10 +18,17 @@ export function isFresh(lastSeen: string | null | undefined, ignition?: boolean 
   return Date.now() - new Date(lastSeen).getTime() < limitMin * 60_000
 }
 
+/** Dispositivo marcado como fuera de servicio (desmontado/parado a propósito). */
+export function isOutOfService(status: VehicleStatus | null | undefined): boolean {
+  return status?.device_out_of_service === true
+}
+
 /** Online con umbral adaptativo según ignición. Deriva del frescor de
- *  device_last_seen (preferido) o last_seen — ver isFresh(). */
+ *  device_last_seen (preferido) o last_seen — ver isFresh().
+ *  Un device fuera de servicio nunca cuenta como online. */
 export function isOnline(status: VehicleStatus | null | undefined): boolean {
   if (!status) return false
+  if (status.device_out_of_service === true) return false
   return isFresh(status.device_last_seen ?? status.last_seen, status.ignition)
 }
 

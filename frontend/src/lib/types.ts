@@ -51,6 +51,7 @@ export interface VehicleStatus {
   ext_voltage_mv: number | null
   can_data: Record<string, unknown> | null
   dout_state: Record<number, boolean>
+  device_out_of_service?: boolean
 }
 
 export interface TrackPoint {
@@ -656,6 +657,8 @@ export interface DeviceOut {
   last_seen: string | null
   sim_phone: string | null
   active: boolean
+  out_of_service?: boolean
+  out_of_service_since?: string | null
   created_at: string
   total_bytes: number
   month_bytes: number
