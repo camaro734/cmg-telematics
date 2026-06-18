@@ -187,3 +187,24 @@ def test_online_pulse_sends_on_then_off():
     publishes = [c for c in redis.publish.await_args_list
                  if c.args and c.args[0] == "cmg:manual_can_commands"]
     assert len(publishes) == 2, "pulse online publica ON y OFF"
+
+
+def test_toggle_uses_operational_scope_not_write():
+    """Accionar un botón pide acceso 'operational' (no 'write'), para que un
+    fabricante con manufacturer_can_view_operations=True pueda accionarlos."""
+    db = _setup_db()
+    _setup(ADMIN_A, db)
+    redis = AsyncMock()
+    redis.exists.return_value = 0  # offline → encola; no requiere blpop
+    redis.hget.return_value = None
+
+    with patch("app.api.v1.vehicles.assert_can_access_vehicle",
+               new_callable=AsyncMock, return_value=_MockVehicle()) as mock_access, \
+         patch("app.api.v1.vehicles._vehicle_manual_can_cfg",
+               new_callable=AsyncMock, return_value=(SLOTS, BUTTONS)):
+        with TestClient(app) as c:
+            app.state.redis = redis
+            c.post(URL, json={"value": True})
+
+    assert mock_access.await_args.kwargs.get("operation") == "read"
+    assert mock_access.await_args.kwargs.get("scope") == "operational"

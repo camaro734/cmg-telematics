@@ -2438,7 +2438,12 @@ async def toggle_manual_can_button(
     entrar para no dejar la salida físicamente encendida.
     Si el FMC está offline el comando queda encolado en Redis (202 queued).
     """
-    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    # Accionar un botón Manual CAN es una acción OPERATIVA (no modifica config del
+    # vehículo), por eso se usa scope="operational" en vez de operation="write": así
+    # un fabricante con manufacturer_can_view_operations=True puede accionarlos.
+    # Para client/cmg es equivalente (su acceso no cambia); quién puede pulsar lo
+    # decide role_can_press más abajo.
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 

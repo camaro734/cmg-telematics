@@ -55,7 +55,11 @@ function StatusDot({ status }: { status: CommandStatus }) {
 
 export default function ManualCanControl({ vehicleId, slots }: Props) {
   const qc = useQueryClient()
-  const isAdmin = useAuthStore(s => s.user?.role === 'admin')
+  // El historial de comandos solo lo ve un admin que NO sea de tier fabricante:
+  // un fabricante puede accionar botones pero no consultar el historial del cliente.
+  const canSeeHistory = useAuthStore(
+    s => s.user?.role === 'admin' && s.user?.tenant_tier !== 'manufacturer',
+  )
   const [open, setOpen] = useState(true)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
@@ -74,7 +78,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
         `/api/v1/vehicles/${vehicleId}/commands?command_type=MANUAL_CAN&limit=5`,
       ),
     refetchInterval: 15_000,
-    enabled: isAdmin,
+    enabled: canSeeHistory,
   })
 
   // Una query por slot; aplanamos todos los botones en una única rejilla.
@@ -312,7 +316,7 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
             </div>
           )}
 
-          {isAdmin && history.length > 0 && (
+          {canSeeHistory && history.length > 0 && (
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
               <div style={{
                 fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)',
