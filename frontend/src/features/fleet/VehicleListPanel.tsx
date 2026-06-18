@@ -20,6 +20,8 @@ export interface VehicleEntry {
   moving?: boolean
   speed?: number
   speedHistory?: number[]
+  /** Vehículo desmontado — fuera de servicio */
+  outOfService?: boolean
 }
 
 interface VehicleListPanelProps {
@@ -47,9 +49,15 @@ export function VehicleListPanel({ vehicles, selectedId, onSelect }: VehicleList
   }, [vehicles, filter, search])
 
   const statusColor = (v: VehicleEntry) => {
+    if (v.outOfService) return 'var(--accent-off)'
     if (!v.online) return 'var(--offline)'
     if (v.moving) return 'var(--cmg-teal)'
     return 'var(--ok)'
+  }
+
+  const statusLabel = (v: VehicleEntry): string | null => {
+    if (v.outOfService) return 'Equipo desmontado'
+    return null
   }
 
   if (!open) {
@@ -136,6 +144,11 @@ export function VehicleListPanel({ vehicles, selectedId, onSelect }: VehicleList
               {v.name && (
                 <p style={{ margin: 0, fontSize: 11, color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {v.name}
+                </p>
+              )}
+              {statusLabel(v) && (
+                <p style={{ margin: 0, fontSize: 10, color: 'var(--accent-off)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {statusLabel(v)}
                 </p>
               )}
             </div>

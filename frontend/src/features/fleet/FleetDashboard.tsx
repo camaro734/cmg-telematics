@@ -110,7 +110,11 @@ export default function FleetDashboard() {
     const s = statuses.get(v.id)
     return isOnline(s) && (s!.speed_kmh ?? 0) <= 2
   }).length
-  const offlineCount = vehicles.filter(v => !isOnline(statuses.get(v.id))).length
+  // Excluye vehículos fuera de servicio del contador "Sin señal"
+  const offlineCount = vehicles.filter(v => {
+    const s = statuses.get(v.id)
+    return !isOnline(s) && !isOutOfService(s)
+  }).length
 
   const sortedVehicles = [...vehicles].sort((a, b) =>
     STATE_ORDER[getVehicleState(a, statuses.get(a.id), firingAlerts)] -
@@ -134,6 +138,7 @@ export default function FleetDashboard() {
   const vehicleEntries: VehicleEntry[] = useMemo(() =>
     sortedVehicles.map(v => {
       const s = statuses.get(v.id)
+      const outOfService = isOutOfService(s)
       const online = isOnline(s)
       const moving = online && (s?.speed_kmh ?? 0) > 2
       return {
@@ -142,6 +147,7 @@ export default function FleetDashboard() {
         name: v.name !== v.license_plate ? v.name : undefined,
         online,
         moving,
+        outOfService,
         speed: s?.speed_kmh != null ? Math.round(s.speed_kmh) : undefined,
         speedHistory: undefined,
       }
@@ -224,7 +230,7 @@ export default function FleetDashboard() {
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicle.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{vehicle.license_plate ?? '—'}</span>
                   <span style={{ fontSize: 11, color: sc, fontWeight: 600, flexShrink: 0 }}>
-                    {vState === 'moving' ? `${vStatus?.speed_kmh?.toFixed(0) ?? 0} km/h` : vState === 'idle' ? 'Parado' : vState === 'alert' ? '⚠' : '○'}
+                    {vState === 'moving' ? `${vStatus?.speed_kmh?.toFixed(0) ?? 0} km/h` : STATE_LABEL[vState]}
                   </span>
                 </div>
               )
