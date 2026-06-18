@@ -93,14 +93,19 @@ async def _send_email(action: dict, context: dict, db_pool: asyncpg.Pool | None 
             context.get("vehicle_name", ""),
         )
     )
-    msg.set_content(
-        "Vehículo: %s\nSeveridad: %s\nValor disparado: %s\nRegla: %s" % (
-            context.get("vehicle_name", context.get("vehicle_id")),
-            context.get("severity"),
-            context.get("trigger_value"),
-            context.get("rule_name"),
+    custom_body = action.get("body")
+    if custom_body:
+        # Correo con cuerpo libre (p. ej. recuperación de contraseña)
+        msg.set_content(custom_body)
+    else:
+        msg.set_content(
+            "Vehículo: %s\nSeveridad: %s\nValor disparado: %s\nRegla: %s" % (
+                context.get("vehicle_name", context.get("vehicle_id")),
+                context.get("severity"),
+                context.get("trigger_value"),
+                context.get("rule_name"),
+            )
         )
-    )
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, _smtp_send, msg, cfg)
 
