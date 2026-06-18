@@ -32,6 +32,9 @@ class Tenant(Base):
     manufacturer_can_view_operations: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     manufacturer_can_view_can_data: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     manufacturer_can_create_rules: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+    # Autogestión del fabricante (solo CMG las activa). Por defecto false.
+    manufacturer_can_manage_clients: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    manufacturer_can_transfer_vehicles: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     compliance_level: Mapped[str] = mapped_column(String(20), server_default="standard", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
