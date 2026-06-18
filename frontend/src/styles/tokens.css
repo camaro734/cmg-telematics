@@ -31,8 +31,8 @@
   --fg-primary:      #F1F5F9;
   --fg-secondary:    #E2E8F0;
   --fg-tertiary:     #94A3B8;
-  --fg-muted:        #64748B;
-  --fg-dim:          #475569;
+  --fg-muted:        #8E9CB0;   /* subido desde #64748B (era 3.97:1, fallaba AA) → legible a pleno sol */
+  --fg-dim:          #788AA0;   /* subido desde #475569 (era 2.49:1, crítico) → WCAG AA */
 
   /* ---------- Border / divider ---------- */
   --border:          #2D3148;
@@ -48,7 +48,7 @@
   --danger-soft:     rgba(239, 68, 68, 0.15);
   --info:            #3B82F6;
   --info-soft:       rgba(59, 130, 246, 0.15);
-  --offline:         #64748B;
+  --offline:         #8E9CB0;   /* subido desde #64748B — el texto de estado "offline" se usa pequeño y debe leerse */
   --offline-soft:    rgba(100, 116, 139, 0.15);
   --danger-12:       rgba(239, 68, 68, 0.12);
   --danger-25:       rgba(239, 68, 68, 0.25);
@@ -66,11 +66,11 @@
   --font-sans:  "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --fs-2xs: 10px;
-  --fs-xs:  11px;
+  --fs-2xs: 11px;
+  --fs-xs:  12px;
   --fs-sm:  13px;
   --fs-md:  14px;
-  --fs-base:15px;
+  --fs-base:16px;
   --fs-lg:  16px;
   --fs-xl:  18px;
   --fs-2xl: 22px;
@@ -183,6 +183,17 @@ input { font: inherit; }
 }
 @media (max-width: 767px) {
   html, body, #root { overflow-x: hidden; }
+}
+/* Tipografía un punto mayor en móvil — legibilidad a pleno sol en pantallas pequeñas.
+   Solo afecta a lo que usa los tokens --fs-*; los tamaños px inline no escalan. */
+@media (max-width: 767px) {
+  :root {
+    --fs-2xs: 12px;
+    --fs-xs:  13px;
+    --fs-sm:  14px;
+    --fs-md:  15px;
+    --fs-base:16px;
+  }
 }
 
 /* ── Typography classes ────────────────────────────────────────────────── */
