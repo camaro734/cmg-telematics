@@ -5,6 +5,7 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { useAuthStore } from '../auth/useAuthStore'
+import { useMyProfile } from '../../lib/useMyProfile'
 import type { DeviceOut, TenantOut, DeviceCreate, DeviceTransfer } from '../../lib/types'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
@@ -29,7 +30,14 @@ export default function DevicesPage() {
   const confirmAsk = useConfirm()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const userTier = useAuthStore(s => s.user?.tenant_tier)
+  const userTenantId = useAuthStore(s => s.user?.tenant_id)
   const isCmg = userTier === 'cmg'
+
+  // Flag de autogestión (el JWT no lo lleva): un fabricante con permiso puede transferir
+  // sus dispositivos a sus clientes.
+  const { data: profile } = useMyProfile()
+  const mfrCanTransfer = profile?.manufacturer_can_transfer_vehicles ?? false
+  const canTransferDevices = isAdmin && (isCmg || (userTier === 'manufacturer' && mfrCanTransfer))
 
   const [filterTenantId, setFilterTenantId] = useState('')
 
@@ -148,7 +156,10 @@ export default function DevicesPage() {
   const ownerOptions = tenants.filter(t => t.tier === 'cmg' || t.tier === 'manufacturer')
   // Opciones de destino en la transferencia: CMG + fabricantes (excluyendo el tenant actual del device)
   const transferTargetOptions = (d: DeviceOut) =>
-    tenants.filter(t => (t.tier === 'cmg' || t.tier === 'manufacturer') && t.id !== d.tenant_id)
+    isCmg
+      ? tenants.filter(t => (t.tier === 'cmg' || t.tier === 'manufacturer') && t.id !== d.tenant_id)
+      // Fabricante: a sus clientes (o de vuelta a su flota), excluyendo el dueño actual.
+      : tenants.filter(t => (t.id === userTenantId || t.parent_manufacturer_id === userTenantId) && t.id !== d.tenant_id)
 
   // Tenants no-CMG para el filtro de tabla (visible para CMG)
   const clientTenants = tenants.filter(t => t.tier !== 'cmg')
@@ -299,7 +310,7 @@ export default function DevicesPage() {
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            {isCmg && isAdmin && (
+                            {canTransferDevices && (
                               <span title={linked ? 'Desvincula el dispositivo del vehículo antes de transferirlo' : ''}>
                                 <button
                                   onClick={() => { setTransferDevice(device); setTransferTargetId(''); setTransferError(null) }}

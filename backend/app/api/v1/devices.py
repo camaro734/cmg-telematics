@@ -318,10 +318,14 @@ async def transfer_device(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Solo CMG admin. Transfiere un device libre (sin vehículo) a otro tenant
-    CMG o fabricante. Si el device está vinculado a un vehículo → 409."""
-    if user.tenant_tier != "cmg" or user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG admin puede transferir dispositivos")
+    """Transfiere un device LIBRE (sin vehículo) a otro tenant.
+
+    - CMG admin: a cualquier tenant CMG o fabricante.
+    - Fabricante admin (con manufacturer_can_transfer_vehicles): un device de su propio
+      inventario a uno de sus clientes o de vuelta a su flota.
+    Si el device está montado en un vehículo → 409 (se traspasa vendiendo el vehículo)."""
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
     device = await db.get(Device, device_id)
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
@@ -333,11 +337,31 @@ async def transfer_device(
     target = await db.get(Tenant, body.target_tenant_id)
     if not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant destino no encontrado")
-    if target.tier not in ("cmg", "manufacturer"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Solo se puede transferir dispositivos a tenants CMG o fabricante",
+
+    if user.tenant_tier == "cmg":
+        if target.tier not in ("cmg", "manufacturer"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="CMG solo puede transferir dispositivos a tenants CMG o fabricante",
+            )
+    elif user.tenant_tier == "manufacturer":
+        mfr = await db.get(Tenant, user.tenant_id)
+        if not mfr or not mfr.manufacturer_can_transfer_vehicles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CMG no ha habilitado el traspaso para este fabricante")
+        # Solo puede transferir dispositivos de su propio inventario
+        if device.tenant_id is None or str(device.tenant_id) != str(user.tenant_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo puedes transferir dispositivos de tu propio inventario")
+        # Destino: su propia flota o uno de sus clientes
+        own = str(target.id) == str(user.tenant_id)
+        client_of_mfr = (
+            target.parent_manufacturer_id is not None
+            and str(target.parent_manufacturer_id) == str(user.tenant_id)
         )
+        if not own and not client_of_mfr:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo puedes transferir a tu flota o a tus clientes")
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permiso para transferir dispositivos")
+
     device.tenant_id = body.target_tenant_id
     await db.commit()
     await db.refresh(device)

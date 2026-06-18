@@ -357,7 +357,7 @@ export default function TenantFormPage() {
                   { label: 'Puede ver datos CAN de sus máquinas', checked: mfrViewCan, set: setMfrViewCan },
                   { label: 'Puede crear reglas de alerta', checked: mfrCreateRules, set: setMfrCreateRules },
                   { label: 'Puede gestionar sus clientes', checked: mfrManageClients, set: setMfrManageClients },
-                  { label: 'Puede traspasar vehículos a sus clientes', checked: mfrTransferVehicles, set: setMfrTransferVehicles },
+                  { label: 'Puede traspasar vehículos y dispositivos a sus clientes', checked: mfrTransferVehicles, set: setMfrTransferVehicles },
                 ].map(row => (
                   <label key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
                     <input type="checkbox" checked={row.checked} onChange={e => row.set(e.target.checked)} style={{ cursor: 'pointer' }} />

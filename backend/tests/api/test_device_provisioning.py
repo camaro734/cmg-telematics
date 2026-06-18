@@ -55,10 +55,13 @@ CLIENT_USER = CurrentUser(
 # ---------------------------------------------------------------------------
 
 class _MockTenant:
-    def __init__(self, tid: uuid.UUID, tier: str):
+    def __init__(self, tid: uuid.UUID, tier: str, parent_manufacturer_id=None,
+                 manufacturer_can_transfer_vehicles: bool = False):
         self.id = tid
         self.tier = tier
         self.name = f"Tenant-{tier}"
+        self.parent_manufacturer_id = parent_manufacturer_id
+        self.manufacturer_can_transfer_vehicles = manufacturer_can_transfer_vehicles
 
 
 class _MockDevice:
@@ -222,10 +225,12 @@ def test_transfer_to_client_tier_422():
     assert "fabricante" in r.json()["detail"].lower() or "manufacturer" in r.json()["detail"].lower()
 
 
-def test_transfer_non_cmg_403():
-    """Non-CMG (manufacturer) intenta transferir → 403."""
-    db = _make_db(get_side_effects=[])
-    _setup(VPS_ADMIN, db)
+def test_transfer_client_tier_403():
+    """Un cliente (tier=client) nunca puede transferir dispositivos → 403."""
+    dev = _MockDevice(tenant_id=CLIENT_ID, vehicle_id=None)
+    target = _MockTenant(CMG_ID, "cmg")
+    db = _make_db(get_side_effects=[dev, target])
+    _setup(CLIENT_USER, db)
     with TestClient(app) as c:
         r = c.patch(f"/api/v1/devices/{DEV_ID}/transfer", json={"target_tenant_id": str(CMG_ID)})
     assert r.status_code == 403
@@ -267,6 +272,45 @@ class _MockVehicle:
         self.tenant_id = tenant_id
         self.manufacturer_tenant_id = manufacturer_tenant_id
         self.active = True
+
+
+def test_manufacturer_transfers_own_device_to_client_200():
+    """Fabricante con permiso transfiere un device propio suelto a su cliente."""
+    dev = _MockDevice(tenant_id=VPS_ID, vehicle_id=None)
+    target = _MockTenant(CLIENT_ID, "client", parent_manufacturer_id=VPS_ID)
+    mfr = _MockTenant(VPS_ID, "manufacturer", manufacturer_can_transfer_vehicles=True)
+    db = _make_db(get_side_effects=[dev, target, mfr])
+    _setup(VPS_ADMIN, db)
+    with TestClient(app) as c:
+        r = c.patch(f"/api/v1/devices/{DEV_ID}/transfer", json={"target_tenant_id": str(CLIENT_ID)})
+    assert r.status_code == 200
+    assert dev.tenant_id == CLIENT_ID
+
+
+def test_manufacturer_transfer_without_flag_403():
+    """Sin el flag manufacturer_can_transfer_vehicles → 403."""
+    dev = _MockDevice(tenant_id=VPS_ID, vehicle_id=None)
+    target = _MockTenant(CLIENT_ID, "client", parent_manufacturer_id=VPS_ID)
+    mfr = _MockTenant(VPS_ID, "manufacturer", manufacturer_can_transfer_vehicles=False)
+    db = _make_db(get_side_effects=[dev, target, mfr])
+    _setup(VPS_ADMIN, db)
+    with TestClient(app) as c:
+        r = c.patch(f"/api/v1/devices/{DEV_ID}/transfer", json={"target_tenant_id": str(CLIENT_ID)})
+    assert r.status_code == 403
+    assert dev.tenant_id == VPS_ID  # no se tocó
+
+
+def test_manufacturer_cannot_transfer_to_foreign_tenant_403():
+    """Fabricante no puede transferir a un tenant que no es su cliente."""
+    other_mfr = uuid.UUID("ae200000-0000-0000-0000-000000000099")
+    dev = _MockDevice(tenant_id=VPS_ID, vehicle_id=None)
+    target = _MockTenant(CLIENT_ID, "client", parent_manufacturer_id=other_mfr)
+    mfr = _MockTenant(VPS_ID, "manufacturer", manufacturer_can_transfer_vehicles=True)
+    db = _make_db(get_side_effects=[dev, target, mfr])
+    _setup(VPS_ADMIN, db)
+    with TestClient(app) as c:
+        r = c.patch(f"/api/v1/devices/{DEV_ID}/transfer", json={"target_tenant_id": str(CLIENT_ID)})
+    assert r.status_code == 403
 
 
 def test_assign_unowned_device_adopts_vehicle_tenant():
