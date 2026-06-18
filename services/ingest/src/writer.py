@@ -138,9 +138,18 @@ async def get_device_info(
 async def update_device_online(
     conn: asyncpg.Connection, imei: str, online: bool
 ) -> None:
-    await conn.execute("""
-        UPDATE device SET online=$1, last_seen=now() WHERE imei=$2
-    """, online, imei)
+    if online:
+        # Reconexión = dispositivo vivo: reactiva si estaba fuera de servicio (remontado).
+        await conn.execute("""
+            UPDATE device
+               SET online=true, last_seen=now(),
+                   out_of_service=false, out_of_service_since=NULL
+             WHERE imei=$1
+        """, imei)
+    else:
+        await conn.execute("""
+            UPDATE device SET online=false, last_seen=now() WHERE imei=$1
+        """, imei)
 
 
 async def update_device_last_packet(
