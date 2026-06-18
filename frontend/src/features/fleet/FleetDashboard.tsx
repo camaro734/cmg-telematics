@@ -14,16 +14,26 @@ import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { VehicleListPanel, type VehicleEntry } from './VehicleListPanel'
 import { VehicleDetailPanel } from './VehicleDetailPanel'
 import { Input } from '../../shared/ui/Input'
-import { isOnline } from '../../lib/staleStatus'
+import { isOnline, isOutOfService } from '../../lib/staleStatus'
 
-type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert'
-const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, parked: 3, offline: 4 }
+type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert' | 'out_of_service'
+const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, parked: 3, offline: 4, out_of_service: 5 }
+
+const STATE_LABEL: Record<VehicleState, string> = {
+  alert: 'Alerta',
+  moving: 'En movimiento',
+  idle: 'Ralentí',
+  parked: 'Parado',
+  offline: 'Sin señal',
+  out_of_service: 'Equipo desmontado',
+}
 
 function getVehicleState(
   vehicle: VehicleOut,
   status: VehicleStatus | undefined,
   alerts: AlertInstanceOut[]
 ): VehicleState {
+  if (isOutOfService(status)) return 'out_of_service'
   if (!isOnline(status)) return 'offline'
   if (alerts.some(a => a.vehicle_id === vehicle.id)) return 'alert'
   if ((status!.speed_kmh ?? 0) > 2) return 'moving'
@@ -36,6 +46,7 @@ function stateColor(state: VehicleState): string {
     : state === 'moving' ? 'var(--ok)'
     : state === 'idle' ? 'var(--warn)'
     : state === 'parked' ? 'var(--info)'
+    : state === 'out_of_service' ? 'var(--accent-off)'
     : 'var(--offline)'
 }
 

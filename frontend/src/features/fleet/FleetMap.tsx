@@ -107,6 +107,7 @@ function makeOfflineIcon(): L.DivIcon {
 }
 
 function makeVehicleIcon(status: VehicleStatus, hasAlert: boolean): L.DivIcon {
+  if (status.device_out_of_service === true) return makeOfflineIcon()
   if (!isEffectivelyOnline(status)) return makeOfflineIcon()
   if (hasAlert) return makeAlertIcon()
   if ((status.speed_kmh ?? 0) > 2) return makeMovingIcon()

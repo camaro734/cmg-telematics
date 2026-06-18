@@ -382,18 +382,27 @@ export default function VehiclesPage() {
                         </td>
                         <td style={tdStyle}>
                           {dev ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{
-                                width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                                background: devOnline ? 'var(--ok)' : 'var(--offline)',
-                              }} />
-                              <span style={{
-                                fontFamily: 'var(--font-mono)', fontSize: 12,
-                                color: devOnline ? 'var(--ok)' : 'var(--fg-muted)',
-                              }}>
-                                {dev.imei}
+                            dev.out_of_service ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: 'var(--accent-off)' }} />
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-off)' }}>
+                                  {dev.imei} · desmontado
+                                </span>
                               </span>
-                            </span>
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{
+                                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                                  background: devOnline ? 'var(--ok)' : 'var(--offline)',
+                                }} />
+                                <span style={{
+                                  fontFamily: 'var(--font-mono)', fontSize: 12,
+                                  color: devOnline ? 'var(--ok)' : 'var(--fg-muted)',
+                                }}>
+                                  {dev.imei}
+                                </span>
+                              </span>
+                            )
                           ) : (
                             <span style={{ color: 'var(--warn)', fontSize: 12 }}>Sin dispositivo</span>
                           )}
