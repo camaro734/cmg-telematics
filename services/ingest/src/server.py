@@ -196,6 +196,7 @@ class TeltonikaConnection:
 
         # Re-aplicar último estado DOUT conocido al reconectar
         await self._restore_dout_state()
+        await self._restore_manual_can_state()
 
     async def _restore_dout_state(self) -> None:
         """Re-envía el último estado DOUT al dispositivo al reconectar."""
@@ -223,6 +224,35 @@ class TeltonikaConnection:
         self.writer.write(packet)
         await self.writer.drain()
         logger.info("DOUT restaurado al reconectar %s: %s", self.imei, command)
+
+    async def _restore_manual_can_state(self) -> None:
+        """Reproduce los comandos Manual CAN encolados mientras el FMC estaba offline.
+
+        El API guarda en vehicle:{id}:manual_can_pending (hash por param_id) los
+        comandos a entregar. Aquí se escriben al socket Codec 12, se actualiza el
+        estado de salidas y se confirma cada CommandLog. Sin caducidad: persisten
+        hasta reproducirse en una reconexión."""
+        vehicle_id = self.device_info["vehicle_id"]
+        pending_key = f"vehicle:{vehicle_id}:manual_can_pending"
+        pending = await self.redis.hgetall(pending_key)
+        if not pending:
+            return
+        outputs_key = f"vehicle:{vehicle_id}:can_outputs"
+        for _param_id, raw in pending.items():
+            try:
+                entry = json.loads(raw)
+            except (ValueError, TypeError):
+                continue
+            for command in entry.get("commands", []):
+                self.writer.write(build_codec12_command(command))
+                await self.writer.drain()
+            if entry.get("value_hex") is not None and entry.get("slot") is not None:
+                await self.redis.hset(outputs_key, str(entry["slot"]), entry["value_hex"])
+            if entry.get("log_id"):
+                # Entregado a un socket vivo → confirmado (best-effort para el ACK real).
+                await _confirm_command(entry["log_id"], "OK (entrega diferida)")
+            logger.info("Manual CAN diferido entregado a %s: %s", self.imei, entry.get("commands"))
+        await self.redis.delete(pending_key)
 
     async def _receive_loop(self) -> None:
         """Recibe paquetes Codec 8 en bucle hasta que la conexión se cierre."""
