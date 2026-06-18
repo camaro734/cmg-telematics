@@ -23,4 +23,12 @@ describe('ForgotPasswordPage', () => {
     ))
     expect(await screen.findByText(/si el correo está registrado/i)).toBeInTheDocument()
   })
+
+  it('muestra el mensaje genérico aunque la llamada a la API falle (anti-enumeración)', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(new Error('Error de red'))
+    renderPage()
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'b@c.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }))
+    expect(await screen.findByText(/si el correo está registrado/i)).toBeInTheDocument()
+  })
 })

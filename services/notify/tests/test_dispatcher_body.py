@@ -24,3 +24,29 @@ async def test_send_email_usa_body_personalizado_cuando_existe():
 
     assert captured["subject"] == "Asunto propio"
     assert "reset-password/TOK" in captured["body"]
+
+
+@pytest.mark.asyncio
+async def test_send_email_usa_template_alerta_cuando_no_hay_body():
+    action = {
+        "type": "email",
+        "recipients": ["x@example.com"],
+    }
+    context = {
+        "vehicle_name": "Cisterna-07",
+        "severity": "critical",
+        "trigger_value": "120",
+        "rule_name": "Temperatura motor alta",
+    }
+    cfg = {"host": "smtp.test", "port": 587, "user": "", "password": "", "from_addr": "no-reply@cmg.es", "tls": True}
+    captured = {}
+
+    def _fake_send(msg, _cfg):
+        captured["body"] = msg.get_content()
+
+    with patch("src.dispatcher._load_smtp_from_db", return_value=cfg), \
+         patch("src.dispatcher._smtp_send", _fake_send):
+        await _send_email(action, context, db_pool=object())
+
+    assert "Vehículo:" in captured["body"]
+    assert "Cisterna-07" in captured["body"]
