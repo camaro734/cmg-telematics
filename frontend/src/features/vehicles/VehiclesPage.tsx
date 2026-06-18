@@ -10,6 +10,7 @@ import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import { isFresh } from '../../lib/staleStatus'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
+import { useMyProfile } from '../../lib/useMyProfile'
 
 
 
@@ -66,6 +67,10 @@ export default function VehiclesPage() {
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const userTier = useAuthStore(s => s.user?.tenant_tier)
   const userTenantId = useAuthStore(s => s.user?.tenant_id)
+
+  // Flag de permiso: el fabricante puede entregar/traspasar vehículos solo si está habilitado
+  const { data: profile } = useMyProfile()
+  const mfrCanTransfer = profile?.manufacturer_can_transfer_vehicles ?? false
 
   const [showInactive, setShowInactive] = useState(false)
 
@@ -514,7 +519,7 @@ export default function VehiclesPage() {
                               >
                                 Editar
                               </button>}
-                              {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && (v.manufacturer_tenant_id === userTenantId || v.tenant_id === userTenantId))) && (
+                              {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && mfrCanTransfer && (v.manufacturer_tenant_id === userTenantId || v.tenant_id === userTenantId))) && (
                                 <button
                                   onClick={() => openReassign(v)}
                                   style={{
@@ -527,7 +532,7 @@ export default function VehiclesPage() {
                                     cursor: 'pointer',
                                   }}
                                 >
-                                  Reasignar
+                                  Entregar / Traspasar
                                 </button>
                               )}
                               {isAdmin && (
@@ -783,7 +788,7 @@ export default function VehiclesPage() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-                Reasignar vehículo
+                Entregar / Traspasar vehículo
               </h2>
               <button onClick={closeReassign} style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}>✕</button>
             </div>
@@ -826,6 +831,16 @@ export default function VehiclesPage() {
                       {reassignResult.alert_rules_deactivated} regla{reassignResult.alert_rules_deactivated !== 1 ? 's' : ''} desactivada{reassignResult.alert_rules_deactivated !== 1 ? 's' : ''} · {reassignResult.grants_revoked} permiso{reassignResult.grants_revoked !== 1 ? 's' : ''} revocado{reassignResult.grants_revoked !== 1 ? 's' : ''}
                     </div>
                   )}
+                  {/* Cajita GPS movida al nuevo dueño */}
+                  {reassignResult.device_moved && (
+                    <span style={{ display: 'block', marginTop: 4 }}>
+                      Cajita {reassignResult.device_imei} movida al nuevo dueño.
+                    </span>
+                  )}
+                  {/* El fabricante retiene acceso técnico aunque traspase el vehículo */}
+                  <span style={{ display: 'block', marginTop: 4, color: 'var(--fg-muted)' }}>
+                    El fabricante conserva acceso técnico al vehículo.
+                  </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button onClick={closeReassign} style={{
