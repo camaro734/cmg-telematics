@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../features/auth/useAuthStore'
 // CmgMark removed — fallback now uses the CMG Track PNG directly
 import { useIsMobile } from '../../lib/useIsMobile'
+import { useMyProfile } from '../../lib/useMyProfile'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { apiClient } from '../../lib/apiClient'
 import { isOnline } from '../../lib/staleStatus'
@@ -412,6 +413,9 @@ export default function TopNav() {
   const isAdmin        = user?.role === 'admin'
   const canManageClients = isCmg && isAdmin
 
+  const { data: profile } = useMyProfile()
+  const mfrCanManageClients = profile?.manufacturer_can_manage_clients ?? false
+
   const [adminOpen,    setAdminOpen]    = useState(false)
   const [operatorOpen, setOperatorOpen] = useState(false)
   const [userOpen,     setUserOpen]     = useState(false)
@@ -572,7 +576,7 @@ export default function TopNav() {
               adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
               adminLabel={isCmg ? 'Administración' : 'Cuenta'}
               operatorItems={
-                (isManufacturer && isAdmin
+                (isManufacturer && isAdmin && mfrCanManageClients
                   ? [...visibleOperatorBase, MIS_CLIENTES_ITEM]
                   : visibleOperatorBase
                 ) as unknown as typeof OPERATOR_ITEMS
@@ -639,7 +643,7 @@ export default function TopNav() {
                 {operatorOpen && (
                   <DropdownMenu
                     items={
-                      (isManufacturer && isAdmin
+                      (isManufacturer && isAdmin && mfrCanManageClients
                         ? [...visibleOperatorBase, MIS_CLIENTES_ITEM]
                         : visibleOperatorBase
                       ) as unknown as typeof CMG_ADMIN_ITEMS
