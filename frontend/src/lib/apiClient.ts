@@ -1,5 +1,14 @@
 import { useAuthStore } from '../features/auth/useAuthStore'
 
+/** Error HTTP con el código de estado adjunto, para que el handler global de
+ *  React Query (main.tsx) pueda suprimir toasts de 401/403/404 y la política de
+ *  retry pueda no reintentarlos. Sin `.status`, esos filtros se saltan. */
+function httpError(message: string, status: number): Error {
+  const err = new Error(message) as Error & { status?: number }
+  err.status = status
+  return err
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -31,16 +40,19 @@ async function request<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText || 'Error desconocido')
-    // Extraer "detail" del JSON de FastAPI si existe; si no, devolver el texto plano
+    // Extraer "detail" del JSON de FastAPI si existe; si no, usar el texto plano.
+    // Siempre se lanza con `.status` para que el handler global suprima toasts
+    // de 401/403/404 y la política de retry no los reintente.
+    let message = text || `Error ${res.status}`
     try {
       const json = JSON.parse(text)
       if (json.detail) {
-        throw new Error(typeof json.detail === 'string' ? json.detail : JSON.stringify(json.detail))
+        message = typeof json.detail === 'string' ? json.detail : JSON.stringify(json.detail)
       }
-    } catch (parseErr) {
-      if (parseErr instanceof Error && parseErr.message !== text) throw parseErr
+    } catch {
+      // cuerpo no-JSON → se mantiene el texto plano
     }
-    throw new Error(text || `Error ${res.status}`)
+    throw httpError(message, res.status)
   }
 
   if (res.status === 204) return undefined as T
@@ -72,7 +84,7 @@ export const apiClient = {
     }
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText)
-      throw new Error(`${res.status}: ${text}`)
+      throw httpError(`${res.status}: ${text}`, res.status)
     }
     return res.json() as Promise<T>
   },

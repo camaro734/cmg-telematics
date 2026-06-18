@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
+from app.api.v1.access_v2 import assert_can_access_vehicle
 from app.schemas.auth import CurrentUser
 from app.models.command_log import CommandLog
 from app.models.vehicle import Vehicle
@@ -72,10 +73,14 @@ async def list_vehicle_commands(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    vehicle = await db.get(Vehicle, vehicle_id)
-    if not vehicle or not vehicle.active:
-        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    if user.tenant_tier != "cmg" and str(vehicle.tenant_id) != str(user.tenant_id):
+    # Mismo control de acceso que el resto de endpoints operativos del vehículo
+    # (status/track/maintenance/kpis): incluye el tier manufacturer cuando el tenant
+    # cliente tiene manufacturer_can_view_operations=True. assert_can_access_vehicle
+    # lanza 404 "Vehículo no encontrado" si no hay acceso (privacy by obscurity).
+    vehicle = await assert_can_access_vehicle(
+        user, vehicle_id, db, operation="read", scope="operational"
+    )
+    if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
     where_clause = [CommandLog.vehicle_id == vehicle_id]
