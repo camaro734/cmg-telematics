@@ -485,6 +485,18 @@ export default function TopNav() {
     ? OPERATOR_ITEMS_BASE
     : OPERATOR_ITEMS_BASE.filter(item => item.to !== '/work-orders' || enabledModules.includes('work-orders'))
 
+  // Menú de Operaciones. Un fabricante admin gestiona su flota y sus dispositivos
+  // (para crear vehículos de clientes y transferir cajitas), y "Mis clientes" si tiene
+  // habilitada la gestión de clientes.
+  const mfrSelfServiceItems = isManufacturer && isAdmin
+    ? [
+        { label: 'Flota', to: '/vehiculos', Icon: IconVehiculos },
+        { label: 'Dispositivos', to: '/devices', Icon: IconDispositivos },
+        ...(mfrCanManageClients ? [MIS_CLIENTES_ITEM] : []),
+      ]
+    : []
+  const operatorMenuItems = [...visibleOperatorBase, ...mfrSelfServiceItems]
+
   const btnBase: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -575,12 +587,7 @@ export default function TopNav() {
               visibleModules={visibleModules as unknown as typeof MODULES[number][]}
               adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
               adminLabel={isCmg ? 'Administración' : 'Cuenta'}
-              operatorItems={
-                (isManufacturer && isAdmin && mfrCanManageClients
-                  ? [...visibleOperatorBase, MIS_CLIENTES_ITEM]
-                  : visibleOperatorBase
-                ) as unknown as typeof OPERATOR_ITEMS
-              }
+              operatorItems={operatorMenuItems as unknown as typeof OPERATOR_ITEMS}
               showAdmin={canManageClients}
               showOperator={isAdmin || user?.role === 'operator'}
               userEmail={user?.email}
@@ -642,12 +649,7 @@ export default function TopNav() {
                 </button>
                 {operatorOpen && (
                   <DropdownMenu
-                    items={
-                      (isManufacturer && isAdmin && mfrCanManageClients
-                        ? [...visibleOperatorBase, MIS_CLIENTES_ITEM]
-                        : visibleOperatorBase
-                      ) as unknown as typeof CMG_ADMIN_ITEMS
-                    }
+                    items={operatorMenuItems as unknown as typeof CMG_ADMIN_ITEMS}
                     onClose={() => setOperatorOpen(false)}
                   />
                 )}
