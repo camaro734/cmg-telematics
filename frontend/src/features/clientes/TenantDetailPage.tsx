@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Shell from '../../shared/ui/Shell'
 import { apiClient } from '../../lib/apiClient'
@@ -116,6 +116,8 @@ function PortalTokenSection({ tenantId }: { tenantId: string }) {
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const confirmAsk = useConfirm()
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<UserOut | undefined>()
 
@@ -141,6 +143,33 @@ export default function TenantDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.clienteUsers(id!) }),
   })
 
+  const deleteTenant = useMutation({
+    mutationFn: () => apiClient.delete(`/api/v1/tenants/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.tenants() })
+      qc.invalidateQueries({ queryKey: keys.cliente(id!) })
+      navigate('/clientes')
+    },
+  })
+
+  const reactivateTenant = useMutation({
+    mutationFn: () => apiClient.post(`/api/v1/tenants/${id}/reactivate`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.tenants() })
+      qc.invalidateQueries({ queryKey: keys.cliente(id!) })
+    },
+  })
+
+  async function handleDeleteTenant() {
+    const ok = await confirmAsk({
+      title: 'Eliminar cliente',
+      message: `¿Dar de baja el cliente "${tenant?.name}"? Sus usuarios no podrán iniciar sesión. Es reversible: podrás reactivarlo después.`,
+      confirmLabel: 'Eliminar cliente',
+      kind: 'danger',
+    })
+    if (ok) deleteTenant.mutate()
+  }
+
   if (isLoading) {
     return <Shell title="Cliente"><p style={{ padding: 24, color: 'var(--fg-muted)' }}>Cargando...</p></Shell>
   }
@@ -165,16 +194,45 @@ export default function TenantDetailPage() {
               {tenant.active ? 'Activo' : 'Inactivo'}
             </span>
           </div>
-          <Link
-            to={`/clientes/${id}/edit`}
-            style={{
-              background: 'var(--bg-card)', color: 'var(--fg-primary)',
-              border: '1px solid var(--border)', borderRadius: 6,
-              padding: '7px 14px', fontSize: 13, textDecoration: 'none',
-            }}
-          >
-            Editar
-          </Link>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Link
+              to={`/clientes/${id}/edit`}
+              style={{
+                background: 'var(--bg-card)', color: 'var(--fg-primary)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                padding: '7px 14px', fontSize: 13, textDecoration: 'none',
+              }}
+            >
+              Editar
+            </Link>
+            {tenant.tier !== 'cmg' && (tenant.active ? (
+              <button
+                onClick={handleDeleteTenant}
+                disabled={deleteTenant.isPending}
+                style={{
+                  background: 'transparent', color: 'var(--danger)',
+                  border: '1px solid var(--danger)', borderRadius: 6,
+                  padding: '7px 14px', fontSize: 13, cursor: 'pointer',
+                  opacity: deleteTenant.isPending ? 0.6 : 1,
+                }}
+              >
+                Eliminar cliente
+              </button>
+            ) : (
+              <button
+                onClick={() => reactivateTenant.mutate()}
+                disabled={reactivateTenant.isPending}
+                style={{
+                  background: 'transparent', color: 'var(--ok)',
+                  border: '1px solid var(--ok)', borderRadius: 6,
+                  padding: '7px 14px', fontSize: 13, cursor: 'pointer',
+                  opacity: reactivateTenant.isPending ? 0.6 : 1,
+                }}
+              >
+                Reactivar cliente
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 2. Usuarios */}

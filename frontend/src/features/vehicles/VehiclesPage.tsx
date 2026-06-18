@@ -9,6 +9,7 @@ import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import { isFresh } from '../../lib/staleStatus'
+import { useConfirm } from '../../shared/ui/ConfirmDialog'
 
 
 
@@ -60,10 +61,13 @@ const EMPTY_FORM: FormState = {
 
 export default function VehiclesPage() {
   const queryClient = useQueryClient()
+  const confirmAsk = useConfirm()
   const { activeTenantId } = useTenantContext()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const userTier = useAuthStore(s => s.user?.tenant_tier)
   const userTenantId = useAuthStore(s => s.user?.tenant_id)
+
+  const [showInactive, setShowInactive] = useState(false)
 
   const [modal, setModal] = useState<'closed' | 'create' | 'edit'>('closed')
   const [editingVehicle, setEditingVehicle] = useState<VehicleOut | null>(null)
@@ -81,8 +85,14 @@ export default function VehiclesPage() {
   // ── Datos ────────────────────────────────────────────────────────────────
 
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<VehicleOut[]>({
-    queryKey: [...keys.vehicles(), activeTenantId],
-    queryFn: () => apiClient.get<VehicleOut[]>(`/api/v1/vehicles${activeTenantId ? `?tenant_id=${activeTenantId}` : ''}`),
+    queryKey: [...keys.vehicles(), activeTenantId, showInactive],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (activeTenantId) params.set('tenant_id', activeTenantId)
+      if (showInactive) params.set('include_inactive', 'true')
+      const qs = params.toString()
+      return apiClient.get<VehicleOut[]>(`/api/v1/vehicles${qs ? `?${qs}` : ''}`)
+    },
     staleTime: 30_000,
   })
 
@@ -189,6 +199,49 @@ export default function VehiclesPage() {
       else setReassignError('Error al reasignar. Inténtalo de nuevo.')
     } finally {
       setReassigning(false)
+    }
+  }
+
+  // ── Baja / reactivación ───────────────────────────────────────────────────
+
+  async function handleDecommission(v: VehicleOut) {
+    const ok = await confirmAsk({
+      title: 'Dar de baja vehículo',
+      message: `¿Dar de baja "${v.name}"? Dejará de aparecer en la flota. No se borra: podrás reactivarlo y conserva su histórico y dispositivo.`,
+      confirmLabel: 'Dar de baja',
+      kind: 'danger',
+    })
+    if (!ok) return
+    try {
+      await apiClient.delete(`/api/v1/vehicles/${v.id}`)
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const m = msg.match(/^\d{3}:\s*(\{.*\})$/)
+      let detail: string | null = null
+      if (m) { try { detail = JSON.parse(m[1]).detail } catch { /* ignora */ } }
+      await confirmAsk({
+        title: 'No se pudo dar de baja',
+        message: detail ?? (msg.includes('409')
+          ? 'Este vehículo tiene órdenes de trabajo abiertas. Ciérralas o cancélalas antes de darlo de baja.'
+          : 'Error al dar de baja. Inténtalo de nuevo.'),
+        confirmLabel: 'Entendido',
+        kind: 'warning',
+      })
+    }
+  }
+
+  async function handleReactivate(v: VehicleOut) {
+    try {
+      await apiClient.post(`/api/v1/vehicles/${v.id}/reactivate`, {})
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+    } catch {
+      await confirmAsk({
+        title: 'No se pudo reactivar',
+        message: 'Error al reactivar el vehículo. Inténtalo de nuevo.',
+        confirmLabel: 'Entendido',
+        kind: 'warning',
+      })
     }
   }
 
@@ -307,7 +360,16 @@ export default function VehiclesPage() {
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
 
         {/* Cabecera */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--fg-muted)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={e => setShowInactive(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            Mostrar vehículos dados de baja
+          </label>
           {isAdmin && <button
             onClick={openCreate}
             style={{
@@ -411,35 +473,80 @@ export default function VehiclesPage() {
                           {dev?.last_seen ? formatLastSeen(dev.last_seen) : '—'}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right', display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
-                          {isAdmin && <button
-                            onClick={() => openEdit(v)}
-                            style={{
-                              background: 'var(--border)',
-                              color: 'var(--fg-primary)',
-                              border: 'none',
-                              borderRadius: 4,
-                              padding: '4px 10px',
-                              fontSize: 12,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Editar
-                          </button>}
-                          {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && (v.manufacturer_tenant_id === userTenantId || v.tenant_id === userTenantId))) && (
-                            <button
-                              onClick={() => openReassign(v)}
-                              style={{
-                                background: 'transparent',
-                                color: 'var(--accent-info)',
-                                border: '1px solid var(--accent-info)',
-                                borderRadius: 4,
-                                padding: '4px 10px',
-                                fontSize: 12,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Reasignar
-                            </button>
+                          {!v.active ? (
+                            <>
+                              <span style={{
+                                display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 11,
+                                background: 'rgba(120,113,108,0.15)', color: 'var(--offline)',
+                              }}>
+                                De baja
+                              </span>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleReactivate(v)}
+                                  style={{
+                                    background: 'transparent',
+                                    color: 'var(--ok)',
+                                    border: '1px solid var(--ok)',
+                                    borderRadius: 4,
+                                    padding: '4px 10px',
+                                    fontSize: 12,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Reactivar
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {isAdmin && <button
+                                onClick={() => openEdit(v)}
+                                style={{
+                                  background: 'var(--border)',
+                                  color: 'var(--fg-primary)',
+                                  border: 'none',
+                                  borderRadius: 4,
+                                  padding: '4px 10px',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Editar
+                              </button>}
+                              {isAdmin && (userTier === 'cmg' || (userTier === 'manufacturer' && (v.manufacturer_tenant_id === userTenantId || v.tenant_id === userTenantId))) && (
+                                <button
+                                  onClick={() => openReassign(v)}
+                                  style={{
+                                    background: 'transparent',
+                                    color: 'var(--accent-info)',
+                                    border: '1px solid var(--accent-info)',
+                                    borderRadius: 4,
+                                    padding: '4px 10px',
+                                    fontSize: 12,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Reasignar
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleDecommission(v)}
+                                  style={{
+                                    background: 'transparent',
+                                    color: 'var(--danger)',
+                                    border: '1px solid var(--danger)',
+                                    borderRadius: 4,
+                                    padding: '4px 10px',
+                                    fontSize: 12,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Dar de baja
+                                </button>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>

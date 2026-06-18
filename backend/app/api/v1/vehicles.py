@@ -779,10 +779,15 @@ async def apply_system_block_template(
 async def list_vehicles(
     request: Request,
     tenant_id: uuid.UUID | None = Query(None),
+    include_inactive: bool = Query(False),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Vehicle).where(Vehicle.active == True)
+    # Por defecto solo vehículos activos; include_inactive=True incluye los dados de baja
+    # (para poder verlos y reactivarlos desde la UI de gestión).
+    query = select(Vehicle)
+    if not include_inactive:
+        query = query.where(Vehicle.active == True)
     if user.tenant_tier == "cmg":
         if tenant_id is not None:
             query = query.where(Vehicle.tenant_id == tenant_id)
@@ -1087,6 +1092,58 @@ async def reassign_vehicle(
         alert_rules_deactivated=deactivated,
         grants_revoked=revoked,
     )
+
+
+@router.delete("/vehicles/{vehicle_id}", status_code=204)
+async def deactivate_vehicle(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Da de baja un vehículo (soft-delete reversible: active=False).
+
+    No borra telemetría ni el dispositivo asociado; el equipo queda vinculado
+    para poder reactivar el vehículo más adelante o desvincularlo a mano.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if not vehicle.active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+
+    # Candado: no dar de baja si hay órdenes de trabajo abiertas (igual que reasignar)
+    open_order = await db.execute(
+        select(WorkOrder.id).where(
+            WorkOrder.vehicle_id == vehicle_id,
+            ~WorkOrder.status.in_(["done", "cancelled"]),
+        ).limit(1)
+    )
+    if open_order.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cierra o cancela las órdenes abiertas antes de dar de baja el vehículo",
+        )
+
+    vehicle.active = False
+    await db.commit()
+
+
+@router.post("/vehicles/{vehicle_id}/reactivate", response_model=VehicleOut)
+async def reactivate_vehicle(
+    vehicle_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reactiva un vehículo dado de baja (active=True)."""
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
+    if vehicle.active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El vehículo ya está activo")
+    vehicle.active = True
+    await db.commit()
+    await db.refresh(vehicle)
+    return vehicle
 
 
 @router.get("/vehicles/statuses", response_model=list[VehicleStatus])
