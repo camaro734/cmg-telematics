@@ -35,6 +35,8 @@ export interface VehicleReassignOut {
   reassigned_at: string
   alert_rules_deactivated: number
   grants_revoked: number
+  device_moved: boolean
+  device_imei: string | null
 }
 
 export interface VehicleStatus {
@@ -129,6 +131,11 @@ export interface TenantOut {
   brand_tokens: BrandTokens | null
   business_cif: string | null
   business_address: string | null
+  manufacturer_can_view_operations: boolean
+  manufacturer_can_view_can_data: boolean
+  manufacturer_can_create_rules: boolean
+  manufacturer_can_manage_clients: boolean
+  manufacturer_can_transfer_vehicles: boolean
   created_at: string
   enabled_modules: string[]
 }
@@ -579,6 +586,11 @@ export interface TenantUpdate {
   enabled_modules?: string[]
   business_cif?: string | null
   business_address?: string | null
+  manufacturer_can_view_operations?: boolean
+  manufacturer_can_view_can_data?: boolean
+  manufacturer_can_create_rules?: boolean
+  manufacturer_can_manage_clients?: boolean
+  manufacturer_can_transfer_vehicles?: boolean
 }
 
 export interface UserOut {
@@ -806,4 +818,12 @@ export interface MetricTypePatch {
 export interface PreferencesPatch {
   historic_metrics?: Record<string, MetricTypePatch>
   sensor_order?: Record<string, string[] | null>
+}
+
+export interface MyProfile {
+  tenant_id: string
+  tier: string
+  enabled_modules: string[]
+  manufacturer_can_manage_clients: boolean
+  manufacturer_can_transfer_vehicles: boolean
 }
