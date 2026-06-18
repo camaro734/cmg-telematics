@@ -47,7 +47,8 @@ MFR_ADMIN = CurrentUser(
 class _MockTenant:
     def __init__(self, tid: uuid.UUID, tier: str, name: str = "Test", slug: str = "test",
                  enabled_modules: list | None = None, active: bool = True,
-                 parent_id: uuid.UUID | None = None, parent_manufacturer_id: uuid.UUID | None = None):
+                 parent_id: uuid.UUID | None = None, parent_manufacturer_id: uuid.UUID | None = None,
+                 manufacturer_can_manage_clients: bool = False):
         self.id = tid
         self.tier = tier
         self.name = name
@@ -56,6 +57,11 @@ class _MockTenant:
         self.enabled_modules = enabled_modules or []
         self.parent_id = parent_id
         self.parent_manufacturer_id = parent_manufacturer_id
+        self.manufacturer_can_view_operations = True
+        self.manufacturer_can_view_can_data = True
+        self.manufacturer_can_create_rules = True
+        self.manufacturer_can_manage_clients = manufacturer_can_manage_clients
+        self.manufacturer_can_transfer_vehicles = False
         self.brand_name = None
         self.brand_color = None
         self.logo_url = None
@@ -101,6 +107,18 @@ def _make_db(get_side_effects: list) -> AsyncMock:
             obj.business_cif = None
         if not hasattr(obj, 'business_address'):
             obj.business_address = None
+        # El refresh real de BD aplica los server_default de los flags de fabricante;
+        # aquí los reproducimos (3 antiguos = true, 2 de autogestión = false).
+        if getattr(obj, 'manufacturer_can_view_operations', None) is None:
+            obj.manufacturer_can_view_operations = True
+        if getattr(obj, 'manufacturer_can_view_can_data', None) is None:
+            obj.manufacturer_can_view_can_data = True
+        if getattr(obj, 'manufacturer_can_create_rules', None) is None:
+            obj.manufacturer_can_create_rules = True
+        if getattr(obj, 'manufacturer_can_manage_clients', None) is None:
+            obj.manufacturer_can_manage_clients = False
+        if getattr(obj, 'manufacturer_can_transfer_vehicles', None) is None:
+            obj.manufacturer_can_transfer_vehicles = False
 
     db.refresh = _refresh
     return db
@@ -143,8 +161,10 @@ def test_cmg_creates_client_gets_default_modules():
 
 def test_manufacturer_creates_client_gets_default_modules():
     """Fabricante crea tenant client → módulos default sembrados."""
-    mfr_parent = _MockTenant(MANUFACTURER_TENANT_ID, "manufacturer")
-    db = _make_db([mfr_parent])
+    # El fabricante necesita el flag manage_clients habilitado por CMG. create_tenant
+    # hace db.get dos veces (verificación del flag + validación del parent), ambas al fabricante.
+    mfr_parent = _MockTenant(MANUFACTURER_TENANT_ID, "manufacturer", manufacturer_can_manage_clients=True)
+    db = _make_db([mfr_parent, mfr_parent])
     _setup(MFR_ADMIN, db)
     with TestClient(app) as c:
         r = c.post("/api/v1/tenants", json={

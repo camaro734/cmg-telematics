@@ -71,6 +71,10 @@ async def create_tenant(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin para crear clientes")
         if body.tier != "client":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Un fabricante solo puede crear tenants tier=client")
+        # Verificar que CMG ha habilitado la gestión de clientes para este fabricante
+        mfr = await db.get(Tenant, user.tenant_id)
+        if not mfr or not mfr.manufacturer_can_manage_clients:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CMG no ha habilitado la gestión de clientes para este fabricante")
         body = body.model_copy(update={
             "tier": "client",
             "parent_id": user.tenant_id,
@@ -416,6 +420,11 @@ async def create_tenant_user(
     db: AsyncSession = Depends(get_db),
 ):
     await assert_can_manage_tenant(user, tenant_id, db)
+    # Fabricante necesita el flag manage_clients habilitado por CMG para gestionar usuarios
+    if user.tenant_tier == "manufacturer":
+        mfr = await db.get(Tenant, user.tenant_id)
+        if not mfr or not mfr.manufacturer_can_manage_clients:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CMG no ha habilitado la gestión de clientes para este fabricante")
     tenant = await db.get(Tenant, tenant_id)
     if not tenant or not tenant.active:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")

@@ -54,6 +54,47 @@ class _MfrTenant:
         self.manufacturer_can_transfer_vehicles = False
 
 
+def test_manufacturer_without_flag_cannot_create_client_403():
+    mfr = _MfrTenant()  # manage_clients = False
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=mfr)
+    _setup(MFR_ADMIN, db)
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        "/api/v1/tenants",
+        json={"tier": "client", "name": "Delimex", "slug": "delimex"},
+    )
+    assert resp.status_code == 403
+
+
+def test_manufacturer_with_flag_creates_client_201():
+    mfr = _MfrTenant()
+    mfr.manufacturer_can_manage_clients = True
+    db = AsyncMock()
+    # db.get(Tenant, MFR_ID) → mfr;  slug-check select → None
+    db.get = AsyncMock(return_value=mfr)
+    db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
+    db.add = MagicMock()  # db.add es síncrono en SQLAlchemy; evita coroutine sin await
+    # refresh simula lo que haría la BD: rellena los server_defaults que ORM no aplica en __init__
+    async def _refresh(obj):
+        obj.id = obj.id or uuid.uuid4()
+        obj.active = True if obj.active is None else obj.active
+        obj.created_at = obj.created_at or datetime.now(timezone.utc)
+        obj.manufacturer_can_view_operations = True
+        obj.manufacturer_can_view_can_data = True
+        obj.manufacturer_can_create_rules = True
+        obj.manufacturer_can_manage_clients = getattr(obj, "manufacturer_can_manage_clients", False) or False
+        obj.manufacturer_can_transfer_vehicles = False
+        obj.enabled_modules = obj.enabled_modules or []
+        obj.compliance_level = getattr(obj, "compliance_level", "standard") or "standard"
+    db.refresh = _refresh
+    _setup(MFR_ADMIN, db)
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        "/api/v1/tenants",
+        json={"tier": "client", "name": "Delimex", "slug": "delimex"},
+    )
+    assert resp.status_code == 201
+
+
 def test_cmg_can_set_manufacturer_flags():
     tenant = _MfrTenant()
     db = AsyncMock()
