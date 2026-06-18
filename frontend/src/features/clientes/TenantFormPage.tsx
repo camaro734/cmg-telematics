@@ -120,6 +120,12 @@ export default function TenantFormPage() {
   const [businessCif, setBusinessCif] = useState('')
   const [businessAddress, setBusinessAddress] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  // Permisos fabricante — solo relevantes cuando tier === 'manufacturer'
+  const [mfrViewOps, setMfrViewOps] = useState(true)
+  const [mfrViewCan, setMfrViewCan] = useState(true)
+  const [mfrCreateRules, setMfrCreateRules] = useState(true)
+  const [mfrManageClients, setMfrManageClients] = useState(false)
+  const [mfrTransferVehicles, setMfrTransferVehicles] = useState(false)
 
   const { data: tenant } = useQuery({
     queryKey: keys.cliente(id!),
@@ -135,6 +141,14 @@ export default function TenantFormPage() {
       setFormModules(tenant.enabled_modules ?? [])
       setBusinessCif(tenant.business_cif ?? '')
       setBusinessAddress(tenant.business_address ?? '')
+      // Inicializar permisos de fabricante desde los valores persistidos
+      if (tenant.tier === 'manufacturer') {
+        setMfrViewOps(tenant.manufacturer_can_view_operations)
+        setMfrViewCan(tenant.manufacturer_can_view_can_data)
+        setMfrCreateRules(tenant.manufacturer_can_create_rules)
+        setMfrManageClients(tenant.manufacturer_can_manage_clients)
+        setMfrTransferVehicles(tenant.manufacturer_can_transfer_vehicles)
+      }
     }
   }, [tenant])
 
@@ -211,6 +225,13 @@ export default function TenantFormPage() {
         enabled_modules: formModules,
         business_cif: businessCif.trim() || null,
         business_address: businessAddress.trim() || null,
+        ...(tenant?.tier === 'manufacturer' ? {
+          manufacturer_can_view_operations: mfrViewOps,
+          manufacturer_can_view_can_data: mfrViewCan,
+          manufacturer_can_create_rules: mfrCreateRules,
+          manufacturer_can_manage_clients: mfrManageClients,
+          manufacturer_can_transfer_vehicles: mfrTransferVehicles,
+        } : {}),
       } satisfies TenantUpdate)
     } else {
       mutation.mutate({
@@ -323,6 +344,26 @@ export default function TenantFormPage() {
                     style={inputStyle}
                   />
                 </label>
+              </div>
+            )}
+
+            {isEdit && tenant?.tier === 'manufacturer' && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Permisos del fabricante
+                </div>
+                {[
+                  { label: 'Puede ver operaciones de sus máquinas', checked: mfrViewOps, set: setMfrViewOps },
+                  { label: 'Puede ver datos CAN de sus máquinas', checked: mfrViewCan, set: setMfrViewCan },
+                  { label: 'Puede crear reglas de alerta', checked: mfrCreateRules, set: setMfrCreateRules },
+                  { label: 'Puede gestionar sus clientes', checked: mfrManageClients, set: setMfrManageClients },
+                  { label: 'Puede traspasar vehículos a sus clientes', checked: mfrTransferVehicles, set: setMfrTransferVehicles },
+                ].map(row => (
+                  <label key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={row.checked} onChange={e => row.set(e.target.checked)} style={{ cursor: 'pointer' }} />
+                    <span style={{ fontSize: 13, color: 'var(--fg-primary)' }}>{row.label}</span>
+                  </label>
+                ))}
               </div>
             )}
 
