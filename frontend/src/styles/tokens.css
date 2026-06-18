@@ -30,9 +30,14 @@
   /* ---------- Foreground / text ---------- */
   --fg-primary:      #F1F5F9;
   --fg-secondary:    #E2E8F0;
-  --fg-tertiary:     #94A3B8;
-  --fg-muted:        #8E9CB0;   /* subido desde #64748B (era 3.97:1, fallaba AA) → legible a pleno sol */
-  --fg-dim:          #788AA0;   /* subido desde #475569 (era 2.49:1, crítico) → WCAG AA */
+  /* Ramp gris para texto secundario/labels/meta. Subido (2ª pasada) porque menús
+     (--fg-tertiary) y modales (--fg-muted, el token más usado) se ven sobre fondos
+     elevados (--bg-surface/card/elevated), donde el contraste real es menor. Estos
+     valores quedan claramente legibles (~5-6.5:1) sobre esos fondos, no solo sobre
+     el casi-negro --bg-base. */
+  --fg-tertiary:     #B4BFD0;   /* menús inactivos; desde #94A3B8 */
+  --fg-muted:        #AAB6CA;   /* labels/descr. de modales y meta; desde #64748B→#8E9CB0 */
+  --fg-dim:          #9AA8BD;   /* texto más tenue; desde #475569→#788AA0 */
 
   /* ---------- Border / divider ---------- */
   --border:          #2D3148;
@@ -48,7 +53,7 @@
   --danger-soft:     rgba(239, 68, 68, 0.15);
   --info:            #3B82F6;
   --info-soft:       rgba(59, 130, 246, 0.15);
-  --offline:         #8E9CB0;   /* subido desde #64748B — el texto de estado "offline" se usa pequeño y debe leerse */
+  --offline:         #AAB6CA;   /* alineado con --fg-muted para que el texto "offline" no quede más apagado */
   --offline-soft:    rgba(100, 116, 139, 0.15);
   --danger-12:       rgba(239, 68, 68, 0.12);
   --danger-25:       rgba(239, 68, 68, 0.25);
