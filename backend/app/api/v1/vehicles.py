@@ -1013,6 +1013,12 @@ async def reassign_vehicle(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo puedes reasignar vehículos de tu fabricante",
             )
+        mfr_tenant = await db.get(Tenant, user.tenant_id)
+        if not mfr_tenant or not mfr_tenant.manufacturer_can_transfer_vehicles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CMG no ha habilitado el traspaso de vehículos para este fabricante",
+            )
 
     target = await db.get(Tenant, body.target_tenant_id)
     if not target:
@@ -1082,6 +1088,18 @@ async def reassign_vehicle(
     for plan in plans_result.scalars().all():
         plan.tenant_id = body.target_tenant_id
 
+    # 5) La cajita viaja con el camión: el device montado pasa al nuevo dueño.
+    device_result = await db.execute(
+        select(Device).where(Device.vehicle_id == vehicle_id, Device.active == True)
+    )
+    moved_device = device_result.scalar_one_or_none()
+    device_moved = False
+    device_imei = None
+    if moved_device is not None:
+        moved_device.tenant_id = body.target_tenant_id
+        device_moved = True
+        device_imei = moved_device.imei
+
     await db.commit()
 
     return VehicleReassignOut(
@@ -1091,6 +1109,8 @@ async def reassign_vehicle(
         reassigned_at=datetime.now(timezone.utc),
         alert_rules_deactivated=deactivated,
         grants_revoked=revoked,
+        device_moved=device_moved,
+        device_imei=device_imei,
     )
 
 

@@ -78,6 +78,7 @@ class _MockTenant:
         self.id = tid
         self.parent_manufacturer_id = parent_mfr
         self.active = True
+        self.manufacturer_can_transfer_vehicles = True
 
 
 class _MockPlan:
@@ -119,12 +120,13 @@ def _scalars_list(items):
 
 
 def _default_executes():
-    """Secuencia feliz: sin órdenes abiertas, sin reglas específicas, sin grants, sin planes."""
+    """Secuencia feliz: sin órdenes abiertas, sin reglas específicas, sin grants, sin planes, sin device."""
     return [
         _scalar_none(),     # WorkOrder check
         _scalars_list([]),  # AlertRule específicas
         _scalars_list([]),  # PermissionGrant
         _scalars_list([]),  # MaintenancePlan
+        _scalar_none(),     # Device montado (ninguno)
     ]
 
 
@@ -270,6 +272,7 @@ def test_specific_alert_rules_deactivated():
         _scalars_list([rule]),  # AlertRule específica (1 regla para este vehículo)
         _scalars_list([]),      # PermissionGrant
         _scalars_list([]),      # MaintenancePlan
+        _scalar_none(),         # Device montado (ninguno)
     ])
     db.delete = AsyncMock()
     _setup(CMG_ADMIN, db)
@@ -299,6 +302,7 @@ def test_permission_grants_revoked():
         _scalars_list([]),              # AlertRule
         _scalars_list([grant1, grant2]),# PermissionGrant (2 grants)
         _scalars_list([]),              # MaintenancePlan
+        _scalar_none(),                 # Device montado (ninguno)
     ])
     db.delete = AsyncMock()
     _setup(CMG_ADMIN, db)
@@ -327,6 +331,7 @@ def test_maintenance_plan_tenant_migrated_owner_intact():
         _scalars_list([]),       # AlertRule
         _scalars_list([]),       # PermissionGrant
         _scalars_list([plan]),   # MaintenancePlan (1 plan)
+        _scalar_none(),          # Device montado (ninguno)
     ])
     db.delete = AsyncMock()
     _setup(CMG_ADMIN, db)
@@ -340,3 +345,66 @@ def test_maintenance_plan_tenant_migrated_owner_intact():
     assert plan.tenant_id == RENTA_ID
     # owner_tenant_id intacto — propiedad M3 no cambia con reasignación operativa
     assert plan.owner_tenant_id == OWNER_ID
+
+
+# ---------------------------------------------------------------------------
+# Test 10 — La cajita (device) viaja con el camión al reasignar
+# ---------------------------------------------------------------------------
+class _MockDevice:
+    def __init__(self, tenant_id):
+        self.imei = "356938035643809"
+        self.vehicle_id = VEHICLE_ID
+        self.tenant_id = tenant_id
+        self.active = True
+
+
+def test_reassign_moves_device_with_vehicle():
+    vehicle = _MockVehicle(AGUAS_ID, VPS_ID)
+    target = _MockTenant(RENTA_ID, VPS_ID)
+    device = _MockDevice(AGUAS_ID)
+    db = AsyncMock()
+    db.get = AsyncMock(side_effect=lambda model, pk: vehicle if model is Vehicle else target)
+    # Orden de executes: WorkOrder(none), AlertRule([]), PermissionGrant([]), MaintenancePlan([]), Device(device)
+    execs = [
+        _scalar_none(),     # WorkOrder check
+        _scalars_list([]),  # AlertRule específicas
+        _scalars_list([]),  # PermissionGrant
+        _scalars_list([]),  # MaintenancePlan
+        _scalar_val(device),  # Device montado
+    ]
+    db.execute = AsyncMock(side_effect=execs)
+    db.delete = AsyncMock()
+    _setup(CMG_ADMIN, db)
+
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        f"/api/v1/vehicles/{VEHICLE_ID}/reassign",
+        json={"target_tenant_id": str(RENTA_ID)},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["device_moved"] is True
+    assert data["device_imei"] == "356938035643809"
+    assert device.tenant_id == RENTA_ID
+
+
+# ---------------------------------------------------------------------------
+# Test 11 — Fabricante sin flag no puede traspasar → 403
+# ---------------------------------------------------------------------------
+def test_manufacturer_without_transfer_flag_403():
+    vehicle = _MockVehicle(AGUAS_ID, VPS_ID)
+    mfr = _MockTenant(VPS_ID, None)
+    mfr.manufacturer_can_transfer_vehicles = False
+    db = AsyncMock()
+    # db.get: Vehicle → vehicle; Tenant(VPS_ID, flag) → mfr; Tenant(target) → target
+    target = _MockTenant(RENTA_ID, VPS_ID)
+    def _get(model, pk):
+        if model is Vehicle:
+            return vehicle
+        return mfr if str(pk) == str(VPS_ID) else target
+    db.get = AsyncMock(side_effect=_get)
+    _setup(VPS_ADMIN, db)
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        f"/api/v1/vehicles/{VEHICLE_ID}/reassign",
+        json={"target_tenant_id": str(RENTA_ID)},
+    )
+    assert resp.status_code == 403

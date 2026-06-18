@@ -162,6 +162,8 @@ class VehicleReassignOut(BaseModel):
     reassigned_at: datetime
     alert_rules_deactivated: int
     grants_revoked: int
+    device_moved: bool = False
+    device_imei: str | None = None
 
 
 class VehicleStatus(BaseModel):
