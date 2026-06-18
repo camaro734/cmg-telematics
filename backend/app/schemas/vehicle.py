@@ -180,6 +180,7 @@ class VehicleStatus(BaseModel):
     dout_state: dict[int, bool] = {}
     status: str | None = None
     lng: float | None = None
+    device_out_of_service: bool = False
 
 
 class TelemetryPoint(BaseModel):

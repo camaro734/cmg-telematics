@@ -1138,6 +1138,15 @@ async def get_vehicles_statuses_bulk(
     if not accessible_ids:
         return []
 
+    # Estado fuera-de-servicio del device vinculado (bulk, sin N+1)
+    oos_rows = await db.execute(
+        select(Device.vehicle_id, Device.out_of_service)
+        .where(Device.vehicle_id.in_(accessible_ids), Device.active == True)
+    )
+    oos_by_vehicle: dict[uuid.UUID, bool] = {
+        row.vehicle_id: row.out_of_service for row in oos_rows.all()
+    }
+
     # Leer Redis en pipeline: un hgetall por vehicle en una sola operación
     try:
         pipe = redis.pipeline()
@@ -1257,6 +1266,7 @@ async def get_vehicles_statuses_bulk(
             ext_voltage_mv=ext_voltage_mv,
             can_data=can_data,
             dout_state=dout_state,
+            device_out_of_service=bool(oos_by_vehicle.get(vid, False)),
         ))
 
     return statuses
@@ -1388,6 +1398,13 @@ async def get_vehicle_status(
     else:
         effective_online = False
 
+    # Estado fuera-de-servicio del device vinculado
+    oos_result = await db.execute(
+        select(Device.out_of_service)
+        .where(Device.vehicle_id == vehicle_id, Device.active == True)
+    )
+    device_oos = bool(oos_result.scalar_one_or_none() or False)
+
     # Calcular status
     _speed = _parse_float(speed_str) or 0
     _ign_det = ignition_val or False
@@ -1416,6 +1433,7 @@ async def get_vehicle_status(
         can_data=can_data,
         dout_state=dout_state,
         status=_vstatus,
+        device_out_of_service=device_oos,
     )
 
 
