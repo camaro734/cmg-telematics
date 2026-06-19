@@ -28,6 +28,7 @@ class TenantOut(BaseModel):
     manufacturer_can_create_rules: bool = True
     manufacturer_can_manage_clients: bool = False
     manufacturer_can_transfer_vehicles: bool = False
+    can_actuate_controls: bool = False
     created_at: datetime
 
 
@@ -55,6 +56,7 @@ class TenantUpdate(BaseModel):
     manufacturer_can_create_rules: bool | None = None
     manufacturer_can_manage_clients: bool | None = None
     manufacturer_can_transfer_vehicles: bool | None = None
+    can_actuate_controls: bool | None = None
 
 
 class BrandTokensUpdate(BaseModel):

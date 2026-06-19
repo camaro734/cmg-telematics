@@ -6,6 +6,8 @@ import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import UserFormModal from './UserFormModal'
 import GrantsSection from './GrantsSection'
+import ClientActuationSection from './ClientActuationSection'
+import { useAuthStore } from '../auth/useAuthStore'
 import { Input } from '../../shared/ui/Input'
 import BrandTokensEditor from './BrandTokensEditor'
 import { useConfirm } from '../../shared/ui/ConfirmDialog'
@@ -118,6 +120,7 @@ export default function TenantDetailPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const confirmAsk = useConfirm()
+  const isCmg = useAuthStore(s => s.user?.tenant_tier === 'cmg')
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<UserOut | undefined>()
 
@@ -323,6 +326,13 @@ export default function TenantDetailPage() {
             Ver en Flota →
           </Link>
         </SectionCard>
+
+        {/* Clientes que pueden accionar controles (solo CMG, solo fabricantes) */}
+        {isCmg && tenant.tier === 'manufacturer' && (
+          <SectionCard title="Clientes que pueden accionar controles">
+            <ClientActuationSection manufacturerId={id!} />
+          </SectionCard>
+        )}
 
         {/* 4. Permission Grants */}
         <SectionCard title="Permission Grants">

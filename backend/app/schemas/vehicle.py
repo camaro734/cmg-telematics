@@ -110,6 +110,9 @@ class VehicleTypeOut(BaseModel):
     system_blocks: list[SystemBlock] = []
     manual_can_slots: list[dict[str, Any]] = []
     manual_can_buttons: list[dict[str, Any]] = []
+    # Fabricantes con acceso a esta plantilla. Solo se rellena para CMG admin
+    # (gestión desde la página de Plantillas); vacío para el resto.
+    manufacturer_ids: list[uuid.UUID] = []
 
 
 class VehicleOut(BaseModel):
@@ -286,6 +289,8 @@ class VehicleTypeUpdate(BaseModel):
     name: str | None = None
     slug: str | None = None
     pdf_metrics: list[PdfMetric] | None = None
+    # Si viene, reemplaza el set de fabricantes con acceso a esta plantilla.
+    manufacturer_ids: list[uuid.UUID] | None = None
 
 
 class ManualCanCommandRequest(BaseModel):

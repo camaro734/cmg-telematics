@@ -25,6 +25,7 @@ from app.core.database import get_db
 from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token, hash_password
 from app.models.user import User
 from app.models.tenant import Tenant
+from app.api.v1.access_v2 import tenant_can_actuate_controls
 from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, LogoutRequest, CurrentUser, ForgotPasswordRequest, ResetPasswordRequest
 from app.core.reset_token import generate_reset_token, reset_key_for
 from app.core.reset_mailer import enqueue_reset_email
@@ -240,6 +241,7 @@ async def get_me(
         "enabled_modules": tenant.enabled_modules if tenant else [],
         "manufacturer_can_manage_clients": bool(getattr(tenant, "manufacturer_can_manage_clients", False)) if tenant else False,
         "manufacturer_can_transfer_vehicles": bool(getattr(tenant, "manufacturer_can_transfer_vehicles", False)) if tenant else False,
+        "can_actuate_controls": tenant_can_actuate_controls(current_user.tenant_tier, tenant),
     }
 
 

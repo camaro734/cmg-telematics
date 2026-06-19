@@ -52,6 +52,7 @@ class _MfrTenant:
         self.manufacturer_can_create_rules = True
         self.manufacturer_can_manage_clients = False
         self.manufacturer_can_transfer_vehicles = False
+        self.can_actuate_controls = False
 
 
 def test_manufacturer_without_flag_cannot_create_client_403():
@@ -84,6 +85,7 @@ def test_manufacturer_with_flag_creates_client_201():
         obj.manufacturer_can_create_rules = True
         obj.manufacturer_can_manage_clients = getattr(obj, "manufacturer_can_manage_clients", False) or False
         obj.manufacturer_can_transfer_vehicles = False
+        obj.can_actuate_controls = getattr(obj, "can_actuate_controls", False) or False
         obj.enabled_modules = obj.enabled_modules or []
         obj.compliance_level = getattr(obj, "compliance_level", "standard") or "standard"
     db.refresh = _refresh

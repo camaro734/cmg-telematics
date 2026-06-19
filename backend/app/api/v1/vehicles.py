@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import select, text, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
@@ -32,6 +32,7 @@ from app.schemas.vehicle import (
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
+from app.models.vehicle_type_manufacturer import VehicleTypeManufacturer
 from app.models.maintenance import MaintenancePlan
 from app.models.device import Device
 from app.models.driver import Driver, VehicleDriverAssignment
@@ -45,7 +46,7 @@ from app.models.manual_can_button import ManualCanButton
 from app.services import manual_can_config
 from app.services.manual_can_config import is_fmc_error_response
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
-from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids
+from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids, assert_can_actuate_controls
 
 from pydantic import BaseModel, Field
 
@@ -213,13 +214,64 @@ async def get_sensor_catalog(
     return sorted(catalog.values(), key=lambda x: x.label.lower())
 
 
+async def _effective_manufacturer_id(user: CurrentUser, db: AsyncSession) -> uuid.UUID | None:
+    """Fabricante al que se acota el catálogo de plantillas del usuario.
+
+    - cmg: None (ve todas, sin filtro).
+    - manufacturer: su propio tenant.
+    - client/subclient: su parent_manufacturer_id (None si cuelga directo de CMG → ve todas).
+    """
+    if user.tenant_tier == "cmg":
+        return None
+    if user.tenant_tier == "manufacturer":
+        return uuid.UUID(str(user.tenant_id))
+    tenant = await db.get(Tenant, uuid.UUID(str(user.tenant_id)))
+    return tenant.parent_manufacturer_id if tenant else None
+
+
 @router.get("/vehicle-types", response_model=list[VehicleTypeOut])
 async def list_vehicle_types(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(VehicleType).order_by(VehicleType.name))
-    return result.scalars().all()
+    types = list(result.scalars().all())
+
+    # Filtrado por fabricante: lista blanca de plantillas asignadas + las que el
+    # tenant ya usa en vehículos existentes (salvaguarda para no romper la flota
+    # si CMG des-asigna un tipo en uso). CMG y clientes directos de CMG ven todas.
+    manufacturer_id = await _effective_manufacturer_id(user, db)
+    if manufacturer_id is not None:
+        assigned = await db.execute(
+            select(VehicleTypeManufacturer.vehicle_type_id).where(
+                VehicleTypeManufacturer.tenant_id == manufacturer_id
+            )
+        )
+        allowed_ids = set(assigned.scalars().all())
+        in_use = await db.execute(
+            select(Vehicle.vehicle_type_id)
+            .where(Vehicle.tenant_id == uuid.UUID(str(user.tenant_id)))
+            .distinct()
+        )
+        allowed_ids |= set(in_use.scalars().all())
+        types = [t for t in types if t.id in allowed_ids]
+
+    # manufacturer_ids solo es relevante para CMG (checkboxes de la página de
+    # Plantillas). Se carga en bloque para evitar N+1.
+    assoc_map: dict[uuid.UUID, list[uuid.UUID]] = {}
+    if user.tenant_tier == "cmg":
+        rows = await db.execute(
+            select(VehicleTypeManufacturer.vehicle_type_id, VehicleTypeManufacturer.tenant_id)
+        )
+        for vt_id, t_id in rows.all():
+            assoc_map.setdefault(vt_id, []).append(t_id)
+
+    out: list[VehicleTypeOut] = []
+    for t in types:
+        item = VehicleTypeOut.model_validate(t)
+        item.manufacturer_ids = assoc_map.get(t.id, [])
+        out.append(item)
+    return out
 
 
 @router.patch("/vehicle-types/{type_id}/sensor-schema", response_model=VehicleTypeOut)
@@ -486,9 +538,33 @@ async def update_vehicle_type(
                 detail="No se puede duplicar una métrica en pdf_metrics",
             )
         vtype.pdf_metrics = [m.model_dump() for m in body.pdf_metrics]
+    if body.manufacturer_ids is not None:
+        # Reemplaza el set de fabricantes con acceso. Cada id debe ser tier manufacturer.
+        target_ids = set(body.manufacturer_ids)
+        for tid in target_ids:
+            tenant = await db.get(Tenant, tid)
+            if not tenant or tenant.tier != "manufacturer":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Solo se pueden asignar plantillas a tenants fabricante",
+                )
+        await db.execute(
+            delete(VehicleTypeManufacturer).where(
+                VehicleTypeManufacturer.vehicle_type_id == type_id
+            )
+        )
+        for tid in target_ids:
+            db.add(VehicleTypeManufacturer(vehicle_type_id=type_id, tenant_id=tid))
     await db.commit()
     await db.refresh(vtype)
-    return vtype
+    item = VehicleTypeOut.model_validate(vtype)
+    rows = await db.execute(
+        select(VehicleTypeManufacturer.tenant_id).where(
+            VehicleTypeManufacturer.vehicle_type_id == type_id
+        )
+    )
+    item.manufacturer_ids = list(rows.scalars().all())
+    return item
 
 
 @router.delete("/vehicle-types/{type_id}", status_code=204)
@@ -1836,6 +1912,7 @@ async def send_manual_can_command(
     # 1. Auth
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
+    await assert_can_actuate_controls(user, db)
 
     # 2. Multi-tenant check
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
@@ -2526,6 +2603,8 @@ async def toggle_manual_can_button(
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    # El fabricante sí acciona (scope operational); el cliente bajo fabricante solo si tiene el permiso.
+    await assert_can_actuate_controls(user, db)
 
     slots, buttons = await _vehicle_manual_can_cfg(vehicle, db)
     slot = next((s for s in slots if str(s["id"]) == str(slot_id)), None)
@@ -2706,6 +2785,7 @@ async def send_dout_command(
 ):
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=403, detail="Se requiere rol admin u operador")
+    await assert_can_actuate_controls(user, db)
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="write")
     if not vehicle.active:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")

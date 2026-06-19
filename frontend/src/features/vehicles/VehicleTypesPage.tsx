@@ -19,6 +19,7 @@ import DoutConfigSection from './DoutConfigSection'
 import ManualCanConfigSection from './ManualCanConfigSection'
 import AlertRulesSection from './AlertRulesSection'
 import SystemBlocksSection from './SystemBlocksSection'
+import ManufacturersAccessSection from './ManufacturersAccessSection'
 
 // ── Form state types ───────────────────────────────────────────────────────
 
@@ -583,6 +584,13 @@ export default function VehicleTypesPage() {
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
                   <SystemBlocksSection typeId={selectedType.id} selectedType={selectedType} />
+                )}
+                {user?.tenant_tier === 'cmg' && user?.role === 'admin' && selectedType && (
+                  <ManufacturersAccessSection
+                    key={selectedType.id}
+                    typeId={selectedType.id}
+                    selectedType={selectedType}
+                  />
                 )}
                 {user?.tenant_tier === 'cmg' && user?.role === 'admin' && (
                   <div style={{ borderTop: '1px solid var(--border)', marginTop: 24, paddingTop: 20 }}>

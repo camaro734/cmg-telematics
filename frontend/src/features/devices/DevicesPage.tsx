@@ -197,7 +197,7 @@ export default function DevicesPage() {
               ))}
             </Select>
           )}
-          {isAdmin && <button
+          {isCmg && isAdmin && <button
             onClick={() => setShowModal(true)}
             style={{
               background: 'var(--cmg-teal)',

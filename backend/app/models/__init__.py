@@ -3,6 +3,7 @@ from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.permission_grant import PermissionGrant
 from app.models.vehicle_type import VehicleType
+from app.models.vehicle_type_manufacturer import VehicleTypeManufacturer
 from app.models.vehicle import Vehicle
 from app.models.device import Device
 from app.models.device_data_usage import DeviceDataUsage
@@ -23,7 +24,7 @@ from app.models.system_settings import SystemSettings
 from app.models.system_block_template import SystemBlockTemplate
 
 __all__ = [
-    "Base", "Tenant", "User", "PermissionGrant", "VehicleType",
+    "Base", "Tenant", "User", "PermissionGrant", "VehicleType", "VehicleTypeManufacturer",
     "Vehicle", "Device", "DeviceDataUsage", "TelemetryRecord", "AlertRule", "AlertInstance",
     "MaintenancePlan", "MaintenanceLog", "CommandLog", "VehicleManualCanSlot", "ManualCanButton",
     "Driver", "WorkOrder", "WorkOrderStop", "WorkReport", "TenantDocCounter",

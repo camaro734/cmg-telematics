@@ -62,6 +62,7 @@ class _MockTenant:
         self.manufacturer_can_create_rules = True
         self.manufacturer_can_manage_clients = manufacturer_can_manage_clients
         self.manufacturer_can_transfer_vehicles = False
+        self.can_actuate_controls = False
         self.brand_name = None
         self.brand_color = None
         self.logo_url = None
@@ -119,6 +120,8 @@ def _make_db(get_side_effects: list) -> AsyncMock:
             obj.manufacturer_can_manage_clients = False
         if getattr(obj, 'manufacturer_can_transfer_vehicles', None) is None:
             obj.manufacturer_can_transfer_vehicles = False
+        if getattr(obj, 'can_actuate_controls', None) is None:
+            obj.can_actuate_controls = False
 
     db.refresh = _refresh
     return db

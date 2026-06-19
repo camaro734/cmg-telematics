@@ -35,6 +35,10 @@ class Tenant(Base):
     # Autogestión del fabricante (solo CMG las activa). Por defecto false.
     manufacturer_can_manage_clients: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     manufacturer_can_transfer_vehicles: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    # Permite a este cliente (bajo un fabricante) accionar controles (DOUT/Manual CAN).
+    # Por defecto false: los clientes de un fabricante solo ven telemetría hasta que CMG
+    # les concede el control. No afecta a cmg/manufacturer ni a clientes directos de CMG.
+    can_actuate_controls: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     compliance_level: Mapped[str] = mapped_column(String(20), server_default="standard", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

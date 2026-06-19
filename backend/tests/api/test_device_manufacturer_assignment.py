@@ -92,38 +92,17 @@ def clear_overrides():
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — manufacturer admin puede crear dispositivo → 201
+# Test 1 — manufacturer admin NO puede crear dispositivos → 403
+# Solo CMG provisiona dispositivos; el fabricante únicamente los recibe/transfiere.
 # ---------------------------------------------------------------------------
-def test_manufacturer_admin_can_create_device_201():
-    db = AsyncMock()
-    db.get = AsyncMock(return_value=MagicMock(id=VPS_TENANT_ID))
-
-    created = _mock_device(tenant_id=VPS_TENANT_ID)
-
-    async def _fake_refresh(obj):
-        obj.id = created.id
-        obj.tenant_id = VPS_TENANT_ID
-        obj.vehicle_id = None
-        obj.imei = "111222333444555"
-        obj.model = "FMC650"
-        obj.firmware_ver = None
-        obj.online = False
-        obj.last_seen = None
-        obj.sim_phone = None
-        obj.active = True
-        obj.out_of_service = False
-        obj.out_of_service_since = None
-        obj.created_at = datetime.now(timezone.utc)
-
-    db.refresh = _fake_refresh
-    _setup(VPS_ADMIN, db)
+def test_manufacturer_admin_cannot_create_device_403():
+    _setup(VPS_ADMIN, AsyncMock())
 
     resp = TestClient(app, raise_server_exceptions=False).post(
         "/api/v1/devices",
         json={"imei": "111222333444555", "model": "FMC650", "tenant_id": str(VPS_TENANT_ID)},
     )
-    assert resp.status_code == 201
-    assert resp.json()["imei"] == "111222333444555"
+    assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------

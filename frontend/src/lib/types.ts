@@ -136,6 +136,7 @@ export interface TenantOut {
   manufacturer_can_create_rules: boolean
   manufacturer_can_manage_clients: boolean
   manufacturer_can_transfer_vehicles: boolean
+  can_actuate_controls: boolean
   created_at: string
   enabled_modules: string[]
 }
@@ -234,6 +235,8 @@ export interface VehicleTypeOut {
   system_blocks: SystemBlock[]
   manual_can_slots: ManualCanSlotCfg[]
   manual_can_buttons: ManualCanButtonCfg[]
+  // Fabricantes con acceso a esta plantilla (solo poblado para CMG admin).
+  manufacturer_ids?: string[]
 }
 
 export interface ManualCanSlotCfg {
@@ -826,4 +829,5 @@ export interface MyProfile {
   enabled_modules: string[]
   manufacturer_can_manage_clients: boolean
   manufacturer_can_transfer_vehicles: boolean
+  can_actuate_controls: boolean
 }

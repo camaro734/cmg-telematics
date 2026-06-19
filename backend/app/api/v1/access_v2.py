@@ -26,6 +26,32 @@ Operation = Literal["read", "write", "delete"]
 Scope = Literal["all", "technical", "operational"]
 
 
+def tenant_can_actuate_controls(user_tier: str, tenant: Tenant | None) -> bool:
+    """¿Puede este usuario accionar controles (DOUT/Manual CAN)?
+
+    - cmg y manufacturer: siempre.
+    - cliente directo de CMG (parent_manufacturer_id is None): siempre.
+    - cliente/subcliente bajo un fabricante: solo si su flag can_actuate_controls
+      está activo (lo concede CMG cliente a cliente). Por defecto solo lectura.
+    """
+    if user_tier in ("cmg", "manufacturer"):
+        return True
+    if tenant is None or tenant.parent_manufacturer_id is None:
+        return True
+    return bool(getattr(tenant, "can_actuate_controls", False))
+
+
+async def assert_can_actuate_controls(user: CurrentUser, db: AsyncSession) -> None:
+    """Bloquea (403) el accionamiento de controles a los clientes de un fabricante
+    que no tienen el permiso concedido. La telemetría sigue siendo de solo lectura."""
+    tenant = await db.get(Tenant, user.tenant_id)
+    if not tenant_can_actuate_controls(user.tenant_tier, tenant):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu organización tiene acceso de solo lectura; los controles los gestiona el fabricante",
+        )
+
+
 async def _log_access(
     user: CurrentUser,
     vehicle: Vehicle,

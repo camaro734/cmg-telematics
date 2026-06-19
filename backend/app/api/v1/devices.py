@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case, update
+from sqlalchemy import select, func, case, update, or_
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
@@ -74,10 +74,25 @@ async def list_devices(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Device)
-    if user.tenant_tier != "cmg":
+    if user.tenant_tier == "cmg":
+        if tenant_id is not None:
+            query = query.where(Device.tenant_id == tenant_id)
+    elif user.tenant_tier == "manufacturer":
+        # El fabricante ve sus propios dispositivos Y los montados en vehículos
+        # que él ha fabricado, aunque la cajita ya pertenezca al cliente
+        # (device.tenant_id == cliente). Coherente con list_vehicles, que le
+        # muestra esos vehículos por manufacturer_tenant_id.
+        mfr_vehicle_ids = select(Vehicle.id).where(
+            Vehicle.manufacturer_tenant_id == user.tenant_id
+        )
+        query = query.where(
+            or_(
+                Device.tenant_id == user.tenant_id,
+                Device.vehicle_id.in_(mfr_vehicle_ids),
+            )
+        )
+    else:
         query = query.where(Device.tenant_id == user.tenant_id)
-    elif tenant_id is not None:
-        query = query.where(Device.tenant_id == tenant_id)
     result = await db.execute(query.order_by(Device.created_at.desc()))
     devices = result.scalars().all()
 
@@ -153,24 +168,21 @@ async def create_device(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Política: solo CMG admin o manufacturer admin puede registrar dispositivos.
+    # Política: solo CMG admin puede registrar dispositivos nuevos.
     # CMG puede indicar un tenant destino (debe ser tier cmg o manufacturer).
-    # Manufacturer siempre registra en su propio tenant.
-    if user.tenant_tier not in ("cmg", "manufacturer") or user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG o manufacturer admin puede registrar dispositivos")
-    if user.tenant_tier == "cmg":
-        if body.tenant_id is not None:
-            target_tenant = await db.get(Tenant, body.tenant_id)
-            if not target_tenant:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
-            if target_tenant.tier not in ("cmg", "manufacturer"):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Solo se puede aprovisionar dispositivos a tenants CMG o fabricante",
-                )
-            effective_tenant_id = body.tenant_id
-        else:
-            effective_tenant_id = user.tenant_id
+    # El fabricante NO crea dispositivos; solo recibe/transfiere los que CMG le provisiona.
+    if user.tenant_tier != "cmg" or user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo CMG admin puede registrar dispositivos")
+    if body.tenant_id is not None:
+        target_tenant = await db.get(Tenant, body.tenant_id)
+        if not target_tenant:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+        if target_tenant.tier not in ("cmg", "manufacturer"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Solo se puede aprovisionar dispositivos a tenants CMG o fabricante",
+            )
+        effective_tenant_id = body.tenant_id
     else:
         effective_tenant_id = user.tenant_id
     device = Device(imei=body.imei, model=body.model, firmware_ver=body.firmware_ver, tenant_id=effective_tenant_id)

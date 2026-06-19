@@ -25,31 +25,41 @@ DEFAULT_CLIENT_MODULES: list[str] = sorted(ALLOWED_MODULES)
 
 @router.get("/tenants", response_model=list[TenantOut])
 async def list_tenants(
+    q: str | None = Query(None, description="Búsqueda por nombre o slug (ilike)"),
+    manufacturer_id: uuid.UUID | None = Query(None, description="Filtra los clientes de un fabricante"),
+    limit: int | None = Query(None, le=500, description="Máximo de resultados (sin límite si se omite)"),
+    offset: int = Query(0, ge=0),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Alcance jerárquico según el tier del solicitante (sin parámetros se comporta igual que antes).
+    query = select(Tenant)
     if user.tenant_tier == "cmg":
-        result = await db.execute(select(Tenant).order_by(Tenant.name))
+        pass
     elif user.tenant_tier == "client":
         # client ve su propio tenant + sus subclientes
-        result = await db.execute(
-            select(Tenant).where(
-                (Tenant.id == user.tenant_id) |
-                (Tenant.parent_id == user.tenant_id)
-            ).order_by(Tenant.name)
+        query = query.where(
+            (Tenant.id == user.tenant_id) | (Tenant.parent_id == user.tenant_id)
         )
     elif user.tenant_tier == "manufacturer":
         # manufacturer ve su propio tenant + los clientes que ha creado
-        result = await db.execute(
-            select(Tenant).where(
-                (Tenant.id == user.tenant_id) |
-                (Tenant.parent_manufacturer_id == user.tenant_id)
-            ).order_by(Tenant.name)
+        query = query.where(
+            (Tenant.id == user.tenant_id) | (Tenant.parent_manufacturer_id == user.tenant_id)
         )
     else:
-        result = await db.execute(
-            select(Tenant).where(Tenant.id == user.tenant_id)
-        )
+        query = query.where(Tenant.id == user.tenant_id)
+
+    if manufacturer_id is not None:
+        query = query.where(Tenant.parent_manufacturer_id == manufacturer_id)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.where(or_(Tenant.name.ilike(like), Tenant.slug.ilike(like)))
+
+    query = query.order_by(Tenant.name)
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
+
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -223,7 +233,7 @@ async def patch_tenant(
         for f in (
             "manufacturer_can_view_operations", "manufacturer_can_view_can_data",
             "manufacturer_can_create_rules", "manufacturer_can_manage_clients",
-            "manufacturer_can_transfer_vehicles",
+            "manufacturer_can_transfer_vehicles", "can_actuate_controls",
         ):
             update_data.pop(f, None)
     for field, value in update_data.items():

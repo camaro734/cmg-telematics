@@ -170,19 +170,14 @@ def test_cmg_creates_device_for_client_tier_422():
     assert "fabricante" in r.json()["detail"].lower() or "manufacturer" in r.json()["detail"].lower()
 
 
-def test_manufacturer_forced_to_own_tenant():
-    """Manufacturer siempre registra en su propio tenant aunque envíe otro tenant_id."""
-    vps_tenant = _MockTenant(VPS_ID, "manufacturer")
-    dev = _MockDevice(tenant_id=VPS_ID)
-    db = _make_db(get_side_effects=[vps_tenant, dev])
+def test_manufacturer_cannot_create_device_403():
+    """El fabricante ya no puede registrar dispositivos: solo CMG provisiona."""
+    db = _make_db(get_side_effects=[])
     _setup(VPS_ADMIN, db)
     with TestClient(app) as c:
-        # Aunque envíe CLIENT_ID, debe quedar en VPS_ID
-        r = c.post("/api/v1/devices", json={"imei": "12345678901234", "model": "FMC650", "tenant_id": str(CLIENT_ID)})
-    assert r.status_code == 201
-    # El device se crea con effective_tenant_id = VPS_ID (no CLIENT_ID)
-    added_device = db.add.call_args[0][0]
-    assert str(added_device.tenant_id) == str(VPS_ID)
+        r = c.post("/api/v1/devices", json={"imei": "12345678901234", "model": "FMC650", "tenant_id": str(VPS_ID)})
+    assert r.status_code == 403
+    db.add.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

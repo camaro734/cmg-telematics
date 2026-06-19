@@ -195,6 +195,62 @@ def test_devices_client_scoped_to_own_tenant():
     assert resp.json() == []
 
 
+MFR_TENANT_ID = uuid.UUID("40000000-0000-0000-0000-000000000000")
+MFR_USER = CurrentUser(
+    user_id=uuid.uuid4(), tenant_id=MFR_TENANT_ID,
+    tenant_tier="manufacturer", role="admin", email="mfr@test.com",
+)
+
+
+def _capture_first_statement(db: AsyncMock) -> list:
+    """Intercepta db.execute para capturar los statements ejecutados."""
+    captured: list = []
+    devices_result = MagicMock()
+    devices_result.scalars.return_value.all.return_value = []
+    usage_result = MagicMock()
+    usage_result.all.return_value = []
+
+    async def _execute(stmt, *a, **k):
+        captured.append(stmt)
+        return devices_result if len(captured) == 1 else usage_result
+
+    db.execute = _execute
+    return captured
+
+
+def test_manufacturer_sees_devices_on_manufactured_vehicles():
+    """Regresión: el fabricante ve los dispositivos montados en vehículos que él
+    fabricó aunque la cajita pertenezca al cliente (device.tenant_id == cliente).
+    El WHERE debe contemplar Vehicle.manufacturer_tenant_id, no solo tenant propio."""
+    _override_user(MFR_USER)
+    db = AsyncMock()
+    captured = _capture_first_statement(db)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/api/v1/devices")
+    assert resp.status_code == 200
+    sql = str(captured[0])
+    # El filtro del fabricante referencia los vehículos que él fabricó.
+    assert "manufacturer_tenant_id" in sql
+    assert "device.tenant_id" in sql
+
+
+def test_client_devices_query_does_not_widen_scope():
+    """El cliente sigue restringido a su propio tenant (sin ensanchar el alcance)."""
+    _override_user(CLIENT_USER)
+    db = AsyncMock()
+    captured = _capture_first_statement(db)
+    _override_db(db)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/api/v1/devices")
+    assert resp.status_code == 200
+    sql = str(captured[0])
+    assert "device.tenant_id" in sql
+    assert "manufacturer_tenant_id" not in sql
+
+
 # ---------------------------------------------------------------------------
 # Test 6 — client admin asigna vehículo a dispositivo propio → 200
 # ---------------------------------------------------------------------------
