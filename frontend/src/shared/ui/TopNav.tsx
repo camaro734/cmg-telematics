@@ -546,12 +546,31 @@ export default function TopNav() {
         }}
       >
         {logoUrl && !logoImgError
-          ? <img
-              src={logoUrl}
-              alt="logo"
-              onError={() => setLogoImgError(true)}
-              style={{ width: isMobile ? 140 : 200, height: isMobile ? 48 : 62, objectFit: 'contain', display: 'block' }}
-            />
+          ? logoUrl.startsWith('/uploads/')
+            ? (
+              <div style={{
+                background: 'rgba(255,255,255,0.92)',
+                borderRadius: 6,
+                padding: isMobile ? '4px 8px' : '5px 12px',
+                display: 'flex',
+                alignItems: 'center',
+              }}>
+                <img
+                  src={logoUrl}
+                  alt="logo"
+                  onError={() => setLogoImgError(true)}
+                  style={{ maxWidth: isMobile ? 118 : 168, maxHeight: isMobile ? 38 : 48, objectFit: 'contain', display: 'block' }}
+                />
+              </div>
+            )
+            : (
+              <img
+                src={logoUrl}
+                alt="logo"
+                onError={() => setLogoImgError(true)}
+                style={{ width: isMobile ? 140 : 200, height: isMobile ? 48 : 62, objectFit: 'contain', display: 'block' }}
+              />
+            )
           : <img
               src="/static/logos/cmgtrack.png"
               alt="CMG Track"

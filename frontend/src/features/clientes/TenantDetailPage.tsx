@@ -189,6 +189,28 @@ export default function TenantDetailPage() {
           <div>
             <h2 style={{ margin: '0 0 4px', color: 'var(--fg-primary)', fontSize: 22, fontWeight: 700 }}>{tenant.name}</h2>
             <span style={{ color: 'var(--fg-muted)', fontSize: 13, fontFamily: 'var(--font-mono)' }}>{tenant.slug}</span>
+            {tenant.tier !== 'cmg' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <span style={{ color: 'var(--fg-dim)', fontSize: 12 }}>URL de acceso:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-muted)' }}>
+                  {window.location.origin}/{tenant.slug}/login
+                </span>
+                <button
+                  title="Copiar URL"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(`${window.location.origin}/${tenant.slug}/login`)
+                    // toast breve sin importar Toast aquí
+                    const btn = document.activeElement as HTMLElement
+                    btn.textContent = '✓'
+                    setTimeout(() => { btn.textContent = '⧉' }, 1500)
+                  }}
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: 'var(--cmg-teal)', fontSize: 14, padding: '0 2px', lineHeight: 1,
+                  }}
+                >⧉</button>
+              </div>
+            )}
             <span style={{
               marginLeft: 10, display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12,
               background: tenant.active ? 'rgba(34,197,94,0.15)' : 'rgba(120,113,108,0.15)',

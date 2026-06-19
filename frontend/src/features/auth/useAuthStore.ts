@@ -73,17 +73,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       body: JSON.stringify({ email, password }),
     })
     if (!res.ok) throw new Error('Credenciales incorrectas')
-    const data = await res.json() as { access_token: string; refresh_token: string }
+    const data = await res.json() as { access_token: string; refresh_token: string; logo_url?: string; brand_name?: string }
     localStorage.setItem(REFRESH_KEY, data.refresh_token)
     const user = parseJwt(data.access_token)
     if (!user) throw new Error('Token de acceso inválido')
     set({ accessToken: data.access_token, user })
     const enabledModules = await fetchEnabledModules(data.access_token)
     set({ enabledModules })
+    get().applyBrandTokens({ logo_url: data.logo_url, brand_name: data.brand_name })
   },
 
   logout: () => {
     localStorage.removeItem(REFRESH_KEY)
+    localStorage.removeItem('cmg_brand_logo')
     wsClient.disconnect()
     document.documentElement.style.removeProperty('--cmg-teal')
     set({ accessToken: null, user: null, enabledModules: [], brandName: null, logoUrl: null })
@@ -122,6 +124,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const safeLogoUrl = tokens.logo_url
       ? (tokens.logo_url.startsWith('https://') || tokens.logo_url.startsWith('/')) ? tokens.logo_url : null
       : get().logoUrl   // no logo_url key → keep existing
+    try { if (safeLogoUrl) localStorage.setItem('cmg_brand_logo', safeLogoUrl) } catch {}
     set({
       brandName: tokens.brand_name ?? get().brandName,
       logoUrl: safeLogoUrl,

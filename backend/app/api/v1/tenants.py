@@ -1,6 +1,7 @@
 # backend/app/api/v1/tenants.py
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pathlib import Path
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
@@ -332,6 +333,40 @@ async def update_brand_tokens(
     return tenant.brand_tokens
 
 
+_LOGOS_DIR = Path("/app/uploads/logos") if Path("/app/uploads").exists() else Path(__file__).parents[4] / "uploads" / "logos"
+
+_LOGO_ALLOWED = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/svg+xml": ".svg"}
+
+
+@router.post("/tenants/{tenant_id}/logo")
+async def upload_tenant_logo(
+    tenant_id: uuid.UUID,
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant = await db.get(Tenant, tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    if user.tenant_tier != "cmg" and str(tenant.id) != str(user.tenant_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo admins")
+    ct = (file.content_type or "").lower()
+    if ct not in _LOGO_ALLOWED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo PNG, JPG, WebP o SVG")
+    contents = await file.read()
+    if len(contents) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo no puede superar 2 MB")
+    _LOGOS_DIR.mkdir(parents=True, exist_ok=True)
+    dest = _LOGOS_DIR / f"{tenant_id}{_LOGO_ALLOWED[ct]}"
+    dest.write_bytes(contents)
+    logo_url = f"/uploads/logos/{tenant_id}{_LOGO_ALLOWED[ct]}"
+    tenant.logo_url = logo_url
+    await db.commit()
+    return {"logo_url": logo_url}
+
+
 @router.get("/grants", response_model=list[GrantOut])
 async def list_grants(
     grantee_id: uuid.UUID | None = Query(None),
@@ -491,3 +526,33 @@ async def get_portal_token(
     if not tenant or not tenant.active:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return {"portal_access_token": tenant.portal_access_token}
+
+
+# ─── Endpoint público (sin autenticación) ────────────────────────────────────
+
+@router.get("/public/brand/{slug}")
+async def get_brand_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
+    """Devuelve tokens de marca de un tenant por slug. Sin autenticación."""
+    result = await db.execute(
+        select(Tenant.id, Tenant.name, Tenant.logo_url, Tenant.brand_name, Tenant.brand_tokens, Tenant.parent_id)
+        .where(Tenant.slug == slug, Tenant.active == True)  # noqa: E712
+    )
+    row = result.mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="No encontrado")
+
+    logo_url: str | None = row["logo_url"]
+    brand_tokens: dict = dict(row["brand_tokens"] or {})
+    brand_name: str = row["brand_name"] or brand_tokens.get("brand_name") or row["name"]
+    brand_color: str | None = brand_tokens.get("brand_color")
+
+    if not logo_url and row["parent_id"]:
+        parent = await db.get(Tenant, row["parent_id"])
+        if parent:
+            if parent.logo_url:
+                logo_url = parent.logo_url
+            if not brand_color:
+                parent_tokens = parent.brand_tokens or {}
+                brand_color = parent_tokens.get("brand_color")
+
+    return {"brand_name": brand_name, "logo_url": logo_url, "brand_color": brand_color}

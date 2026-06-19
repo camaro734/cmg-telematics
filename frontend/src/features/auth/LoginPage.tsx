@@ -1,25 +1,39 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAuthStore } from './useAuthStore'
 import { apiClient } from '../../lib/apiClient'
 import type { BrandTokens } from '../../lib/types'
 import { CmgLogoFull } from '../../shared/ui/CmgLogo'
 import { Input } from '../../shared/ui/Input'
 
-const LOGO_URL = '/static/logos/cmgtrack.png'
+const DEFAULT_LOGO = '/static/logos/cmgtrack.png'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { slug } = useParams<{ slug?: string }>()
   const { login, applyBrandTokens, user } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [logoSrc, setLogoSrc] = useState<string>(() => {
+    try { return localStorage.getItem('cmg_brand_logo') ?? DEFAULT_LOGO } catch { return DEFAULT_LOGO }
+  })
   const [logoOk, setLogoOk] = useState(true)
 
   useEffect(() => {
     if (user) navigate('/fleet', { replace: true })
   }, [user, navigate])
+
+  useEffect(() => {
+    if (!slug) return
+    apiClient.get<{ brand_name?: string; logo_url?: string; brand_color?: string }>(
+      `/api/v1/public/brand/${encodeURIComponent(slug)}`
+    ).then(brand => {
+      applyBrandTokens(brand)
+      if (brand.logo_url) setLogoSrc(brand.logo_url)
+    }).catch(() => { /* slug desconocido — mostrar branding CMG por defecto */ })
+  }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -35,6 +49,7 @@ export default function LoginPage() {
             `/api/v1/tenants/${store.user.tenant_id}/brand-tokens`
           )
           applyBrandTokens(tokens)
+          if (tokens.logo_url) setLogoSrc(tokens.logo_url)
         } catch {
           // brand tokens are optional — ignore failures
         }
@@ -60,19 +75,42 @@ export default function LoginPage() {
       {/* Logo sobre la tarjeta */}
       <div style={{ marginBottom: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
         {logoOk
-          ? (
-            <img
-              src={LOGO_URL}
-              alt="CMG Track"
-              onError={() => setLogoOk(false)}
-              style={{
-                width: 'clamp(180px, 40vw, 260px)',
-                height: 'auto',
-                objectFit: 'contain',
-                display: 'block',
-              }}
-            />
-          )
+          ? logoSrc.startsWith('/uploads/')
+            ? (
+              <div style={{
+                background: 'rgba(255,255,255,0.93)',
+                borderRadius: 10,
+                padding: '14px 28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <img
+                  src={logoSrc}
+                  alt="Logo"
+                  onError={() => setLogoOk(false)}
+                  style={{
+                    maxWidth: 'clamp(140px, 35vw, 220px)',
+                    maxHeight: 72,
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                />
+              </div>
+            )
+            : (
+              <img
+                src={logoSrc}
+                alt="CMG Track"
+                onError={() => setLogoOk(false)}
+                style={{
+                  width: 'clamp(180px, 40vw, 260px)',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+            )
           : <CmgLogoFull />
         }
         <span style={{

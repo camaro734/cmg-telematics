@@ -103,6 +103,7 @@ export default function App() {
     <ConfirmDialogHost />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/:slug/login" element={<LoginPage />} />
       <Route path="/portal/:token" element={<Suspense fallback={<Loading />}><ClientPortalPage /></Suspense>} />
       <Route path="/forgot-password" element={<Suspense fallback={<Loading />}><ForgotPasswordPage /></Suspense>} />
       <Route path="/reset-password/:token" element={<Suspense fallback={<Loading />}><ResetPasswordPage /></Suspense>} />

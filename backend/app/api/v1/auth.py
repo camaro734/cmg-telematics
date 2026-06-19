@@ -140,10 +140,15 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales incorrectas")
 
-    t_result = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules).where(Tenant.id == user.tenant_id))
+    t_result = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules, Tenant.parent_id).where(Tenant.id == user.tenant_id))
     tenant_row = t_result.mappings().one_or_none()
     if tenant_row is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno")
+    effective_logo = tenant_row["logo_url"]
+    if not effective_logo and tenant_row["parent_id"]:
+        parent = await db.get(Tenant, tenant_row["parent_id"])
+        if parent and parent.logo_url:
+            effective_logo = parent.logo_url
     payload = {
         "sub": str(user.id),
         "tenant_id": str(user.tenant_id),
@@ -155,7 +160,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     return TokenResponse(
         access_token=create_access_token(payload),
         refresh_token=create_refresh_token(payload),
-        logo_url=_versioned_url(tenant_row["logo_url"]),
+        logo_url=_versioned_url(effective_logo),
         brand_name=tenant_row["brand_name"],
         enabled_modules=tenant_row["enabled_modules"] or [],
     )
@@ -183,10 +188,15 @@ async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Dep
     if token_pwd_version is None or token_pwd_version != user.pwd_version:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revocado")
 
-    t_result2 = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules).where(Tenant.id == user.tenant_id))
+    t_result2 = await db.execute(select(Tenant.id, Tenant.tier, Tenant.logo_url, Tenant.brand_name, Tenant.enabled_modules, Tenant.parent_id).where(Tenant.id == user.tenant_id))
     tenant_row2 = t_result2.mappings().one_or_none()
     if tenant_row2 is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+    effective_logo2 = tenant_row2["logo_url"]
+    if not effective_logo2 and tenant_row2["parent_id"]:
+        parent2 = await db.get(Tenant, tenant_row2["parent_id"])
+        if parent2 and parent2.logo_url:
+            effective_logo2 = parent2.logo_url
 
     new_payload = {
         "sub": str(user.id),
@@ -204,7 +214,7 @@ async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Dep
     return TokenResponse(
         access_token=create_access_token(new_payload),
         refresh_token=create_refresh_token(new_payload, expires_at=refresh_expires_at),
-        logo_url=_versioned_url(tenant_row2["logo_url"]),
+        logo_url=_versioned_url(effective_logo2),
         brand_name=tenant_row2["brand_name"],
         enabled_modules=tenant_row2["enabled_modules"] or [],
     )
