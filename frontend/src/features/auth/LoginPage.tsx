@@ -133,29 +133,27 @@ export default function LoginPage() {
               borderRadius: '12px 12px 0 0',
             }} />
 
-            {/* Badge de logo */}
+            {/* Logo del cliente */}
             {logoOk && isClientLogo && (
-              <div style={{
-                background: '#ffffff',
-                borderRadius: 10,
-                padding: '14px 28px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <img
-                  src={logoSrc}
-                  alt="Logo"
-                  onError={() => setLogoOk(false)}
-                  style={{
-                    maxWidth: 'clamp(120px, 28vw, 190px)',
-                    maxHeight: 58,
-                    objectFit: 'contain',
-                    display: 'block',
-                  }}
-                />
-              </div>
+              <img
+                src={logoSrc}
+                alt="Logo"
+                onError={() => setLogoOk(false)}
+                style={{
+                  maxWidth: 220,
+                  maxHeight: 150,
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  display: 'block',
+                  filter: [
+                    'drop-shadow(0 0 3px rgba(0,0,0,0.95))',
+                    'drop-shadow(0 0 3px rgba(0,0,0,0.95))',
+                    'drop-shadow(0 0 3px rgba(0,0,0,0.95))',
+                    'brightness(1.15)',
+                  ].join(' '),
+                }}
+              />
             )}
             {/* Fallback si el logo falla */}
             {(!logoOk || !isClientLogo) && slug && (
