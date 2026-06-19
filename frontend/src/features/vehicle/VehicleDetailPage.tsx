@@ -24,6 +24,7 @@ import MaintenanceTab from './MaintenanceTab'
 import { toast } from '../../shared/ui/Toast'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useFleetStore } from '../fleet/useFleetStore'
+import { useMyProfile } from '../../lib/useMyProfile'
 import { Select } from '../../shared/ui/Select'
 
 const BASE_TABS = [
@@ -41,6 +42,10 @@ export default function VehicleDetailPage() {
   const isCmg = user?.tenant_tier === 'cmg'
   const isManufacturer = user?.tenant_tier === 'manufacturer'
   const isPrivileged = isCmg || isManufacturer
+  // Los clientes bajo un fabricante solo accionan controles (DOUT/Manual CAN) si CMG
+  // les concede el permiso. El backend lo calcula en /auth/me; aquí solo ocultamos UI.
+  const { data: myProfile } = useMyProfile()
+  const canActuate = myProfile?.can_actuate_controls ?? false
   const canMaintenance = isPrivileged || enabledModules.includes('maintenance')
   const canAlerts      = isPrivileged || enabledModules.includes('alerts')
   const canReports     = isPrivileged || enabledModules.includes('reports')
@@ -406,10 +411,10 @@ export default function VehicleDetailPage() {
                 </div>
 
                 {/* CONTROLES DOUT */}
-                {(vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
-                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Controles de mando</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                {canActuate && (vehicleType?.dout_config ?? []).filter(d => d.enabled).length > 0 && (
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700, color: 'var(--fg-primary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 10 }}>Controles de mando</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
                       {(vehicleType?.dout_config ?? []).filter(d => d.enabled).map(d => {
                         const active = !!doutState[d.slot]
                         const loading = !!doutLoading[d.slot]
@@ -422,15 +427,15 @@ export default function VehicleDetailPage() {
                           : null
                         return (
                           <div key={d.slot} style={{
-                            background: active ? 'var(--ok-soft)' : 'var(--bg-card)',
-                            border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
-                            borderRadius: 8, padding: '10px 12px',
-                            display: 'flex', flexDirection: 'column', gap: 6,
+                            background: active ? 'color-mix(in srgb, var(--cmg-teal) 12%, transparent)' : 'var(--bg-card)',
+                            border: `1px solid ${active ? 'var(--cmg-teal)' : 'var(--border)'}`,
+                            borderRadius: 10, padding: '12px 12px',
+                            display: 'flex', flexDirection: 'column', gap: 8,
                             transition: 'background 0.2s, border-color 0.2s',
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)' }}>{d.label}</span>
-                              <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: active ? 'var(--ok)' : 'var(--offline)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)', lineHeight: 1.35 }}>{d.label}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: active ? 'var(--cmg-teal)' : 'var(--fg-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                 {active ? '● ON' : '○ OFF'}
                               </span>
                             </div>
@@ -441,12 +446,12 @@ export default function VehicleDetailPage() {
                             )}
                             <button onClick={() => sendDout(d.slot)} disabled={loading}
                               style={{
-                                background: active ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
-                                border: `1px solid ${active ? 'var(--ok)' : 'var(--border)'}`,
-                                borderRadius: 6, padding: '5px 0', fontSize: 11, fontWeight: 600,
-                                cursor: loading ? 'wait' : 'pointer', color: active ? 'var(--ok)' : 'var(--fg-tertiary)',
+                                background: active ? 'color-mix(in srgb, var(--cmg-teal) 20%, transparent)' : 'var(--bg-elevated)',
+                                border: `1px solid ${active ? 'var(--cmg-teal)' : 'var(--border)'}`,
+                                borderRadius: 8, padding: '10px 0', minHeight: 44, fontSize: 13, fontWeight: 700,
+                                cursor: loading ? 'wait' : 'pointer', color: active ? 'var(--cmg-teal)' : 'var(--fg-muted)',
                                 opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
-                                transition: 'all 0.15s',
+                                transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}>
                               {loading ? '…' : active ? 'Desactivar' : 'Activar'}
                             </button>
@@ -459,7 +464,7 @@ export default function VehicleDetailPage() {
 
                 {/* CONTROL CAN MANUAL — botones definidos en la plantilla del tipo.
                     La configuración se hace en /tipos-vehiculo (CMG admin). */}
-                {id && manualCanSlots.length > 0 && (
+                {canActuate && id && manualCanSlots.length > 0 && (
                   <ManualCanControl vehicleId={id} slots={manualCanSlots} />
                 )}
 

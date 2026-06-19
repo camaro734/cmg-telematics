@@ -1,5 +1,5 @@
 import type { SystemBlock, SensorDef, VehicleStatus, AlertInstanceEnrichedOut } from '../../../lib/types'
-import { resolveRawValue, applyScaleOffset, formatSensorValue } from '../../../lib/sensorValue'
+import { resolveRawValue, applyTransform, formatSensorValue } from '../../../lib/sensorValue'
 import { blockDiagnostics, alertSensorKey } from '../../../lib/blockDiagnostics'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 
@@ -96,7 +96,7 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minHeight: 36 }}>
           {keySensors.map(sensor => {
             const raw = resolveRawValue(sensor, status, derived)
-            const scaled = applyScaleOffset(raw, sensor.scale, sensor.offset)
+            const scaled = applyTransform(raw, sensor)
             const sz = sensorSeverity(sensor, scaled) ?? 'nodata'
             const dotColor = isStale ? ZONE_BORDER.nodata : (ZONE_BORDER[sz] ?? ZONE_BORDER.nodata)
             const formatted = formatSensorValue(scaled) ?? '—'

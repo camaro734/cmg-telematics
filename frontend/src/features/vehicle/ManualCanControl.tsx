@@ -215,38 +215,32 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
       <button
         onClick={() => setOpen(v => !v)}
         style={{
-          width: '100%', background: 'none', border: 'none', padding: '7px 10px',
+          width: '100%', background: 'none', border: 'none', padding: '12px 14px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           cursor: 'pointer', gap: 8,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
             transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
             transition: 'transform 0.2s', display: 'inline-block',
-            fontSize: 10, color: 'var(--fg-muted)',
+            fontSize: 13, color: 'var(--fg-muted)',
           }}>▾</span>
           <span style={{
-            fontFamily: 'var(--font-sans)', fontSize: 9, fontWeight: 700,
-            color: 'var(--fg-muted)', letterSpacing: '0.07em', textTransform: 'uppercase',
-          }}>Control CAN Manual</span>
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 700,
+            color: 'var(--fg-primary)', letterSpacing: '0.04em', textTransform: 'uppercase',
+          }}>Control CAN Manual — Salidas CR2530</span>
         </div>
       </button>
 
       {open && (
-        <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {buttons.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{
-                fontSize: 9, fontWeight: 700, color: 'var(--fg-muted)',
-                letterSpacing: '0.07em', textTransform: 'uppercase',
-              }}>Salidas CR2530</div>
-              {/* Rejilla compacta unificada: chips pequeños de todas las salidas,
-                  varios por fila, mismo lenguaje visual que las tarjetas de la página. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(116px, 1fr))',
-                gap: 6,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: 8,
               }}>
                 {buttons.map(btn => {
                   const on = optimistic[btn.id] ?? btn.current_bit
@@ -264,23 +258,22 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                       : (on ? 'Desactivar' : 'Activar')
                   return (
                     <div key={btn.id} style={{
-                      background: on ? 'var(--ok-soft)' : 'var(--bg-card)',
-                      border: `1px solid ${on ? 'var(--ok)' : 'var(--border)'}`,
-                      borderRadius: 8, padding: '7px 8px',
-                      display: 'flex', flexDirection: 'column', gap: 5,
+                      background: on ? 'color-mix(in srgb, var(--cmg-teal) 12%, transparent)' : 'var(--bg-card)',
+                      border: `1px solid ${on ? 'var(--cmg-teal)' : 'var(--border)'}`,
+                      borderRadius: 10, padding: '12px 10px',
+                      display: 'flex', flexDirection: 'column', gap: 8,
                       transition: 'background 0.2s, border-color 0.2s',
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <span style={{
-                          fontSize: 11, fontWeight: 600, color: 'var(--fg-primary)',
-                          fontFamily: 'var(--font-sans)', overflow: 'hidden',
-                          textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0,
-                        }} title={btn.label}>
+                          fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)',
+                          fontFamily: 'var(--font-sans)', lineHeight: 1.35,
+                        }}>
                           {btn.label}
                         </span>
                         <span style={{
-                          fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
-                          color: on ? 'var(--ok)' : 'var(--offline)', whiteSpace: 'nowrap',
+                          fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                          color: on ? 'var(--cmg-teal)' : 'var(--fg-muted)', whiteSpace: 'nowrap', flexShrink: 0,
                         }}>
                           {on ? '● ON' : '○ OFF'}
                         </span>
@@ -291,23 +284,24 @@ export default function ManualCanControl({ vehicleId, slots }: Props) {
                         title={isHold ? 'Envía un pulso de reset (ON+OFF) al equipo' : undefined}
                         {...clickHandler}
                         style={{
-                          background: on ? 'rgba(34,197,94,0.2)' : 'var(--bg-elevated)',
-                          border: `1px solid ${on ? 'var(--ok)' : 'var(--border)'}`,
-                          borderRadius: 6, padding: '4px 0', fontSize: 10, fontWeight: 600,
+                          background: on ? 'color-mix(in srgb, var(--cmg-teal) 20%, transparent)' : 'var(--bg-elevated)',
+                          border: `1px solid ${on ? 'var(--cmg-teal)' : 'var(--border)'}`,
+                          borderRadius: 8, padding: '10px 0', minHeight: 44, fontSize: 13, fontWeight: 700,
                           cursor: disabled ? 'not-allowed' : 'pointer',
-                          color: on ? 'var(--ok)' : 'var(--fg-tertiary)',
+                          color: on ? 'var(--cmg-teal)' : 'var(--fg-muted)',
                           opacity: loading ? 0.6 : 1, width: '100%', fontFamily: 'var(--font-sans)',
                           transition: 'all 0.15s', userSelect: 'none',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                       >
                         {btnText}
                       </button>
                       {/* Badge de estado de encolado/entrega */}
                       {queuedBtns[btn.id] === 'queued' && (
-                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--warn)' }}>⏳ Encolado</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warn)' }}>⏳ Encolado</span>
                       )}
                       {queuedBtns[btn.id] === 'sent' && (
-                        <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--ok)' }}>✓ Enviado OK</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ok)' }}>✓ Enviado OK</span>
                       )}
                     </div>
                   )
