@@ -570,3 +570,385 @@ class TestLocationPrivacyPatch:
 
         assert resp.status_code == 200, resp.text
         assert resp.json()["hide_location_from_upstream"] is True
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Bloque 4: Endpoints restantes — FALLAN hasta que se filtren (pieza B, batch 2)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestLocationPrivacyNewEndpoints:
+    """Anti-fuga para los 6 endpoints no cubiertos en el bloque 2.
+
+    TDD: ROJO hasta implementar el filtro, VERDE tras la implementación.
+    GET /vehicles/{id} se verifica como "seguro por diseño" (lat/lng nunca en ORM).
+    """
+
+    # ── helpers internos ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _make_redis_with_location_pipeline() -> tuple:
+        """Devuelve (redis_mock, hash_data) con pipeline sincrónico."""
+        hash_data = {
+            "lat": "39.4702", "lon": "-0.3768",
+            "speed_kmh": "55.0", "heading": "90",
+            "ignition": "true",
+            "last_seen": "2026-06-20T08:00:00+00:00",
+        }
+        pipe = MagicMock()
+        pipe.hgetall = MagicMock()
+        pipe.execute = AsyncMock(return_value=[hash_data])
+        redis_mock = AsyncMock()
+        redis_mock.pipeline = MagicMock(return_value=pipe)  # sync, no await
+        return redis_mock, hash_data
+
+    # ── 1. GET /vehicles (lista) ──────────────────────────────────────────────
+
+    def test_list_vehicles_hides_location_from_manufacturer(self):
+        """GET /vehicles no devuelve lat/lng al fabricante con flag activo."""
+        vehicle = _make_vehicle(hide=True)
+        vehicle.vehicle_type = MagicMock()
+        vehicle.vehicle_type.slug = "cisterna"
+        _override_user(MANUFACTURER_USER)
+
+        mock_result = MagicMock()
+        mock_result.unique.return_value.scalars.return_value.all.return_value = [vehicle]
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = mock_result
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+        redis_mock, _ = self._make_redis_with_location_pipeline()
+
+        with TestClient(app) as client:
+            app.state.redis = redis_mock
+            resp = client.get("/api/v1/vehicles")
+
+        assert resp.status_code == 200, resp.text
+        leaks = _find_location_leak(resp.json())
+        assert not leaks, f"FUGA en GET /vehicles (manufacturer): {leaks}"
+
+    # ── 2. GET /vehicles/{id} — verificar seguro por diseño ──────────────────
+
+    def test_get_vehicle_detail_has_no_coords_for_upstream(self):
+        """GET /vehicles/{id} — lat/lng no son columnas del ORM, siempre None.
+        Este test verifica que el invariante se cumple (seguro por diseño).
+        PASA en fase roja (la protección ya existe estructuralmente).
+        """
+        vehicle = _make_vehicle(hide=True)
+        _override_user(MANUFACTURER_USER)
+
+        with patch(
+            "app.api.v1.vehicles.assert_can_access_vehicle",
+            AsyncMock(return_value=vehicle),
+        ):
+            with TestClient(app) as client:
+                resp = client.get(f"/api/v1/vehicles/{VEHICLE_ID}")
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data.get("lat") is None, "lat debe ser None (no es columna del ORM Vehicle)"
+        assert data.get("lng") is None, "lng debe ser None (no es columna del ORM Vehicle)"
+
+    # ── 3. GET /vehicles/statuses (bulk) ─────────────────────────────────────
+
+    def test_bulk_statuses_hides_location_from_cmg(self):
+        """GET /vehicles/statuses no devuelve lat/lon a CMG con flag activo."""
+        vehicle = _make_vehicle(hide=True)
+        _override_user(CMG_USER)
+
+        vehicles_result = MagicMock()
+        vehicles_result.scalars.return_value.all.return_value = [vehicle]
+
+        oos_result = MagicMock()
+        oos_result.all.return_value = []
+
+        mock_db = AsyncMock()
+        mock_db.execute.side_effect = [vehicles_result, oos_result]
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+
+        hash_data = {
+            "lat": "39.4702", "lon": "-0.3768",
+            "speed_kmh": "55.0", "heading": "90",
+            "ignition": "true",
+            "last_seen": "2026-06-20T08:00:00+00:00",
+        }
+        pipe1 = MagicMock()
+        pipe1.hgetall = MagicMock()
+        pipe1.execute = AsyncMock(return_value=[hash_data])
+
+        pipe2 = MagicMock()
+        pipe2.get = MagicMock()
+        pipe2.execute = AsyncMock(return_value=[None])
+
+        redis_mock = AsyncMock()
+        redis_mock.pipeline = MagicMock(side_effect=[pipe1, pipe2])
+
+        with TestClient(app) as client:
+            app.state.redis = redis_mock
+            resp = client.get(f"/api/v1/vehicles/statuses?ids={VEHICLE_ID}")
+
+        assert resp.status_code == 200, resp.text
+        leaks = _find_location_leak(resp.json())
+        assert not leaks, f"FUGA en GET /vehicles/statuses (CMG): {leaks}"
+
+    # ── 4. GET /vehicles/{id}/trips ───────────────────────────────────────────
+
+    def test_trips_returns_empty_for_upstream_with_flag(self):
+        """GET /vehicles/{id}/trips devuelve trips=[] al fabricante con flag activo."""
+        vehicle = _make_vehicle(hide=True)
+        _override_user(MANUFACTURER_USER)
+
+        mock_row = MagicMock()
+        mock_row._mapping = {
+            "time": datetime.now(timezone.utc),
+            "lat": 39.4702, "lon": -0.3768,
+            "ignition": True, "speed_kmh": 55.0,
+        }
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [mock_row]
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = mock_result
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+
+        with patch(
+            "app.api.v1.vehicles.assert_can_access_vehicle",
+            AsyncMock(return_value=vehicle),
+        ):
+            with TestClient(app) as client:
+                resp = client.get(f"/api/v1/vehicles/{VEHICLE_ID}/trips?date=2026-06-20")
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["trips"] == [], (
+            f"trips debe estar vacío para upstream con flag activo; got {data['trips']}"
+        )
+        leaks = _find_location_leak(data)
+        assert not leaks, f"FUGA en GET /vehicles/{{id}}/trips: {leaks}"
+
+    # ── 5. GET /work-orders ───────────────────────────────────────────────────
+
+    def test_work_orders_list_hides_location_from_cmg(self):
+        """GET /work-orders no devuelve location_lat/lon a CMG con flag activo."""
+        from app.models.work_order import WorkOrder as WorkOrderModel
+
+        vehicle = _make_vehicle(hide=True)
+        _override_user(CMG_USER)
+
+        mock_order = MagicMock()
+        mock_order.id = uuid.uuid4()
+        mock_order.tenant_id = CLIENT_TENANT_ID
+        mock_order.vehicle_id = VEHICLE_ID
+        mock_order.driver_id = None
+        mock_order.title = "Test Order"
+        mock_order.status = "pending"
+        mock_order.priority = "normal"
+        mock_order.description = None
+        mock_order.scheduled_at = None
+        mock_order.started_at = None
+        mock_order.completed_at = None
+        mock_order.location_address = "Calle Test, Valencia"
+        mock_order.location_lat = 39.4702
+        mock_order.location_lon = -0.3768
+        mock_order.notes = None
+        mock_order.final_client_name = None
+        mock_order.final_client_address = None
+        mock_order.doc_number = None
+        mock_order.created_by = None
+        mock_order.created_at = datetime.now(timezone.utc)
+        mock_order.auto_close_config = None
+        mock_order.vehicle_name = None
+        mock_order.driver_name = None
+
+        orders_result = MagicMock()
+        orders_result.scalars.return_value.all.return_value = [mock_order]
+
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = orders_result
+        mock_db.get.return_value = vehicle  # db.get(Vehicle, vehicle_id)
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+
+        with TestClient(app) as client:
+            resp = client.get("/api/v1/work-orders")
+
+        assert resp.status_code == 200, resp.text
+        leaks = _find_location_leak(resp.json())
+        assert not leaks, f"FUGA en GET /work-orders (CMG): {leaks}"
+
+    # ── 6. GET /work-orders/{id} ──────────────────────────────────────────────
+
+    def test_work_order_detail_hides_location_from_cmg(self):
+        """GET /work-orders/{id} no devuelve location_lat/lon a CMG con flag activo."""
+        vehicle = _make_vehicle(hide=True)
+        _override_user(CMG_USER)
+
+        order_id = uuid.uuid4()
+        mock_order = MagicMock()
+        mock_order.id = order_id
+        mock_order.tenant_id = CLIENT_TENANT_ID
+        mock_order.vehicle_id = VEHICLE_ID
+        mock_order.driver_id = None
+        mock_order.title = "Test Order"
+        mock_order.status = "pending"
+        mock_order.priority = "normal"
+        mock_order.description = None
+        mock_order.scheduled_at = None
+        mock_order.started_at = None
+        mock_order.completed_at = None
+        mock_order.location_address = "Calle Test, Valencia"
+        mock_order.location_lat = 39.4702
+        mock_order.location_lon = -0.3768
+        mock_order.notes = None
+        mock_order.final_client_name = None
+        mock_order.final_client_address = None
+        mock_order.doc_number = None
+        mock_order.created_by = None
+        mock_order.created_at = datetime.now(timezone.utc)
+        mock_order.auto_close_config = None
+        mock_order.vehicle_name = None
+        mock_order.driver_name = None
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = vehicle  # primer get devuelve orden NO; necesita ser selectivo
+
+        # Para work-orders/{id}: db.get(WorkOrder, order_id) primero,
+        # luego db.get(Vehicle, vehicle_id) en _enrich
+        from app.models.work_order import WorkOrder as WorkOrderModel
+
+        async def _get_side_effect(model, oid):
+            if model is WorkOrderModel:
+                return mock_order
+            return vehicle  # Vehicle
+
+        mock_db.get = AsyncMock(side_effect=_get_side_effect)
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+
+        with TestClient(app) as client:
+            resp = client.get(f"/api/v1/work-orders/{order_id}")
+
+        assert resp.status_code == 200, resp.text
+        leaks = _find_location_leak(resp.json())
+        assert not leaks, f"FUGA en GET /work-orders/{{id}} (CMG): {leaks}"
+
+    # ── 7. GET /work-orders/{id}/stops ────────────────────────────────────────
+
+    def test_work_order_stops_hides_location_from_cmg(self):
+        """GET /work-orders/{id}/stops no devuelve lat/lon a CMG con flag activo."""
+        from app.models.work_order import WorkOrder as WorkOrderModel
+
+        vehicle = _make_vehicle(hide=True)
+        _override_user(CMG_USER)
+
+        order_id = uuid.uuid4()
+        mock_order = MagicMock()
+        mock_order.id = order_id
+        mock_order.tenant_id = CLIENT_TENANT_ID
+        mock_order.vehicle_id = VEHICLE_ID
+
+        mock_stop = MagicMock()
+        mock_stop.id = uuid.uuid4()
+        mock_stop.work_order_id = order_id
+        mock_stop.order_index = 0
+        mock_stop.title = "Parada Test"
+        mock_stop.address = "Calle Test, Valencia"
+        mock_stop.lat = 39.4702
+        mock_stop.lon = -0.3768
+        mock_stop.arrival_radius_m = 150
+        mock_stop.notes = None
+        mock_stop.client_name = None
+        mock_stop.status = "pending"
+        mock_stop.arrived_at = None
+        mock_stop.started_at = None
+        mock_stop.completed_at = None
+        mock_stop.pto_minutes = None
+        mock_stop.fuel_l = None
+        mock_stop.rpm_avg = None
+        mock_stop.pump_minutes = None
+        mock_stop.pressure_min = None
+        mock_stop.pressure_max = None
+        mock_stop.created_at = datetime.now(timezone.utc)
+
+        stops_result = MagicMock()
+        stops_result.scalars.return_value.all.return_value = [mock_stop]
+
+        async def _get_side_effect(model, oid):
+            if model is WorkOrderModel:
+                return mock_order
+            return vehicle  # Vehicle
+
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(side_effect=_get_side_effect)
+        mock_db.execute.return_value = stops_result
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+
+        with TestClient(app) as client:
+            resp = client.get(f"/api/v1/work-orders/{order_id}/stops")
+
+        assert resp.status_code == 200, resp.text
+        leaks = _find_location_leak(resp.json())
+        assert not leaks, f"FUGA en GET /work-orders/{{id}}/stops (CMG): {leaks}"
+
+    # ── 8. GET /work-cycles ───────────────────────────────────────────────────
+
+    def test_work_cycles_hides_location_from_cmg(self):
+        """GET /work-cycles no devuelve lat/lon a CMG con flag activo en el vehículo."""
+        vehicle = _make_vehicle(hide=True)
+        _override_user(CMG_USER)
+
+        mock_cycle = MagicMock()
+        mock_cycle.id = uuid.uuid4()
+        mock_cycle.vehicle_id = VEHICLE_ID
+        mock_cycle.definition_id = uuid.uuid4()
+        mock_cycle.tenant_id = CLIENT_TENANT_ID
+        mock_cycle.started_at = datetime.now(timezone.utc)
+        mock_cycle.ended_at = None
+        mock_cycle.duration_seconds = None
+        mock_cycle.cycle_data = {}
+        mock_cycle.lat = 39.4702
+        mock_cycle.lon = -0.3768
+
+        cycles_result = MagicMock()
+        cycles_result.scalars.return_value.all.return_value = [mock_cycle]
+
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = cycles_result
+        mock_db.get.return_value = vehicle  # db.get(Vehicle, vehicle_id)
+
+        async def _db_gen():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = _db_gen
+
+        from_dt = "2026-06-20T00:00:00Z"
+        to_dt = "2026-06-20T23:59:59Z"
+
+        with TestClient(app) as client:
+            resp = client.get(
+                f"/api/v1/work-cycles?vehicle_id={VEHICLE_ID}"
+                f"&from_dt={from_dt}&to_dt={to_dt}"
+            )
+
+        assert resp.status_code == 200, resp.text
+        leaks = _find_location_leak(resp.json())
+        assert not leaks, f"FUGA en GET /work-cycles (CMG): {leaks}"

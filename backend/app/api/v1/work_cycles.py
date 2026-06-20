@@ -6,6 +6,7 @@ from sqlalchemy import select, or_
 
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user
+from app.api.v1.access_v2 import user_can_see_vehicle_location, strip_location
 from app.schemas.auth import CurrentUser
 from app.schemas.work_cycle import (
     WorkCycleDefinitionOut, WorkCycleDefinitionCreate, WorkCycleDefinitionUpdate,
@@ -121,7 +122,16 @@ async def list_cycles(
     if definition_id:
         q = q.where(WorkCycle.definition_id == definition_id)
     result = await db.execute(q.order_by(WorkCycle.started_at))
-    return result.scalars().all()
+    cycles = result.scalars().all()
+
+    vehicle_obj = await db.get(Vehicle, vehicle_id)
+    if vehicle_obj and not user_can_see_vehicle_location(user, vehicle_obj):
+        outs = [WorkCycleOut.model_validate(c) for c in cycles]
+        for out in outs:
+            strip_location(out)
+        return outs
+
+    return cycles
 
 
 @router.post("/compute")

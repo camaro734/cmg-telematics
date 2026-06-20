@@ -957,6 +957,8 @@ async def list_vehicles(
                 d['speed'] = speed
             except Exception:
                 pass
+        if not user_can_see_vehicle_location(user, v):
+            strip_location(d)
         out.append(d)
     return out
 
@@ -1414,7 +1416,7 @@ async def get_vehicles_statuses_bulk(
         else:
             effective_online = False
 
-        statuses.append(VehicleStatus(
+        st = VehicleStatus(
             vehicle_id=vid,
             online=effective_online,
             last_seen=last_seen_dt,
@@ -1429,7 +1431,11 @@ async def get_vehicles_statuses_bulk(
             can_data=can_data,
             dout_state=dout_state,
             device_out_of_service=bool(oos_by_vehicle.get(vid, False)),
-        ))
+        )
+        vehicle_obj = vehicles_by_id.get(vid)
+        if vehicle_obj and not user_can_see_vehicle_location(user, vehicle_obj):
+            strip_location(st)
+        statuses.append(st)
 
     return statuses
 
@@ -1783,6 +1789,13 @@ async def get_vehicle_trips(
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+
+    if not user_can_see_vehicle_location(user, vehicle):
+        return DayTrips(
+            date=date,
+            trips=[],
+            totals=DayTripTotals(trips=0, distance_km=0.0, route_time_s=0, avg_speed_kmh=0.0),
+        )
 
     try:
         naive = datetime.strptime(date, "%Y-%m-%d")

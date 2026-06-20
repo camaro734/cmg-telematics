@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user, require_module
+from app.api.v1.access_v2 import user_can_see_vehicle_location, strip_location
 from app.schemas.auth import CurrentUser
 from app.schemas.work_order import (
     WorkOrderOut, WorkOrderCreate, WorkOrderUpdate, WorkOrderStatusPatch,
@@ -35,11 +36,17 @@ def _check_tenant(user: CurrentUser, tenant_id: uuid.UUID) -> None:
         raise HTTPException(status_code=404, detail="No encontrado")
 
 
-async def _enrich(db: AsyncSession, order: WorkOrder) -> WorkOrderOut:
+async def _enrich(
+    db: AsyncSession,
+    order: WorkOrder,
+    user: CurrentUser | None = None,
+) -> WorkOrderOut:
     out = WorkOrderOut.model_validate(order)
     if order.vehicle_id:
         v = await db.get(Vehicle, order.vehicle_id)
         out.vehicle_name = v.name if v else None
+        if user is not None and v is not None and not user_can_see_vehicle_location(user, v):
+            strip_location(out)
     if order.driver_id:
         d = await db.get(Driver, order.driver_id)
         out.driver_name = d.full_name if d else None
@@ -70,7 +77,7 @@ async def list_work_orders(
     q = q.order_by(WorkOrder.created_at.desc()).limit(limit)
     result = await db.execute(q)
     orders = result.scalars().all()
-    return [await _enrich(db, o) for o in orders]
+    return [await _enrich(db, o, user) for o in orders]
 
 
 @router.get("/work-orders/{order_id}", response_model=WorkOrderOut)
@@ -83,7 +90,7 @@ async def get_work_order(
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     _check_tenant(user, order.tenant_id)
-    return await _enrich(db, order)
+    return await _enrich(db, order, user)
 
 
 @router.get("/work-orders/{order_id}/telemetry-detail")
@@ -263,13 +270,23 @@ async def list_stops(
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _get_order_for_tenant(db, order_id, user)
+    order = await _get_order_for_tenant(db, order_id, user)
     result = await db.execute(
         select(WorkOrderStop)
         .where(WorkOrderStop.work_order_id == order_id)
         .order_by(WorkOrderStop.order_index)
     )
-    return result.scalars().all()
+    stops_orm = result.scalars().all()
+
+    if order.vehicle_id:
+        vehicle = await db.get(Vehicle, order.vehicle_id)
+        if vehicle and not user_can_see_vehicle_location(user, vehicle):
+            stops_out = [WorkOrderStopOut.model_validate(s) for s in stops_orm]
+            for s in stops_out:
+                strip_location(s)
+            return stops_out
+
+    return stops_orm
 
 
 @router.post("/work-orders/{order_id}/stops", response_model=WorkOrderStopOut, status_code=201)
