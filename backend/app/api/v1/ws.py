@@ -121,11 +121,13 @@ def _broadcast_channels(
 
 
 async def warmup_location_privacy_cache(redis) -> None:
-    """Carga hide_location_from_upstream de todos los vehículos en Redis.
+    """Precarga en Redis solo los vehículos con hide_location_from_upstream=True.
 
-    vehicle:{id}:loc_private → "1" (oculto) / "0" (visible)
-    loc_private:_sentinel → "1" indica que la caché está inicializada.
-    Si el sentinel no existe, el broadcast asume privado (fail-safe).
+    Representación única: key presente con valor "1" → privado;
+    key ausente (sentinel presente) → público. No se escriben keys "0".
+    Las keys de vehículo tienen TTL=90s; el refresher las renueva cada 60s.
+    Si un vehículo pasa de privado a público, su key expira sola en ≤90s
+    (o se borra inmediatamente si el PATCH llama a redis.delete).
     """
     from sqlalchemy import select
     from app.core.database import AsyncSessionLocal
@@ -133,17 +135,17 @@ async def warmup_location_privacy_cache(redis) -> None:
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(Vehicle.id, Vehicle.hide_location_from_upstream)
+            select(Vehicle.id).where(Vehicle.hide_location_from_upstream == True)
         )
-        rows = result.all()
+        private_ids = result.scalars().all()
 
     pipe = redis.pipeline()
-    for vehicle_id, hide in rows:
-        pipe.set(f"vehicle:{vehicle_id}:loc_private", "1" if hide else "0")
+    for vehicle_id in private_ids:
+        pipe.set(f"vehicle:{vehicle_id}:loc_private", "1", ex=90)
     # TTL 120 s: si el refresher falla más de 2 min, sentinel expira → fail-safe activo
     pipe.set("loc_private:_sentinel", "1", ex=120)
     await pipe.execute()
-    logger.info("loc_private_cache_warmed", extra={"count": len(rows)})
+    logger.info("loc_private_cache_warmed", extra={"count": len(private_ids)})
 
 
 async def loc_private_refresher(redis) -> None:

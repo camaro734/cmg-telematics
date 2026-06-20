@@ -1460,6 +1460,7 @@ class _LocationPrivacyBody(BaseModel):
 async def patch_vehicle_location_privacy(
     vehicle_id: uuid.UUID,
     body: _LocationPrivacyBody,
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1476,6 +1477,19 @@ async def patch_vehicle_location_privacy(
     vehicle.hide_location_from_upstream = body.hide
     await db.commit()
     await db.refresh(vehicle)
+
+    # Sincronización inmediata con Redis (no esperar el refresher de 60 s)
+    redis = getattr(request.app.state, "redis", None)
+    if redis:
+        loc_key = f"vehicle:{vehicle_id}:loc_private"
+        try:
+            if body.hide:
+                await redis.set(loc_key, "1", ex=90)
+            else:
+                await redis.delete(loc_key)
+        except Exception:
+            pass  # El refresher lo corrige en <60 s si falla
+
     return {"hide_location_from_upstream": vehicle.hide_location_from_upstream}
 
 
