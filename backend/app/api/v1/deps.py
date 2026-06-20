@@ -1,6 +1,6 @@
 # backend/app/api/v1/deps.py
 import uuid
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -163,3 +163,8 @@ async def assert_can_manage_plan(user: CurrentUser, plan) -> None:
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, detail="Tier no autorizado para gestionar planes"
     )
+
+
+async def get_redis(request: Request):
+    """Devuelve la conexión Redis de app.state. Inyectable como dependencia FastAPI."""
+    return getattr(request.app.state, "redis", None)

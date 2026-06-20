@@ -53,7 +53,7 @@ async def assert_can_actuate_controls(user: CurrentUser, db: AsyncSession) -> No
         )
 
 
-# Campos de ubicación que se filtran cuando hide_location_from_upstream es True.
+# Campos de ubicación que se filtran cuando el usuario no tiene permiso de ver.
 # location_lat/location_lon son los alias en WorkOrderOut.
 _LOCATION_FIELDS: frozenset[str] = frozenset({
     "lat", "lon", "lng",
@@ -62,16 +62,38 @@ _LOCATION_FIELDS: frozenset[str] = frozenset({
 })
 
 
-def user_can_see_vehicle_location(user: "CurrentUser", vehicle: "Vehicle") -> bool:
+async def user_can_see_vehicle_location(
+    user: "CurrentUser",
+    vehicle: "Vehicle",
+    redis,
+) -> bool:
     """True si el usuario puede ver las coordenadas del vehículo.
 
-    El dueño (vehicle.tenant_id == user.tenant_id) siempre ve.
-    Cualquier otro — incluyendo CMG y fabricante — no ve si
-    hide_location_from_upstream está activo. CMG no está exento.
+    Modelo escalonado: el dueño siempre ve. Los niveles superiores solo ven si
+    existe una cadena ininterrumpida de grants desde el dueño hasta ellos.
+    El SET Redis 'loc_viewers:{vehicle_id}' contiene los tenant_ids autorizados;
+    CMG usa la clave especial '__cmg__'. Fail-safe: sin sentinel → ocultar.
     """
-    if user.tenant_id == vehicle.tenant_id:
+    # El dueño siempre ve su propio vehículo, independientemente del estado de Redis.
+    if str(user.tenant_id) == str(vehicle.tenant_id):
         return True
-    return not vehicle.hide_location_from_upstream
+
+    if redis is None:
+        return False
+
+    try:
+        pipe = redis.pipeline()
+        pipe.get("loc_viewers:_sentinel")
+        pipe.smembers(f"loc_viewers:{vehicle.id}")
+        sentinel, viewers = await pipe.execute()
+    except Exception:
+        return False  # fail-safe: cualquier error de Redis → ocultar
+
+    if sentinel is None:
+        return False  # caché no inicializada → ocultar por seguridad
+
+    viewer_key = "__cmg__" if user.tenant_tier == "cmg" else str(user.tenant_id)
+    return viewer_key in (viewers or set())
 
 
 def strip_location(obj: BaseModel | dict) -> None:
