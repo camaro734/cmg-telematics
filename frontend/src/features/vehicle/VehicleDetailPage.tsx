@@ -26,6 +26,7 @@ import { useAuthStore } from '../auth/useAuthStore'
 import { useFleetStore } from '../fleet/useFleetStore'
 import { useMyProfile } from '../../lib/useMyProfile'
 import { Select } from '../../shared/ui/Select'
+import LocationPrivacySection from './LocationPrivacySection'
 
 const BASE_TABS = [
   { id: 'live', label: 'EN VIVO' },
@@ -328,6 +329,15 @@ export default function VehicleDetailPage() {
                   {mapExpanded && (
                     <div style={{ height: 300, position: 'relative' }}>
                       <TrackMap track={[]} status={status} />
+                      {status != null && status.lat == null && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,17,23,0.75)', backdropFilter: 'blur(4px)', zIndex: 400 }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 22, marginBottom: 4 }}>🔒</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)', fontFamily: 'var(--font-sans)' }}>Ubicación privada</div>
+                            <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 4, fontFamily: 'var(--font-sans)' }}>El propietario no ha compartido su ubicación</div>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 400, background: 'rgba(28,25,23,0.82)', backdropFilter: 'blur(6px)', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 11 }}>
                         {vehicle.driver_name && (
                           <span><span style={{ color: 'rgba(255,255,255,0.45)' }}>Conductor </span><span style={{ color: '#fff', fontWeight: 600 }}>{vehicle.driver_name}</span></span>
@@ -480,6 +490,9 @@ export default function VehicleDetailPage() {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
 
+                {/* PRIVACIDAD DE UBICACIÓN */}
+                {id && <LocationPrivacySection vehicleId={id} />}
+
               </>) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -557,11 +570,15 @@ export default function VehicleDetailPage() {
                     <span style={{ fontSize: 10, color: 'var(--fg-muted)' }}>{track.length} puntos GPS</span>
                   )}
                 </div>
-                <div style={{ height: 340, borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ height: 340, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
                   <TrackMap
                     track={track}
                     status={isTrackToday ? status : undefined}
-                    emptyMessage={isTrackToday ? 'Sin recorrido registrado hoy' : 'Sin recorrido registrado para esta fecha'}
+                    emptyMessage={
+                      status != null && status.lat == null
+                        ? 'Recorrido no disponible — ubicación privada'
+                        : isTrackToday ? 'Sin recorrido registrado hoy' : 'Sin recorrido registrado para esta fecha'
+                    }
                   />
                 </div>
               </div>
