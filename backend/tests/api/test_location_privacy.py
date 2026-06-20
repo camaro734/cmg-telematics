@@ -631,10 +631,15 @@ class TestLocationPrivacyNewEndpoints:
 
     # ── 2. GET /vehicles/{id} — verificar seguro por diseño ──────────────────
 
-    def test_get_vehicle_detail_has_no_coords_for_upstream(self):
-        """GET /vehicles/{id} — lat/lng no son columnas del ORM, siempre None.
-        Este test verifica que el invariante se cumple (seguro por diseño).
-        PASA en fase roja (la protección ya existe estructuralmente).
+    def test_get_vehicle_detail_no_location_leak_for_upstream(self):
+        """GET /vehicles/{id} no filtra coordenadas: lat/lng no son columnas del ORM Vehicle.
+
+        Verificación empírica: el endpoint devuelve el ORM object directamente.
+        Como Vehicle no tiene columnas lat/lng, Pydantic usa el default None para
+        VehicleOut.lat y VehicleOut.lng. El test usa _find_location_leak para
+        demostrar que ningún campo de ubicación llega con valor no-null al fabricante.
+        Si en el futuro alguien añadiera lat/lng al ORM o al endpoint, este test
+        fallaría y quedaría expuesta la necesidad de añadir strip_location.
         """
         vehicle = _make_vehicle(hide=True)
         _override_user(MANUFACTURER_USER)
@@ -648,8 +653,15 @@ class TestLocationPrivacyNewEndpoints:
 
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        assert data.get("lat") is None, "lat debe ser None (no es columna del ORM Vehicle)"
-        assert data.get("lng") is None, "lng debe ser None (no es columna del ORM Vehicle)"
+        # Verificación mediante _find_location_leak (igual que el resto de endpoints)
+        leaks = _find_location_leak(data)
+        assert not leaks, (
+            f"FUGA en GET /vehicles/{{id}} (upstream): {leaks}. "
+            "Si falla, hay que añadir strip_location() en get_vehicle()."
+        )
+        # Confirmar explícitamente que los campos de VehicleOut están a None
+        assert data.get("lat") is None, "lat debe ser None — Vehicle ORM no tiene esta columna"
+        assert data.get("lng") is None, "lng debe ser None — Vehicle ORM no tiene esta columna"
 
     # ── 3. GET /vehicles/statuses (bulk) ─────────────────────────────────────
 
