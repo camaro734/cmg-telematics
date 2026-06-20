@@ -46,7 +46,13 @@ from app.models.manual_can_button import ManualCanButton
 from app.services import manual_can_config
 from app.services.manual_can_config import is_fmc_error_response
 from app.schemas.maintenance import MaintenancePlanOut, MaintenanceTemplateItem
-from app.api.v1.access_v2 import assert_can_access_vehicle, list_accessible_vehicle_ids, assert_can_actuate_controls
+from app.api.v1.access_v2 import (
+    assert_can_access_vehicle,
+    list_accessible_vehicle_ids,
+    assert_can_actuate_controls,
+    user_can_see_vehicle_location,
+    strip_location,
+)
 
 from pydantic import BaseModel, Field
 
@@ -1573,7 +1579,7 @@ async def get_vehicle_status(
     else:
         _vstatus = 'parked'
     _lon = _parse_float(lon_str)
-    return VehicleStatus(
+    out = VehicleStatus(
         vehicle_id=vehicle_id,
         online=effective_online,
         last_seen=last_seen_dt,
@@ -1591,6 +1597,9 @@ async def get_vehicle_status(
         status=_vstatus,
         device_out_of_service=device_oos,
     )
+    if not user_can_see_vehicle_location(user, vehicle):
+        strip_location(out)
+    return out
 
 
 @router.get("/vehicles/{vehicle_id}/telemetry/latest", response_model=TelemetryPoint)
@@ -1620,7 +1629,10 @@ async def get_vehicle_telemetry_latest(
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No hay telemetría reciente")
 
-    return TelemetryPoint(**dict(row._mapping))
+    point = TelemetryPoint(**dict(row._mapping))
+    if not user_can_see_vehicle_location(user, vehicle):
+        strip_location(point)
+    return point
 
 
 @router.get("/vehicles/{vehicle_id}/telemetry/history", response_model=list[TelemetryPoint])
@@ -1665,7 +1677,11 @@ async def get_vehicle_telemetry_history(
         )
     ).fetchall()
 
-    return [TelemetryPoint(**dict(r._mapping)) for r in rows]
+    points = [TelemetryPoint(**dict(r._mapping)) for r in rows]
+    if not user_can_see_vehicle_location(user, vehicle):
+        for p in points:
+            strip_location(p)
+    return points
 
 
 @router.get("/vehicles/{vehicle_id}/track/today", response_model=list[TrackPoint])
@@ -1677,6 +1693,9 @@ async def get_vehicle_track_today(
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
+
+    if not user_can_see_vehicle_location(user, vehicle):
+        return []
 
     rows = (
         await db.execute(
@@ -1707,6 +1726,9 @@ async def get_vehicle_track(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
     if from_ > to:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from debe ser anterior a to")
+
+    if not user_can_see_vehicle_location(user, vehicle):
+        return []
 
     rows = (
         await db.execute(
