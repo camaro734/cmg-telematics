@@ -1446,6 +1446,33 @@ async def get_vehicle(
     return vehicle
 
 
+class _LocationPrivacyBody(BaseModel):
+    hide: bool
+
+
+@router.patch("/vehicles/{vehicle_id}/location-privacy")
+async def patch_vehicle_location_privacy(
+    vehicle_id: uuid.UUID,
+    body: _LocationPrivacyBody,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vehicle = await db.get(Vehicle, vehicle_id)
+    if not vehicle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+
+    if vehicle.tenant_id != user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el propietario del vehículo puede modificar la privacidad de ubicación",
+        )
+
+    vehicle.hide_location_from_upstream = body.hide
+    await db.commit()
+    await db.refresh(vehicle)
+    return {"hide_location_from_upstream": vehicle.hide_location_from_upstream}
+
+
 @router.get("/vehicles/{vehicle_id}/status", response_model=VehicleStatus)
 async def get_vehicle_status(
     vehicle_id: uuid.UUID,
