@@ -19,6 +19,7 @@ from app.api.v1.work_reports import router as work_reports_router
 from app.api.v1.portal import router as portal_router
 from app.api.v1.fleet import router as fleet_router
 from app.api.v1.settings_smtp import router as smtp_router
+from app.api.v1.location_grant import router as location_grant_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)
@@ -40,3 +41,4 @@ api_router.include_router(diagnostics_router)
 api_router.include_router(commands_router)
 api_router.include_router(fleet_router)
 api_router.include_router(smtp_router)
+api_router.include_router(location_grant_router)
