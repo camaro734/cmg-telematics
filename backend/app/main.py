@@ -21,7 +21,13 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.router import api_router
-from app.api.v1.ws import router as ws_router, ConnectionManager, broadcast_telemetry_task
+from app.api.v1.ws import (
+    router as ws_router,
+    ConnectionManager,
+    broadcast_telemetry_task,
+    warmup_location_privacy_cache,
+    loc_private_refresher,
+)
 from app.api.v1.commands import internal_router
 from app.core.config import settings
 
@@ -104,6 +110,10 @@ async def lifespan(app: FastAPI):
     Path("/app/uploads/logos").mkdir(parents=True, exist_ok=True)
     app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     app.state.ws_manager = ConnectionManager()
+    try:
+        await warmup_location_privacy_cache(app.state.redis)
+    except Exception as exc:
+        logger.warning("warmup_location_privacy_cache failed at startup: %s", exc)
     from app.core.maintenance_notifier import maintenance_notification_task
     task = asyncio.create_task(
         broadcast_telemetry_task(app.state.redis, app.state.ws_manager)
@@ -111,10 +121,14 @@ async def lifespan(app: FastAPI):
     notifier_task = asyncio.create_task(
         maintenance_notification_task(app.state.redis)
     )
+    loc_refresh_task = asyncio.create_task(
+        loc_private_refresher(app.state.redis)
+    )
     yield
     task.cancel()
     notifier_task.cancel()
-    for t in (task, notifier_task):
+    loc_refresh_task.cancel()
+    for t in (task, notifier_task, loc_refresh_task):
         try:
             await t
         except asyncio.CancelledError:

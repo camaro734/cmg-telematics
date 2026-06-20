@@ -12,6 +12,12 @@ from app.schemas.auth import CurrentUser
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
 
+# Campos de ubicación a ocultar en el WS cuando hide_location_from_upstream=True.
+# Solo en el canal upstream (fabricante, __cmg__); el dueño siempre recibe todo.
+_WS_LOC_FIELDS: frozenset[str] = frozenset({
+    "lat", "lon", "lng", "speed_kmh", "heading", "altitude_m",
+})
+
 
 def _enrich_payload(payload: dict) -> dict:
     """Mapea received_at→device_last_seen y calcula el campo online.
@@ -114,6 +120,60 @@ def _broadcast_channels(
     return channels
 
 
+async def warmup_location_privacy_cache(redis) -> None:
+    """Carga hide_location_from_upstream de todos los vehículos en Redis.
+
+    vehicle:{id}:loc_private → "1" (oculto) / "0" (visible)
+    loc_private:_sentinel → "1" indica que la caché está inicializada.
+    Si el sentinel no existe, el broadcast asume privado (fail-safe).
+    """
+    from sqlalchemy import select
+    from app.core.database import AsyncSessionLocal
+    from app.models.vehicle import Vehicle
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Vehicle.id, Vehicle.hide_location_from_upstream)
+        )
+        rows = result.all()
+
+    pipe = redis.pipeline()
+    for vehicle_id, hide in rows:
+        pipe.set(f"vehicle:{vehicle_id}:loc_private", "1" if hide else "0")
+    # TTL 120 s: si el refresher falla más de 2 min, sentinel expira → fail-safe activo
+    pipe.set("loc_private:_sentinel", "1", ex=120)
+    await pipe.execute()
+    logger.info("loc_private_cache_warmed", extra={"count": len(rows)})
+
+
+async def loc_private_refresher(redis) -> None:
+    """Refresca la caché loc_private cada 60 s. Máxima exposición tras un PATCH: 60 s."""
+    while True:
+        try:
+            await asyncio.sleep(60)
+            await warmup_location_privacy_cache(redis)
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning("loc_private_refresh_failed: %s", exc)
+
+
+async def _should_hide_location(redis, vehicle_id: str) -> bool:
+    """True si hay que ocultar coordenadas a upstream para este vehículo.
+
+    Usa MGET (2 claves, 1 round-trip). Fail-safe: devuelve True si el sentinel
+    no existe, impidiendo cualquier filtración durante el cold-start de Redis.
+    """
+    try:
+        vals = await redis.mget("loc_private:_sentinel", f"vehicle:{vehicle_id}:loc_private")
+    except Exception:
+        return True
+    sentinel, vehicle_flag = vals
+    if sentinel is None:
+        return True  # cache no inicializada → ocultar por seguridad
+    return vehicle_flag == "1"
+
+
 async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
     last_id = "$"
     _last_sent: dict[str, float] = {}   # vehicle_id → monotonic del último emit
@@ -151,9 +211,22 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                                 _last_state[vehicle_id] = (payload.get("online"), payload.get("ignition"))
                         tenant_id = payload.get("tenant_id")
                         manufacturer_tenant_id = payload.get("manufacturer_tenant_id")
-                        msg = {"type": ws_type, "data": payload}
+
+                        # Privacidad de ubicación: calcular una sola vez si hay que filtrar
+                        hide_loc = False
+                        if ws_type == "telemetry" and vehicle_id:
+                            hide_loc = await _should_hide_location(redis, str(vehicle_id))
+
+                        full_msg = {"type": ws_type, "data": payload}
                         for channel in _broadcast_channels(tenant_id, manufacturer_tenant_id, ws_type):
-                            await manager.broadcast_to_tenant(channel, msg)
+                            if hide_loc and channel != tenant_id:
+                                stripped = {
+                                    k: (None if k in _WS_LOC_FIELDS else v)
+                                    for k, v in payload.items()
+                                }
+                                await manager.broadcast_to_tenant(channel, {"type": ws_type, "data": stripped})
+                            else:
+                                await manager.broadcast_to_tenant(channel, full_msg)
                     except Exception as exc:
                         logger.warning("WS broadcast parse error: %s", exc)
 
