@@ -22,11 +22,12 @@ from app.models.tenant_doc_counter import TenantDocCounter
 from app.models.access_audit_log import AccessAuditLog  # noqa
 from app.models.system_settings import SystemSettings
 from app.models.system_block_template import SystemBlockTemplate
+from app.models.location_access_grant import LocationAccessGrant
 
 __all__ = [
     "Base", "Tenant", "User", "PermissionGrant", "VehicleType", "VehicleTypeManufacturer",
     "Vehicle", "Device", "DeviceDataUsage", "TelemetryRecord", "AlertRule", "AlertInstance",
     "MaintenancePlan", "MaintenanceLog", "CommandLog", "VehicleManualCanSlot", "ManualCanButton",
     "Driver", "WorkOrder", "WorkOrderStop", "WorkReport", "TenantDocCounter",
-    "AccessAuditLog", "SystemSettings", "SystemBlockTemplate",
+    "AccessAuditLog", "SystemSettings", "SystemBlockTemplate", "LocationAccessGrant",
 ]
