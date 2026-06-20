@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, require_module
+from app.api.v1.deps import get_current_user, get_redis, require_module
 from app.api.v1.access_v2 import user_can_see_vehicle_location, strip_location
 from app.schemas.auth import CurrentUser
 from app.schemas.work_order import (
@@ -40,12 +40,13 @@ async def _enrich(
     db: AsyncSession,
     order: WorkOrder,
     user: CurrentUser | None = None,
+    redis=None,
 ) -> WorkOrderOut:
     out = WorkOrderOut.model_validate(order)
     if order.vehicle_id:
         v = await db.get(Vehicle, order.vehicle_id)
         out.vehicle_name = v.name if v else None
-        if user is not None and v is not None and not user_can_see_vehicle_location(user, v):
+        if user is not None and v is not None and not await user_can_see_vehicle_location(user, v, redis):
             strip_location(out)
     if order.driver_id:
         d = await db.get(Driver, order.driver_id)
@@ -62,6 +63,7 @@ async def list_work_orders(
     limit: int = Query(100, le=500),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     q = select(WorkOrder)
     if user.tenant_tier != "cmg":
@@ -77,7 +79,7 @@ async def list_work_orders(
     q = q.order_by(WorkOrder.created_at.desc()).limit(limit)
     result = await db.execute(q)
     orders = result.scalars().all()
-    return [await _enrich(db, o, user) for o in orders]
+    return [await _enrich(db, o, user, redis) for o in orders]
 
 
 @router.get("/work-orders/{order_id}", response_model=WorkOrderOut)
@@ -85,12 +87,13 @@ async def get_work_order(
     order_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     _check_tenant(user, order.tenant_id)
-    return await _enrich(db, order, user)
+    return await _enrich(db, order, user, redis)
 
 
 @router.get("/work-orders/{order_id}/telemetry-detail")
@@ -269,6 +272,7 @@ async def list_stops(
     order_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     order = await _get_order_for_tenant(db, order_id, user)
     result = await db.execute(
@@ -280,7 +284,7 @@ async def list_stops(
 
     if order.vehicle_id:
         vehicle = await db.get(Vehicle, order.vehicle_id)
-        if vehicle and not user_can_see_vehicle_location(user, vehicle):
+        if vehicle and not await user_can_see_vehicle_location(user, vehicle, redis):
             stops_out = [WorkOrderStopOut.model_validate(s) for s in stops_orm]
             for s in stops_out:
                 strip_location(s)

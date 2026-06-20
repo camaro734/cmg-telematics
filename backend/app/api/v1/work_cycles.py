@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, get_redis
 from app.api.v1.access_v2 import user_can_see_vehicle_location, strip_location
 from app.schemas.auth import CurrentUser
 from app.schemas.work_cycle import (
@@ -111,6 +111,7 @@ async def list_cycles(
     definition_id: uuid.UUID | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     q = select(WorkCycle).where(
         WorkCycle.vehicle_id == vehicle_id,
@@ -125,7 +126,7 @@ async def list_cycles(
     cycles = result.scalars().all()
 
     vehicle_obj = await db.get(Vehicle, vehicle_id)
-    if vehicle_obj and not user_can_see_vehicle_location(user, vehicle_obj):
+    if vehicle_obj and not await user_can_see_vehicle_location(user, vehicle_obj, redis):
         outs = [WorkCycleOut.model_validate(c) for c in cycles]
         for out in outs:
             strip_location(out)

@@ -121,35 +121,56 @@ def _broadcast_channels(
 
 
 async def warmup_location_privacy_cache(redis) -> None:
-    """Precarga en Redis solo los vehículos con hide_location_from_upstream=True.
+    """Precarga en Redis los sets loc_viewers:{vehicle_id} desde location_access_grant.
 
-    Representación única: key presente con valor "1" → privado;
-    key ausente (sentinel presente) → público. No se escriben keys "0".
-    Las keys de vehículo tienen TTL=90s; el refresher las renueva cada 60s.
-    Si un vehículo pasa de privado a público, su key expira sola en ≤90s
-    (o se borra inmediatamente si el PATCH llama a redis.delete).
+    Estructura en Redis:
+      loc_viewers:_sentinel  TTL=90s  — ausente → fail-safe (nadie fuera del dueño ve)
+      loc_viewers:{id}       SET      TTL=120s — tenant_ids/tokens que tienen grant
+
+    El dueño (vehicle.tenant_id) nunca se guarda en el set: su acceso se garantiza
+    por comparación directa tenant_id == vehicle.tenant_id en el hot path.
+    TTL sentinel < TTL viewers: si el refresher falla, sentinel expira primero →
+    _get_location_viewers devuelve None → fail-safe privado en el WS.
     """
     from sqlalchemy import select
     from app.core.database import AsyncSessionLocal
-    from app.models.vehicle import Vehicle
+    from app.models.location_access_grant import LocationAccessGrant
+    from app.models.tenant import Tenant
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(Vehicle.id).where(Vehicle.hide_location_from_upstream == True)
+            select(
+                LocationAccessGrant.vehicle_id,
+                Tenant.tier,
+                Tenant.parent_manufacturer_id,
+            ).join(Tenant, Tenant.id == LocationAccessGrant.granting_tenant_id)
         )
-        private_ids = result.scalars().all()
+        rows = result.all()
+
+    # viewer_key: el PADRE del granting_tenant es quien gana visibilidad
+    viewers_by_vehicle: dict[str, set[str]] = {}
+    for row in rows:
+        vid = str(row.vehicle_id)
+        viewers_by_vehicle.setdefault(vid, set())
+        if row.tier == "client" and row.parent_manufacturer_id:
+            viewers_by_vehicle[vid].add(str(row.parent_manufacturer_id))
+        elif row.tier == "manufacturer":
+            viewers_by_vehicle[vid].add("__cmg__")
 
     pipe = redis.pipeline()
-    for vehicle_id in private_ids:
-        pipe.set(f"vehicle:{vehicle_id}:loc_private", "1", ex=90)
-    # TTL 120 s: si el refresher falla más de 2 min, sentinel expira → fail-safe activo
-    pipe.set("loc_private:_sentinel", "1", ex=120)
+    for vid, viewers in viewers_by_vehicle.items():
+        if viewers:
+            pipe.delete(f"loc_viewers:{vid}")
+            pipe.sadd(f"loc_viewers:{vid}", *viewers)
+            pipe.expire(f"loc_viewers:{vid}", 120)
+    # Sentinel TTL 90s < viewers TTL 120s: garantiza que expire primero.
+    pipe.set("loc_viewers:_sentinel", "1", ex=90)
     await pipe.execute()
-    logger.info("loc_private_cache_warmed", extra={"count": len(private_ids)})
+    logger.info("loc_viewers_cache_warmed", extra={"count": len(viewers_by_vehicle)})
 
 
 async def loc_private_refresher(redis) -> None:
-    """Refresca la caché loc_private cada 60 s. Máxima exposición tras un PATCH: 60 s."""
+    """Refresca la caché loc_viewers cada 60 s. Máxima latencia tras POST/DELETE grant: 60 s."""
     while True:
         try:
             await asyncio.sleep(60)
@@ -157,23 +178,27 @@ async def loc_private_refresher(redis) -> None:
         except asyncio.CancelledError:
             break
         except Exception as exc:
-            logger.warning("loc_private_refresh_failed: %s", exc)
+            logger.warning("loc_viewers_refresh_failed: %s", exc)
 
 
-async def _should_hide_location(redis, vehicle_id: str) -> bool:
-    """True si hay que ocultar coordenadas a upstream para este vehículo.
+async def _get_location_viewers(redis, vehicle_id: str) -> frozenset[str] | None:
+    """Devuelve el set de canales con grant explícito para este vehículo.
 
-    Usa MGET (2 claves, 1 round-trip). Fail-safe: devuelve True si el sentinel
-    no existe, impidiendo cualquier filtración durante el cold-start de Redis.
+    Usa pipeline GET+SMEMBERS (1 round-trip).
+    None  → sentinel ausente → cache no inicializada → fail-safe: nadie fuera del dueño ve.
+    frozenset vacío → sentinel presente pero sin grants → nadie fuera del dueño ve.
+    frozenset con IDs → esos canales (tenant_id / "__cmg__") pueden ver la ubicación.
     """
     try:
-        vals = await redis.mget("loc_private:_sentinel", f"vehicle:{vehicle_id}:loc_private")
+        pipe = redis.pipeline()
+        pipe.get("loc_viewers:_sentinel")
+        pipe.smembers(f"loc_viewers:{vehicle_id}")
+        sentinel, viewers = await pipe.execute()
     except Exception:
-        return True
-    sentinel, vehicle_flag = vals
+        return None  # fail-safe
     if sentinel is None:
-        return True  # cache no inicializada → ocultar por seguridad
-    return vehicle_flag == "1"
+        return None  # cache no inicializada → fail-safe
+    return frozenset(viewers or set())
 
 
 async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
@@ -214,21 +239,26 @@ async def broadcast_telemetry_task(redis, manager: ConnectionManager) -> None:
                         tenant_id = payload.get("tenant_id")
                         manufacturer_tenant_id = payload.get("manufacturer_tenant_id")
 
-                        # Privacidad de ubicación: calcular una sola vez si hay que filtrar
-                        hide_loc = False
+                        # Privacidad de ubicación: obtener set de canales con grant (1 round-trip)
+                        viewers: frozenset[str] | None = None
                         if ws_type == "telemetry" and vehicle_id:
-                            hide_loc = await _should_hide_location(redis, str(vehicle_id))
+                            viewers = await _get_location_viewers(redis, str(vehicle_id))
 
                         full_msg = {"type": ws_type, "data": payload}
                         for channel in _broadcast_channels(tenant_id, manufacturer_tenant_id, ws_type):
-                            if hide_loc and channel != tenant_id:
+                            if channel == tenant_id:
+                                # Dueño siempre recibe todo — no consulta Redis
+                                await manager.broadcast_to_tenant(channel, full_msg)
+                            elif viewers is not None and channel in viewers:
+                                # Grant explícito → ubicación visible
+                                await manager.broadcast_to_tenant(channel, full_msg)
+                            else:
+                                # Sin grant o cache no inicializada → fail-safe: strip
                                 stripped = {
                                     k: (None if k in _WS_LOC_FIELDS else v)
                                     for k, v in payload.items()
                                 }
                                 await manager.broadcast_to_tenant(channel, {"type": ws_type, "data": stripped})
-                            else:
-                                await manager.broadcast_to_tenant(channel, full_msg)
                     except Exception as exc:
                         logger.warning("WS broadcast parse error: %s", exc)
 

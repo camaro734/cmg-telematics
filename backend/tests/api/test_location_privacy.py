@@ -1,13 +1,16 @@
-"""Tests de privacidad de ubicación — Feature 059.
+"""Tests de privacidad de ubicación — Feature 060 (modelo escalonado).
 
-Orden TDD:
-  Bloque 1 (funciones puras): pasan desde el primer commit (A).
-  Bloque 2 (endpoints): FALLAN hasta que se implementen los filtros en vehicles.py (B).
-  Bloque 3 (endpoint PATCH): FALLAN hasta que se implemente el endpoint (F).
+Estructura:
+  Bloque 1 (strip_location): tests de la función pura — siempre pasan.
+  Bloque 2 (endpoints REST): anti-fuga para los 14 endpoints.
+    Simulación de "upstream no tiene grant" → viewers vacío → strip aplicado.
+    Simulación de "dueño ve siempre" → tenant_id coincide → sin consulta Redis.
 
-Los tests de endpoints fallan porque actualmente los endpoints devuelven lat/lon
-a usuarios upstream aunque hide_location_from_upstream=True. La transición
-ROJO → VERDE ocurre al implementar strip_location() en cada endpoint.
+Mocks de Redis:
+  _privacy_redis(can_see=False) → sentinel="1", viewers=set() → upstream no ve.
+  _privacy_redis(can_see=True) → sentinel="1", viewers={CLIENT_TENANT_ID} → dueño ve.
+  Los tests de endpoints sobreescriben la dependencia get_redis con este helper,
+  independientemente del mock de app.state.redis usado para telemetría (hgetall, etc.).
 """
 import uuid
 from datetime import datetime, timezone
@@ -19,9 +22,8 @@ from fastapi.testclient import TestClient
 from app.api.v1.access_v2 import (
     _LOCATION_FIELDS,
     strip_location,
-    user_can_see_vehicle_location,
 )
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, get_redis
 from app.core.database import get_db
 from app.main import app
 from app.models.vehicle import Vehicle
@@ -59,12 +61,11 @@ CLIENT_USER = CurrentUser(
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-def _make_vehicle(hide: bool = False) -> MagicMock:
+def _make_vehicle() -> MagicMock:
     v = MagicMock(spec=Vehicle)
     v.id = VEHICLE_ID
     v.tenant_id = CLIENT_TENANT_ID
     v.manufacturer_tenant_id = MANUF_TENANT_ID
-    v.hide_location_from_upstream = hide
     v.active = True
     v.name = "Test Vehicle"
     v.vehicle_type_id = uuid.uuid4()
@@ -76,8 +77,25 @@ def _make_vehicle(hide: bool = False) -> MagicMock:
     return v
 
 
+def _privacy_redis(can_see: bool = False) -> MagicMock:
+    """Mock de Redis para user_can_see_vehicle_location (pipeline GET+SMEMBERS).
+
+    can_see=False → viewers=set() → upstream no está en viewers → strip aplicado.
+    can_see=True  → viewers contiene CLIENT_TENANT_ID → dueño ve (irrelevante porque
+                    la función retorna True antes de consultar Redis cuando tenant_id coincide).
+    """
+    viewers = {str(CLIENT_TENANT_ID)} if can_see else set()
+    pipe = MagicMock()
+    pipe.get = MagicMock()
+    pipe.smembers = MagicMock()
+    pipe.execute = AsyncMock(return_value=["1", viewers])
+    redis = MagicMock()
+    redis.pipeline = MagicMock(return_value=pipe)
+    return redis
+
+
 def _redis_with_location() -> AsyncMock:
-    """Redis mock que devuelve telemetría con coordenadas reales."""
+    """Redis mock que devuelve telemetría con coordenadas reales (para hgetall)."""
     redis = AsyncMock()
     hash_data = {
         b"online": b"true",
@@ -94,13 +112,6 @@ def _redis_with_location() -> AsyncMock:
         b"last_seen": b"2026-06-20T08:00:00+00:00",
     }
     redis.hgetall.return_value = hash_data
-    redis.mget.return_value = [b"1", None]  # sentinel presente, vehicle no privado en WS cache
-    pipe_mock = AsyncMock()
-    pipe_mock.hgetall = MagicMock()
-    pipe_mock.execute = AsyncMock(return_value=[hash_data])
-    pipe_mock.__aenter__ = AsyncMock(return_value=pipe_mock)
-    pipe_mock.__aexit__ = AsyncMock(return_value=False)
-    redis.pipeline.return_value = pipe_mock
     return redis
 
 
@@ -130,34 +141,15 @@ def _override_user(user: CurrentUser) -> None:
     app.dependency_overrides[get_current_user] = lambda: user
 
 
+def _override_privacy_redis(can_see: bool = False) -> None:
+    """Sobreescribe get_redis con un mock de privacidad independiente del redis de telemetría."""
+    r = _privacy_redis(can_see=can_see)
+    app.dependency_overrides[get_redis] = lambda: r
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# Bloque 1: Funciones puras — PASAN desde el primer commit (pieza A)
+# Bloque 1: strip_location y _LOCATION_FIELDS
 # ═══════════════════════════════════════════════════════════════════════════════
-
-class TestUserCanSeeVehicleLocation:
-    """user_can_see_vehicle_location() — 5 casos según Decisión 2."""
-
-    def test_owner_always_sees_location(self):
-        vehicle = _make_vehicle(hide=True)
-        assert user_can_see_vehicle_location(CLIENT_USER, vehicle) is True
-
-    def test_manufacturer_sees_when_flag_off(self):
-        vehicle = _make_vehicle(hide=False)
-        assert user_can_see_vehicle_location(MANUFACTURER_USER, vehicle) is True
-
-    def test_manufacturer_hidden_when_flag_on(self):
-        vehicle = _make_vehicle(hide=True)
-        assert user_can_see_vehicle_location(MANUFACTURER_USER, vehicle) is False
-
-    def test_cmg_hidden_when_flag_on(self):
-        """CMG NO está exento — Decisión 2 corrige el diseño inicial."""
-        vehicle = _make_vehicle(hide=True)
-        assert user_can_see_vehicle_location(CMG_USER, vehicle) is False
-
-    def test_cmg_sees_when_flag_off(self):
-        vehicle = _make_vehicle(hide=False)
-        assert user_can_see_vehicle_location(CMG_USER, vehicle) is True
-
 
 class TestStripLocation:
     """strip_location() — elimina coordenadas, mantiene telemetría técnica."""
@@ -176,7 +168,6 @@ class TestStripLocation:
         assert point.speed_kmh is None
         assert point.heading is None
         assert point.altitude_m is None
-        # Telemetría técnica intacta
         assert point.ignition is True
         assert point.pto_active is False
         assert point.ext_voltage_mv == 12100
@@ -207,17 +198,13 @@ class TestStripLocation:
         assert status.ext_voltage_mv == 12100
 
     def test_location_fields_constant_covers_all_schemas(self):
-        """_LOCATION_FIELDS debe cubrir todos los campos de ubicación de todos los schemas.
-        Si alguien añade un campo nuevo de ubicación en un schema y olvida registrarlo
-        aquí, este test falla.
-        """
+        """_LOCATION_FIELDS debe cubrir todos los campos de ubicación de todos los schemas."""
         from app.schemas.vehicle import (
             TelemetryPoint, TrackPoint, VehicleOut, VehicleStatus,
         )
         from app.schemas.work_order import WorkOrderOut, WorkOrderStopOut
         from app.schemas.work_cycle import WorkCycleOut
 
-        # Campos de ubicación esperados por schema (nombres exactos en el modelo Pydantic)
         expected: dict[type, set[str]] = {
             VehicleOut:       {"lat", "lng"},
             VehicleStatus:    {"lat", "lon", "lng", "speed_kmh", "heading"},
@@ -235,7 +222,6 @@ class TestStripLocation:
                     f"{schema_cls.__name__} ya no tiene campo '{f}' — "
                     f"actualiza este test o el schema."
                 )
-            # Verifica que todos los campos están en _LOCATION_FIELDS
             for f in location_fields:
                 assert f in _LOCATION_FIELDS, (
                     f"Campo '{f}' de {schema_cls.__name__} no está en _LOCATION_FIELDS — "
@@ -244,15 +230,12 @@ class TestStripLocation:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Bloque 2: Endpoints REST — FALLAN hasta que se implemente pieza B
+# Bloque 2: Endpoints REST — anti-fuga
+# Simulación: viewers vacío → upstream sin grant → strip aplicado.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestLocationPrivacyEndpoints:
-    """Anti-fuga: upstream no debe recibir coordenadas cuando el flag está activo.
-
-    FASE ROJA: los tests de manufacturer/CMG fallan porque los endpoints aún
-    devuelven lat/lon. Los tests de 'owner' pasan en ambas fases.
-    """
+    """Anti-fuga: upstream no debe recibir coordenadas cuando no tiene grant."""
 
     def _status_redis_hash(self) -> dict:
         return {
@@ -277,9 +260,10 @@ class TestLocationPrivacyEndpoints:
         return mock_db
 
     def test_vehicle_status_hides_location_from_manufacturer(self):
-        """GET /vehicles/{id}/status no devuelve lat/lon al fabricante con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+        """GET /vehicles/{id}/status no devuelve lat/lon al fabricante sin grant."""
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_db = self._make_status_db_mock()
 
@@ -298,14 +282,13 @@ class TestLocationPrivacyEndpoints:
 
         assert resp.status_code == 200, resp.text
         leaks = _find_location_leak(resp.json())
-        assert not leaks, (
-            f"FUGA en GET /vehicles/{{id}}/status (manufacturer): {leaks}"
-        )
+        assert not leaks, f"FUGA en GET /vehicles/{{id}}/status (manufacturer): {leaks}"
 
     def test_vehicle_status_hides_location_from_cmg(self):
-        """CMG tampoco ve coordenadas cuando el flag está activo (Decisión 2)."""
-        vehicle = _make_vehicle(hide=True)
+        """CMG no ve coordenadas cuando no tiene grant."""
+        vehicle = _make_vehicle()
         _override_user(CMG_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_db = self._make_status_db_mock()
 
@@ -324,14 +307,13 @@ class TestLocationPrivacyEndpoints:
 
         assert resp.status_code == 200, resp.text
         leaks = _find_location_leak(resp.json())
-        assert not leaks, (
-            f"FUGA en GET /vehicles/{{id}}/status (CMG): {leaks}"
-        )
+        assert not leaks, f"FUGA en GET /vehicles/{{id}}/status (CMG): {leaks}"
 
     def test_vehicle_status_owner_sees_full_location(self):
-        """El dueño SIEMPRE ve coordenadas aunque el flag esté activo."""
-        vehicle = _make_vehicle(hide=True)
+        """El dueño SIEMPRE ve coordenadas (tenant_id coincide, no consulta Redis)."""
+        vehicle = _make_vehicle()
         _override_user(CLIENT_USER)
+        # No override de get_redis: la función retorna True antes de consultar Redis
 
         mock_db = self._make_status_db_mock()
 
@@ -355,8 +337,9 @@ class TestLocationPrivacyEndpoints:
 
     def test_telemetry_latest_hides_location_from_manufacturer(self):
         """GET /vehicles/{id}/telemetry/latest no devuelve lat/lon al fabricante."""
-        vehicle = _make_vehicle(hide=True)
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_row = MagicMock()
         mock_row._mapping = {
@@ -385,14 +368,13 @@ class TestLocationPrivacyEndpoints:
 
         assert resp.status_code == 200, resp.text
         leaks = _find_location_leak(resp.json())
-        assert not leaks, (
-            f"FUGA en GET /vehicles/{{id}}/telemetry/latest: {leaks}"
-        )
+        assert not leaks, f"FUGA en GET /vehicles/{{id}}/telemetry/latest: {leaks}"
 
-    def test_track_today_returns_empty_for_manufacturer_with_flag(self):
-        """GET /vehicles/{id}/track/today devuelve [] para upstream con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+    def test_track_today_returns_empty_for_manufacturer_without_grant(self):
+        """GET /vehicles/{id}/track/today devuelve [] al fabricante sin grant."""
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_row = MagicMock()
         mock_row._mapping = {
@@ -418,13 +400,14 @@ class TestLocationPrivacyEndpoints:
 
         assert resp.status_code == 200, resp.text
         assert resp.json() == [], (
-            "track/today debe devolver [] cuando la ubicación está oculta para upstream"
+            "track/today debe devolver [] cuando upstream no tiene grant"
         )
 
-    def test_track_range_returns_empty_for_manufacturer_with_flag(self):
-        """GET /vehicles/{id}/track devuelve [] para upstream con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+    def test_track_range_returns_empty_for_manufacturer_without_grant(self):
+        """GET /vehicles/{id}/track devuelve [] al fabricante sin grant."""
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_row = MagicMock()
         mock_row._mapping = {
@@ -453,13 +436,14 @@ class TestLocationPrivacyEndpoints:
 
         assert resp.status_code == 200, resp.text
         assert resp.json() == [], (
-            "track debe devolver [] cuando la ubicación está oculta para upstream"
+            "track debe devolver [] cuando upstream no tiene grant"
         )
 
     def test_telemetry_history_hides_location_from_manufacturer(self):
         """GET /vehicles/{id}/telemetry/history no devuelve lat/lon al fabricante."""
-        vehicle = _make_vehicle(hide=True)
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_row = MagicMock()
         mock_row._mapping = {
@@ -494,100 +478,15 @@ class TestLocationPrivacyEndpoints:
             )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Bloque 3: Endpoint PATCH — FALLA hasta que se implemente pieza F
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class TestLocationPrivacyPatch:
-    """El fabricante y CMG NO pueden cambiar el flag (Decisión 3)."""
-
-    def test_manufacturer_cannot_change_privacy_flag(self):
-        """PATCH /vehicles/{id}/location-privacy devuelve 403 al fabricante."""
-        vehicle = _make_vehicle(hide=False)
-        _override_user(MANUFACTURER_USER)
-
-        mock_db = AsyncMock()
-        mock_db.get.return_value = vehicle
-
-        async def _db_gen():
-            yield mock_db
-
-        app.dependency_overrides[get_db] = _db_gen
-
-        with TestClient(app) as client:
-            resp = client.patch(
-                f"/api/v1/vehicles/{VEHICLE_ID}/location-privacy",
-                json={"hide": True},
-            )
-
-        assert resp.status_code == 403, (
-            f"El fabricante no debe poder cambiar el flag de privacidad. Got {resp.status_code}"
-        )
-
-    def test_cmg_cannot_change_privacy_flag(self):
-        """PATCH /vehicles/{id}/location-privacy devuelve 403 a CMG."""
-        vehicle = _make_vehicle(hide=False)
-        _override_user(CMG_USER)
-
-        mock_db = AsyncMock()
-        mock_db.get.return_value = vehicle
-
-        async def _db_gen():
-            yield mock_db
-
-        app.dependency_overrides[get_db] = _db_gen
-
-        with TestClient(app) as client:
-            resp = client.patch(
-                f"/api/v1/vehicles/{VEHICLE_ID}/location-privacy",
-                json={"hide": True},
-            )
-
-        assert resp.status_code == 403, (
-            f"CMG no debe poder cambiar el flag de privacidad. Got {resp.status_code}"
-        )
-
-    def test_owner_can_activate_privacy_flag(self):
-        """El dueño puede activar hide_location_from_upstream."""
-        vehicle = _make_vehicle(hide=False)
-        _override_user(CLIENT_USER)
-
-        mock_db = AsyncMock()
-        mock_db.get.return_value = vehicle
-        mock_redis = AsyncMock()
-        app.state.redis = mock_redis
-
-        async def _db_gen():
-            yield mock_db
-
-        app.dependency_overrides[get_db] = _db_gen
-
-        with TestClient(app) as client:
-            resp = client.patch(
-                f"/api/v1/vehicles/{VEHICLE_ID}/location-privacy",
-                json={"hide": True},
-            )
-
-        assert resp.status_code == 200, resp.text
-        assert resp.json()["hide_location_from_upstream"] is True
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Bloque 4: Endpoints restantes — FALLAN hasta que se filtren (pieza B, batch 2)
-# ═══════════════════════════════════════════════════════════════════════════════
-
 class TestLocationPrivacyNewEndpoints:
-    """Anti-fuga para los 6 endpoints no cubiertos en el bloque 2.
+    """Anti-fuga para los endpoints restantes.
 
-    TDD: ROJO hasta implementar el filtro, VERDE tras la implementación.
-    GET /vehicles/{id} se verifica como "seguro por diseño" (lat/lng nunca en ORM).
+    GET /vehicles/{id} se verifica como seguro por diseño (lat/lng nunca en ORM).
     """
-
-    # ── helpers internos ─────────────────────────────────────────────────────
 
     @staticmethod
     def _make_redis_with_location_pipeline() -> tuple:
-        """Devuelve (redis_mock, hash_data) con pipeline sincrónico."""
+        """Devuelve (redis_mock, hash_data) con pipeline sincrónico para telemetría."""
         hash_data = {
             "lat": "39.4702", "lon": "-0.3768",
             "speed_kmh": "55.0", "heading": "90",
@@ -598,17 +497,18 @@ class TestLocationPrivacyNewEndpoints:
         pipe.hgetall = MagicMock()
         pipe.execute = AsyncMock(return_value=[hash_data])
         redis_mock = AsyncMock()
-        redis_mock.pipeline = MagicMock(return_value=pipe)  # sync, no await
+        redis_mock.pipeline = MagicMock(return_value=pipe)
         return redis_mock, hash_data
 
     # ── 1. GET /vehicles (lista) ──────────────────────────────────────────────
 
     def test_list_vehicles_hides_location_from_manufacturer(self):
-        """GET /vehicles no devuelve lat/lng al fabricante con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+        """GET /vehicles no devuelve lat/lng al fabricante sin grant."""
+        vehicle = _make_vehicle()
         vehicle.vehicle_type = MagicMock()
         vehicle.vehicle_type.slug = "cisterna"
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_result = MagicMock()
         mock_result.unique.return_value.scalars.return_value.all.return_value = [vehicle]
@@ -629,19 +529,11 @@ class TestLocationPrivacyNewEndpoints:
         leaks = _find_location_leak(resp.json())
         assert not leaks, f"FUGA en GET /vehicles (manufacturer): {leaks}"
 
-    # ── 2. GET /vehicles/{id} — verificar seguro por diseño ──────────────────
+    # ── 2. GET /vehicles/{id} — seguro por diseño ─────────────────────────────
 
     def test_get_vehicle_detail_no_location_leak_for_upstream(self):
-        """GET /vehicles/{id} no filtra coordenadas: lat/lng no son columnas del ORM Vehicle.
-
-        Verificación empírica: el endpoint devuelve el ORM object directamente.
-        Como Vehicle no tiene columnas lat/lng, Pydantic usa el default None para
-        VehicleOut.lat y VehicleOut.lng. El test usa _find_location_leak para
-        demostrar que ningún campo de ubicación llega con valor no-null al fabricante.
-        Si en el futuro alguien añadiera lat/lng al ORM o al endpoint, este test
-        fallaría y quedaría expuesta la necesidad de añadir strip_location.
-        """
-        vehicle = _make_vehicle(hide=True)
+        """GET /vehicles/{id} nunca filtra coordenadas: lat/lng no son columnas del ORM Vehicle."""
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
 
         with patch(
@@ -653,22 +545,21 @@ class TestLocationPrivacyNewEndpoints:
 
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        # Verificación mediante _find_location_leak (igual que el resto de endpoints)
         leaks = _find_location_leak(data)
         assert not leaks, (
             f"FUGA en GET /vehicles/{{id}} (upstream): {leaks}. "
             "Si falla, hay que añadir strip_location() en get_vehicle()."
         )
-        # Confirmar explícitamente que los campos de VehicleOut están a None
         assert data.get("lat") is None, "lat debe ser None — Vehicle ORM no tiene esta columna"
         assert data.get("lng") is None, "lng debe ser None — Vehicle ORM no tiene esta columna"
 
     # ── 3. GET /vehicles/statuses (bulk) ─────────────────────────────────────
 
     def test_bulk_statuses_hides_location_from_cmg(self):
-        """GET /vehicles/statuses no devuelve lat/lon a CMG con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+        """GET /vehicles/statuses no devuelve lat/lon a CMG sin grant."""
+        vehicle = _make_vehicle()
         _override_user(CMG_USER)
+        _override_privacy_redis(can_see=False)
 
         vehicles_result = MagicMock()
         vehicles_result.scalars.return_value.all.return_value = [vehicle]
@@ -694,12 +585,8 @@ class TestLocationPrivacyNewEndpoints:
         pipe1.hgetall = MagicMock()
         pipe1.execute = AsyncMock(return_value=[hash_data])
 
-        pipe2 = MagicMock()
-        pipe2.get = MagicMock()
-        pipe2.execute = AsyncMock(return_value=[None])
-
         redis_mock = AsyncMock()
-        redis_mock.pipeline = MagicMock(side_effect=[pipe1, pipe2])
+        redis_mock.pipeline = MagicMock(return_value=pipe1)
 
         with TestClient(app) as client:
             app.state.redis = redis_mock
@@ -711,10 +598,11 @@ class TestLocationPrivacyNewEndpoints:
 
     # ── 4. GET /vehicles/{id}/trips ───────────────────────────────────────────
 
-    def test_trips_returns_empty_for_upstream_with_flag(self):
-        """GET /vehicles/{id}/trips devuelve trips=[] al fabricante con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+    def test_trips_returns_empty_for_upstream_without_grant(self):
+        """GET /vehicles/{id}/trips devuelve trips=[] al fabricante sin grant."""
+        vehicle = _make_vehicle()
         _override_user(MANUFACTURER_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_row = MagicMock()
         mock_row._mapping = {
@@ -742,7 +630,7 @@ class TestLocationPrivacyNewEndpoints:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["trips"] == [], (
-            f"trips debe estar vacío para upstream con flag activo; got {data['trips']}"
+            f"trips debe estar vacío para upstream sin grant; got {data['trips']}"
         )
         leaks = _find_location_leak(data)
         assert not leaks, f"FUGA en GET /vehicles/{{id}}/trips: {leaks}"
@@ -750,11 +638,12 @@ class TestLocationPrivacyNewEndpoints:
     # ── 5. GET /work-orders ───────────────────────────────────────────────────
 
     def test_work_orders_list_hides_location_from_cmg(self):
-        """GET /work-orders no devuelve location_lat/lon a CMG con flag activo."""
+        """GET /work-orders no devuelve location_lat/lon a CMG sin grant."""
         from app.models.work_order import WorkOrder as WorkOrderModel
 
-        vehicle = _make_vehicle(hide=True)
+        vehicle = _make_vehicle()
         _override_user(CMG_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_order = MagicMock()
         mock_order.id = uuid.uuid4()
@@ -786,7 +675,7 @@ class TestLocationPrivacyNewEndpoints:
 
         mock_db = AsyncMock()
         mock_db.execute.return_value = orders_result
-        mock_db.get.return_value = vehicle  # db.get(Vehicle, vehicle_id)
+        mock_db.get.return_value = vehicle
 
         async def _db_gen():
             yield mock_db
@@ -803,9 +692,10 @@ class TestLocationPrivacyNewEndpoints:
     # ── 6. GET /work-orders/{id} ──────────────────────────────────────────────
 
     def test_work_order_detail_hides_location_from_cmg(self):
-        """GET /work-orders/{id} no devuelve location_lat/lon a CMG con flag activo."""
-        vehicle = _make_vehicle(hide=True)
+        """GET /work-orders/{id} no devuelve location_lat/lon a CMG sin grant."""
+        vehicle = _make_vehicle()
         _override_user(CMG_USER)
+        _override_privacy_redis(can_see=False)
 
         order_id = uuid.uuid4()
         mock_order = MagicMock()
@@ -833,18 +723,14 @@ class TestLocationPrivacyNewEndpoints:
         mock_order.vehicle_name = None
         mock_order.driver_name = None
 
-        mock_db = AsyncMock()
-        mock_db.get.return_value = vehicle  # primer get devuelve orden NO; necesita ser selectivo
-
-        # Para work-orders/{id}: db.get(WorkOrder, order_id) primero,
-        # luego db.get(Vehicle, vehicle_id) en _enrich
         from app.models.work_order import WorkOrder as WorkOrderModel
 
         async def _get_side_effect(model, oid):
             if model is WorkOrderModel:
                 return mock_order
-            return vehicle  # Vehicle
+            return vehicle
 
+        mock_db = AsyncMock()
         mock_db.get = AsyncMock(side_effect=_get_side_effect)
 
         async def _db_gen():
@@ -862,11 +748,12 @@ class TestLocationPrivacyNewEndpoints:
     # ── 7. GET /work-orders/{id}/stops ────────────────────────────────────────
 
     def test_work_order_stops_hides_location_from_cmg(self):
-        """GET /work-orders/{id}/stops no devuelve lat/lon a CMG con flag activo."""
+        """GET /work-orders/{id}/stops no devuelve lat/lon a CMG sin grant."""
         from app.models.work_order import WorkOrder as WorkOrderModel
 
-        vehicle = _make_vehicle(hide=True)
+        vehicle = _make_vehicle()
         _override_user(CMG_USER)
+        _override_privacy_redis(can_see=False)
 
         order_id = uuid.uuid4()
         mock_order = MagicMock()
@@ -903,7 +790,7 @@ class TestLocationPrivacyNewEndpoints:
         async def _get_side_effect(model, oid):
             if model is WorkOrderModel:
                 return mock_order
-            return vehicle  # Vehicle
+            return vehicle
 
         mock_db = AsyncMock()
         mock_db.get = AsyncMock(side_effect=_get_side_effect)
@@ -924,9 +811,10 @@ class TestLocationPrivacyNewEndpoints:
     # ── 8. GET /work-cycles ───────────────────────────────────────────────────
 
     def test_work_cycles_hides_location_from_cmg(self):
-        """GET /work-cycles no devuelve lat/lon a CMG con flag activo en el vehículo."""
-        vehicle = _make_vehicle(hide=True)
+        """GET /work-cycles no devuelve lat/lon a CMG sin grant en el vehículo."""
+        vehicle = _make_vehicle()
         _override_user(CMG_USER)
+        _override_privacy_redis(can_see=False)
 
         mock_cycle = MagicMock()
         mock_cycle.id = uuid.uuid4()
@@ -945,7 +833,7 @@ class TestLocationPrivacyNewEndpoints:
 
         mock_db = AsyncMock()
         mock_db.execute.return_value = cycles_result
-        mock_db.get.return_value = vehicle  # db.get(Vehicle, vehicle_id)
+        mock_db.get.return_value = vehicle
 
         async def _db_gen():
             yield mock_db

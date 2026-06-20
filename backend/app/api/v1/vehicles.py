@@ -16,7 +16,7 @@ from sqlalchemy import select, text, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, require_management_tier
+from app.api.v1.deps import get_current_user, get_redis, require_management_tier
 from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
@@ -864,6 +864,7 @@ async def list_vehicles(
     include_inactive: bool = Query(False),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     # Por defecto solo vehículos activos; include_inactive=True incluye los dados de baja
     # (para poder verlos y reactivarlos desde la UI de gestión).
@@ -957,7 +958,7 @@ async def list_vehicles(
                 d['speed'] = speed
             except Exception:
                 pass
-        if not user_can_see_vehicle_location(user, v):
+        if not await user_can_see_vehicle_location(user, v, redis):
             strip_location(d)
         out.append(d)
     return out
@@ -1259,6 +1260,7 @@ async def get_vehicles_statuses_bulk(
     request: Request = None,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     """Devuelve el status en Redis de múltiples vehículos en una sola llamada."""
     try:
@@ -1433,7 +1435,7 @@ async def get_vehicles_statuses_bulk(
             device_out_of_service=bool(oos_by_vehicle.get(vid, False)),
         )
         vehicle_obj = vehicles_by_id.get(vid)
-        if vehicle_obj and not user_can_see_vehicle_location(user, vehicle_obj):
+        if vehicle_obj and not await user_can_see_vehicle_location(user, vehicle_obj, redis):
             strip_location(st)
         statuses.append(st)
 
@@ -1484,7 +1486,7 @@ async def patch_vehicle_location_privacy(
         loc_key = f"vehicle:{vehicle_id}:loc_private"
         try:
             if body.hide:
-                await redis.set(loc_key, "1", ex=90)
+                await redis.set(loc_key, "1", ex=120)  # debe ser > TTL sentinel (90s)
             else:
                 await redis.delete(loc_key)
         except Exception:
@@ -1499,6 +1501,7 @@ async def get_vehicle_status(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
@@ -1644,7 +1647,7 @@ async def get_vehicle_status(
         status=_vstatus,
         device_out_of_service=device_oos,
     )
-    if not user_can_see_vehicle_location(user, vehicle):
+    if not await user_can_see_vehicle_location(user, vehicle, redis):
         strip_location(out)
     return out
 
@@ -1654,6 +1657,7 @@ async def get_vehicle_telemetry_latest(
     vehicle_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="technical")
     if not vehicle.active:
@@ -1677,7 +1681,7 @@ async def get_vehicle_telemetry_latest(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No hay telemetría reciente")
 
     point = TelemetryPoint(**dict(row._mapping))
-    if not user_can_see_vehicle_location(user, vehicle):
+    if not await user_can_see_vehicle_location(user, vehicle, redis):
         strip_location(point)
     return point
 
@@ -1690,6 +1694,7 @@ async def get_vehicle_telemetry_history(
     limit: int = 500,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     if limit > 5000:
         limit = 5000
@@ -1725,7 +1730,7 @@ async def get_vehicle_telemetry_history(
     ).fetchall()
 
     points = [TelemetryPoint(**dict(r._mapping)) for r in rows]
-    if not user_can_see_vehicle_location(user, vehicle):
+    if not await user_can_see_vehicle_location(user, vehicle, redis):
         for p in points:
             strip_location(p)
     return points
@@ -1736,12 +1741,13 @@ async def get_vehicle_track_today(
     vehicle_id: uuid.UUID,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
 
-    if not user_can_see_vehicle_location(user, vehicle):
+    if not await user_can_see_vehicle_location(user, vehicle, redis):
         return []
 
     rows = (
@@ -1767,6 +1773,7 @@ async def get_vehicle_track(
     to: datetime = Query(...),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
@@ -1774,7 +1781,7 @@ async def get_vehicle_track(
     if from_ > to:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from debe ser anterior a to")
 
-    if not user_can_see_vehicle_location(user, vehicle):
+    if not await user_can_see_vehicle_location(user, vehicle, redis):
         return []
 
     rows = (
@@ -1799,12 +1806,13 @@ async def get_vehicle_trips(
     date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD (Europe/Madrid)"),
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ) -> DayTrips:
     vehicle = await assert_can_access_vehicle(user, vehicle_id, db, operation="read", scope="operational")
     if not vehicle.active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado")
 
-    if not user_can_see_vehicle_location(user, vehicle):
+    if not await user_can_see_vehicle_location(user, vehicle, redis):
         return DayTrips(
             date=date,
             trips=[],
