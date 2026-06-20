@@ -127,6 +127,7 @@ class VehicleOut(BaseModel):
     driver_name: str | None = None
     year: int | None = None
     active: bool
+    hide_location_from_upstream: bool = False
     status: str | None = None
     last_seen: str | None = None
     lat: float | None = None

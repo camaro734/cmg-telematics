@@ -10,6 +10,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +51,43 @@ async def assert_can_actuate_controls(user: CurrentUser, db: AsyncSession) -> No
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu organización tiene acceso de solo lectura; los controles los gestiona el fabricante",
         )
+
+
+# Campos de ubicación que se filtran cuando hide_location_from_upstream es True.
+# location_lat/location_lon son los alias en WorkOrderOut.
+_LOCATION_FIELDS: frozenset[str] = frozenset({
+    "lat", "lon", "lng",
+    "speed_kmh", "heading", "altitude_m",
+    "location_lat", "location_lon",
+})
+
+
+def user_can_see_vehicle_location(user: "CurrentUser", vehicle: "Vehicle") -> bool:
+    """True si el usuario puede ver las coordenadas del vehículo.
+
+    El dueño (vehicle.tenant_id == user.tenant_id) siempre ve.
+    Cualquier otro — incluyendo CMG y fabricante — no ve si
+    hide_location_from_upstream está activo. CMG no está exento.
+    """
+    if user.tenant_id == vehicle.tenant_id:
+        return True
+    return not vehicle.hide_location_from_upstream
+
+
+def strip_location(obj: BaseModel | dict) -> None:
+    """Elimina campos de ubicación de un Pydantic model o dict. Operación in-place.
+
+    Remueve: lat, lon, lng, speed_kmh, heading, altitude_m, location_lat, location_lon.
+    Mantiene telemetría técnica: ignition, pto_active, ext_voltage_mv, can_data.
+    """
+    if isinstance(obj, dict):
+        for field in _LOCATION_FIELDS:
+            if field in obj:
+                obj[field] = None
+    else:
+        for field in _LOCATION_FIELDS:
+            if hasattr(obj, field):
+                object.__setattr__(obj, field, None)
 
 
 async def _log_access(

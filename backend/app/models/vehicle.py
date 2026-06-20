@@ -20,6 +20,7 @@ class Vehicle(Base):
     year: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    hide_location_from_upstream: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tenant = relationship("Tenant", back_populates="vehicles", foreign_keys=[tenant_id])
