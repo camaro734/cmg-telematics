@@ -42,7 +42,12 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      ["expo-notifications", {
+        "icon": "./assets/logo-color.png",
+        "color": "#2563eb",
+        "iosDisplayInForeground": true
+      }]
     ],
     "experiments": {
       "typedRoutes": true
