@@ -15,6 +15,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "ios": { "image": "macos-sequoia-15.6-xcode-16.4" },
       "env": { "EXPO_PUBLIC_API_URL": "http://213.210.20.183/api/v1" }
     }
   },
