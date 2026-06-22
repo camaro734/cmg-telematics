@@ -194,10 +194,10 @@ async def geocode(
 
 @router.get("/route", response_model=RouteInfo)
 async def route(
-    from_lat: float,
-    from_lon: float,
-    to_lat: float,
-    to_lon: float,
+    from_lat: float = Query(..., ge=-90, le=90),
+    from_lon: float = Query(..., ge=-180, le=180),
+    to_lat: float = Query(..., ge=-90, le=90),
+    to_lon: float = Query(..., ge=-180, le=180),
     user: CurrentUser = Depends(get_current_user),
 ) -> RouteInfo:
     """Proxy a Valhalla: previsualización de ruta libre entre dos puntos."""

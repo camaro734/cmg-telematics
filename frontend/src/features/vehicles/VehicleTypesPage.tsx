@@ -926,7 +926,7 @@ export default function VehicleTypesPage() {
                 <input
                   type="checkbox"
                   id="sensor-fleet-panel"
-                  checked={sensorForm.show_in_fleet_panel ?? false}
+                  checked={sensorForm.show_in_fleet_panel}
                   onChange={e => setSensorForm(f => ({ ...f, show_in_fleet_panel: e.target.checked }))}
                 />
                 <label htmlFor="sensor-fleet-panel" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>

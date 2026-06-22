@@ -35,3 +35,26 @@ def test_route(monkeypatch):
     resp = client.get("/api/v1/route?from_lat=40&from_lon=-0.5&to_lat=39.47&to_lon=-0.38")
     assert resp.status_code == 200
     assert resp.json()["distance_m"] == 8000
+
+
+def test_route_lat_out_of_range():
+    """Latitud fuera del rango válido [-90, 90] debe devolver 422."""
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/api/v1/route?from_lat=200&from_lon=-0.5&to_lat=39.47&to_lon=-0.38")
+    assert resp.status_code == 422
+
+
+def test_geocode_unauthenticated():
+    """Sin autenticación, /geocode debe devolver 403."""
+    app.dependency_overrides = {}
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/api/v1/geocode?q=valencia")
+    assert resp.status_code == 403
+
+
+def test_route_unauthenticated():
+    """Sin autenticación, /route debe devolver 403."""
+    app.dependency_overrides = {}
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/api/v1/route?from_lat=40&from_lon=-0.5&to_lat=39.47&to_lon=-0.38")
+    assert resp.status_code == 403
