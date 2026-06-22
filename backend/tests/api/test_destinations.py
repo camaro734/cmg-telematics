@@ -99,3 +99,79 @@ def test_get_destination_404_when_none(monkeypatch):
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.get(f"/api/v1/vehicles/{VEHICLE_ID}/destination")
     assert resp.status_code == 404
+
+
+def test_delete_destination_cancels_existing(monkeypatch):
+    """DELETE cancela el destino activo y devuelve 204."""
+    db = AsyncMock()
+    dest = MagicMock()
+    dest.status = "active"
+    existing = MagicMock()
+    existing.scalar_one_or_none.return_value = dest
+    db.execute = AsyncMock(return_value=existing)
+    redis = AsyncMock()
+    _override(CMG_USER, db, redis)
+
+    async def _fake_access(*a, **k): return _vehicle()
+    monkeypatch.setattr("app.api.v1.destinations.assert_can_access_vehicle", _fake_access)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.delete(f"/api/v1/vehicles/{VEHICLE_ID}/destination")
+    assert resp.status_code == 204
+    assert dest.status == "cancelled"
+
+
+def test_delete_destination_idempotent_when_none(monkeypatch):
+    """DELETE devuelve 204 aunque no haya destino (idempotente)."""
+    db = AsyncMock()
+    no_existing = MagicMock()
+    no_existing.scalar_one_or_none.return_value = None
+    db.execute = AsyncMock(return_value=no_existing)
+    redis = AsyncMock()
+    _override(CMG_USER, db, redis)
+
+    async def _fake_access(*a, **k): return _vehicle()
+    monkeypatch.setattr("app.api.v1.destinations.assert_can_access_vehicle", _fake_access)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.delete(f"/api/v1/vehicles/{VEHICLE_ID}/destination")
+    assert resp.status_code == 204
+    # No commit llamado porque no había destino
+    db.commit.assert_not_called()
+
+
+def test_get_destination_valhalla_failure_returns_200(monkeypatch):
+    """GET devuelve 200 con route=None cuando Valhalla falla."""
+    db = AsyncMock()
+    dest = MagicMock()
+    dest.vehicle_id = VEHICLE_ID
+    dest.label = "Valencia"
+    dest.lat = 39.47
+    dest.lon = -0.38
+    dest.status = "active"
+    dest.arrived_at = None
+    dest.assigned_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = dest
+    db.execute = AsyncMock(return_value=result)
+    redis = AsyncMock()
+    _override(CMG_USER, db, redis)
+
+    async def _fake_access(*a, **k): return _vehicle()
+    monkeypatch.setattr("app.api.v1.destinations.assert_can_access_vehicle", _fake_access)
+
+    # Posición lejana (>100 m) para no activar el branch de llegada
+    async def _fake_pos_far(*a, **k): return (40.0, -0.5)
+    monkeypatch.setattr("app.api.v1.destinations._get_vehicle_latlon", _fake_pos_far)
+
+    # Valhalla lanza excepción
+    async def _failing_route(*a, **k): raise Exception("Valhalla unavailable")
+    monkeypatch.setattr("app.api.v1.destinations.valhalla_route", _failing_route)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/vehicles/{VEHICLE_ID}/destination")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["label"] == "Valencia"
+    assert body["route"] is None
+    assert body["remaining_distance_m"] is None
