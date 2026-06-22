@@ -30,10 +30,12 @@ def test_decode_polyline6_roundtrip():
 
 @pytest.mark.asyncio
 async def test_valhalla_route_parses_summary(monkeypatch):
+    # Ruta de 3 puntos para ejercitar la decodificación multi-punto de la shape
+    _three_point_shape = _encode6([(39.47, -0.38), (39.50, -0.40), (41.39, 2.17)])
     fake_json = {
         "trip": {
             "summary": {"length": 12.5, "time": 600},
-            "legs": [{"shape": _encode6([(39.47, -0.38)])}],
+            "legs": [{"shape": _three_point_shape}],
         }
     }
 
@@ -51,4 +53,8 @@ async def test_valhalla_route_parses_summary(monkeypatch):
     assert isinstance(result, RouteResult)
     assert result.distance_m == pytest.approx(12500.0)   # 12.5 km → m
     assert result.duration_s == 600
-    assert len(result.geometry) == 1
+    assert len(result.geometry) == 3
+    assert result.geometry[0][0] == pytest.approx(39.47, abs=1e-5)
+    assert result.geometry[0][1] == pytest.approx(-0.38, abs=1e-5)
+    assert result.geometry[2][0] == pytest.approx(41.39, abs=1e-5)
+    assert result.geometry[2][1] == pytest.approx(2.17, abs=1e-5)
