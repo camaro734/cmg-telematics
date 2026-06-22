@@ -171,6 +171,7 @@ export interface SensorDef {
   derivative?: boolean
   visible_in_detail?: boolean
   show_in_popup?: boolean
+  show_in_fleet_panel?: boolean   // mostrar en panel lateral de flota
   transform?: SensorTransform
   icon?: SensorIcon
   color?: string

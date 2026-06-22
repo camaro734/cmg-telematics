@@ -37,6 +37,7 @@ type SensorFormState = {
   in_min: string; in_max: string; out_min: string; out_max: string
   visible_in_detail: boolean
   show_in_popup: boolean
+  show_in_fleet_panel: boolean
 }
 const emptySensorForm: SensorFormState = {
   avl_id: '', key: '', label: '', unit: '', mode: 'byte', gauge_type: 'numeric',
@@ -46,6 +47,7 @@ const emptySensorForm: SensorFormState = {
   in_min: '', in_max: '', out_min: '', out_max: '',
   visible_in_detail: true,
   show_in_popup: false,
+  show_in_fleet_panel: false,
 }
 
 function sensorDefToForm(def: SensorDef): SensorFormState {
@@ -78,6 +80,7 @@ function sensorDefToForm(def: SensorDef): SensorFormState {
     out_max: lin ? lin.out_max.toString() : '',
     visible_in_detail: def.visible_in_detail !== false,
     show_in_popup: def.show_in_popup === true,
+    show_in_fleet_panel: def.show_in_fleet_panel === true,
   }
 }
 
@@ -120,6 +123,7 @@ function formToSensorDef(f: SensorFormState): SensorDef {
   }
   def.visible_in_detail = f.visible_in_detail
   def.show_in_popup = f.show_in_popup
+  def.show_in_fleet_panel = f.show_in_fleet_panel
   return def
 }
 
@@ -916,6 +920,17 @@ export default function VehicleTypesPage() {
                 />
                 <label htmlFor="sensor-popup" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
                   En popup de Flota
+                </label>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="checkbox"
+                  id="sensor-fleet-panel"
+                  checked={sensorForm.show_in_fleet_panel ?? false}
+                  onChange={e => setSensorForm(f => ({ ...f, show_in_fleet_panel: e.target.checked }))}
+                />
+                <label htmlFor="sensor-fleet-panel" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
+                  En panel lateral de Flota
                 </label>
               </div>
             </div>
