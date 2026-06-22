@@ -96,6 +96,18 @@ docker compose up -d valhalla
 docker compose logs -f valhalla
 ```
 
+> **Nota — primer arranque únicamente:** `docker compose up -d valhalla` funciona correctamente
+> solo en el **primer** inicio de este servicio (contenedor nuevo). Si más adelante hay que
+> recrearlo tras un cambio de configuración, `up -d` puede fallar con el error conocido
+> `KeyError: ContainerConfig` de docker-compose v1.29.2 (ver §DEPLOY del CLAUDE.md).
+> En ese caso usar el patrón de swap con `docker run` o, si solo es un reinicio sin recreación,
+> `docker compose restart valhalla`.
+
+> **Nota — volumen de teselas vacío:** con un volumen `valhalla_tiles` recién creado, el
+> contenedor arranca pero **no sirve rutas** hasta que el build de teselas (este Paso 1) termine
+> completamente. Una petición de ruta antes de ver `Running tile service` en los logs devolverá
+> un error; esto es esperado y no indica un problema de configuración.
+
 El contenedor descargará `europe-latest.osm.pbf` (~28 GB) y construirá las teselas de ruta.
 El proceso completo tarda entre 1 y 3 horas. Esperar la línea `Running tile service` en los logs.
 

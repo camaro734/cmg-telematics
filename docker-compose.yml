@@ -142,7 +142,8 @@ services:
         condition: service_healthy
 
   valhalla:
-    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    # Versión fijada para reproducibilidad; última semver publicada en ghcr.io/gis-ops (jun 2026)
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:3.5.1
     restart: unless-stopped
     networks:
       default:
