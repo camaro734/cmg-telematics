@@ -547,6 +547,34 @@ export interface MaintenanceLogOut {
   document_url: string | null
 }
 
+// --- Destino / Geocodificación / Ruta ---
+
+export interface GeoResult {
+  label: string
+  lat: number
+  lon: number
+}
+
+export interface RouteInfo {
+  distance_m: number
+  duration_s: number
+  // Coordenadas [lat, lon] del trayecto calculado
+  geometry: [number, number][]
+}
+
+export interface DestinationOut {
+  vehicle_id: string
+  label: string
+  lat: number
+  lon: number
+  status: 'active' | 'arrived' | 'cancelled'
+  assigned_at: string
+  arrived_at: string | null
+  route: RouteInfo | null
+  remaining_distance_m: number | null
+  remaining_duration_s: number | null
+}
+
 export interface MaintenanceLogCreate {
   performed_at: string
   description?: string
