@@ -223,12 +223,18 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
         }),
       }).addTo(map).bindPopup(destination.label)
     }
-    // Pintar ruta como polyline con color --cmg-teal
+    // Pintar ruta como polyline — resuelve --cmg-teal en runtime para white-label
     if (routeGeometry && routeGeometry.length > 1) {
+      const teal = getComputedStyle(document.documentElement).getPropertyValue('--cmg-teal').trim() || '#1D9E75'
       routeLineRef.current = L.polyline(routeGeometry, {
-        color: '#1D9E75', weight: 4, opacity: 0.85,
+        color: teal, weight: 4, opacity: 0.85,
       }).addTo(map)
       map.fitBounds(routeLineRef.current.getBounds(), { padding: [60, 60] })
+    }
+    // Limpieza al desmontar o al cambiar destination/routeGeometry
+    return () => {
+      if (destMarkerRef.current) { mapRef.current?.removeLayer(destMarkerRef.current); destMarkerRef.current = null }
+      if (routeLineRef.current)  { mapRef.current?.removeLayer(routeLineRef.current);  routeLineRef.current  = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination, routeGeometry])

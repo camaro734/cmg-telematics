@@ -16,6 +16,7 @@ import { VehicleDetailPanel } from './VehicleDetailPanel'
 import { Input } from '../../shared/ui/Input'
 import { isOnline, isOutOfService } from '../../lib/staleStatus'
 import { useGeocode, useVehicleDestination } from './useDestination'
+import { useToast } from '../../shared/ui/Toast'
 
 type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert' | 'out_of_service'
 const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, parked: 3, offline: 4, out_of_service: 5 }
@@ -138,6 +139,7 @@ export default function FleetDashboard() {
   const [pendingDest, setPendingDest] = useState<GeoResult | null>(null)
   const geocode = useGeocode()
   const geoInputRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
 
   // Destino activo del vehículo seleccionado (poll + WS-invalidado)
   const destQuery = useVehicleDestination(selectedVehicleId, !!selectedVehicleId)
@@ -154,8 +156,13 @@ export default function FleetDashboard() {
   async function handleGeoSearch() {
     const q = geoInputRef.current?.value.trim() ?? ''
     if (!q) return
-    const results = await geocode.mutateAsync(q)
-    setGeoResults(results)
+    try {
+      const results = await geocode.mutateAsync(q)
+      setGeoResults(results)
+      if (results.length === 0) toast.warning('Sin resultados para esa búsqueda')
+    } catch {
+      toast.error('Error al buscar la ubicación. Inténtalo de nuevo.')
+    }
   }
 
   function handleGeoSelect(r: GeoResult) {
@@ -344,7 +351,7 @@ export default function FleetDashboard() {
           }}>
             {geoResults.map((r, i) => (
               <button
-                key={i}
+                key={`${r.lat},${r.lon}-${r.label}`}
                 onClick={() => handleGeoSelect(r)}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',

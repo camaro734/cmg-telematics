@@ -157,23 +157,28 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
           <div style={{ padding: '0 16px 12px', flexShrink: 0 }}>
             {/* Botón "Enviar destino" cuando hay un candidato seleccionado y ningún destino activo */}
             {pendingDest && !activeDest && (
-              <button
-                onClick={() => {
-                  setDest.mutate(
-                    { lat: pendingDest.lat, lon: pendingDest.lon, label: pendingDest.label },
-                    { onSuccess: () => onDestSent?.() },
-                  )
-                }}
-                disabled={setDest.isPending}
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: 8,
-                  background: 'var(--cmg-teal)', color: '#fff',
-                  border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                  fontFamily: 'var(--font-sans)',
-                }}
-              >
-                {setDest.isPending ? 'Enviando…' : `Enviar destino: ${pendingDest.label}`}
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setDest.mutate(
+                      { lat: pendingDest.lat, lon: pendingDest.lon, label: pendingDest.label },
+                      { onSuccess: () => onDestSent?.() },
+                    )
+                  }}
+                  disabled={setDest.isPending}
+                  style={{
+                    width: '100%', padding: '10px 14px', borderRadius: 8,
+                    background: 'var(--cmg-teal)', color: '#fff',
+                    border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  {setDest.isPending ? 'Enviando…' : `Enviar destino: ${pendingDest.label}`}
+                </button>
+                {setDest.isError && (
+                  <span style={{ color: 'var(--accent-crit)', fontSize: 12 }}>Error al enviar destino</span>
+                )}
+              </>
             )}
 
             {/* ETA en tiempo real cuando hay destino activo */}
@@ -205,6 +210,9 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
                 >
                   {cancelDest.isPending ? 'Cancelando…' : 'Cancelar destino'}
                 </button>
+                {cancelDest.isError && (
+                  <span style={{ color: 'var(--accent-crit)', fontSize: 12 }}>Error al cancelar destino</span>
+                )}
               </div>
             )}
 
