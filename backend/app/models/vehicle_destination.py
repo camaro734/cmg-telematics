@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Float, ForeignKey, DateTime
+from sqlalchemy import String, Float, ForeignKey, DateTime, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,11 +23,11 @@ class VehicleDestination(Base):
     label: Mapped[str] = mapped_column(String(300), nullable=False)
     lat: Mapped[float] = mapped_column(Float, nullable=False)
     lon: Mapped[float] = mapped_column(Float, nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")  # active|arrived|cancelled
-    assigned_by: Mapped[uuid.UUID] = mapped_column(
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default=text("'active'"))  # active|arrived|cancelled
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True
     )
     assigned_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=text("now()")
     )
     arrived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
