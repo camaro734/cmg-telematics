@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     sentry_dsn: str | None = None
     seed_admin_password: str | None = None
+    valhalla_url: str = "http://valhalla:8002"
+    nominatim_url: str = "https://nominatim.openstreetmap.org"
 
     @field_validator("secret_key")
     @classmethod
