@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { useVehicleLive } from '../../lib/useVehicleLive'
+import type { VehicleTypeOut, SensorDef } from '../../lib/types'
+import { sensorDisplayValue } from './popupHtml'
 
 interface VehicleDetailPanelProps {
   vehicleId: string | null
   plate?: string
   vehicleName?: string
+  vehicleType?: VehicleTypeOut
   onClose: () => void
 }
 
@@ -23,10 +26,14 @@ function KpiRow({ label, value, unit }: { label: string; value: React.ReactNode;
   )
 }
 
-export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: VehicleDetailPanelProps) {
+export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType, onClose }: VehicleDetailPanelProps) {
   const navigate = useNavigate()
 
   const { data: status } = useVehicleLive(vehicleId)
+
+  // Sensores marcados para el panel de flota; si no hay ninguno, fallback a los 4 fijos.
+  const panelSensors: SensorDef[] = (vehicleType?.sensor_schema ?? [])
+    .filter(s => s.show_in_fleet_panel === true)
 
   const online = status ? isEffectivelyOnline(status) : false
   const stale = !online
@@ -95,23 +102,37 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
                 {statusStamp(status).text}
               </div>
             )}
-            <KpiRow label="Ignición" value={
-              <span style={{ color: stale ? 'var(--fg-muted)' : (status?.ignition ? 'var(--ok)' : 'var(--offline)') }}>
-                {status?.ignition ? 'ON' : 'OFF'}
-              </span>
-            } />
-            {status?.speed_kmh != null && (
-              <KpiRow label="Velocidad" value={status.speed_kmh.toFixed(0)} unit="km/h" />
-            )}
-            {status?.ext_voltage_mv != null && (
-              <KpiRow label="Tensión batería" value={(status.ext_voltage_mv / 1000).toFixed(1)} unit="V" />
-            )}
-            {status?.pto_active != null && (
-              <KpiRow label="PTO" value={
-                <span style={{ color: stale ? 'var(--fg-muted)' : (status.pto_active ? 'var(--cmg-teal)' : 'var(--fg-dim)') }}>
-                  {status.pto_active ? 'Activo' : 'Inactivo'}
-                </span>
-              } />
+            {panelSensors.length > 0 ? (
+              panelSensors.map(s => (
+                <KpiRow
+                  key={s.key}
+                  label={s.label}
+                  value={<span style={{ color: stale ? 'var(--fg-muted)' : undefined }}>
+                    {status ? sensorDisplayValue(s, status) : '—'}
+                  </span>}
+                />
+              ))
+            ) : (
+              <>
+                <KpiRow label="Ignición" value={
+                  <span style={{ color: stale ? 'var(--fg-muted)' : (status?.ignition ? 'var(--ok)' : 'var(--offline)') }}>
+                    {status?.ignition ? 'ON' : 'OFF'}
+                  </span>
+                } />
+                {status?.speed_kmh != null && (
+                  <KpiRow label="Velocidad" value={status.speed_kmh.toFixed(0)} unit="km/h" />
+                )}
+                {status?.ext_voltage_mv != null && (
+                  <KpiRow label="Tensión batería" value={(status.ext_voltage_mv / 1000).toFixed(1)} unit="V" />
+                )}
+                {status?.pto_active != null && (
+                  <KpiRow label="PTO" value={
+                    <span style={{ color: stale ? 'var(--fg-muted)' : (status.pto_active ? 'var(--cmg-teal)' : 'var(--fg-dim)') }}>
+                      {status.pto_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  } />
+                )}
+              </>
             )}
           </div>
 

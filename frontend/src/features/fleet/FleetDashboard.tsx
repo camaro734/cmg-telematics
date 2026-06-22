@@ -101,6 +101,10 @@ export default function FleetDashboard() {
 
   const statuses = useVehicleStatuses(vehicles)
   const vehicleById = new Map(vehicles.map(v => [v.id, v]))
+  const vehicleTypesById = useMemo(
+    () => new Map(vehicleTypes.map(vt => [vt.id, vt])),
+    [vehicleTypes],
+  )
 
   const movingCount = vehicles.filter(v => {
     const s = statuses.get(v.id)
@@ -262,6 +266,7 @@ export default function FleetDashboard() {
         vehicleId={selectedVehicleId}
         plate={selectedVehicleId ? vehicleById.get(selectedVehicleId)?.license_plate ?? undefined : undefined}
         vehicleName={selectedVehicleId ? vehicleById.get(selectedVehicleId)?.name : undefined}
+        vehicleType={selectedVehicleId ? vehicleTypesById.get(vehicleById.get(selectedVehicleId)?.vehicle_type_id ?? '') : undefined}
         onClose={handlePanelClose}
       />
     </div>
