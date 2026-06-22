@@ -140,6 +140,86 @@ def test_delete_destination_idempotent_when_none(monkeypatch):
     db.commit.assert_not_called()
 
 
+def test_get_destination_arrival_persists_for_write_user(monkeypatch):
+    """Llegada dentro de radio: usuario con permiso de escritura persiste el estado en BD."""
+    db = AsyncMock()
+    dest = MagicMock()
+    dest.vehicle_id = VEHICLE_ID
+    dest.label = "Valencia"
+    # Destino en la misma posición que el vehículo → dentro del radio de llegada
+    dest.lat = 39.47
+    dest.lon = -0.38
+    dest.status = "active"
+    dest.arrived_at = None
+    dest.assigned_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = dest
+    db.execute = AsyncMock(return_value=result)
+    redis = AsyncMock()
+    _override(CMG_USER, db, redis)
+
+    # Tanto la llamada de lectura como la de escritura devuelven el vehículo
+    async def _fake_access_write_capable(user, vehicle_id, db, operation="read", scope="all"):
+        return _vehicle()
+    monkeypatch.setattr("app.api.v1.destinations.assert_can_access_vehicle", _fake_access_write_capable)
+
+    # Posición idéntica al destino → distancia 0 m → dentro del radio
+    async def _fake_pos_near(*a, **k): return (39.47, -0.38)
+    monkeypatch.setattr("app.api.v1.destinations._get_vehicle_latlon", _fake_pos_near)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/vehicles/{VEHICLE_ID}/destination")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "arrived"
+    assert body["arrived_at"] is not None
+    # Verifica que se persistió en BD
+    db.commit.assert_awaited_once()
+    assert dest.status == "arrived"
+
+
+def test_get_destination_arrival_transient_for_readonly_user(monkeypatch):
+    """Llegada dentro de radio: usuario sin permiso de escritura recibe 'arrived' solo en respuesta; no se persiste."""
+    from fastapi import HTTPException as FastAPIHTTPException
+
+    db = AsyncMock()
+    dest = MagicMock()
+    dest.vehicle_id = VEHICLE_ID
+    dest.label = "Valencia"
+    dest.lat = 39.47
+    dest.lon = -0.38
+    dest.status = "active"
+    dest.arrived_at = None
+    dest.assigned_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = dest
+    db.execute = AsyncMock(return_value=result)
+    redis = AsyncMock()
+    _override(CMG_USER, db, redis)
+
+    # Lectura permitida; escritura denegada (403)
+    async def _fake_access_readonly(user, vehicle_id, db, operation="read", scope="all"):
+        if operation == "write":
+            raise FastAPIHTTPException(status_code=403, detail="Forbidden")
+        return _vehicle()
+    monkeypatch.setattr("app.api.v1.destinations.assert_can_access_vehicle", _fake_access_readonly)
+
+    # Posición idéntica al destino → dentro del radio de llegada
+    async def _fake_pos_near(*a, **k): return (39.47, -0.38)
+    monkeypatch.setattr("app.api.v1.destinations._get_vehicle_latlon", _fake_pos_near)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get(f"/api/v1/vehicles/{VEHICLE_ID}/destination")
+    assert resp.status_code == 200
+    body = resp.json()
+    # La respuesta muestra llegada (transitoria)
+    assert body["status"] == "arrived"
+    assert body["arrived_at"] is not None
+    # Pero la BD no fue tocada
+    db.commit.assert_not_called()
+    assert dest.status == "active"  # sin modificar
+
+
 def test_get_destination_valhalla_failure_returns_200(monkeypatch):
     """GET devuelve 200 con route=None cuando Valhalla falla."""
     db = AsyncMock()

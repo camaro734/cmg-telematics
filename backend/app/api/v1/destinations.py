@@ -151,10 +151,25 @@ async def get_destination(
 
     # Detección de llegada: si el vehículo está dentro del radio de llegada
     if _haversine_m(pos, (dest.lat, dest.lon)) <= ARRIVAL_RADIUS_M:
-        dest.status = "arrived"
-        dest.arrived_at = datetime.now(timezone.utc)
-        await db.commit()
-        out.status, out.arrived_at = "arrived", dest.arrived_at
+        now = datetime.now(timezone.utc)
+        # Siempre informamos llegada en la respuesta (todos los lectores la ven)
+        out.status = "arrived"
+        out.arrived_at = now
+
+        # Solo persistimos si el caller tiene permiso de escritura.
+        # Un GET es read-only para lectores; no debe mutar la BD en su nombre.
+        can_write = False
+        try:
+            await assert_can_access_vehicle(user, vehicle_id, db, operation="write", scope="operational")
+            can_write = True
+        except HTTPException:
+            pass  # lector sin permisos de escritura → solo respuesta transitoria
+
+        if can_write:
+            dest.status = "arrived"
+            dest.arrived_at = now
+            await db.commit()
+
         return out
 
     try:
