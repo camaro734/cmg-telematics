@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.models.vehicle_destination import VehicleDestination
 from app.schemas.auth import CurrentUser
 from app.schemas.destination import DestinationIn, DestinationOut, RouteInfo
+from app.services.geocoding import GeoResult, nominatim_search
 from app.services.routing import valhalla_route
 
 router = APIRouter()
@@ -164,3 +165,26 @@ async def get_destination(
     except Exception as exc:  # noqa: BLE001 — Valhalla caído no debe romper el GET del destino
         logger.warning("valhalla_route_failed vehicle_id=%s error=%s", vehicle_id, exc)
     return out
+
+
+@router.get("/geocode", response_model=list[GeoResult])
+async def geocode(
+    q: str = Query(..., min_length=2),
+    limit: int = Query(5, ge=1, le=10),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[GeoResult]:
+    """Proxy a Nominatim: búsqueda de ubicación por texto libre."""
+    return await nominatim_search(q, limit=limit)
+
+
+@router.get("/route", response_model=RouteInfo)
+async def route(
+    from_lat: float,
+    from_lon: float,
+    to_lat: float,
+    to_lon: float,
+    user: CurrentUser = Depends(get_current_user),
+) -> RouteInfo:
+    """Proxy a Valhalla: previsualización de ruta libre entre dos puntos."""
+    result = await valhalla_route((from_lat, from_lon), (to_lat, to_lon))
+    return RouteInfo(**result.model_dump())
