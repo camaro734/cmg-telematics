@@ -319,20 +319,39 @@ git commit -m "infra(routing): servicio Valhalla Europa en red interna + procedi
 
 Valhalla devuelve `trip.legs[].shape` como polyline codificada con precisión 6. El servicio debe decodificarla.
 
-Crear `backend/tests/services/test_routing.py`:
+Crear `backend/tests/services/test_routing.py`. El encoder `_encode6` vive solo en el
+test (scaffolding), para validar el decoder con un round-trip y no depender de un literal
+mágico (Valhalla codifica con **precisión 6**, no 5):
 
 ```python
 import pytest
 from app.services.routing import _decode_polyline6, valhalla_route, RouteResult
 
 
-def test_decode_polyline6_known_value():
-    # Polyline6 de un único punto (lat=38.5, lon=-120.2)
-    encoded = "_izlhA~rlgdF"
-    pts = _decode_polyline6(encoded)
-    assert len(pts) == 1
-    assert pts[0][0] == pytest.approx(38.5, abs=1e-4)
-    assert pts[0][1] == pytest.approx(-120.2, abs=1e-4)
+def _encode6(coords: list[tuple[float, float]]) -> str:
+    """Encoder polyline precisión 6, solo para el test (round-trip del decoder)."""
+    def _enc(delta: int) -> str:
+        v = ~(delta << 1) if delta < 0 else (delta << 1)
+        s = ""
+        while v >= 0x20:
+            s += chr((0x20 | (v & 0x1F)) + 63)
+            v >>= 5
+        return s + chr(v + 63)
+    out, prev_lat, prev_lon = "", 0, 0
+    for lat, lon in coords:
+        ilat, ilon = round(lat * 1e6), round(lon * 1e6)
+        out += _enc(ilat - prev_lat) + _enc(ilon - prev_lon)
+        prev_lat, prev_lon = ilat, ilon
+    return out
+
+
+def test_decode_polyline6_roundtrip():
+    coords = [(39.469000, -0.376000), (41.385000, 2.173000)]
+    pts = _decode_polyline6(_encode6(coords))
+    assert len(pts) == 2
+    assert pts[0][0] == pytest.approx(39.469, abs=1e-5)
+    assert pts[0][1] == pytest.approx(-0.376, abs=1e-5)
+    assert pts[1][1] == pytest.approx(2.173, abs=1e-5)
 
 
 @pytest.mark.asyncio
@@ -340,7 +359,7 @@ async def test_valhalla_route_parses_summary(monkeypatch):
     fake_json = {
         "trip": {
             "summary": {"length": 12.5, "time": 600},
-            "legs": [{"shape": "_izlhA~rlgdF"}],
+            "legs": [{"shape": _encode6([(39.47, -0.38)])}],
         }
     }
 
@@ -826,7 +845,8 @@ Expected: FAIL — `app.api.v1.destinations` no existe.
 import math
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -839,6 +859,7 @@ from app.schemas.destination import DestinationIn, DestinationOut, RouteInfo
 from app.services.routing import valhalla_route
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 ARRIVAL_RADIUS_M = 100.0
 
@@ -959,8 +980,8 @@ async def get_destination(
         out.route = RouteInfo(**route.model_dump())
         out.remaining_distance_m = route.distance_m
         out.remaining_duration_s = route.duration_s
-    except Exception:  # noqa: BLE001 — Valhalla caído no debe romper el GET del destino
-        pass
+    except Exception as exc:  # noqa: BLE001 — Valhalla caído no debe romper el GET del destino
+        logger.warning("valhalla_route_failed", vehicle_id=str(vehicle_id), error=str(exc))
     return out
 ```
 
