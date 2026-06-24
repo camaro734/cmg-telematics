@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     valhalla_url: str = "http://valhalla:8002"
     nominatim_url: str = "https://nominatim.openstreetmap.org"
 
+    # Runner programado del detector de intervención (Paso 2b-2).
+    # ALLOWLIST: CSV de vehicle_id habilitados. Arranca con SOLO el FUSO de pruebas.
+    # Vacía → no procesa ningún vehículo. Ningún cliente sin añadirlo aquí explícitamente.
+    intervention_runner_enabled: bool = True
+    intervention_runner_interval_s: int = 300        # cada 5 min
+    intervention_runner_window_s: int = 7200         # ventana rolling de 2 h
+    intervention_runner_vehicle_ids: str = "8120ac70-7dc4-4af8-9afd-0cc61bde690a"  # FUSO #F97316 (pruebas)
+
     @field_validator("secret_key")
     @classmethod
     def _validate_secret_key(cls, v: str) -> str:

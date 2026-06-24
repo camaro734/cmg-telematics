@@ -115,6 +115,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("warmup_location_privacy_cache failed at startup: %s", exc)
     from app.core.maintenance_notifier import maintenance_notification_task
+    from app.core.intervention_runner import intervention_runner_task
     task = asyncio.create_task(
         broadcast_telemetry_task(app.state.redis, app.state.ws_manager)
     )
@@ -124,11 +125,13 @@ async def lifespan(app: FastAPI):
     loc_refresh_task = asyncio.create_task(
         loc_private_refresher(app.state.redis)
     )
+    intervention_task = asyncio.create_task(intervention_runner_task())
     yield
     task.cancel()
     notifier_task.cancel()
     loc_refresh_task.cancel()
-    for t in (task, notifier_task, loc_refresh_task):
+    intervention_task.cancel()
+    for t in (task, notifier_task, loc_refresh_task, intervention_task):
         try:
             await t
         except asyncio.CancelledError:
