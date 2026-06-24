@@ -333,3 +333,61 @@ def render_report_pdf(report: dict, *, title: str = "Parte de trabajos", subtitl
         generated_at=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
     )
     return weasyprint.HTML(string=html, base_url=str(_TEMPLATES_DIR)).write_pdf()
+
+
+def _col_header(col: dict) -> str:
+    return f"{col['label']} ({col['unit']})" if col.get("unit") else col["label"]
+
+
+def render_report_xlsx(report: dict) -> bytes:
+    """Renderiza el reporte a Excel (.xlsx) con openpyxl. Función síncrona."""
+    from io import BytesIO
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    cols = report["columnas_senal"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Intervenciones"
+
+    headers = ["Fecha", "OT", "Cliente"] + [_col_header(c) for c in cols] + ["Kilometraje (km)", "Dirección"]
+    ws.append(headers)
+    header_fill = PatternFill("solid", fgColor="1A2E4A")
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    for fila in report["filas"]:
+        row = [fila["fecha"], fila["ot"], fila["cliente"]]
+        for c in cols:
+            v = fila["senales"].get(c["key"])
+            row.append(v if v is not None else "—")
+        row += [fila["kilometraje"], fila["direccion"]]
+        ws.append(row)
+
+    # Fila de totales
+    totals = report["totales"]
+    total_row = [f"TOTALES ({totals['intervenciones']} interv.)", "", ""]
+    for c in cols:
+        t = totals["senales"].get(c["key"], {})
+        total_row.append(
+            f"{t['min']:.2f} / {t['max']:.2f}" if t.get("min") is not None else "—"
+        )
+    total_row += [totals["km_total"], ""]
+    ws.append(total_row)
+    for cell in ws[ws.max_row]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="EEF2F7")
+
+    # Anchos de columna razonables
+    widths = [12, 16, 22] + [16] * len(cols) + [16, 60]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.freeze_panes = "A2"
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

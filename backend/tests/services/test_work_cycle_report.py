@@ -133,6 +133,27 @@ def test_render_report_pdf_empty_is_valid():
     assert pdf[:4] == b"%PDF"
 
 
+def test_render_report_xlsx_has_headers_rows_and_totals():
+    from io import BytesIO
+    from openpyxl import load_workbook
+    from app.services.work_cycle_report import render_report_xlsx
+
+    report = _sample_report([
+        {"fecha": "22/06/2026", "ot": "PT-2026-00001", "cliente": "DELIMEX",
+         "senales": {"min_depresor": 24.0}, "kilometraje": 12.3, "direccion": "Calle Test"},
+        {"fecha": "22/06/2026", "ot": "Sin asignar", "cliente": "DELIMEX",
+         "senales": {"min_depresor": None}, "kilometraje": 4.0, "direccion": "Otra"},
+    ])
+    xlsx = render_report_xlsx(report)
+    ws = load_workbook(BytesIO(xlsx)).active
+    rows = list(ws.iter_rows(values_only=True))
+    assert rows[0] == ("Fecha", "OT", "Cliente", "Min Depresor (Min)", "Kilometraje (km)", "Dirección")
+    assert rows[1][1] == "PT-2026-00001" and rows[1][3] == 24.0
+    assert rows[2][3] == "—"   # señal ausente
+    assert rows[-1][0].startswith("TOTALES")
+    assert rows[-1][4] == 16.3   # km total
+
+
 def test_compute_totals():
     signals = [{"key": "min_depresor", "aggregate": "max"}]
     rows = [

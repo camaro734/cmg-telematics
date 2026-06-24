@@ -13,7 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import get_current_user, require_module
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.services.work_cycle_report import generate_report_data, render_report_pdf
+from app.services.work_cycle_report import (
+    generate_report_data,
+    render_report_pdf,
+    render_report_xlsx,
+)
+
+_XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 router = APIRouter(tags=["work_cycle_reports"])
 
@@ -78,5 +84,26 @@ async def get_report_pdf(
     return StreamingResponse(
         iter([pdf]),
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.get("/xlsx")
+async def get_report_xlsx(
+    desde: datetime = Query(...),
+    hasta: datetime = Query(...),
+    vehicle_id: uuid.UUID | None = Query(default=None),
+    client_id: uuid.UUID | None = Query(default=None),
+    user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("reports")),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """Descarga del reporte de intervenciones en Excel (.xlsx)."""
+    report = await _report_payload(db, user, desde, hasta, vehicle_id, client_id)
+    xlsx = await asyncio.to_thread(render_report_xlsx, report)
+    fname = _filename("parte_trabajos", desde, hasta, "xlsx")
+    return StreamingResponse(
+        iter([xlsx]),
+        media_type=_XLSX_MEDIA,
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
