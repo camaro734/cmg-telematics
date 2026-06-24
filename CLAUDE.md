@@ -41,7 +41,7 @@ vehicle_type    — sensor_schema JSONB (canal CAN, Byte/Bit, scale, offset)
 vehicle         — pertenece a tenant + vehicle_type
 device          — IMEI único, 1:1 con vehicle
 telemetry_record — hypertable, chunk 1d, compresión 7d, can_data JSONB
-telemetry_1h/1d  — continuous aggregates (KPIs hora/día)
+telemetry_1h     — continuous aggregate (KPIs por hora); NO existe telemetry_1d
 alert_rule      — condition JSONB (threshold|sustained|accumulation|trend|composite|schedule|geofence)
 alert_instance  — firing|acknowledged|resolved|escalated
 maintenance_plan/log — umbrales + reset de acumuladores
@@ -74,8 +74,8 @@ Logo: `backend/static/logos/cmgtrack.png` (668×187). Topbar: 62px (`--topbar-h`
 | timescaledb | ✅ PostgreSQL + TimescaleDB |
 | redis | ✅ |
 
-### Migraciones Alembic: 001→022 aplicadas
-Última: `022` — índices `ix_<tabla>_tenant_id` en vehicle, maintenance_plan, alert_instance, alert_rule.
+### Migraciones Alembic: 001→061 aplicadas (producción)
+Última: `061` — tabla `vehicle_destination` (rutas+ETA/Valhalla). Cadena lineal 001→061, head único.
 
 ### Páginas frontend implementadas
 `/fleet` `/vehicles` `/tipos-vehiculo` `/vehicles/:id` `/alerts` `/reports` `/devices`
