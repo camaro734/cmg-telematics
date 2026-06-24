@@ -742,6 +742,11 @@ export interface WorkCycleDefinition {
   aggregate_fields: string[]
   active: boolean
   created_at: string
+  // Regla de intervención (migración 062)
+  end_trigger_type?: string | null
+  end_trigger_config?: Record<string, unknown>
+  merge_window_seconds?: number
+  safety_radius_m?: number
 }
 
 export interface WorkCycleDefinitionCreate {
@@ -751,6 +756,10 @@ export interface WorkCycleDefinitionCreate {
   trigger_config?: Record<string, unknown>
   snapshot_fields?: string[]
   aggregate_fields?: string[]
+  end_trigger_type?: string | null
+  end_trigger_config?: Record<string, unknown>
+  merge_window_seconds?: number
+  safety_radius_m?: number
 }
 
 export interface WorkCycle {

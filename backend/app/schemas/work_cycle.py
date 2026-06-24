@@ -21,6 +21,11 @@ class WorkCycleDefinitionOut(BaseModel):
     aggregate_fields: list[str]
     active: bool
     created_at: datetime
+    # Regla de intervención (migración 062). end_trigger_type None = fin implícito.
+    end_trigger_type: str | None = None
+    end_trigger_config: dict[str, Any] = {}
+    merge_window_seconds: int = 300
+    safety_radius_m: int = 150
 
 
 class WorkCycleDefinitionCreate(BaseModel):
@@ -30,6 +35,11 @@ class WorkCycleDefinitionCreate(BaseModel):
     trigger_config: dict[str, Any] = {}
     snapshot_fields: list[str] = []
     aggregate_fields: list[str] = []
+    # Regla de intervención (aditivo, retrocompatible): defaults seguros.
+    end_trigger_type: str | None = None
+    end_trigger_config: dict[str, Any] = {}
+    merge_window_seconds: int = 300
+    safety_radius_m: int = 150
 
     @field_validator("trigger_type")
     @classmethod
@@ -45,6 +55,11 @@ class WorkCycleDefinitionUpdate(BaseModel):
     snapshot_fields: list[str] | None = None
     aggregate_fields: list[str] | None = None
     active: bool | None = None
+    # Regla de intervención (migración 062): opcionales, se aplican vía model_dump(exclude_unset).
+    end_trigger_type: str | None = None
+    end_trigger_config: dict[str, Any] | None = None
+    merge_window_seconds: int | None = None
+    safety_radius_m: int | None = None
 
 
 class WorkCycleOut(BaseModel):

@@ -56,6 +56,10 @@ async def create_definition(
         trigger_config=body.trigger_config,
         snapshot_fields=body.snapshot_fields,
         aggregate_fields=body.aggregate_fields,
+        end_trigger_type=body.end_trigger_type,
+        end_trigger_config=body.end_trigger_config,
+        merge_window_seconds=body.merge_window_seconds,
+        safety_radius_m=body.safety_radius_m,
     )
     db.add(defn)
     await db.commit()

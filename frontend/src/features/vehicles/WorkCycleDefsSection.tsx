@@ -55,6 +55,12 @@ type CycleDefForm = {
   snapshotCustom: string
   aggregateChecked: Set<string>
   aggregateCustom: string
+  // Regla de intervención: fin configurable, ventana de fusión, radio de seguridad
+  end_sensor: string
+  end_op: string
+  end_value: string
+  merge_window: string
+  safety_radius: string
 }
 
 const emptyForm: CycleDefForm = {
@@ -69,6 +75,11 @@ const emptyForm: CycleDefForm = {
   snapshotCustom: '',
   aggregateChecked: new Set(),
   aggregateCustom: '',
+  end_sensor: '',
+  end_op: '<',
+  end_value: '',
+  merge_window: '300',
+  safety_radius: '150',
 }
 
 function defToForm(d: WorkCycleDefinition, schemaKeys: string[]): CycleDefForm {
@@ -87,6 +98,12 @@ function defToForm(d: WorkCycleDefinition, schemaKeys: string[]): CycleDefForm {
     snapshotCustom: (d.snapshot_fields ?? []).filter(k => !schemaKeys.includes(k)).join(', '),
     aggregateChecked: new Set((d.aggregate_fields ?? []).filter(k => schemaKeys.includes(k))),
     aggregateCustom: (d.aggregate_fields ?? []).filter(k => !schemaKeys.includes(k)).join(', '),
+    end_sensor: ((d.end_trigger_config ?? {}) as Record<string, unknown>).sensor as string ?? '',
+    end_op: (((d.end_trigger_config ?? {}) as Record<string, unknown>).op as string) ?? '<',
+    end_value: ((d.end_trigger_config ?? {}) as Record<string, unknown>).value != null
+      ? String(((d.end_trigger_config ?? {}) as Record<string, unknown>).value) : '',
+    merge_window: d.merge_window_seconds != null ? String(d.merge_window_seconds) : '300',
+    safety_radius: d.safety_radius_m != null ? String(d.safety_radius_m) : '150',
   }
 }
 
@@ -100,6 +117,13 @@ function formToPayload(form: CycleDefForm, typeId: string): WorkCycleDefinitionC
   }
   const customSnapshot = form.snapshotCustom.split(',').map(s => s.trim()).filter(Boolean)
   const customAggregate = form.aggregateCustom.split(',').map(s => s.trim()).filter(Boolean)
+  // Fin configurable: si hay sensor de fin, se define la condición; si no, fin implícito
+  // (NULL = "igual que inicio invertido", comportamiento actual).
+  const endSensor = form.end_sensor.trim()
+  const end_trigger_type = endSensor ? 'threshold_exceeded' : null
+  const end_trigger_config = endSensor
+    ? { sensor: endSensor, op: form.end_op, value: parseFloat(form.end_value) }
+    : {}
   return {
     vehicle_type_id: typeId,
     name: form.name.trim(),
@@ -107,6 +131,10 @@ function formToPayload(form: CycleDefForm, typeId: string): WorkCycleDefinitionC
     trigger_config,
     snapshot_fields: [...form.snapshotChecked, ...customSnapshot],
     aggregate_fields: [...form.aggregateChecked, ...customAggregate],
+    end_trigger_type,
+    end_trigger_config,
+    merge_window_seconds: parseInt(form.merge_window) || 300,
+    safety_radius_m: parseInt(form.safety_radius) || 150,
   }
 }
 
@@ -398,6 +426,51 @@ export default function WorkCycleDefsSection({ typeId, sensorSchema }: Props) {
                 onCheckedChange={aggregateChecked => setForm(f => ({ ...f, aggregateChecked }))}
                 onCustomChange={aggregateCustom => setForm(f => ({ ...f, aggregateCustom }))}
               />
+
+              {/* Regla de intervención: fin configurable, ventana de fusión, radio de seguridad */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Regla de intervención
+                </span>
+
+                <div>
+                  <label style={labelStyle}>SEÑAL DE FIN (opcional)</label>
+                  <Select value={form.end_sensor} onChange={e => setForm(f => ({ ...f, end_sensor: e.target.value }))}>
+                    <option value="">— Igual que el inicio, invertido (fin implícito) —</option>
+                    {schemaKeys.map(k => <option key={k} value={k}>{k}</option>)}
+                  </Select>
+                </div>
+
+                {form.end_sensor && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                    <div>
+                      <label style={labelStyle}>OPERADOR FIN</label>
+                      <Select value={form.end_op} onChange={e => setForm(f => ({ ...f, end_op: e.target.value }))}>
+                        {['>', '>=', '<', '<=', '=='].map(o => <option key={o} value={o}>{o}</option>)}
+                      </Select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>VALOR FIN</label>
+                      <Input type="number" step="any" value={form.end_value}
+                        onChange={e => setForm(f => ({ ...f, end_value: e.target.value }))}
+                        placeholder="ej. 0" />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={labelStyle}>VENTANA DE FUSIÓN (segundos)</label>
+                    <Input type="number" min="0" value={form.merge_window}
+                      onChange={e => setForm(f => ({ ...f, merge_window: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>RADIO DE SEGURIDAD (metros)</label>
+                    <Input type="number" min="0" value={form.safety_radius}
+                      onChange={e => setForm(f => ({ ...f, safety_radius: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
 
               {modalError && (
                 <div style={{ color: 'var(--danger)', fontSize: 12 }}>{modalError}</div>
