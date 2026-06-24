@@ -9,14 +9,77 @@ import uuid
 from datetime import datetime
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.models.work_cycle import WorkCycleDefinition, WorkCycle
+from app.models.vehicle_type import VehicleType
+from app.services.sensor_transform import apply_transform
 
 
 # Whitelist of allowed extra columns in _query_telemetry.
 # Protection against accidental exposure of non-scoped fields in future changes.
-_ALLOWED_EXTRA_COLS = frozenset({"pto_active", "ignition"})
+# status_field de sensor_schema puede apuntar a estas columnas nativas del row.
+_ALLOWED_EXTRA_COLS = frozenset({"pto_active", "ignition", "ext_voltage_mv", "speed_kmh"})
+
+# Valores "not available" del estándar J1939 (1/2/4 bytes). Espejo de
+# frontend/src/lib/sensorValue.ts::J1939_NA.
+_J1939_NA = frozenset({0xFF, 0xFFFF, 0xFFFFFFFF})
+
+
+def _build_schema_index(sensor_schema: list | None) -> dict[str, dict]:
+    """Indexa el sensor_schema por su ``key`` para resolver señales por nombre."""
+    index: dict[str, dict] = {}
+    for s in sensor_schema or []:
+        if isinstance(s, dict) and s.get("key"):
+            index[s["key"]] = s
+    return index
+
+
+def _resolve_field_value(
+    field: str, can_data: dict | None, row: dict, schema_by_key: dict[str, dict]
+) -> float | None:
+    """Resuelve el valor físico de un ``field`` (key de sensor_schema) en una fila.
+
+    Traduce ``key`` → ``avl_<id>`` (o columna nativa vía ``status_field``), aplica
+    ``bit_index`` para señales digitales y ``apply_transform`` (scale/transform)
+    para analógicas. Espejo de ``frontend/src/lib/sensorValue.ts``.
+    Fallback retrocompatible: si ``field`` no está en el schema, se busca como clave
+    directa de ``can_data`` (comportamiento legado para definiciones antiguas/tests).
+    """
+    sensor = schema_by_key.get(field)
+    can = can_data or {}
+    if sensor is None:
+        return _to_float(can.get(field))
+
+    status_field = sensor.get("status_field")
+    if status_field:
+        val = row.get(status_field)
+        if isinstance(val, bool):
+            return 1.0 if val else 0.0
+        return _to_float(val)
+
+    avl_id = sensor.get("avl_id")
+    if avl_id is None:
+        return None
+    raw = _to_float(can.get(f"avl_{avl_id}"))
+    if raw is None:
+        return None
+    if raw in _J1939_NA or raw in (sensor.get("invalid_values") or []):
+        return None
+
+    bit_index = sensor.get("bit_index")
+    if bit_index is not None:
+        return float((int(raw) >> int(bit_index)) & 1)
+    return apply_transform(raw, sensor)
+
+
+def _to_float(raw: Any) -> float | None:
+    if raw is None or isinstance(raw, bool):
+        return 1.0 if raw is True else (0.0 if raw is False else None)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 async def detect_and_store_cycles(
@@ -41,6 +104,13 @@ async def detect_and_store_cycles(
     trigger_type = definition.trigger_type
     config = definition.trigger_config or {}
 
+    # Catálogo de señales del tipo de vehículo: necesario para traducir los nombres
+    # (key) de las definiciones a las claves reales avl_<id> de can_data.
+    sensor_schema = await db.scalar(
+        select(VehicleType.sensor_schema).where(VehicleType.id == definition.vehicle_type_id)
+    )
+    schema_by_key = _build_schema_index(sensor_schema)
+
     if trigger_type == "pto_change":
         rows = await _query_telemetry(db, vehicle_id, from_dt, to_dt, extra_cols=["pto_active"])
         groups = _group_boolean_periods(rows, "pto_active", True)
@@ -52,12 +122,12 @@ async def detect_and_store_cycles(
         threshold = float(config.get("threshold", 0))
         operator = config.get("op", ">")
         rows = await _query_telemetry(db, vehicle_id, from_dt, to_dt, extra_cols=[])
-        groups = _group_threshold_periods(rows, sensor, threshold, operator)
+        groups = _group_threshold_periods(rows, sensor, threshold, operator, schema_by_key)
     elif trigger_type == "sensor_pulse":
         sensor = config.get("sensor", "")
         min_gap = int(config.get("min_gap_seconds", 30))
         rows = await _query_telemetry(db, vehicle_id, from_dt, to_dt, extra_cols=[])
-        groups = _detect_pulses(rows, sensor, min_gap)
+        groups = _detect_pulses(rows, sensor, min_gap, schema_by_key)
     else:
         return 0
 
@@ -69,7 +139,7 @@ async def detect_and_store_cycles(
         group_rows = g["rows"]
         if not group_rows:
             continue
-        cycle_data = _build_cycle_data(group_rows, snapshot_fields, aggregate_fields)
+        cycle_data = _build_cycle_data(group_rows, snapshot_fields, aggregate_fields, schema_by_key)
         start_row = group_rows[0]
         end_row = group_rows[-1]
         started_at: datetime = start_row["recorded_at"]
@@ -132,15 +202,11 @@ def _group_boolean_periods(rows: list[dict], col: str, active_value: bool) -> li
 
 
 def _group_threshold_periods(
-    rows: list[dict], sensor: str, threshold: float, op: str
+    rows: list[dict], sensor: str, threshold: float, op: str, schema_by_key: dict[str, dict]
 ) -> list[dict]:
     def matches(row: dict) -> bool:
-        raw = (row.get("can_data") or {}).get(sensor)
-        if raw is None:
-            return False
-        try:
-            v = float(raw)
-        except (TypeError, ValueError):
+        v = _resolve_field_value(sensor, row.get("can_data"), row, schema_by_key)
+        if v is None:
             return False
         if op == ">":   return v > threshold
         if op == ">=":  return v >= threshold
@@ -163,13 +229,13 @@ def _group_threshold_periods(
 
 
 def _detect_pulses(
-    rows: list[dict], sensor: str, min_gap_seconds: int
+    rows: list[dict], sensor: str, min_gap_seconds: int, schema_by_key: dict[str, dict]
 ) -> list[dict]:
     pulses: list[dict] = []
     last_t: datetime | None = None
     for row in rows:
-        val = (row.get("can_data") or {}).get(sensor)
-        if val in (True, "true", "1", 1):
+        val = _resolve_field_value(sensor, row.get("can_data"), row, schema_by_key)
+        if val is not None and val != 0:
             t: datetime = row["recorded_at"]
             if last_t is None or (t - last_t).total_seconds() >= min_gap_seconds:
                 pulses.append({"rows": [row]})
@@ -181,32 +247,30 @@ def _build_cycle_data(
     rows: list[dict],
     snapshot_fields: list[str],
     aggregate_fields: list[str],
+    schema_by_key: dict[str, dict],
 ) -> dict[str, Any]:
+    """Construye cycle_data resolviendo cada field (key de sensor_schema) a su valor
+    físico (avl_<id> traducido + bit_index/transform). Ver _resolve_field_value."""
     data: dict[str, Any] = {}
     if not rows:
         return data
 
-    can_start = rows[0].get("can_data") or {}
-    can_end = rows[-1].get("can_data") or {}
-
+    first, last = rows[0], rows[-1]
     for field in snapshot_fields:
-        if (v := can_start.get(field)) is not None:
+        if (v := _resolve_field_value(field, first.get("can_data"), first, schema_by_key)) is not None:
             data[f"{field}_start"] = v
-        if (v := can_end.get(field)) is not None:
+        if (v := _resolve_field_value(field, last.get("can_data"), last, schema_by_key)) is not None:
             data[f"{field}_end"] = v
 
     for field in aggregate_fields:
-        values = []
-        for row in rows:
-            raw = (row.get("can_data") or {}).get(field)
-            if raw is not None:
-                try:
-                    values.append(float(raw))
-                except (TypeError, ValueError):
-                    pass
+        values = [
+            v for row in rows
+            if (v := _resolve_field_value(field, row.get("can_data"), row, schema_by_key)) is not None
+        ]
         if values:
             data[f"{field}_sum"] = round(sum(values), 3)
             data[f"{field}_avg"] = round(sum(values) / len(values), 3)
             data[f"{field}_max"] = round(max(values), 3)
+            data[f"{field}_min"] = round(min(values), 3)
 
     return data
