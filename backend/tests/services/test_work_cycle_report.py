@@ -104,6 +104,35 @@ async def test_compute_leg_km_zero_when_nothing():
     assert await compute_leg_km([], None, None, matcher=None) == 0.0
 
 
+def _sample_report(filas):
+    from app.services.work_cycle_report import _compute_totals
+    signals = [{"key": "min_depresor", "label": "Min Depresor", "unit": "Min", "aggregate": "max"}]
+    return {
+        "filtros": {"desde": "2026-06-22T00:00:00+00:00", "hasta": "2026-06-23T00:00:00+00:00",
+                    "vehicle_id": None, "client_id": None},
+        "columnas_senal": [{"key": "min_depresor", "label": "Min Depresor", "unit": "Min"}],
+        "filas": filas,
+        "totales": _compute_totals(filas, signals),
+    }
+
+
+def test_render_report_pdf_produces_pdf_bytes():
+    from app.services.work_cycle_report import render_report_pdf
+    report = _sample_report([
+        {"fecha": "22/06/2026", "ot": "Sin asignar", "cliente": "DELIMEX",
+         "senales": {"min_depresor": 24.0}, "kilometraje": 12.3, "direccion": "Calle Test, Valencia"},
+    ])
+    pdf = render_report_pdf(report, subtitle="test")
+    assert pdf[:4] == b"%PDF"
+    assert len(pdf) > 1000
+
+
+def test_render_report_pdf_empty_is_valid():
+    from app.services.work_cycle_report import render_report_pdf
+    pdf = render_report_pdf(_sample_report([]))
+    assert pdf[:4] == b"%PDF"
+
+
 def test_compute_totals():
     signals = [{"key": "min_depresor", "aggregate": "max"}]
     rows = [

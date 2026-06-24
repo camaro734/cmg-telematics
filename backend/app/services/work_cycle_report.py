@@ -11,11 +11,14 @@ Estructura:
   - helpers puros (``_report_signals``, ``_signal_value``, ``_compute_totals``,
     ``compute_leg_km``) — testeables sin BD ni red.
 """
+import base64
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +27,9 @@ from app.services.geocoding import nominatim_reverse
 from app.services.routing import valhalla_trace_distance_m
 
 logger = logging.getLogger(__name__)
+
+_TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+_LOGO_PATH = Path(__file__).parent.parent / "static" / "logos" / "cmgtrack.png"
 
 # report_aggregate → sufijo de la clave en cycle_data (ver cycle_detector._build_cycle_data).
 # max/min/avg vienen de aggregate_fields; "last" es el snapshot de fin (_end).
@@ -295,3 +301,35 @@ async def assemble_report(
         "filas": rows,
         "totales": _compute_totals(rows, signals),
     }
+
+
+def _logo_b64() -> str | None:
+    """Logo CMG en base64 para incrustar en el PDF (None si falta el fichero)."""
+    try:
+        return base64.b64encode(_LOGO_PATH.read_bytes()).decode()
+    except Exception:  # noqa: BLE001 — la ausencia de logo no debe romper el PDF
+        return None
+
+
+def _periodo_label(report: dict) -> str:
+    """'dd/mm/aaaa – dd/mm/aaaa' a partir de los filtros del reporte."""
+    desde = datetime.fromisoformat(report["filtros"]["desde"]).strftime("%d/%m/%Y")
+    hasta = datetime.fromisoformat(report["filtros"]["hasta"]).strftime("%d/%m/%Y")
+    return f"{desde} – {hasta}"
+
+
+def render_report_pdf(report: dict, *, title: str = "Parte de trabajos", subtitle: str = "") -> bytes:
+    """Renderiza el reporte a PDF (formato VPS) con WeasyPrint. Función síncrona."""
+    import weasyprint
+
+    env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
+    template = env.get_template("reports/work_cycle_report.html")
+    html = template.render(
+        report=report,
+        title=title,
+        subtitle=subtitle,
+        logo_b64=_logo_b64(),
+        periodo=_periodo_label(report),
+        generated_at=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
+    )
+    return weasyprint.HTML(string=html, base_url=str(_TEMPLATES_DIR)).write_pdf()

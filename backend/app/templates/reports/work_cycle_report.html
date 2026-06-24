@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 1.2cm 1.2cm 1.6cm 1.2cm;
+    @bottom-right {
+      content: "Página " counter(page) " de " counter(pages);
+      font-size: 7pt; color: #9ca3af;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #111827; font-size: 8.5pt; line-height: 1.4;
+  }
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 2px solid #374151; padding-bottom: 10px; margin-bottom: 14px;
+  }
+  .header-logo { height: 40px; object-fit: contain; }
+  .header-title { font-size: 16pt; font-weight: 700; color: #111827; }
+  .header-sub { font-size: 8.5pt; color: #6b7280; margin-top: 2px; }
+  .header-right { text-align: right; font-size: 8pt; color: #6b7280; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: #1a2e4a; color: #fff; font-size: 7.5pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 6px 7px; text-align: left; border: 1px solid #1a2e4a;
+  }
+  tbody td {
+    padding: 5px 7px; border: 1px solid #e5e7eb; vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: #f9fafb; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  td.addr { font-size: 7.5pt; color: #374151; }
+  td.ot-none { color: #9ca3af; font-style: italic; }
+
+  tfoot td {
+    padding: 6px 7px; border: 1px solid #d1d5db;
+    font-weight: 700; background: #eef2f7;
+  }
+  .totals {
+    margin-top: 14px; display: flex; gap: 24px; flex-wrap: wrap;
+    border-top: 1px solid #e5e7eb; padding-top: 10px;
+  }
+  .total-card { font-size: 8.5pt; }
+  .total-card .label { color: #6b7280; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.04em; }
+  .total-card .value { font-size: 13pt; font-weight: 700; color: #111827; }
+  .total-card .sub { color: #6b7280; font-size: 7.5pt; }
+  .empty { padding: 30px; text-align: center; color: #9ca3af; font-style: italic; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="header-title">{{ title }}</div>
+      <div class="header-sub">{{ subtitle }}</div>
+    </div>
+    {% if logo_b64 %}<img class="header-logo" src="data:image/png;base64,{{ logo_b64 }}">{% endif %}
+    <div class="header-right">
+      <div>Periodo: {{ periodo }}</div>
+      <div>Generado: {{ generated_at }}</div>
+    </div>
+  </div>
+
+  {% if report.filas %}
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>OT</th>
+        <th>Cliente</th>
+        {% for col in report.columnas_senal %}
+          <th class="num">{{ col.label }}{% if col.unit %} ({{ col.unit }}){% endif %}</th>
+        {% endfor %}
+        <th class="num">Kilometraje</th>
+        <th>Dirección</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fila in report.filas %}
+      <tr>
+        <td>{{ fila.fecha }}</td>
+        <td class="{% if fila.ot == 'Sin asignar' %}ot-none{% endif %}">{{ fila.ot }}</td>
+        <td>{{ fila.cliente }}</td>
+        {% for col in report.columnas_senal %}
+          {% set v = fila.senales[col.key] %}
+          <td class="num">{% if v is not none %}{{ "%.2f"|format(v) }}{% else %}—{% endif %}</td>
+        {% endfor %}
+        <td class="num">{{ "%.2f"|format(fila.kilometraje) }} km</td>
+        <td class="addr">{{ fila.direccion }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">TOTALES ({{ report.totales.intervenciones }} intervenciones)</td>
+        {% for col in report.columnas_senal %}
+          {% set t = report.totales.senales[col.key] %}
+          <td class="num">{% if t.min is not none %}{{ "%.2f"|format(t.min) }} / {{ "%.2f"|format(t.max) }}{% else %}—{% endif %}</td>
+        {% endfor %}
+        <td class="num">{{ "%.2f"|format(report.totales.km_total) }} km</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="totals">
+    <div class="total-card">
+      <div class="label">Órdenes servidas</div>
+      <div class="value">{{ report.totales.intervenciones }}</div>
+    </div>
+    <div class="total-card">
+      <div class="label">Kilometraje total</div>
+      <div class="value">{{ "%.1f"|format(report.totales.km_total) }} <span class="sub">km</span></div>
+    </div>
+    {% for col in report.columnas_senal %}
+      {% set t = report.totales.senales[col.key] %}
+      <div class="total-card">
+        <div class="label">{{ col.label }} (mín / máx)</div>
+        <div class="value">{% if t.min is not none %}{{ "%.1f"|format(t.min) }} / {{ "%.1f"|format(t.max) }}{% else %}—{% endif %}
+          {% if col.unit %}<span class="sub">{{ col.unit }}</span>{% endif %}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">No hay intervenciones en el periodo y filtros seleccionados.</div>
+  {% endif %}
+</body>
+</html>

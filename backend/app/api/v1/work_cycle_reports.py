@@ -2,16 +2,18 @@
 
 Solo lectura: el reporte nunca escribe en las intervenciones ni en producción.
 """
+import asyncio
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, require_module
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
-from app.services.work_cycle_report import generate_report_data
+from app.services.work_cycle_report import generate_report_data, render_report_pdf
 
 router = APIRouter(tags=["work_cycle_reports"])
 
@@ -52,3 +54,29 @@ async def get_report_data(
 ) -> dict:
     """Datos del reporte de intervenciones en JSON (para verificar antes de formatear)."""
     return await _report_payload(db, user, desde, hasta, vehicle_id, client_id)
+
+
+def _filename(prefix: str, desde: datetime, hasta: datetime, ext: str) -> str:
+    return f"{prefix}_{desde.strftime('%Y%m%d')}_{hasta.strftime('%Y%m%d')}.{ext}"
+
+
+@router.get("/pdf")
+async def get_report_pdf(
+    desde: datetime = Query(...),
+    hasta: datetime = Query(...),
+    vehicle_id: uuid.UUID | None = Query(default=None),
+    client_id: uuid.UUID | None = Query(default=None),
+    user: CurrentUser = Depends(get_current_user),
+    _: None = Depends(require_module("reports")),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """Descarga del reporte de intervenciones en PDF (formato VPS)."""
+    report = await _report_payload(db, user, desde, hasta, vehicle_id, client_id)
+    subtitle = "Detección automática de intervenciones (work_cycle)"
+    pdf = await asyncio.to_thread(render_report_pdf, report, subtitle=subtitle)
+    fname = _filename("parte_trabajos", desde, hasta, "pdf")
+    return StreamingResponse(
+        iter([pdf]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
