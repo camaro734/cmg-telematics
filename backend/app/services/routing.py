@@ -61,3 +61,29 @@ async def valhalla_route(
         duration_s=trip["summary"]["time"],
         geometry=geometry,
     )
+
+
+async def valhalla_trace_distance_m(
+    trace: list[tuple[float, float]],
+    valhalla_url: str | None = None,
+) -> float:
+    """Distancia recorrida (metros) de una traza GPS por map-matching de Valhalla.
+
+    Usa ``/trace_route`` (shape_match=map_snap) para encajar la traza a la red viaria.
+    ``trace`` = lista de (lat, lon). Lanza si la traza es insuficiente o Valhalla falla;
+    el llamante decide el fallback (haversine).
+    """
+    if len(trace) < 2:
+        raise ValueError("traza insuficiente para map-matching")
+    base = valhalla_url or settings.valhalla_url
+    payload = {
+        "shape": [{"lat": p[0], "lon": p[1]} for p in trace],
+        "costing": "auto",
+        "shape_match": "map_snap",
+        "directions_options": {"units": "kilometers"},
+    }
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(f"{base}/trace_route", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+    return float(data["trip"]["summary"]["length"]) * 1000.0
