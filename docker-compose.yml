@@ -141,9 +141,29 @@ services:
       core-api:
         condition: service_healthy
 
+  valhalla:
+    # Versión fijada para reproducibilidad; última semver publicada en ghcr.io/gis-ops (jun 2026)
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:3.5.1
+    restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - valhalla
+    volumes:
+      - valhalla_tiles:/custom_files
+    environment:
+      - tile_urls=https://download.geofabrik.de/europe-latest.osm.pbf
+      - server_threads=2
+      - use_tiles_ignore_pbf=True
+      - build_elevation=False
+      - build_admins=True
+      - build_time_zones=False
+    # Sin `ports:` — solo accesible en la red interna Docker
+
 volumes:
   pgdata:
   redisdata:
   caddydata:
   caddyconfig:
   uploads_data:
+  valhalla_tiles:

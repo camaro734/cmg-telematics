@@ -1,12 +1,28 @@
 import { useNavigate } from 'react-router-dom'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { useVehicleLive } from '../../lib/useVehicleLive'
+import type { VehicleTypeOut, SensorDef, GeoResult, DestinationOut } from '../../lib/types'
+import { sensorDisplayValue } from './popupHtml'
+import { useSetDestination, useCancelDestination } from './useDestination'
 
 interface VehicleDetailPanelProps {
   vehicleId: string | null
   plate?: string
   vehicleName?: string
+  vehicleType?: VehicleTypeOut
+  // Props de destino — inyectadas desde FleetDashboard
+  pendingDest?: GeoResult | null
+  activeDest?: DestinationOut | null
+  onDestSent?: () => void
+  onDestCancelled?: () => void
   onClose: () => void
+}
+
+/** Formatea segundos como "X min" o "Xh Ymin" */
+function fmtEta(seconds: number): string {
+  const m = Math.round(seconds / 60)
+  if (m < 60) return `${m} min`
+  return `${Math.floor(m / 60)}h ${m % 60} min`
 }
 
 function KpiRow({ label, value, unit }: { label: string; value: React.ReactNode; unit?: string }) {
@@ -23,10 +39,18 @@ function KpiRow({ label, value, unit }: { label: string; value: React.ReactNode;
   )
 }
 
-export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: VehicleDetailPanelProps) {
+export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType, pendingDest, activeDest, onDestSent, onDestCancelled, onClose }: VehicleDetailPanelProps) {
   const navigate = useNavigate()
 
   const { data: status } = useVehicleLive(vehicleId)
+
+  // Hooks de mutación para enviar/cancelar destino
+  const setDest = useSetDestination(vehicleId ?? '')
+  const cancelDest = useCancelDestination(vehicleId ?? '')
+
+  // Sensores marcados para el panel de flota; si no hay ninguno, fallback a los 4 fijos.
+  const panelSensors: SensorDef[] = (vehicleType?.sensor_schema ?? [])
+    .filter(s => s.show_in_fleet_panel === true)
 
   const online = status ? isEffectivelyOnline(status) : false
   const stale = !online
@@ -95,23 +119,108 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, onClose }: V
                 {statusStamp(status).text}
               </div>
             )}
-            <KpiRow label="Ignición" value={
-              <span style={{ color: stale ? 'var(--fg-muted)' : (status?.ignition ? 'var(--ok)' : 'var(--offline)') }}>
-                {status?.ignition ? 'ON' : 'OFF'}
-              </span>
-            } />
-            {status?.speed_kmh != null && (
-              <KpiRow label="Velocidad" value={status.speed_kmh.toFixed(0)} unit="km/h" />
+            {panelSensors.length > 0 ? (
+              panelSensors.map(s => (
+                <KpiRow
+                  key={s.key}
+                  label={s.label}
+                  value={<span style={{ color: stale ? 'var(--fg-muted)' : undefined }}>
+                    {status ? sensorDisplayValue(s, status) : '—'}
+                  </span>}
+                />
+              ))
+            ) : (
+              <>
+                <KpiRow label="Ignición" value={
+                  <span style={{ color: stale ? 'var(--fg-muted)' : (status?.ignition ? 'var(--ok)' : 'var(--offline)') }}>
+                    {status?.ignition ? 'ON' : 'OFF'}
+                  </span>
+                } />
+                {status?.speed_kmh != null && (
+                  <KpiRow label="Velocidad" value={status.speed_kmh.toFixed(0)} unit="km/h" />
+                )}
+                {status?.ext_voltage_mv != null && (
+                  <KpiRow label="Tensión batería" value={(status.ext_voltage_mv / 1000).toFixed(1)} unit="V" />
+                )}
+                {status?.pto_active != null && (
+                  <KpiRow label="PTO" value={
+                    <span style={{ color: stale ? 'var(--fg-muted)' : (status.pto_active ? 'var(--cmg-teal)' : 'var(--fg-dim)') }}>
+                      {status.pto_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  } />
+                )}
+              </>
             )}
-            {status?.ext_voltage_mv != null && (
-              <KpiRow label="Tensión batería" value={(status.ext_voltage_mv / 1000).toFixed(1)} unit="V" />
+          </div>
+
+          {/* Sección de destino y ETA */}
+          <div style={{ padding: '0 16px 12px', flexShrink: 0 }}>
+            {/* Botón "Enviar destino" cuando hay un candidato seleccionado y ningún destino activo */}
+            {pendingDest && !activeDest && (
+              <>
+                <button
+                  onClick={() => {
+                    setDest.mutate(
+                      { lat: pendingDest.lat, lon: pendingDest.lon, label: pendingDest.label },
+                      { onSuccess: () => onDestSent?.() },
+                    )
+                  }}
+                  disabled={setDest.isPending}
+                  style={{
+                    width: '100%', padding: '10px 14px', borderRadius: 8,
+                    background: 'var(--cmg-teal)', color: '#fff',
+                    border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  {setDest.isPending ? 'Enviando…' : `Enviar destino: ${pendingDest.label}`}
+                </button>
+                {setDest.isError && (
+                  <span style={{ color: 'var(--accent-crit)', fontSize: 12 }}>Error al enviar destino</span>
+                )}
+              </>
             )}
-            {status?.pto_active != null && (
-              <KpiRow label="PTO" value={
-                <span style={{ color: stale ? 'var(--fg-muted)' : (status.pto_active ? 'var(--cmg-teal)' : 'var(--fg-dim)') }}>
-                  {status.pto_active ? 'Activo' : 'Inactivo'}
-                </span>
-              } />
+
+            {/* ETA en tiempo real cuando hay destino activo */}
+            {activeDest?.remaining_distance_m != null && (
+              <div style={{
+                padding: 12, background: 'var(--bg-elevated)', borderRadius: 8,
+                border: '1px solid var(--border)',
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>
+                  Hacia {activeDest.label}
+                </div>
+                <div style={{ fontSize: 20, fontFamily: 'var(--font-data)', color: 'var(--fg-primary)', fontWeight: 700 }}>
+                  {(activeDest.remaining_distance_m / 1000).toFixed(1)} km
+                  {activeDest.remaining_duration_s != null && (
+                    <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--fg-muted)', marginLeft: 8 }}>
+                      · {fmtEta(activeDest.remaining_duration_s)}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => cancelDest.mutate(undefined, { onSuccess: () => onDestCancelled?.() })}
+                  disabled={cancelDest.isPending}
+                  style={{
+                    marginTop: 8, background: 'none',
+                    border: '1px solid var(--border)', color: 'var(--accent-crit)',
+                    borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+                    fontSize: 12, fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  {cancelDest.isPending ? 'Cancelando…' : 'Cancelar destino'}
+                </button>
+                {cancelDest.isError && (
+                  <span style={{ color: 'var(--accent-crit)', fontSize: 12 }}>Error al cancelar destino</span>
+                )}
+              </div>
+            )}
+
+            {/* Confirmación de llegada */}
+            {activeDest?.status === 'arrived' && (
+              <div style={{ fontSize: 13, color: 'var(--accent-ok)', padding: '8px 0', fontWeight: 600 }}>
+                ✓ Vehículo llegado al destino
+              </div>
             )}
           </div>
 

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import FleetMap from './FleetMap'
 import { useFleetStore } from './useFleetStore'
 import { useVehicleStatuses } from './useVehicleStatuses'
@@ -9,12 +9,14 @@ import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useWsConnected } from '../../lib/useWsConnected'
-import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, VehicleStatus, RuleOut, WorkOrderOut, TenantOut } from '../../lib/types'
+import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, VehicleStatus, RuleOut, WorkOrderOut, TenantOut, GeoResult } from '../../lib/types'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { VehicleListPanel, type VehicleEntry } from './VehicleListPanel'
 import { VehicleDetailPanel } from './VehicleDetailPanel'
 import { Input } from '../../shared/ui/Input'
 import { isOnline, isOutOfService } from '../../lib/staleStatus'
+import { useGeocode, useVehicleDestination } from './useDestination'
+import { useToast } from '../../shared/ui/Toast'
 
 type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert' | 'out_of_service'
 const STATE_ORDER: Record<VehicleState, number> = { alert: 0, moving: 1, idle: 2, parked: 3, offline: 4, out_of_service: 5 }
@@ -101,6 +103,10 @@ export default function FleetDashboard() {
 
   const statuses = useVehicleStatuses(vehicles)
   const vehicleById = new Map(vehicles.map(v => [v.id, v]))
+  const vehicleTypesById = useMemo(
+    () => new Map(vehicleTypes.map(vt => [vt.id, vt])),
+    [vehicleTypes],
+  )
 
   const movingCount = vehicles.filter(v => {
     const s = statuses.get(v.id)
@@ -127,6 +133,51 @@ export default function FleetDashboard() {
   const [search, setSearch] = useState('')
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
 
+  // Estado para búsqueda geocodificada de destino
+  const [geoQuery, setGeoQuery] = useState('')
+  const [geoResults, setGeoResults] = useState<GeoResult[]>([])
+  const [pendingDest, setPendingDest] = useState<GeoResult | null>(null)
+  const geocode = useGeocode()
+  const geoInputRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
+
+  // Destino activo del vehículo seleccionado (poll + WS-invalidado)
+  const destQuery = useVehicleDestination(selectedVehicleId, !!selectedVehicleId)
+  const activeDest = destQuery.data?.status === 'active' ? destQuery.data : null
+
+  // Destino a pintar en el mapa: candidato de búsqueda o el activo del vehículo
+  const mapDestination = pendingDest
+    ? { lat: pendingDest.lat, lon: pendingDest.lon, label: pendingDest.label }
+    : activeDest
+      ? { lat: activeDest.lat, lon: activeDest.lon, label: activeDest.label }
+      : null
+  const mapRoute = pendingDest ? null : (activeDest?.route?.geometry ?? null)
+
+  async function handleGeoSearch() {
+    const q = geoInputRef.current?.value.trim() ?? ''
+    if (!q) return
+    try {
+      const results = await geocode.mutateAsync(q)
+      setGeoResults(results)
+      if (results.length === 0) toast.warning('Sin resultados para esa búsqueda')
+    } catch {
+      toast.error('Error al buscar la ubicación. Inténtalo de nuevo.')
+    }
+  }
+
+  function handleGeoSelect(r: GeoResult) {
+    setPendingDest(r)
+    setGeoResults([])
+    setGeoQuery(r.label)
+  }
+
+  // Al cambiar de vehículo, limpiar el destino pendiente de búsqueda
+  function handlePanelSelectWithDestClear(id: string) {
+    setPendingDest(null)
+    setGeoResults([])
+    setGeoQuery('')
+    handlePanelSelect(id)
+  }
 
   const filteredVehicles = sortedVehicles.filter(v =>
     search === '' ||
@@ -247,14 +298,81 @@ export default function FleetDashboard() {
 
       {/* MAP — fills everything */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        <FleetMap vehicles={vehicles} statuses={statuses} vehicleTypes={vehicleTypes} firingAlerts={firingAlerts} rules={rules} workOrders={activeOrders} tenantNames={tenantNames} />
+        <FleetMap
+          vehicles={vehicles}
+          statuses={statuses}
+          vehicleTypes={vehicleTypes}
+          firingAlerts={firingAlerts}
+          rules={rules}
+          workOrders={activeOrders}
+          tenantNames={tenantNames}
+          destination={mapDestination}
+          routeGeometry={mapRoute}
+        />
+      </div>
+
+      {/* Caja de búsqueda de ubicación — flotante sobre el mapa */}
+      <div style={{
+        position: 'absolute', top: 12, left: 'calc(280px + 24px)', zIndex: 1000, width: 300,
+        pointerEvents: 'auto',
+      }}>
+        <div style={{ position: 'relative' }}>
+          <input
+            ref={geoInputRef}
+            value={geoQuery}
+            onChange={e => setGeoQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleGeoSearch() }}
+            placeholder="Buscar ubicación…"
+            style={{
+              width: '100%', padding: '8px 38px 8px 12px', borderRadius: 8, boxSizing: 'border-box',
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              color: 'var(--fg-primary)', fontSize: 13, fontFamily: 'var(--font-ui)',
+              outline: 'none',
+            }}
+          />
+          <button
+            onClick={handleGeoSearch}
+            disabled={geocode.isPending}
+            style={{
+              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--cmg-teal)', fontSize: 16, padding: 2, lineHeight: 1,
+            }}
+          >
+            {geocode.isPending ? '…' : '🔍'}
+          </button>
+        </div>
+        {/* Resultados del geocoder */}
+        {geoResults.length > 0 && (
+          <div style={{
+            marginTop: 4, borderRadius: 8, overflow: 'hidden',
+            border: '1px solid var(--border)', background: 'var(--bg-elevated)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          }}>
+            {geoResults.map((r, i) => (
+              <button
+                key={`${r.lat},${r.lon}-${r.label}`}
+                onClick={() => handleGeoSelect(r)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '8px 12px', background: 'none',
+                  border: 'none', borderBottom: i < geoResults.length - 1 ? '1px solid var(--border)' : 'none',
+                  color: 'var(--fg-primary)', fontSize: 12, cursor: 'pointer',
+                  fontFamily: 'var(--font-ui)',
+                }}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Panel izquierdo — lista de vehículos */}
       <VehicleListPanel
         vehicles={vehicleEntries}
         selectedId={selectedVehicleId}
-        onSelect={handlePanelSelect}
+        onSelect={handlePanelSelectWithDestClear}
       />
 
       {/* Panel derecho — detalle del vehículo seleccionado */}
@@ -262,6 +380,11 @@ export default function FleetDashboard() {
         vehicleId={selectedVehicleId}
         plate={selectedVehicleId ? vehicleById.get(selectedVehicleId)?.license_plate ?? undefined : undefined}
         vehicleName={selectedVehicleId ? vehicleById.get(selectedVehicleId)?.name : undefined}
+        vehicleType={selectedVehicleId ? vehicleTypesById.get(vehicleById.get(selectedVehicleId)?.vehicle_type_id ?? '') : undefined}
+        pendingDest={pendingDest}
+        activeDest={activeDest}
+        onDestSent={() => { setPendingDest(null); setGeoQuery('') }}
+        onDestCancelled={() => { setPendingDest(null); setGeoQuery('') }}
         onClose={handlePanelClose}
       />
     </div>

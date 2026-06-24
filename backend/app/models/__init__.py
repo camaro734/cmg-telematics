@@ -23,6 +23,7 @@ from app.models.access_audit_log import AccessAuditLog  # noqa
 from app.models.system_settings import SystemSettings
 from app.models.system_block_template import SystemBlockTemplate
 from app.models.location_access_grant import LocationAccessGrant
+from app.models.vehicle_destination import VehicleDestination  # noqa: F401
 
 __all__ = [
     "Base", "Tenant", "User", "PermissionGrant", "VehicleType", "VehicleTypeManufacturer",
@@ -30,4 +31,5 @@ __all__ = [
     "MaintenancePlan", "MaintenanceLog", "CommandLog", "VehicleManualCanSlot", "ManualCanButton",
     "Driver", "WorkOrder", "WorkOrderStop", "WorkReport", "TenantDocCounter",
     "AccessAuditLog", "SystemSettings", "SystemBlockTemplate", "LocationAccessGrant",
+    "VehicleDestination",
 ]

@@ -122,9 +122,12 @@ interface FleetMapProps {
   rules?: RuleOut[]
   workOrders?: WorkOrderOut[]
   tenantNames?: Map<string, string>
+  // Destino y ruta a pintar sobre el mapa
+  destination?: { lat: number; lon: number; label: string } | null
+  routeGeometry?: [number, number][] | null
 }
 
-export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules = [], workOrders = [], tenantNames = new Map(), vehicleTypes = [] }: FleetMapProps) {
+export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules = [], workOrders = [], tenantNames = new Map(), vehicleTypes = [], destination, routeGeometry }: FleetMapProps) {
   const navigate = useNavigate()
   const { selectedId } = useFleetStore()
   const mapRef = useRef<L.Map | null>(null)
@@ -134,6 +137,9 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
   const circlesRef = useRef<Map<string, L.Circle>>(new Map())
   const geofenceLayerRef = useRef<L.LayerGroup | null>(null)
   const orderLayerRef    = useRef<L.LayerGroup | null>(null)
+  // Marcador de destino + polyline de ruta
+  const destMarkerRef = useRef<L.Marker | null>(null)
+  const routeLineRef  = useRef<L.Polyline | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const initialFitDoneRef = useRef(false)
 
@@ -190,10 +196,48 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
       geofenceLayerRef.current = null
       orderLayerRef.current?.clearLayers()
       orderLayerRef.current = null
+      // Limpiar marcador de destino y ruta al desmontar
+      if (destMarkerRef.current) { mapRef.current?.removeLayer(destMarkerRef.current); destMarkerRef.current = null }
+      if (routeLineRef.current)  { mapRef.current?.removeLayer(routeLineRef.current);  routeLineRef.current  = null }
       mapRef.current?.remove()
       mapRef.current = null
     }
   }, [])
+
+  // Marcador de destino y polyline de ruta — limpia y repinta cuando cambian las props
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    // Limpiar capas previas
+    if (destMarkerRef.current) { map.removeLayer(destMarkerRef.current); destMarkerRef.current = null }
+    if (routeLineRef.current)  { map.removeLayer(routeLineRef.current);  routeLineRef.current  = null }
+    // Pintar nuevo destino
+    if (destination) {
+      destMarkerRef.current = L.marker([destination.lat, destination.lon], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="font-size:24px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5))">📍</div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],
+          popupAnchor: [0, -26],
+        }),
+      }).addTo(map).bindPopup(destination.label)
+    }
+    // Pintar ruta como polyline — resuelve --cmg-teal en runtime para white-label
+    if (routeGeometry && routeGeometry.length > 1) {
+      const teal = getComputedStyle(document.documentElement).getPropertyValue('--cmg-teal').trim() || '#1D9E75'
+      routeLineRef.current = L.polyline(routeGeometry, {
+        color: teal, weight: 4, opacity: 0.85,
+      }).addTo(map)
+      map.fitBounds(routeLineRef.current.getBounds(), { padding: [60, 60] })
+    }
+    // Limpieza al desmontar o al cambiar destination/routeGeometry
+    return () => {
+      if (destMarkerRef.current) { mapRef.current?.removeLayer(destMarkerRef.current); destMarkerRef.current = null }
+      if (routeLineRef.current)  { mapRef.current?.removeLayer(routeLineRef.current);  routeLineRef.current  = null }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination, routeGeometry])
 
   // Update markers when statuses change
   useEffect(() => {

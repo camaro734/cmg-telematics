@@ -76,6 +76,81 @@ SELECT imei, last_seen FROM device ORDER BY last_seen DESC LIMIT 3;
 "
 ```
 
+## Valhalla — build de teselas Europa (primera vez y re-builds)
+
+> ⚠️ Operación puntual, **fuera de hora punta**. Requiere ~110 GB libres en disco durante el build;
+> el pico se reduce a ~80 GB tras borrar el `.pbf`.
+
+### Prerrequisito: espacio en disco
+
+```bash
+df -h /
+# Necesario: ≥ 110 GB libres antes de arrancar
+```
+
+### Paso 1: arrancar solo Valhalla y seguir los logs
+
+```bash
+cd /opt/cmg-telematic1
+docker compose up -d valhalla
+docker compose logs -f valhalla
+```
+
+> **Nota — primer arranque únicamente:** `docker compose up -d valhalla` funciona correctamente
+> solo en el **primer** inicio de este servicio (contenedor nuevo). Si más adelante hay que
+> recrearlo tras un cambio de configuración, `up -d` puede fallar con el error conocido
+> `KeyError: ContainerConfig` de docker-compose v1.29.2 (ver §DEPLOY del CLAUDE.md).
+> En ese caso usar el patrón de swap con `docker run` o, si solo es un reinicio sin recreación,
+> `docker compose restart valhalla`.
+
+> **Nota — volumen de teselas vacío:** con un volumen `valhalla_tiles` recién creado, el
+> contenedor arranca pero **no sirve rutas** hasta que el build de teselas (este Paso 1) termine
+> completamente. Una petición de ruta antes de ver `Running tile service` en los logs devolverá
+> un error; esto es esperado y no indica un problema de configuración.
+
+El contenedor descargará `europe-latest.osm.pbf` (~28 GB) y construirá las teselas de ruta.
+El proceso completo tarda entre 1 y 3 horas. Esperar la línea `Running tile service` en los logs.
+
+### Paso 2: borrar el `.pbf` tras generar teselas (recuperar disco)
+
+Una vez que Valhalla sirve peticiones, el `.pbf` ya no es necesario:
+
+```bash
+docker compose exec valhalla sh -c 'rm -f /custom_files/*.osm.pbf'
+df -h /
+# Resultado esperado: ~80 GB ocupados por el volumen, margen recuperado
+```
+
+### Paso 3: verificar que responde en la red interna
+
+```bash
+docker compose exec core-api python -c "
+import httpx
+print(httpx.post(
+    'http://valhalla:8002/route',
+    json={
+        'locations': [{'lat': 39.47, 'lon': -0.38}, {'lat': 41.39, 'lon': 2.17}],
+        'costing': 'auto'
+    }
+).json()['trip']['summary'])
+"
+# Esperado: dict con 'length' (km) y 'time' (s) > 0 (ruta Valencia → Barcelona)
+```
+
+### Re-build futuro (actualizar teselas)
+
+Para actualizar la cartografía (p.ej. nuevas carreteras), basta con cambiar `tile_urls`
+en `docker-compose.yml` apuntando a un `.pbf` más reciente y reiniciar el servicio:
+
+```bash
+# Editar docker-compose.yml: tile_urls=<nueva_url>
+# Borrar teselas antiguas del volumen
+docker compose exec valhalla sh -c 'rm -rf /custom_files/*'
+docker compose restart valhalla
+docker compose logs -f valhalla
+# Esperar 'Running tile service', luego borrar el .pbf (Paso 2)
+```
+
 ## Lección importante
 
 **git push NO despliega.** Solo actualiza GitHub. El deploy requiere
