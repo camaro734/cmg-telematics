@@ -150,6 +150,9 @@ async def detect_and_store_cycles(
     aggregate_fields: list[str] = definition.aggregate_fields or []
     is_pulse = trigger_type == "sensor_pulse"
 
+    # Paradas candidatas para asociar la intervención por geofence al cerrar.
+    stops = await _fetch_active_stops(db, tenant_id, vehicle_id)
+
     for g in groups:
         group_rows = g["rows"]
         if not group_rows:
@@ -163,6 +166,10 @@ async def detect_and_store_cycles(
             None if is_pulse
             else int((end_row["recorded_at"] - started_at).total_seconds())
         )
+        # Asociación OT por geofence (auto/pending/sin_asignar) según la ubicación de inicio.
+        assignment_status, work_order_id, work_order_stop_id = _classify_assignment(
+            start_row.get("lat"), start_row.get("lon"), stops
+        )
         db.add(WorkCycle(
             vehicle_id=vehicle_id,
             definition_id=definition.id,
@@ -173,10 +180,64 @@ async def detect_and_store_cycles(
             cycle_data=cycle_data,
             lat=start_row.get("lat"),
             lon=start_row.get("lon"),
+            work_order_id=work_order_id,
+            work_order_stop_id=work_order_stop_id,
+            assignment_status=assignment_status,
         ))
 
     await db.commit()
     return len(groups)
+
+
+async def _fetch_active_stops(
+    db: AsyncSession, tenant_id: uuid.UUID, vehicle_id: uuid.UUID
+) -> list[dict]:
+    """Paradas (work_order_stop) candidatas para asociación por geofence.
+
+    Sólo paradas activas (no ``done``/``skipped``) con coordenadas, de OTs del mismo
+    tenant y vehículo. Reutiliza el criterio de radio (``arrival_radius_m``) del
+    geofence de stop_autoclose.
+    """
+    result = await db.execute(
+        text("""
+            SELECT wos.id, wos.work_order_id, wos.lat, wos.lon, wos.arrival_radius_m
+            FROM work_order_stop wos
+            JOIN work_order wo ON wo.id = wos.work_order_id
+            WHERE wo.tenant_id = :tid
+              AND wo.vehicle_id = :vid
+              AND wos.status NOT IN ('done', 'skipped')
+              AND wos.lat IS NOT NULL AND wos.lon IS NOT NULL
+        """),
+        {"tid": str(tenant_id), "vid": str(vehicle_id)},
+    )
+    return [dict(row._mapping) for row in result]
+
+
+def _classify_assignment(
+    lat, lon, stops: list[dict]
+) -> tuple[str, uuid.UUID | None, uuid.UUID | None]:
+    """Resuelve la asociación de una intervención a una parada de OT por geofence.
+
+    - Dentro del radio de **una** parada → ``('auto', work_order_id, stop_id)``.
+    - Dentro de **varias** paradas candidatas → ``('pending', None, None)`` (no se adivina).
+    - **Ninguna** → ``('sin_asignar', None, None)``.
+    """
+    if lat is None or lon is None:
+        return ("sin_asignar", None, None)
+    clat, clon = float(lat), float(lon)
+    matches: list[dict] = []
+    for s in stops:
+        slat, slon = s.get("lat"), s.get("lon")
+        if slat is None or slon is None:
+            continue
+        radius = float(s.get("arrival_radius_m") or 150)
+        if haversine_m(clat, clon, float(slat), float(slon)) <= radius:
+            matches.append(s)
+    if len(matches) == 1:
+        return ("auto", matches[0]["work_order_id"], matches[0]["id"])
+    if len(matches) > 1:
+        return ("pending", None, None)
+    return ("sin_asignar", None, None)
 
 
 async def _query_telemetry(
