@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useWsConnected } from '../../lib/useWsConnected'
-import type { GeoResult, DestinationOut } from '../../lib/types'
+import type { GeoResult, DestinationOut, RouteInfo } from '../../lib/types'
 
 /**
  * Búsqueda geocodificada de una dirección. Se modela como mutation porque
@@ -12,6 +12,20 @@ export function useGeocode() {
   return useMutation({
     mutationFn: (q: string) =>
       apiClient.get<GeoResult[]>(`/api/v1/geocode?q=${encodeURIComponent(q)}&limit=5`),
+  })
+}
+
+/**
+ * Previsualización de ruta entre dos puntos (vehículo → destino candidato).
+ * Mutation porque se dispara al seleccionar un destino, no en cada render.
+ * Origen = posición actual del vehículo seleccionado.
+ */
+export function useRoutePreview() {
+  return useMutation({
+    mutationFn: (p: { fromLat: number; fromLon: number; toLat: number; toLon: number }) =>
+      apiClient.get<RouteInfo>(
+        `/api/v1/route?from_lat=${p.fromLat}&from_lon=${p.fromLon}&to_lat=${p.toLat}&to_lon=${p.toLon}`,
+      ),
   })
 }
 

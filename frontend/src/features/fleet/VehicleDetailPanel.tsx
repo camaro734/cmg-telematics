@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { useVehicleLive } from '../../lib/useVehicleLive'
-import type { VehicleTypeOut, SensorDef, GeoResult, DestinationOut } from '../../lib/types'
+import type { VehicleTypeOut, SensorDef, GeoResult, DestinationOut, RouteInfo } from '../../lib/types'
 import { sensorDisplayValue } from './popupHtml'
 import { useSetDestination, useCancelDestination } from './useDestination'
 
@@ -12,6 +12,7 @@ interface VehicleDetailPanelProps {
   vehicleType?: VehicleTypeOut
   // Props de destino — inyectadas desde FleetDashboard
   pendingDest?: GeoResult | null
+  previewRoute?: RouteInfo | null
   activeDest?: DestinationOut | null
   onDestSent?: () => void
   onDestCancelled?: () => void
@@ -39,7 +40,7 @@ function KpiRow({ label, value, unit }: { label: string; value: React.ReactNode;
   )
 }
 
-export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType, pendingDest, activeDest, onDestSent, onDestCancelled, onClose }: VehicleDetailPanelProps) {
+export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType, pendingDest, previewRoute, activeDest, onDestSent, onDestCancelled, onClose }: VehicleDetailPanelProps) {
   const navigate = useNavigate()
 
   const { data: status } = useVehicleLive(vehicleId)
@@ -177,6 +178,12 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
                 </button>
                 {setDest.isError && (
                   <span style={{ color: 'var(--accent-crit)', fontSize: 12 }}>Error al enviar destino</span>
+                )}
+                {/* ETA previsualizado vehículo→candidato (antes de confirmar el destino) */}
+                {previewRoute && (
+                  <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 6, textAlign: 'center' }}>
+                    {(previewRoute.distance_m / 1000).toFixed(1)} km · {fmtEta(previewRoute.duration_s)}
+                  </div>
                 )}
               </>
             )}

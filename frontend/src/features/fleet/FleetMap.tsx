@@ -229,7 +229,11 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
       routeLineRef.current = L.polyline(routeGeometry, {
         color: teal, weight: 4, opacity: 0.85,
       }).addTo(map)
+      // Encuadra la ruta completa (origen vehículo + destino)
       map.fitBounds(routeLineRef.current.getBounds(), { padding: [60, 60] })
+    } else if (destination) {
+      // Sin ruta aún: centra el mapa sobre el destino para que el marcador sea visible
+      map.flyTo([destination.lat, destination.lon], 14, { duration: 0.8 })
     }
     // Limpieza al desmontar o al cambiar destination/routeGeometry
     return () => {

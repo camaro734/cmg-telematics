@@ -9,13 +9,13 @@ import { keys } from '../../lib/queryKeys'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { useWsConnected } from '../../lib/useWsConnected'
-import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, VehicleStatus, RuleOut, WorkOrderOut, TenantOut, GeoResult } from '../../lib/types'
+import type { VehicleOut, VehicleTypeOut, AlertInstanceOut, VehicleStatus, RuleOut, WorkOrderOut, TenantOut, GeoResult, RouteInfo } from '../../lib/types'
 import { SkeletonRow } from '../../shared/ui/SkeletonCard'
 import { VehicleListPanel, type VehicleEntry } from './VehicleListPanel'
 import { VehicleDetailPanel } from './VehicleDetailPanel'
 import { Input } from '../../shared/ui/Input'
 import { isOnline, isOutOfService } from '../../lib/staleStatus'
-import { useGeocode, useVehicleDestination } from './useDestination'
+import { useGeocode, useRoutePreview, useVehicleDestination } from './useDestination'
 import { useToast } from '../../shared/ui/Toast'
 
 type VehicleState = 'moving' | 'idle' | 'parked' | 'offline' | 'alert' | 'out_of_service'
@@ -137,7 +137,10 @@ export default function FleetDashboard() {
   const [geoQuery, setGeoQuery] = useState('')
   const [geoResults, setGeoResults] = useState<GeoResult[]>([])
   const [pendingDest, setPendingDest] = useState<GeoResult | null>(null)
+  // Ruta previsualizada vehículo→candidato (antes de "Enviar destino")
+  const [previewRoute, setPreviewRoute] = useState<RouteInfo | null>(null)
   const geocode = useGeocode()
+  const routePreview = useRoutePreview()
   const geoInputRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
 
@@ -151,7 +154,10 @@ export default function FleetDashboard() {
     : activeDest
       ? { lat: activeDest.lat, lon: activeDest.lon, label: activeDest.label }
       : null
-  const mapRoute = pendingDest ? null : (activeDest?.route?.geometry ?? null)
+  // Para el candidato pintamos la ruta previsualizada; para el activo, la del backend
+  const mapRoute = pendingDest
+    ? (previewRoute?.geometry ?? null)
+    : (activeDest?.route?.geometry ?? null)
 
   async function handleGeoSearch() {
     const q = geoInputRef.current?.value.trim() ?? ''
@@ -165,15 +171,35 @@ export default function FleetDashboard() {
     }
   }
 
-  function handleGeoSelect(r: GeoResult) {
+  async function handleGeoSelect(r: GeoResult) {
     setPendingDest(r)
     setGeoResults([])
     setGeoQuery(r.label)
+    setPreviewRoute(null)
+    // Sin vehículo seleccionado no hay origen: marcamos el destino pero no trazamos ruta
+    if (!selectedVehicleId) {
+      toast.warning('Selecciona un vehículo para trazar la ruta hasta el destino')
+      return
+    }
+    const origin = statuses.get(selectedVehicleId)
+    if (origin?.lat == null || origin?.lon == null) {
+      toast.warning('El vehículo seleccionado no tiene posición conocida')
+      return
+    }
+    try {
+      const route = await routePreview.mutateAsync({
+        fromLat: origin.lat, fromLon: origin.lon, toLat: r.lat, toLon: r.lon,
+      })
+      setPreviewRoute(route)
+    } catch {
+      toast.error('No se pudo calcular la ruta hasta el destino')
+    }
   }
 
   // Al cambiar de vehículo, limpiar el destino pendiente de búsqueda
   function handlePanelSelectWithDestClear(id: string) {
     setPendingDest(null)
+    setPreviewRoute(null)
     setGeoResults([])
     setGeoQuery('')
     handlePanelSelect(id)
@@ -382,9 +408,10 @@ export default function FleetDashboard() {
         vehicleName={selectedVehicleId ? vehicleById.get(selectedVehicleId)?.name : undefined}
         vehicleType={selectedVehicleId ? vehicleTypesById.get(vehicleById.get(selectedVehicleId)?.vehicle_type_id ?? '') : undefined}
         pendingDest={pendingDest}
+        previewRoute={previewRoute}
         activeDest={activeDest}
-        onDestSent={() => { setPendingDest(null); setGeoQuery('') }}
-        onDestCancelled={() => { setPendingDest(null); setGeoQuery('') }}
+        onDestSent={() => { setPendingDest(null); setPreviewRoute(null); setGeoQuery('') }}
+        onDestCancelled={() => { setPendingDest(null); setPreviewRoute(null); setGeoQuery('') }}
         onClose={handlePanelClose}
       />
     </div>
