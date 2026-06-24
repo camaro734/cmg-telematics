@@ -13,6 +13,7 @@ from sqlalchemy import select, text
 
 from app.models.work_cycle import WorkCycleDefinition, WorkCycle
 from app.models.vehicle_type import VehicleType
+from app.services.geo import haversine_m
 from app.services.sensor_transform import apply_transform
 
 
@@ -111,18 +112,32 @@ async def detect_and_store_cycles(
     )
     schema_by_key = _build_schema_index(sensor_schema)
 
+    # Configuración v2 de la regla de intervención (migración 062).
+    merge_window = int(definition.merge_window_seconds or 300)
+    safety_radius = int(definition.safety_radius_m or 150)
+    is_end = _make_end_predicate(
+        definition.end_trigger_type, definition.end_trigger_config or {}, schema_by_key
+    )
+
     if trigger_type == "pto_change":
         rows = await _query_telemetry(db, vehicle_id, from_dt, to_dt, extra_cols=["pto_active"])
-        groups = _group_boolean_periods(rows, "pto_active", True)
+        groups = _group_with_merge(
+            rows, _make_bool_col_predicate("pto_active"), merge_window, safety_radius, is_end
+        )
     elif trigger_type == "ignition_period":
         rows = await _query_telemetry(db, vehicle_id, from_dt, to_dt, extra_cols=["ignition"])
-        groups = _group_boolean_periods(rows, "ignition", True)
+        groups = _group_with_merge(
+            rows, _make_bool_col_predicate("ignition"), merge_window, safety_radius, is_end
+        )
     elif trigger_type == "threshold_exceeded":
         sensor = config.get("sensor", "")
         threshold = float(config.get("threshold", 0))
         operator = config.get("op", ">")
         rows = await _query_telemetry(db, vehicle_id, from_dt, to_dt, extra_cols=[])
-        groups = _group_threshold_periods(rows, sensor, threshold, operator, schema_by_key)
+        groups = _group_with_merge(
+            rows, _make_threshold_predicate(sensor, threshold, operator, schema_by_key),
+            merge_window, safety_radius, is_end,
+        )
     elif trigger_type == "sensor_pulse":
         sensor = config.get("sensor", "")
         min_gap = int(config.get("min_gap_seconds", 30))
@@ -186,45 +201,124 @@ async def _query_telemetry(
     return [dict(row._mapping) for row in result]
 
 
-def _group_boolean_periods(rows: list[dict], col: str, active_value: bool) -> list[dict]:
-    cycles: list[dict] = []
-    current: list[dict] = []
-    for row in rows:
-        if row.get(col) == active_value:
-            current.append(row)
-        else:
-            if current:
-                cycles.append({"rows": current})
-                current = []
-    if current:
-        cycles.append({"rows": current})
-    return cycles
+# Operadores de comparación soportados por triggers de umbral (inicio y fin).
+_OPS = {
+    ">":  lambda a, b: a > b,
+    ">=": lambda a, b: a >= b,
+    "<":  lambda a, b: a < b,
+    "<=": lambda a, b: a <= b,
+    "==": lambda a, b: a == b,
+}
 
 
-def _group_threshold_periods(
-    rows: list[dict], sensor: str, threshold: float, op: str, schema_by_key: dict[str, dict]
-) -> list[dict]:
-    def matches(row: dict) -> bool:
+def _row_latlon(row: dict) -> tuple[float, float] | None:
+    """Extrae (lat, lon) como floats; None si falta alguno o no es numérico."""
+    lat, lon = row.get("lat"), row.get("lon")
+    if lat is None or lon is None:
+        return None
+    try:
+        return (float(lat), float(lon))
+    except (TypeError, ValueError):
+        return None
+
+
+def _make_bool_col_predicate(col: str):
+    """Predicado para columnas booleanas nativas (pto_active, ignition)."""
+    return lambda row: row.get(col) is True
+
+
+def _make_threshold_predicate(sensor: str, threshold: float, op: str, schema_by_key: dict[str, dict]):
+    """Predicado de umbral sobre una señal resuelta por key del sensor_schema."""
+    cmp = _OPS.get(op, _OPS["=="])
+
+    def pred(row: dict) -> bool:
         v = _resolve_field_value(sensor, row.get("can_data"), row, schema_by_key)
-        if v is None:
-            return False
-        if op == ">":   return v > threshold
-        if op == ">=":  return v >= threshold
-        if op == "<":   return v < threshold
-        if op == "<=":  return v <= threshold
-        return v == threshold
+        return v is not None and cmp(v, threshold)
 
+    return pred
+
+
+def _make_end_predicate(end_trigger_type: str | None, end_config: dict, schema_by_key: dict[str, dict]):
+    """Construye el predicado de fin configurable, o None si el fin es implícito.
+
+    El editor (WorkCycleDefsSection) sólo produce ``end_trigger_type='threshold_exceeded'``
+    con ``end_trigger_config={sensor, op, value}`` (umbral bajo la clave ``value``).
+    """
+    if not end_trigger_type:
+        return None
+    if end_trigger_type == "threshold_exceeded":
+        sensor = end_config.get("sensor", "")
+        # El fin guarda el umbral bajo "value"; se acepta "threshold" como alias defensivo.
+        value = float(end_config.get("value", end_config.get("threshold", 0)))
+        op = end_config.get("op", "<")
+        return _make_threshold_predicate(sensor, value, op, schema_by_key)
+    return None
+
+
+def _group_with_merge(
+    rows: list[dict],
+    is_active,
+    merge_window_seconds: int,
+    safety_radius_m: int,
+    is_end=None,
+) -> list[dict]:
+    """Agrupa filas en intervenciones aplicando ventana de fusión y radio de seguridad.
+
+    - **Inicio:** la primera fila con ``is_active`` abre la intervención.
+    - **Fin explícito** (``is_end`` no es None): cierra en la primera fila con
+      ``is_end`` True (inclusive); la inactividad del inicio NO cierra.
+    - **Fin implícito** (``is_end`` None): si el inicio se apaga pero vuelve dentro de
+      ``merge_window_seconds`` Y el vehículo sigue dentro de ``safety_radius_m`` del
+      punto de inicio → misma intervención (se puentea el hueco). Si la ventana expira
+      O el vehículo sale del radio → cierra (fin = última fila activa).
+    """
     cycles: list[dict] = []
-    current: list[dict] = []
+    current: list[dict] = []   # filas confirmadas (activas + huecos ya puenteados)
+    pending: list[dict] = []   # filas de hueco tentativas (aún sin confirmar)
+    anchor: tuple[float, float] | None = None
+
+    def _close() -> None:
+        nonlocal current, pending, anchor
+        if current:
+            cycles.append({"rows": current})
+        current, pending, anchor = [], [], None
+
     for row in rows:
-        if matches(row):
+        if not current:
+            if is_active(row):
+                current = [row]
+                pending = []
+                anchor = _row_latlon(row)
+            continue
+
+        # Fin explícito: el disparador de fin manda; acumula hasta que se cumple.
+        if is_end is not None:
             current.append(row)
+            if is_end(row):
+                _close()
+            continue
+
+        # Fin implícito: inicio activo → continúa (puenteando hueco previo si lo hay).
+        if is_active(row):
+            if pending:
+                current.extend(pending)
+                pending = []
+            current.append(row)
+            continue
+
+        # Inicio inactivo → hueco: ¿puentear (ventana+radio) o cerrar?
+        gap_s = (row["recorded_at"] - current[-1]["recorded_at"]).total_seconds()
+        ll = _row_latlon(row)
+        left_radius = (
+            anchor is not None and ll is not None
+            and haversine_m(anchor[0], anchor[1], ll[0], ll[1]) > safety_radius_m
+        )
+        if left_radius or gap_s > merge_window_seconds:
+            _close()
         else:
-            if current:
-                cycles.append({"rows": current})
-                current = []
-    if current:
-        cycles.append({"rows": current})
+            pending.append(row)
+
+    _close()
     return cycles
 
 
