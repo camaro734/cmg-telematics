@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, Integer, Numeric
+from sqlalchemy import String, ForeignKey, DateTime, Boolean, Integer, Numeric, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -26,6 +26,14 @@ class WorkCycleDefinition(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
     )
+    # Configuración de la regla de intervención (aditivo, migración 062).
+    # end_trigger_type NULL = fin implícito (cuando el disparador de inicio deja de cumplirse).
+    end_trigger_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    end_trigger_config: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"),
+    )
+    merge_window_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300, server_default="300")
+    safety_radius_m: Mapped[int] = mapped_column(Integer, nullable=False, default=150, server_default="150")
 
     cycles = relationship("WorkCycle", back_populates="definition", cascade="all, delete-orphan")
 
@@ -49,5 +57,15 @@ class WorkCycle(Base):
     cycle_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     lat: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
     lon: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    # Asociación opcional a OT/parada + estado de asignación (aditivo, migración 062).
+    work_order_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("work_order.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    work_order_stop_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("work_order_stop.id", ondelete="SET NULL"), nullable=True,
+    )
+    assignment_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="sin_asignar", server_default="sin_asignar",
+    )
 
     definition = relationship("WorkCycleDefinition", back_populates="cycles")
