@@ -74,8 +74,8 @@ Logo: `backend/static/logos/cmgtrack.png` (668×187). Topbar: 62px (`--topbar-h`
 | timescaledb | ✅ PostgreSQL + TimescaleDB |
 | redis | ✅ |
 
-### Migraciones Alembic: 001→061 aplicadas (producción)
-Última: `061` — tabla `vehicle_destination` (rutas+ETA/Valhalla). Cadena lineal 001→061, head único.
+### Migraciones Alembic: 001→062 aplicadas (producción)
+Última: `062` — esqueleto intervención (fin/ventana/radio en work_cycle_definition, OT opcional en work_cycle). Cadena lineal 001→062, head único.
 
 ### Páginas frontend implementadas
 `/fleet` `/vehicles` `/tipos-vehiculo` `/vehicles/:id` `/alerts` `/reports` `/devices`
