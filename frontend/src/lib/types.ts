@@ -172,6 +172,8 @@ export interface SensorDef {
   visible_in_detail?: boolean
   show_in_popup?: boolean
   show_in_fleet_panel?: boolean   // mostrar en panel lateral de flota
+  is_report?: boolean             // incluir esta señal en el reporte
+  report_aggregate?: 'max' | 'min' | 'avg' | 'last'  // agregado del reporte (default last)
   transform?: SensorTransform
   icon?: SensorIcon
   color?: string

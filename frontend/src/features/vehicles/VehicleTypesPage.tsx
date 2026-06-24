@@ -38,6 +38,8 @@ type SensorFormState = {
   visible_in_detail: boolean
   show_in_popup: boolean
   show_in_fleet_panel: boolean
+  is_report: boolean
+  report_aggregate: 'max' | 'min' | 'avg' | 'last'
 }
 const emptySensorForm: SensorFormState = {
   avl_id: '', key: '', label: '', unit: '', mode: 'byte', gauge_type: 'numeric',
@@ -48,6 +50,8 @@ const emptySensorForm: SensorFormState = {
   visible_in_detail: true,
   show_in_popup: false,
   show_in_fleet_panel: false,
+  is_report: false,
+  report_aggregate: 'last',
 }
 
 function sensorDefToForm(def: SensorDef): SensorFormState {
@@ -81,6 +85,8 @@ function sensorDefToForm(def: SensorDef): SensorFormState {
     visible_in_detail: def.visible_in_detail !== false,
     show_in_popup: def.show_in_popup === true,
     show_in_fleet_panel: def.show_in_fleet_panel === true,
+    is_report: def.is_report === true,
+    report_aggregate: def.report_aggregate ?? 'last',
   }
 }
 
@@ -124,6 +130,8 @@ function formToSensorDef(f: SensorFormState): SensorDef {
   def.visible_in_detail = f.visible_in_detail
   def.show_in_popup = f.show_in_popup
   def.show_in_fleet_panel = f.show_in_fleet_panel
+  def.is_report = f.is_report
+  if (f.is_report) def.report_aggregate = f.report_aggregate
   return def
 }
 
@@ -933,6 +941,37 @@ export default function VehicleTypesPage() {
                   En panel lateral de Flota
                 </label>
               </div>
+            </div>
+
+            {/* Reporte: marca la señal para incluirla en el reporte y con qué agregado */}
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="checkbox"
+                  id="sensor-report"
+                  checked={sensorForm.is_report}
+                  onChange={e => setSensorForm(f => ({ ...f, is_report: e.target.checked }))}
+                />
+                <label htmlFor="sensor-report" style={{ fontSize: 13, color: 'var(--fg-primary)', cursor: 'pointer' }}>
+                  Sale en reporte
+                </label>
+              </div>
+              {sensorForm.is_report && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label htmlFor="sensor-report-agg" style={{ fontSize: 13, color: 'var(--fg-muted)' }}>Agregado</label>
+                  <select
+                    id="sensor-report-agg"
+                    value={sensorForm.report_aggregate}
+                    onChange={e => setSensorForm(f => ({ ...f, report_aggregate: e.target.value as SensorFormState['report_aggregate'] }))}
+                    style={{ background: 'var(--bg-elevated)', color: 'var(--fg-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px', fontSize: 13 }}
+                  >
+                    <option value="max">Máximo</option>
+                    <option value="min">Mínimo</option>
+                    <option value="avg">Media</option>
+                    <option value="last">Último</option>
+                  </select>
+                </div>
+              )}
             </div>
             {sensorError && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{sensorError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

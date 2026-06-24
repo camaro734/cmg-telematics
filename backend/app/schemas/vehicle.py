@@ -265,19 +265,26 @@ class VehicleTypeSensorSchemaUpdate(BaseModel):
     @field_validator('sensor_schema')
     @classmethod
     def _validate_transforms(cls, sensors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Si un sensor trae `transform`, valida su forma (tolerante con el resto)."""
+        """Valida `transform`, `is_report` y `report_aggregate` si vienen (tolerante
+        con el resto: las entradas sin estos campos son válidas, retrocompatible)."""
         for sensor in sensors:
             transform = sensor.get('transform')
-            if transform is None:
-                continue
-            if not isinstance(transform, dict):
-                raise ValueError("transform debe ser un objeto")
-            if transform.get('type') == 'linear_range':
-                SensorLinearRange.model_validate(transform)
-            elif transform.get('type') == 'minutes_to_hours':
-                pass  # sin parámetros adicionales
-            else:
-                raise ValueError(f"transform.type no soportado: {transform.get('type')!r}")
+            if transform is not None:
+                if not isinstance(transform, dict):
+                    raise ValueError("transform debe ser un objeto")
+                if transform.get('type') == 'linear_range':
+                    SensorLinearRange.model_validate(transform)
+                elif transform.get('type') == 'minutes_to_hours':
+                    pass  # sin parámetros adicionales
+                else:
+                    raise ValueError(f"transform.type no soportado: {transform.get('type')!r}")
+
+            is_report = sensor.get('is_report')
+            if is_report is not None and not isinstance(is_report, bool):
+                raise ValueError("is_report debe ser booleano")
+            agg = sensor.get('report_aggregate')
+            if agg is not None and agg not in ('max', 'min', 'avg', 'last'):
+                raise ValueError(f"report_aggregate no soportado: {agg!r}")
         return sensors
 
 
