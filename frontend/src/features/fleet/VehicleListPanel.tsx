@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { Sparkline } from '../../shared/ui/Sparkline'
 import { Chip } from '../../shared/ui/Chip'
 import { Input } from '../../shared/ui/Input'
@@ -28,9 +28,11 @@ interface VehicleListPanelProps {
   vehicles: VehicleEntry[]
   selectedId: string | null
   onSelect: (id: string) => void
+  /** Contenido fijo en la parte superior del panel (p.ej. buscador de ubicación). */
+  topSlot?: ReactNode
 }
 
-export function VehicleListPanel({ vehicles, selectedId, onSelect }: VehicleListPanelProps) {
+export function VehicleListPanel({ vehicles, selectedId, onSelect, topSlot }: VehicleListPanelProps) {
   const [open, setOpen] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
@@ -93,6 +95,11 @@ export function VehicleListPanel({ vehicles, selectedId, onSelect }: VehicleList
       borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
     }}>
+      {topSlot && (
+        <div style={{ padding: '12px 12px 0', flexShrink: 0 }}>
+          {topSlot}
+        </div>
+      )}
       <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border-soft)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>Vehículos</span>

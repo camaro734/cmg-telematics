@@ -67,6 +67,12 @@ export function useCancelDestination(vehicleId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => apiClient.delete<void>(`/api/v1/vehicles/${vehicleId}/destination`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.vehicleDestination(vehicleId) }),
+    // Tras cancelar, el GET del destino devuelve 404 (sin destino activo), lo
+    // que deja la query en estado error SIN limpiar su `data` previo: React
+    // Query conserva el último valor exitoso ante un error, por lo que
+    // `activeDest` seguiría poblado hasta un refresco manual. Eliminamos la
+    // entrada de caché para que `activeDest` pase a null y la UI se actualice
+    // al instante.
+    onSuccess: () => qc.removeQueries({ queryKey: keys.vehicleDestination(vehicleId) }),
   })
 }

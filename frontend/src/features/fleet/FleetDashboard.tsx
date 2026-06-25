@@ -337,68 +337,65 @@ export default function FleetDashboard() {
         />
       </div>
 
-      {/* Caja de búsqueda de ubicación — flotante sobre el mapa */}
-      <div style={{
-        position: 'absolute', top: 12, left: 'calc(280px + 24px)', zIndex: 1000, width: 300,
-        pointerEvents: 'auto',
-      }}>
-        <div style={{ position: 'relative' }}>
-          <input
-            ref={geoInputRef}
-            value={geoQuery}
-            onChange={e => setGeoQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleGeoSearch() }}
-            placeholder="Buscar ubicación…"
-            style={{
-              width: '100%', padding: '8px 38px 8px 12px', borderRadius: 8, boxSizing: 'border-box',
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              color: 'var(--fg-primary)', fontSize: 13, fontFamily: 'var(--font-ui)',
-              outline: 'none',
-            }}
-          />
-          <button
-            onClick={handleGeoSearch}
-            disabled={geocode.isPending}
-            style={{
-              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--cmg-teal)', fontSize: 16, padding: 2, lineHeight: 1,
-            }}
-          >
-            {geocode.isPending ? '…' : '🔍'}
-          </button>
-        </div>
-        {/* Resultados del geocoder */}
-        {geoResults.length > 0 && (
-          <div style={{
-            marginTop: 4, borderRadius: 8, overflow: 'hidden',
-            border: '1px solid var(--border)', background: 'var(--bg-elevated)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          }}>
-            {geoResults.map((r, i) => (
-              <button
-                key={`${r.lat},${r.lon}-${r.label}`}
-                onClick={() => handleGeoSelect(r)}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 12px', background: 'none',
-                  border: 'none', borderBottom: i < geoResults.length - 1 ? '1px solid var(--border)' : 'none',
-                  color: 'var(--fg-primary)', fontSize: 12, cursor: 'pointer',
-                  fontFamily: 'var(--font-ui)',
-                }}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Panel izquierdo — lista de vehículos */}
+      {/* Panel izquierdo — buscador de ubicación (arriba) + lista de vehículos */}
       <VehicleListPanel
         vehicles={vehicleEntries}
         selectedId={selectedVehicleId}
         onSelect={handlePanelSelectWithDestClear}
+        topSlot={
+          <div>
+            <div style={{ position: 'relative' }}>
+              <input
+                ref={geoInputRef}
+                value={geoQuery}
+                onChange={e => setGeoQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleGeoSearch() }}
+                placeholder="Buscar ubicación…"
+                style={{
+                  width: '100%', padding: '8px 38px 8px 12px', borderRadius: 8, boxSizing: 'border-box',
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  color: 'var(--fg-primary)', fontSize: 13, fontFamily: 'var(--font-ui)',
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={handleGeoSearch}
+                disabled={geocode.isPending}
+                style={{
+                  position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--cmg-teal)', fontSize: 16, padding: 2, lineHeight: 1,
+                }}
+              >
+                {geocode.isPending ? '…' : '🔍'}
+              </button>
+            </div>
+            {/* Resultados del geocoder */}
+            {geoResults.length > 0 && (
+              <div style={{
+                marginTop: 4, borderRadius: 8, overflow: 'hidden',
+                border: '1px solid var(--border)', background: 'var(--bg-elevated)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              }}>
+                {geoResults.map((r, i) => (
+                  <button
+                    key={`${r.lat},${r.lon}-${r.label}`}
+                    onClick={() => handleGeoSelect(r)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '8px 12px', background: 'none',
+                      border: 'none', borderBottom: i < geoResults.length - 1 ? '1px solid var(--border)' : 'none',
+                      color: 'var(--fg-primary)', fontSize: 12, cursor: 'pointer',
+                      fontFamily: 'var(--font-ui)',
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        }
       />
 
       {/* Panel derecho — detalle del vehículo seleccionado */}
