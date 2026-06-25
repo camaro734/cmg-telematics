@@ -205,15 +205,22 @@ export interface HistoricMetricItem {
   group?: string | null
 }
 
+// Claves "de parada": columnas fijas que agrega el rules-engine en work_order_stop.
 export type PdfMetricKey =
   | 'pto_minutes' | 'pressure_min' | 'pressure_max' | 'rpm_avg' | 'pump_minutes' | 'fuel_l'
 export type PdfMetricFormat = 'integer' | 'decimal1' | 'decimal2'
+export type PdfMetricSource = 'stop' | 'sensor'
+export type PdfMetricAggregate = 'max' | 'min' | 'avg' | 'last'
 
 export interface PdfMetricItem {
-  key: PdfMetricKey
+  key: string
   label: string
   unit: string
   format: PdfMetricFormat
+  // 'stop' (default) = columna fija de work_order_stop; 'sensor' = señal del sensor_schema
+  source?: PdfMetricSource
+  // agregado para métricas de sensor (se calcula al vuelo sobre la ventana de la parada)
+  aggregate?: PdfMetricAggregate
 }
 
 export interface SystemBlock {
