@@ -21,6 +21,7 @@ from app.models.work_order_stop import WorkOrderStop
 from app.models.work_report import WorkReport
 from app.schemas.auth import CurrentUser
 from app.schemas.work_report import WorkReportCreate, WorkReportOut
+from app.services.stop_metrics import build_schema_index, compute_stop_sensor_metrics
 
 router = APIRouter(prefix="/work-orders", tags=["work-reports"])
 
@@ -394,6 +395,9 @@ async def download_pdf(
             tq = await db.execute(select(VehicleType).where(VehicleType.id == vehicle.vehicle_type_id))
             vtype = tq.scalar_one_or_none()
     pdf_metrics = (vtype.pdf_metrics if vtype else None) or []
+    # Métricas derivadas de sensores: se calculan al vuelo desde telemetry_record por parada.
+    sensor_metrics = [m for m in pdf_metrics if m.get("source") == "sensor"]
+    schema_by_key = build_schema_index(vtype.sensor_schema) if (vtype and sensor_metrics) else {}
     if vehicle:
         vehicle_label = (
             f"{vehicle.name} · {vehicle.license_plate}" if vehicle.license_plate
@@ -414,8 +418,9 @@ async def download_pdf(
         select(WorkOrderStop).where(WorkOrderStop.work_order_id == order_id)
         .order_by(WorkOrderStop.order_index)
     )
-    stops = [
-        {
+    stops = []
+    for s in stops_q.scalars().all():
+        row = {
             "address": s.address,
             "client_name": s.client_name,
             "pto_minutes": s.pto_minutes,
@@ -425,8 +430,12 @@ async def download_pdf(
             "pump_minutes": s.pump_minutes,
             "fuel_l": s.fuel_l,
         }
-        for s in stops_q.scalars().all()
-    ]
+        # Métricas de sensor: agregadas al vuelo sobre la ventana de la parada (si la hay).
+        if sensor_metrics and s.started_at and s.completed_at:
+            row.update(await compute_stop_sensor_metrics(
+                db, order.vehicle_id, s.started_at, s.completed_at, sensor_metrics, schema_by_key,
+            ))
+        stops.append(row)
 
     duration_label = (
         f"{report.work_duration_minutes // 60}h {report.work_duration_minutes % 60}min"

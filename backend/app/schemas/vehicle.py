@@ -7,16 +7,26 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.maintenance import MaintenanceTemplateItem, MaintenanceCounter
 
 
-PdfMetricKey = Literal['pto_minutes', 'pressure_min', 'pressure_max', 'rpm_avg', 'pump_minutes', 'fuel_l']
+# Métricas "de parada": columnas fijas que el rules-engine agrega en work_order_stop.
+STOP_METRIC_KEYS = frozenset({'pto_minutes', 'pressure_min', 'pressure_max', 'rpm_avg', 'pump_minutes', 'fuel_l'})
 PdfMetricFormat = Literal['integer', 'decimal1', 'decimal2']
+PdfMetricSource = Literal['stop', 'sensor']
+PdfMetricAggregate = Literal['max', 'min', 'avg', 'last']
 
 
 class PdfMetric(BaseModel):
-    """Métrica configurable que aparece en la tabla de paradas del PDF de parte de servicio."""
-    key: PdfMetricKey
+    """Métrica configurable que aparece en la tabla de paradas del PDF de parte de servicio.
+
+    ``source='stop'`` (default): una de las columnas fijas de work_order_stop (STOP_METRIC_KEYS).
+    ``source='sensor'``: una señal del sensor_schema; ``key`` es la key del sensor y ``aggregate``
+    el agregado a calcular al vuelo sobre la ventana de la parada.
+    """
+    key: str = Field(min_length=1, max_length=80)
     label: str = Field(min_length=1, max_length=60)
     unit: str = Field(min_length=1, max_length=10)
     format: PdfMetricFormat
+    source: PdfMetricSource = 'stop'
+    aggregate: PdfMetricAggregate | None = None
 
 
 class DoutSlot(BaseModel):
