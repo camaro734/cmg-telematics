@@ -100,7 +100,7 @@ export function useReportData(): UseReportDataReturn {
     if (fromState?.vehicleId) setVehicleId(fromState.vehicleId)
     if (
       fromState?.tab &&
-      ['historico', 'mantenimiento', 'rutas'].includes(fromState.tab)
+      ['historico', 'mantenimiento', 'rutas', 'partes'].includes(fromState.tab)
     ) {
       setTab(fromState.tab as Parameters<typeof setTab>[0])
     }

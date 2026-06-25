@@ -19,6 +19,7 @@ import { resolveVisibleMetrics } from '../../lib/resolveVisibleMetrics'
 import { MetricPicker } from '../../components/MetricPicker'
 import { useReportData, periodToHours, PERIOD_LABELS } from './useReportData'
 import { SelectorBar, PdfDownloadBtn } from './ReportFilters'
+import { PartesReportTab } from './PartesReportTab'
 import { Input } from '../../shared/ui/Input'
 import { Select } from '../../shared/ui/Select'
 import type { Period } from './useReportData'
@@ -1020,6 +1021,7 @@ const REPORT_TABS_CONFIG: ContextNavTab[] = [
   { key: 'historico',     label: 'Actividad',     icon: 'ti-chart-bar' },
   { key: 'mantenimiento', label: 'Intervenciones', icon: 'ti-tool' },
   { key: 'rutas',         label: 'Rutas',          icon: 'ti-route' },
+  { key: 'partes',        label: 'Partes',         icon: 'ti-clipboard-list' },
 ]
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -1083,6 +1085,7 @@ export default function ReportsPage() {
       />
     ),
     mantenimiento: null,
+    partes: periodRightSlot,
   }
 
   return (
@@ -1139,6 +1142,16 @@ export default function ReportsPage() {
           )}
           {tab === 'rutas' && (
             <RutasTab vehicleId={vehicleId} date={routeDate} />
+          )}
+          {tab === 'partes' && (
+            <PartesReportTab
+              vehicleId={vehicleId}
+              clientId={tenantId}
+              isCmg={isCmg}
+              period={period}
+              customFrom={customFrom}
+              customTo={customTo}
+            />
           )}
         </div>
       </div>

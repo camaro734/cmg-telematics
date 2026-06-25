@@ -577,6 +577,43 @@ export interface DestinationOut {
   remaining_duration_s: number | null
 }
 
+// ── Reporte de trabajos (intervenciones / work_cycle) ────────────────────────
+// Las columnas de señal son dinámicas: salen de `columnas_senal` (is_report del
+// sensor_schema). NUNCA se hardcodean en el frontend.
+export interface WorkCycleReportSignalCol {
+  key: string
+  label: string
+  unit: string | null
+}
+
+export interface WorkCycleReportRow {
+  fecha: string
+  started_at: string
+  ot: string
+  cliente: string
+  vehiculo: string
+  senales: Record<string, number | null>
+  kilometraje: number
+  direccion: string
+  duracion_s: number | null
+}
+
+export interface WorkCycleReport {
+  filtros: {
+    desde: string
+    hasta: string
+    vehicle_id: string | null
+    client_id: string | null
+  }
+  columnas_senal: WorkCycleReportSignalCol[]
+  filas: WorkCycleReportRow[]
+  totales: {
+    intervenciones: number
+    km_total: number
+    senales: Record<string, { min: number | null; max: number | null }>
+  }
+}
+
 export interface MaintenanceLogCreate {
   performed_at: string
   description?: string
