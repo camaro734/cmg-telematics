@@ -65,14 +65,26 @@ export function useSetDestination(vehicleId: string) {
  */
 export function useCancelDestination(vehicleId: string) {
   const qc = useQueryClient()
+  const key = keys.vehicleDestination(vehicleId)
   return useMutation({
     mutationFn: () => apiClient.delete<void>(`/api/v1/vehicles/${vehicleId}/destination`),
-    // Tras cancelar, el GET del destino devuelve 404 (sin destino activo), lo
-    // que deja la query en estado error SIN limpiar su `data` previo: React
-    // Query conserva el último valor exitoso ante un error, por lo que
-    // `activeDest` seguiría poblado hasta un refresco manual. Eliminamos la
-    // entrada de caché para que `activeDest` pase a null y la UI se actualice
-    // al instante.
-    onSuccess: () => qc.removeQueries({ queryKey: keys.vehicleDestination(vehicleId) }),
+    // El GET del destino incluye la ruta de Valhalla y puede tardar segundos.
+    // Si un GET disparado por el `refetchInterval` ANTES de cancelar (cuando el
+    // destino aún estaba activo) resuelve DESPUÉS de la cancelación, React Query
+    // escribiría ese resultado `active` en caché y `activeDest` reaparecería
+    // (síntoma: el botón vuelve a "Cancelar destino" y solo se limpia al
+    // refrescar). Cancelamos los fetches en vuelo para descartar su resultado.
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: key })
+    },
+    // Marcamos el destino como cancelado en caché: `activeDest` solo es truthy
+    // con status === 'active', así que pasa a null al instante sin depender de
+    // un refetch que devolvería 404. El siguiente poll dará 404 (error) y React
+    // Query conservará este valor cancelado, que tampoco reactiva la UI.
+    onSuccess: () => {
+      qc.setQueryData<DestinationOut>(key, (old) =>
+        old ? { ...old, status: 'cancelled' } : old,
+      )
+    },
   })
 }
