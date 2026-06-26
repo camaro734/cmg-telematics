@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, visible_tenant_ids, assert_tenant_visible
 from app.schemas.auth import CurrentUser
 from app.schemas.driver import DriverOut, DriverCreate, DriverUpdate, AssignDriverRequest, AssignmentOut
 from app.models.driver import Driver, VehicleDriverAssignment
@@ -13,9 +13,6 @@ from app.models.vehicle import Vehicle
 router = APIRouter(tags=["drivers"])
 
 
-def _check_tenant(user: CurrentUser, tenant_id: uuid.UUID) -> None:
-    if user.tenant_tier != "cmg" and str(tenant_id) != str(user.tenant_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No encontrado")
 
 
 @router.get("/drivers", response_model=list[DriverOut])
@@ -25,8 +22,10 @@ async def list_drivers(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Driver).where(Driver.active == True)
-    if user.tenant_tier != "cmg":
-        query = query.where(Driver.tenant_id == user.tenant_id)
+    # Jefe de flota (admin client) ve sus choferes + los de sus subclients; cmg ve todo.
+    visible = await visible_tenant_ids(user, db)
+    if visible is not None:
+        query = query.where(Driver.tenant_id.in_(visible))
     elif tenant_id is not None:
         query = query.where(Driver.tenant_id == tenant_id)
     result = await db.execute(query.order_by(Driver.full_name))
@@ -51,7 +50,7 @@ async def get_driver(
     driver = await db.get(Driver, driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Conductor no encontrado")
-    _check_tenant(user, driver.tenant_id)
+    await assert_tenant_visible(user, driver.tenant_id, db)
     item = DriverOut.model_validate(driver)
     item.current_vehicle_name = await _get_current_vehicle_name(db, driver.id)
     return item
@@ -84,7 +83,7 @@ async def update_driver(
     driver = await db.get(Driver, driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Conductor no encontrado")
-    _check_tenant(user, driver.tenant_id)
+    await assert_tenant_visible(user, driver.tenant_id, db)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(driver, field, value)
     await db.commit()
@@ -105,7 +104,7 @@ async def deactivate_driver(
     driver = await db.get(Driver, driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Conductor no encontrado")
-    _check_tenant(user, driver.tenant_id)
+    await assert_tenant_visible(user, driver.tenant_id, db)
     driver.active = False
     # Cerrar asignación activa si existe
     await _close_active_assignment(db, driver_id)
@@ -121,7 +120,7 @@ async def driver_history(
     driver = await db.get(Driver, driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Conductor no encontrado")
-    _check_tenant(user, driver.tenant_id)
+    await assert_tenant_visible(user, driver.tenant_id, db)
     result = await db.execute(
         select(VehicleDriverAssignment)
         .where(VehicleDriverAssignment.driver_id == driver_id)
@@ -142,7 +141,7 @@ async def assign_driver(
     vehicle = await db.get(Vehicle, vehicle_id)
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    _check_tenant(user, vehicle.tenant_id)
+    await assert_tenant_visible(user, vehicle.tenant_id, db)
 
     # Cerrar asignación anterior si existe
     await _close_active_assignment_for_vehicle(db, vehicle_id)
@@ -155,7 +154,7 @@ async def assign_driver(
     driver = await db.get(Driver, body.driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Conductor no encontrado")
-    _check_tenant(user, driver.tenant_id)
+    await assert_tenant_visible(user, driver.tenant_id, db)
 
     assignment = VehicleDriverAssignment(vehicle_id=vehicle_id, driver_id=body.driver_id)
     db.add(assignment)

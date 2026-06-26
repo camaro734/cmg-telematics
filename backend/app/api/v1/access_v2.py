@@ -224,6 +224,16 @@ async def assert_can_access_vehicle(
             )
         return vehicle
 
+    # Nivel 2b: jefe de flota (admin/operator del tenant client) sobre un vehículo
+    # de uno de sus subclients. Coherente con assert_can_manage_tenant: el client
+    # gestiona su subárbol. NO aplica a manufacturer (su acceso es Nivel 4 por
+    # manufacturer_tenant_id, gobernado por flags) ni a driver.
+    if user.tenant_tier in ("client", "subclient") and user.role != "driver":
+        from app.api.v1.deps import visible_tenant_ids
+        visible = await visible_tenant_ids(user, db)
+        if visible is not None and str(vehicle.tenant_id) in {str(t) for t in visible}:
+            return vehicle
+
     # Nivel 4: fabricante — acceso a vehículos que él fabricó
     if user.tenant_tier == "manufacturer":
         if vehicle.manufacturer_tenant_id != user.tenant_id:

@@ -2,6 +2,7 @@
 import uuid
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import decode_token
@@ -47,6 +48,48 @@ def require_tier(*tiers: str):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
         return user
     return checker
+
+
+async def visible_tenant_ids(user: CurrentUser, db: AsyncSession) -> list[uuid.UUID] | None:
+    """IDs de tenants visibles para `user`: el suyo + sus descendientes directos.
+
+    Política de descenso (1 nivel), coherente con `assert_can_manage_tenant`:
+      - cmg: None  → sin filtro (ve todos los tenants).
+      - client (admin del tenant cliente / "jefe de flota"): su tenant + sus
+        subclients (`parent_id == user.tenant_id`).
+      - manufacturer: su tenant + sus clients (`parent_manufacturer_id == user.tenant_id`).
+      - subclient (u otros): solo su propio tenant.
+
+    Es ADITIVO: el filtro previo era `tenant_id == user.tenant_id` (exacto), y este
+    siempre incluye ese id; solo añade descendientes. Nunca reduce la visibilidad.
+    """
+    if user.tenant_tier == "cmg":
+        return None
+    ids: list[uuid.UUID] = [user.tenant_id]
+    if user.tenant_tier == "client":
+        res = await db.execute(select(Tenant.id).where(Tenant.parent_id == user.tenant_id))
+        ids.extend(res.scalars().all())
+    elif user.tenant_tier == "manufacturer":
+        res = await db.execute(select(Tenant.id).where(Tenant.parent_manufacturer_id == user.tenant_id))
+        ids.extend(res.scalars().all())
+    return ids
+
+
+async def assert_tenant_visible(
+    user: CurrentUser,
+    target_tenant_id: uuid.UUID,
+    db: AsyncSession,
+    *,
+    status_code: int = status.HTTP_404_NOT_FOUND,
+    detail: str = "No encontrado",
+) -> None:
+    """Lanza si `target_tenant_id` no está en el subárbol visible del usuario.
+
+    cmg pasa siempre. Acceso de lectura/gestión coherente con `visible_tenant_ids`.
+    """
+    visible = await visible_tenant_ids(user, db)
+    if visible is not None and str(target_tenant_id) not in {str(t) for t in visible}:
+        raise HTTPException(status_code=status_code, detail=detail)
 
 
 async def assert_can_manage_tenant(user: CurrentUser, target_tenant_id: uuid.UUID, db) -> None:

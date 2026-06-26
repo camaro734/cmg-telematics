@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_redis, require_module
+from app.api.v1.deps import get_current_user, get_redis, require_module, visible_tenant_ids, assert_tenant_visible
 from app.api.v1.access_v2 import user_can_see_vehicle_location, strip_location
 from app.schemas.auth import CurrentUser
 from app.schemas.work_order import (
@@ -47,17 +47,20 @@ async def _driver_id_for_user(db: AsyncSession, user: CurrentUser) -> uuid.UUID 
 
 
 async def _assert_order_visible(db: AsyncSession, user: CurrentUser, order: WorkOrder) -> None:
-    """Control de acceso a una OT concreta: tenant + propiedad del chofer.
+    """Control de acceso a una OT concreta: subárbol de tenant + propiedad del chofer.
 
-    El chofer (rol `driver`) solo accede a sus propias OTs (`order.driver_id`
-    == su `driver.id`). Cualquier otra OT responde 404 (no revela existencia).
-    No cambia nada para admin/operator/viewer.
+    - El chofer (rol `driver`) solo accede a sus propias OTs (`order.driver_id`
+      == su `driver.id`); su `driver_id` ya lo confina a su tenant.
+    - El resto accede a las OTs de su subárbol de tenants (su tenant + descendientes,
+      vía `visible_tenant_ids`): así el jefe de flota ve también las de sus subclients.
+    Cualquier OT fuera de alcance responde 404 (no revela existencia).
     """
-    _check_tenant(user, order.tenant_id)
     if user.role == "driver":
         own_driver_id = await _driver_id_for_user(db, user)
         if own_driver_id is None or str(order.driver_id) != str(own_driver_id):
             raise HTTPException(status_code=404, detail="Orden no encontrada")
+        return
+    await assert_tenant_visible(user, order.tenant_id, db, detail="Orden no encontrada")
 
 
 async def _enrich(
@@ -90,18 +93,22 @@ async def list_work_orders(
     redis=Depends(get_redis),
 ):
     q = select(WorkOrder)
-    if user.tenant_tier != "cmg":
-        q = q.where(WorkOrder.tenant_id == user.tenant_id)
-    elif tenant_id is not None:
-        q = q.where(WorkOrder.tenant_id == tenant_id)
-    # Auto-restricción del chofer: solo ve sus propias OTs. Ignora el query driver_id.
+    # Auto-restricción del chofer: solo ve sus propias OTs (su driver_id ya lo
+    # confina a su tenant). Ignora el query driver_id.
     if user.role == "driver":
         own_driver_id = await _driver_id_for_user(db, user)
         if own_driver_id is None:
             return []  # chofer sin ficha vinculada → ninguna OT
         q = q.where(WorkOrder.driver_id == own_driver_id)
-    elif driver_id:
-        q = q.where(WorkOrder.driver_id == driver_id)
+    else:
+        # Jefe de flota (admin client) ve su tenant + subclients; cmg ve todo.
+        visible = await visible_tenant_ids(user, db)
+        if visible is not None:
+            q = q.where(WorkOrder.tenant_id.in_(visible))
+        elif tenant_id is not None:
+            q = q.where(WorkOrder.tenant_id == tenant_id)
+        if driver_id:
+            q = q.where(WorkOrder.driver_id == driver_id)
     if status_filter:
         q = q.where(WorkOrder.status == status_filter)
     if vehicle_id:
@@ -205,7 +212,7 @@ async def update_work_order(
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    _check_tenant(user, order.tenant_id)
+    await _assert_order_visible(db, user, order)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(order, field, value)
     await db.commit()
@@ -225,7 +232,7 @@ async def transition_status(
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    _check_tenant(user, order.tenant_id)
+    await _assert_order_visible(db, user, order)
 
     allowed = _STATUS_TRANSITIONS.get(order.status, [])
     if body.status not in allowed:
@@ -280,7 +287,7 @@ async def delete_work_order(
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    _check_tenant(user, order.tenant_id)
+    await _assert_order_visible(db, user, order)
     if order.status == "in_progress":
         raise HTTPException(status_code=400, detail="No se puede eliminar una orden en curso. Cancélala primero.")
     await db.delete(order)

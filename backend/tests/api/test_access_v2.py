@@ -153,6 +153,10 @@ def _make_db(
     db.get = AsyncMock(side_effect=_get_side_effect)
     db.scalar = AsyncMock(return_value=assignment)
     db.scalars = AsyncMock(return_value=[])
+    # visible_tenant_ids() consulta descendientes: por defecto, sin subclients.
+    _empty = MagicMock()
+    _empty.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    db.execute = AsyncMock(return_value=_empty)
     db.begin_nested = MagicMock(return_value=AsyncMock())
     db.add = MagicMock()
     db.flush = AsyncMock()
@@ -226,6 +230,20 @@ async def test_client_admin_other_tenant_returns_404():
         await assert_can_access_vehicle(CLIENT_USER, VEHICLE_ID, db)
 
     assert exc_info.value.status_code == 404
+
+
+async def test_client_admin_accesses_subclient_vehicle():
+    """Jefe de flota (admin client) accede a vehículo de su subclient → devuelve vehicle."""
+    vehicle = _make_vehicle(tenant_id=SUBCLIENT_TENANT_ID)
+    db = _make_db(vehicle=vehicle)
+    # visible_tenant_ids → [CLIENT_TENANT_ID, SUBCLIENT_TENANT_ID]
+    res = MagicMock()
+    res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[SUBCLIENT_TENANT_ID])))
+    db.execute = AsyncMock(return_value=res)
+
+    result = await assert_can_access_vehicle(CLIENT_USER, VEHICLE_ID, db)
+
+    assert result is vehicle
 
 
 # ===========================================================================

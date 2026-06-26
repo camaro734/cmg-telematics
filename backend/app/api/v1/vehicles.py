@@ -16,7 +16,7 @@ from sqlalchemy import select, text, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_redis, require_management_tier
+from app.api.v1.deps import get_current_user, get_redis, require_management_tier, visible_tenant_ids
 from app.schemas.auth import CurrentUser
 from app.schemas.vehicle import (
     VehicleTypeOut, VehicleOut, VehicleCreate, VehicleUpdate, VehicleStatus,
@@ -950,7 +950,10 @@ async def list_vehicles(
             )
         )
     else:
-        query = query.where(Vehicle.tenant_id == user.tenant_id)
+        # client / subclient: jefe de flota ve su tenant + sus subclients.
+        visible = await visible_tenant_ids(user, db)
+        query = query.where(Vehicle.tenant_id.in_(visible)) if visible is not None \
+            else query.where(Vehicle.tenant_id == user.tenant_id)
     from sqlalchemy.orm import joinedload
     result = await db.execute(query.options(joinedload(Vehicle.vehicle_type)).order_by(Vehicle.name))
     vehicles = result.unique().scalars().all()

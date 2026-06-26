@@ -146,10 +146,13 @@ def test_admin_list_not_driver_scoped():
     db = AsyncMock()
     order = _make_order(DRIVER_B)
     db.get = _smart_get(order)
-    db.execute = AsyncMock(return_value=_scalars([order]))  # solo la query de OTs
+    # execute #1: visible_tenant_ids (subclients, ninguno). execute #2: query de OTs.
+    db.execute = AsyncMock(side_effect=[_scalars([]), _scalars([order])])
     _setup(ADMIN_USER, db)
     resp = _client().get("/api/v1/work-orders")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
-    # Una sola execute: no hubo resolución de driver_id
-    assert db.execute.await_count == 1
+    # No hubo filtro por driver propio (no es chofer); sí descenso de tenants.
+    second_stmt = str(db.execute.call_args_list[1].args[0])
+    assert "work_order.driver_id =" not in second_stmt   # no auto-scope de chofer
+    assert "work_order.tenant_id IN" in second_stmt       # sí subárbol de tenants
