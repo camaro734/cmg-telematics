@@ -1,8 +1,11 @@
 """Endpoints del reporte de trabajos (intervenciones): JSON, PDF (VPS) y Excel.
 
-Solo lectura: el reporte nunca escribe en las intervenciones ni en producción.
+Antes de leer, recomputa (idempotente) las intervenciones del rango pedido para
+los vehículos en scope, de modo que los partes salgan para cualquier fecha sin
+depender de la ventana rolling del runner programado.
 """
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 
@@ -13,11 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import get_current_user, require_module
 from app.core.database import get_db
 from app.schemas.auth import CurrentUser
+from app.services.cycle_detector import recompute_cycles_for_report
 from app.services.work_cycle_report import (
     generate_report_data,
     render_report_pdf,
     render_report_xlsx,
 )
+
+logger = logging.getLogger(__name__)
 
 _XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -42,6 +48,15 @@ async def _report_payload(
     if hasta <= desde:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="'hasta' debe ser posterior a 'desde'")
     scope = _resolve_scope(user, client_id)
+    # Detecta las intervenciones del rango bajo demanda (idempotente) antes de leer.
+    # Si falla, seguimos con lo que ya hubiera en BD: el reporte nunca debe romperse.
+    try:
+        await recompute_cycles_for_report(
+            db, from_dt=desde, to_dt=hasta,
+            vehicle_id=vehicle_id, client_id=client_id, tenant_scope=scope,
+        )
+    except Exception as exc:  # noqa: BLE001 — la detección no debe tumbar el reporte
+        logger.warning("recompute de partes falló para rango [%s,%s): %s", desde, hasta, exc)
     return await generate_report_data(
         db, from_dt=desde, to_dt=hasta,
         vehicle_id=vehicle_id, client_id=client_id, tenant_scope=scope,

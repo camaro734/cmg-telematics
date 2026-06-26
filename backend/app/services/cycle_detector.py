@@ -5,16 +5,20 @@ for the given vehicle+period, groups records into cycles per trigger_type, build
 cycle_data from snapshot/aggregate fields, and writes work_cycle rows to the DB.
 """
 from __future__ import annotations
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 
 from app.models.work_cycle import WorkCycleDefinition, WorkCycle
+from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.services.geo import haversine_m
 from app.services.sensor_transform import apply_transform
+
+logger = logging.getLogger(__name__)
 
 
 # Whitelist of allowed extra columns in _query_telemetry.
@@ -187,6 +191,60 @@ async def detect_and_store_cycles(
 
     await db.commit()
     return len(groups)
+
+
+async def recompute_cycles_for_report(
+    db: AsyncSession,
+    *,
+    from_dt: datetime,
+    to_dt: datetime,
+    vehicle_id: uuid.UUID | None = None,
+    client_id: uuid.UUID | None = None,
+    tenant_scope: uuid.UUID | None = None,
+) -> int:
+    """Recomputa (idempotente) las intervenciones del rango para los vehículos en
+    scope, justo antes de leer el reporte de partes.
+
+    Hace que los partes salgan para CUALQUIER fecha sin depender de la ventana
+    rolling del runner programado (que solo cubre las últimas 2 h y se perdía los
+    días en que el servicio no corría). ``detect_and_store_cycles`` es DELETE+INSERT
+    transaccional por ventana, así que repetirlo es seguro y nunca deja huecos.
+
+    Respeta el scope multi-tenant: CMG admin (tenant_scope=None) procesa todos los
+    vehículos activos; el resto solo los de su tenant.
+    """
+    q = select(Vehicle).where(Vehicle.active.is_(True))
+    if vehicle_id is not None:
+        q = q.where(Vehicle.id == vehicle_id)
+    if tenant_scope is not None:
+        q = q.where(Vehicle.tenant_id == tenant_scope)
+    if client_id is not None:
+        q = q.where(Vehicle.tenant_id == client_id)
+    vehicles = (await db.execute(q)).scalars().all()
+
+    total = 0
+    for vehicle in vehicles:
+        defs = (await db.execute(
+            select(WorkCycleDefinition).where(
+                WorkCycleDefinition.vehicle_type_id == vehicle.vehicle_type_id,
+                WorkCycleDefinition.active.is_(True),
+                or_(
+                    WorkCycleDefinition.tenant_id == vehicle.tenant_id,
+                    WorkCycleDefinition.tenant_id.is_(None),
+                ),
+            )
+        )).scalars().all()
+        for defn in defs:
+            try:
+                total += await detect_and_store_cycles(
+                    db, vehicle.id, vehicle.tenant_id, defn, from_dt, to_dt
+                )
+            except Exception as exc:  # noqa: BLE001 — un fallo no debe tumbar el reporte
+                logger.warning(
+                    "recompute_cycles_for_report: fallo vehicle=%s def=%s: %s",
+                    vehicle.id, defn.id, exc,
+                )
+    return total
 
 
 async def _fetch_active_stops(

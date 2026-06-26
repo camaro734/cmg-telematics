@@ -85,6 +85,15 @@ _TRIP_STOP_KMH = 3.0    # umbral de velocidad "en movimiento"
 _TRIP_GAP_S    = 300.0  # hueco > 5 min → no cuenta como movimiento
 _TRIP_MAX_KMH  = 150.0  # velocidad imposible → glitch GPS, se ignora
 
+# Segmentación de rutas por PARADAS reales (no por ignición). Una ruta se corta
+# cuando el vehículo permanece quieto > _STOP_MIN_S dentro de _STOP_RADIUS_KM
+# (radio que absorbe el ruido del GPS parado, no una coordenada exacta). Las
+# paradas cortas (semáforos, maniobras) se absorben en la misma ruta.
+_STOP_RADIUS_KM    = 0.040   # 40 m: margen de error del GPS para "misma ubicación"
+_STOP_MIN_S        = 120.0   # parado > 2 min en el radio → fin de ruta
+_TRIP_SPLIT_GAP_S  = 600.0   # hueco de telemetría > 10 min → corta la ruta
+_MIN_TRIP_DIST_KM  = 0.040   # desplazamiento mínimo recorrido para contar como ruta
+
 _TZ_MADRID = ZoneInfo("Europe/Madrid")
 
 
@@ -135,28 +144,70 @@ def _finalize_trip(pts: list[dict], idx: int) -> tuple[Trip, float]:
 
 
 def _segment_trips(rows: list) -> tuple[list[Trip], DayTripTotals]:
-    """Segmenta puntos crudos en trayectos ON→OFF aplicando carry-forward en ignición."""
-    segments: list[list[dict]] = []
-    cur: list[dict] | None = None
-    prev_ign = False
-    for row in rows:
-        state: bool = row["ignition"] if row["ignition"] is not None else prev_ign
-        prev_ign = state
-        pt = {"t": row["time"], "lat": row["lat"], "lon": row["lon"], "speed_kmh": row["speed_kmh"]}
-        if state:
-            if cur is None:
-                cur = []
-            cur.append(pt)
+    """Segmenta los puntos GPS del día en rutas reales por paradas, no por ignición.
+
+    La ignición tenía glitches (un bache de RPM < 200 cortaba la ruta) y no
+    distingue "encendido trabajando parado" de "circulando". Aquí una ruta se
+    corta cuando el vehículo está parado > _STOP_MIN_S dentro de _STOP_RADIUS_KM,
+    o cuando hay un hueco de telemetría > _TRIP_SPLIT_GAP_S. Los periodos sin
+    desplazamiento real (< _MIN_TRIP_DIST_KM) no generan ruta.
+    """
+    pts = [
+        {"t": r["time"], "lat": r["lat"], "lon": r["lon"], "speed_kmh": r["speed_kmh"]}
+        for r in rows
+        if r["lat"] is not None and r["lon"] is not None
+    ]
+    n = len(pts)
+
+    # Fase 1 — marcar puntos que pertenecen a una parada larga. Ancla = primer
+    # punto del grupo; se extiende mientras los siguientes sigan en el radio. Si
+    # la permanencia supera _STOP_MIN_S es parada y se salta; si no, avanza uno.
+    in_stop = [False] * n
+    i = 0
+    while i < n:
+        j = i + 1
+        while j < n and _haversine_km(
+            pts[i]["lat"], pts[i]["lon"], pts[j]["lat"], pts[j]["lon"]
+        ) <= _STOP_RADIUS_KM:
+            j += 1
+        dwell = (pts[j - 1]["t"] - pts[i]["t"]).total_seconds()
+        if dwell >= _STOP_MIN_S:
+            for k in range(i, j):
+                in_stop[k] = True
+            i = j
         else:
-            if cur is not None and len(cur) >= 2:
+            i += 1
+
+    # Fase 2 — construir segmentos de movimiento entre paradas y huecos grandes.
+    segments: list[list[dict]] = []
+    cur: list[dict] = []
+    for k in range(n):
+        if in_stop[k]:
+            if len(cur) >= 2:
                 segments.append(cur)
-            cur = None
-    if cur is not None and len(cur) >= 2:
+            cur = []
+            continue
+        if cur and (pts[k]["t"] - cur[-1]["t"]).total_seconds() > _TRIP_SPLIT_GAP_S:
+            if len(cur) >= 2:
+                segments.append(cur)
+            cur = []
+        cur.append(pts[k])
+    if len(cur) >= 2:
         segments.append(cur)
 
-    pairs = [_finalize_trip(seg, i + 1) for i, seg in enumerate(segments)]
-    trips = [p[0] for p in pairs]
-    mov_dists = [p[1] for p in pairs]
+    # Fase 3 — descartar segmentos sin desplazamiento real y finalizar/renumerar.
+    trips: list[Trip] = []
+    mov_dists: list[float] = []
+    for seg in segments:
+        recorrido = sum(
+            _haversine_km(seg[t - 1]["lat"], seg[t - 1]["lon"], seg[t]["lat"], seg[t]["lon"])
+            for t in range(1, len(seg))
+        )
+        if recorrido < _MIN_TRIP_DIST_KM:
+            continue
+        trip, mov = _finalize_trip(seg, len(trips) + 1)
+        trips.append(trip)
+        mov_dists.append(mov)
 
     total_mov_time = sum(t.moving_time_s for t in trips)
     total_mov_dist = sum(mov_dists)
