@@ -36,6 +36,30 @@ def _check_tenant(user: CurrentUser, tenant_id: uuid.UUID) -> None:
         raise HTTPException(status_code=404, detail="No encontrado")
 
 
+async def _driver_id_for_user(db: AsyncSession, user: CurrentUser) -> uuid.UUID | None:
+    """Resuelve la fila `driver` vinculada a un usuario con rol chofer.
+
+    Devuelve el `driver.id` o None si el usuario no tiene chofer asociado
+    (`driver.user_id == user.user_id`). Solo aplica al rol `driver`.
+    """
+    result = await db.execute(select(Driver.id).where(Driver.user_id == user.user_id))
+    return result.scalar_one_or_none()
+
+
+async def _assert_order_visible(db: AsyncSession, user: CurrentUser, order: WorkOrder) -> None:
+    """Control de acceso a una OT concreta: tenant + propiedad del chofer.
+
+    El chofer (rol `driver`) solo accede a sus propias OTs (`order.driver_id`
+    == su `driver.id`). Cualquier otra OT responde 404 (no revela existencia).
+    No cambia nada para admin/operator/viewer.
+    """
+    _check_tenant(user, order.tenant_id)
+    if user.role == "driver":
+        own_driver_id = await _driver_id_for_user(db, user)
+        if own_driver_id is None or str(order.driver_id) != str(own_driver_id):
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+
 async def _enrich(
     db: AsyncSession,
     order: WorkOrder,
@@ -70,12 +94,18 @@ async def list_work_orders(
         q = q.where(WorkOrder.tenant_id == user.tenant_id)
     elif tenant_id is not None:
         q = q.where(WorkOrder.tenant_id == tenant_id)
+    # Auto-restricción del chofer: solo ve sus propias OTs. Ignora el query driver_id.
+    if user.role == "driver":
+        own_driver_id = await _driver_id_for_user(db, user)
+        if own_driver_id is None:
+            return []  # chofer sin ficha vinculada → ninguna OT
+        q = q.where(WorkOrder.driver_id == own_driver_id)
+    elif driver_id:
+        q = q.where(WorkOrder.driver_id == driver_id)
     if status_filter:
         q = q.where(WorkOrder.status == status_filter)
     if vehicle_id:
         q = q.where(WorkOrder.vehicle_id == vehicle_id)
-    if driver_id:
-        q = q.where(WorkOrder.driver_id == driver_id)
     q = q.order_by(WorkOrder.created_at.desc()).limit(limit)
     result = await db.execute(q)
     orders = result.scalars().all()
@@ -92,7 +122,7 @@ async def get_work_order(
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    _check_tenant(user, order.tenant_id)
+    await _assert_order_visible(db, user, order)
     return await _enrich(db, order, user, redis)
 
 
@@ -110,7 +140,7 @@ async def get_telemetry_detail(
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    _check_tenant(user, order.tenant_id)
+    await _assert_order_visible(db, user, order)
 
     pdf_keys: list[str] = []
     if order.vehicle_id:
@@ -263,7 +293,7 @@ async def _get_order_for_tenant(db: AsyncSession, order_id: uuid.UUID, user: Cur
     order = await db.get(WorkOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    _check_tenant(user, order.tenant_id)
+    await _assert_order_visible(db, user, order)
     return order
 
 

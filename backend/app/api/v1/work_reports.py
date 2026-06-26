@@ -224,6 +224,12 @@ async def _get_order_authorized(
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     if user.tenant_tier != "cmg" and str(order.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=403, detail="Sin acceso")
+    # El chofer (rol driver) solo accede al parte de sus propias OTs.
+    if user.role == "driver":
+        dr = await db.execute(select(Driver.id).where(Driver.user_id == user.user_id))
+        own_driver_id = dr.scalar_one_or_none()
+        if own_driver_id is None or str(order.driver_id) != str(own_driver_id):
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
     return order
 
 
