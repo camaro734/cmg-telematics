@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import FleetMap from './FleetMap'
 import { useFleetStore } from './useFleetStore'
 import { useVehicleStatuses } from './useVehicleStatuses'
@@ -41,6 +41,27 @@ function getVehicleState(
   if ((status!.speed_kmh ?? 0) > 2) return 'moving'
   if (status!.ignition) return 'idle'
   return 'parked'
+}
+
+// ── ETA al destino: criterio de recálculo ───────────────────────────────────
+// El backend recalcula distancia/tiempo restantes (Valhalla) en cada GET del
+// destino; el poll ya refresca cada 30s (WS) / 60s. Para que el ETA reaccione
+// al avance sin saturar Valhalla, forzamos un refetch anticipado cuando el
+// vehículo se ha movido > ETA_REFETCH_MIN_MOVE_M desde el último cálculo, con un
+// intervalo mínimo de ETA_REFETCH_MIN_INTERVAL_MS entre refetches por movimiento.
+// Efecto: se recalcula cada ~30s O al moverse > 250 m, lo que ocurra antes.
+const ETA_REFETCH_MIN_MOVE_M = 250
+const ETA_REFETCH_MIN_INTERVAL_MS = 20_000
+
+/** Distancia haversine en metros entre dos coordenadas. */
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
 }
 
 function stateColor(state: VehicleState): string {
@@ -147,6 +168,31 @@ export default function FleetDashboard() {
   // Destino activo del vehículo seleccionado (poll + WS-invalidado)
   const destQuery = useVehicleDestination(selectedVehicleId, !!selectedVehicleId)
   const activeDest = destQuery.data?.status === 'active' ? destQuery.data : null
+
+  // Recálculo anticipado del ETA por movimiento (complementa el poll de 30s/60s).
+  // Guarda la última posición/instante en que se pidió el ETA y refetcha cuando
+  // el vehículo se ha desplazado lo bastante, respetando un intervalo mínimo.
+  const lastEtaFetchRef = useRef<{ lat: number; lon: number; t: number } | null>(null)
+  const selectedDestStatus = selectedVehicleId ? statuses.get(selectedVehicleId) : undefined
+  useEffect(() => {
+    if (!activeDest || selectedDestStatus?.lat == null || selectedDestStatus?.lon == null) {
+      lastEtaFetchRef.current = null
+      return
+    }
+    const { lat, lon } = selectedDestStatus
+    const now = Date.now()
+    const prev = lastEtaFetchRef.current
+    if (!prev) {
+      lastEtaFetchRef.current = { lat, lon, t: now }
+      return
+    }
+    const moved = haversineM(prev.lat, prev.lon, lat, lon)
+    if (moved > ETA_REFETCH_MIN_MOVE_M && now - prev.t > ETA_REFETCH_MIN_INTERVAL_MS) {
+      lastEtaFetchRef.current = { lat, lon, t: now }
+      destQuery.refetch()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDestStatus, activeDest, selectedVehicleId])
 
   // Destino a pintar en el mapa: candidato de búsqueda o el activo del vehículo
   const mapDestination = pendingDest
