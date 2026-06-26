@@ -19,6 +19,7 @@ from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.driver import Driver
 from app.models.work_report import WorkReport
+from app.schemas.driver import AssignDriverRequest
 from app.services.doc_numbers import assign_doc_number
 
 router = APIRouter(tags=["work_orders"], dependencies=[Depends(require_module("work-orders"))])
@@ -274,6 +275,39 @@ async def transition_status(
     await db.commit()
     await db.refresh(order)
     return await _enrich(db, order)
+
+
+@router.post("/work-orders/{order_id}/assign", response_model=WorkOrderOut)
+async def assign_order_driver(
+    order_id: uuid.UUID,
+    body: AssignDriverRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """Asigna (o desasigna con driver_id=null) el chofer de una OT.
+
+    Endpoint dedicado, separado del alta/edición. Valida que el chofer pertenece
+    al tenant de la orden y que el usuario puede gestionar esa OT (subárbol).
+    """
+    if user.role not in ("admin", "operator"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    order = await db.get(WorkOrder, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    await _assert_order_visible(db, user, order)
+    if body.driver_id is None:
+        order.driver_id = None
+    else:
+        driver = await db.get(Driver, body.driver_id)
+        if not driver or not driver.active:
+            raise HTTPException(status_code=404, detail="Conductor no encontrado")
+        if str(driver.tenant_id) != str(order.tenant_id):
+            raise HTTPException(status_code=400, detail="El conductor no pertenece al tenant de la orden")
+        order.driver_id = body.driver_id
+    await db.commit()
+    await db.refresh(order)
+    return await _enrich(db, order, user, redis)
 
 
 @router.delete("/work-orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)

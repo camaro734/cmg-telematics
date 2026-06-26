@@ -3,14 +3,59 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
+from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
+from app.core.security import hash_password
 from app.api.v1.deps import get_current_user, visible_tenant_ids, assert_tenant_visible
 from app.schemas.auth import CurrentUser
 from app.schemas.driver import DriverOut, DriverCreate, DriverUpdate, AssignDriverRequest, AssignmentOut
 from app.models.driver import Driver, VehicleDriverAssignment
+from app.models.user import User
 from app.models.vehicle import Vehicle
 
 router = APIRouter(tags=["drivers"])
+
+
+async def _resolve_driver_login(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    full_name: str,
+    email: str | None,
+    password: str | None,
+    link_user_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    """Resuelve el `user_id` a vincular al chofer (login de la app móvil).
+
+    - `link_user_id`: vincula un usuario existente del MISMO tenant que el chofer,
+      verificando que no esté ya vinculado a otro chofer (`driver.user_id` es UNIQUE).
+    - `email` + `password`: crea un usuario nuevo con rol `driver` y lo vincula.
+    - Nada: devuelve None (chofer sin login).
+    El schema ya garantiza que no se mezclen ambas vías.
+    """
+    if link_user_id is not None:
+        target = await db.get(User, link_user_id)
+        if not target or str(target.tenant_id) != str(tenant_id):
+            raise HTTPException(status_code=404, detail="Usuario a vincular no encontrado en este tenant")
+        dup = await db.execute(select(Driver.id).where(Driver.user_id == link_user_id))
+        if dup.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=409, detail="Ese usuario ya está vinculado a otro chofer")
+        return link_user_id
+    if email and password:
+        new_user = User(
+            tenant_id=tenant_id,
+            email=email,
+            hashed_password=hash_password(password),
+            full_name=full_name,
+            role="driver",
+        )
+        db.add(new_user)
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail="Email ya registrado")
+        return new_user.id
+    return None
 
 
 
@@ -64,7 +109,14 @@ async def create_driver(
 ):
     if user.role not in ("admin", "operator"):
         raise HTTPException(status_code=403, detail="No autorizado")
-    driver = Driver(tenant_id=user.tenant_id, **body.model_dump())
+    data = body.model_dump()
+    email = data.pop("email", None)
+    password = data.pop("password", None)
+    link_user_id = data.pop("user_id", None)
+    driver = Driver(tenant_id=user.tenant_id, **data)
+    driver.user_id = await _resolve_driver_login(
+        db, driver.tenant_id, driver.full_name, email, password, link_user_id
+    )
     db.add(driver)
     await db.commit()
     await db.refresh(driver)
@@ -84,8 +136,19 @@ async def update_driver(
     if not driver:
         raise HTTPException(status_code=404, detail="Conductor no encontrado")
     await assert_tenant_visible(user, driver.tenant_id, db)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    email = data.pop("email", None)
+    password = data.pop("password", None)
+    link_user_id = data.pop("user_id", None)
+    for field, value in data.items():
         setattr(driver, field, value)
+    # Vincular/crear login solo si se pidió explícitamente y no había ya uno.
+    if (email and password) or link_user_id is not None:
+        if driver.user_id is not None:
+            raise HTTPException(status_code=409, detail="El chofer ya tiene un login vinculado")
+        driver.user_id = await _resolve_driver_login(
+            db, driver.tenant_id, driver.full_name, email, password, link_user_id
+        )
     await db.commit()
     await db.refresh(driver)
     item = DriverOut.model_validate(driver)
