@@ -9,7 +9,7 @@ import { isEffectivelyOnline } from '../../lib/staleStatus'
 import type { VehicleOut, VehicleStatus, AlertInstanceOut, RuleOut, WorkOrderOut, VehicleTypeOut } from '../../lib/types'
 import { CARTO_TILES_URL, CARTO_ATTRIBUTION } from '../../lib/mapConfig'
 import { buildPopupHtml } from './popupHtml'
-import { T_OK, T_WARN, T_CRIT, T_ORANGE, T_INFO, T_OFF, T_ELEVATED } from './mapTokens'
+import { T_OK, T_CRIT, T_ORANGE, T_INFO, T_OFF, T_ELEVATED } from './mapTokens'
 
 // CSS para efecto pulse — se inyecta una sola vez en el documento
 const PULSE_CSS = `
@@ -46,18 +46,20 @@ function injectPulseCSS() {
   document.head.appendChild(style)
 }
 
-// Icono EN MOVIMIENTO — punto pulsante verde
-function makeMovingIcon(): L.DivIcon {
+// Icono EN MOVIMIENTO — flecha verde orientada al rumbo (heading, grados 0=N horario).
+// La flecha SVG apunta al norte por defecto; se rota con CSS `rotate(<heading>deg)`.
+function makeMovingArrowIcon(heading: number): L.DivIcon {
   return L.divIcon({
     html: `
-      <div class="cmg-pulse-wrapper">
-        <div class="cmg-pulse-ring" style="background:rgba(34,197,94,0.45)"></div>
-        <div class="cmg-pulse-dot" style="background:${T_OK}"></div>
+      <div style="width:28px;height:28px;transform:rotate(${heading}deg);transform-origin:center;will-change:transform">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))">
+          <path d="M14 2 L22 24 L14 18.5 L6 24 Z" fill="${T_OK}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
       </div>`,
     className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-    popupAnchor: [0, -14],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
   })
 }
 
@@ -76,19 +78,18 @@ function makeAlertIcon(): L.DivIcon {
   })
 }
 
-// Icono PARADO — drop-pin SVG (amarillo=motor ON, naranja=motor OFF)
-function makeStoppedIcon(ignition: boolean | null): L.DivIcon {
-  const pinColor = ignition ? T_WARN : T_ORANGE
+// Icono PARADO — punto sólido (verde=contacto ON, rojo=contacto OFF)
+function makeStoppedDotIcon(ignition: boolean | null): L.DivIcon {
+  const color = ignition ? T_OK : T_CRIT
   return L.divIcon({
     html: `
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32" style="display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5))">
-        <path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 20 12 20s12-11 12-20C24 5.373 18.627 0 12 0z" fill="${pinColor}"/>
-        <circle cx="12" cy="12" r="5" fill="white"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45))">
+        <circle cx="9" cy="9" r="6" fill="${color}" stroke="#fff" stroke-width="2"/>
       </svg>`,
     className: '',
-    iconSize: [24, 32],
-    iconAnchor: [12, 32],
-    popupAnchor: [0, -34],
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -11],
   })
 }
 
@@ -106,12 +107,14 @@ function makeOfflineIcon(): L.DivIcon {
   })
 }
 
-function makeVehicleIcon(status: VehicleStatus, hasAlert: boolean): L.DivIcon {
+// `fallbackHeading` — último rumbo conocido del vehículo, usado cuando el
+// instante actual no trae heading (campo null) para que la flecha no salte a 0.
+function makeVehicleIcon(status: VehicleStatus, hasAlert: boolean, fallbackHeading: number): L.DivIcon {
   if (status.device_out_of_service === true) return makeOfflineIcon()
   if (!isEffectivelyOnline(status)) return makeOfflineIcon()
   if (hasAlert) return makeAlertIcon()
-  if ((status.speed_kmh ?? 0) > 2) return makeMovingIcon()
-  return makeStoppedIcon(status.ignition)
+  if ((status.speed_kmh ?? 0) > 2) return makeMovingArrowIcon(status.heading ?? fallbackHeading)
+  return makeStoppedDotIcon(status.ignition)
 }
 
 interface FleetMapProps {
@@ -133,6 +136,8 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
   const mapRef = useRef<L.Map | null>(null)
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
+  // Último rumbo conocido por vehículo — fallback cuando heading llega null
+  const lastHeadingRef = useRef<Map<string, number>>(new Map())
   // Círculos de precisión GPS por vehículo
   const circlesRef = useRef<Map<string, L.Circle>>(new Map())
   const geofenceLayerRef = useRef<L.LayerGroup | null>(null)
@@ -280,7 +285,9 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
       const latlng: [number, number] = [lat, lon]
       const hasAlert = alertVehicleIds.has(vehicle.id)
       const online = isEffectivelyOnline(status)
-      const icon = makeVehicleIcon(status, hasAlert)
+      // Memoriza el último rumbo válido para reusarlo si un instante llega sin heading
+      if (status.heading != null) lastHeadingRef.current.set(vehicle.id, status.heading)
+      const icon = makeVehicleIcon(status, hasAlert, lastHeadingRef.current.get(vehicle.id) ?? 0)
       const vehicleAlerts = firingAlerts.filter(a => a.vehicle_id === vehicle.id)
       const vehicleType = vehicleTypes.find(vt => vt.id === vehicle.vehicle_type_id)
       const popupHtml = buildPopupHtml(vehicle, status, vehicleAlerts, tenantNames, rulesById, vehicleType)
