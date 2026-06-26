@@ -75,17 +75,39 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
     license_expiry: initial?.license_expiry ?? '',
     notes: initial?.notes ?? '',
   })
+  // Alta opcional del login del chofer (rol driver) para la app móvil. Solo al crear.
+  const [withLogin, setWithLogin] = useState(false)
+  const [login, setLogin] = useState({ email: '', password: '', password2: '' })
   const [error, setError] = useState('')
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => initial
-      ? apiClient.put<DriverOut>(`/api/v1/drivers/${initial.id}`, form)
-      : apiClient.post<DriverOut>('/api/v1/drivers', form),
+    mutationFn: () => {
+      if (initial) return apiClient.put<DriverOut>(`/api/v1/drivers/${initial.id}`, form)
+      // El backend crea el chofer + usuario `driver` vinculado si llegan email+password.
+      const payload: Record<string, unknown> = { ...form }
+      if (withLogin) {
+        payload.email = login.email.trim()
+        payload.password = login.password
+      }
+      return apiClient.post<DriverOut>('/api/v1/drivers', payload)
+    },
     onSuccess: () => { onSaved(); onClose() },
     onError: (e) => setError((e as Error).message),
   })
 
   const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const updLogin = (k: string, v: string) => setLogin(l => ({ ...l, [k]: v }))
+
+  const submit = () => {
+    setError('')
+    if (!form.full_name.trim()) return
+    if (!initial && withLogin) {
+      if (!login.email.trim()) { setError('Indica el email de acceso del chofer.'); return }
+      if (login.password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return }
+      if (login.password !== login.password2) { setError('Las contraseñas no coinciden.'); return }
+    }
+    mutate()
+  }
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -105,6 +127,24 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
           <textarea style={{ ...S.input, resize: 'vertical', minHeight: 64 }} value={form.notes} onChange={e => update('notes', e.target.value)}/>
         </div>
 
+        {!initial && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-primary)' }}>
+              <input type="checkbox" checked={withLogin} onChange={e => setWithLogin(e.target.checked)} />
+              Crear acceso a la app móvil para este chofer
+            </label>
+            {withLogin && (
+              <>
+                <Input label="Email de acceso *" type="email" value={login.email} onChange={e => updLogin('email', e.target.value)} placeholder="chofer@empresa.com" />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Input label="Contraseña *" type="password" value={login.password} onChange={e => updLogin('password', e.target.value)} minLength={8} helperText="Mínimo 8 caracteres" />
+                  <Input label="Repetir contraseña *" type="password" value={login.password2} onChange={e => updLogin('password2', e.target.value)} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {error && <span style={{ ...S.warn, color: 'var(--danger)' }}>{error}</span>}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -112,7 +152,7 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
           <button
             style={{ ...S.btn, opacity: isPending || !form.full_name.trim() ? 0.6 : 1 }}
             disabled={isPending || !form.full_name.trim()}
-            onClick={() => mutate()}
+            onClick={submit}
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>

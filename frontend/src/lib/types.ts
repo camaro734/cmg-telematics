@@ -437,6 +437,7 @@ export interface DriverOut {
   notes: string | null
   active: boolean
   created_at: string
+  user_id: string | null  // login vinculado (rol driver) para la app móvil
   current_vehicle_name: string | null
 }
 
