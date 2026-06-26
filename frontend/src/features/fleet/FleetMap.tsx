@@ -132,8 +132,14 @@ interface FleetMapProps {
 
 export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules = [], workOrders = [], tenantNames = new Map(), vehicleTypes = [], destination, routeGeometry }: FleetMapProps) {
   const navigate = useNavigate()
-  const { selectedId } = useFleetStore()
+  const { selectedId, selectTick } = useFleetStore()
   const mapRef = useRef<L.Map | null>(null)
+  // Seguimiento (follow): centra el mapa en el vehículo seleccionado y lo
+  // mantiene centrado. Se desengancha si el usuario arrastra/zooma a mano.
+  const followRef = useRef(false)
+  // Marca un movimiento del mapa como programático (centrado/follow) para que el
+  // listener de zoom no lo confunda con interacción manual del usuario.
+  const programmaticRef = useRef(false)
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
   // Último rumbo conocido por vehículo — fallback cuando heading llega null
@@ -183,6 +189,15 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
       })
       mapRef.current.addLayer(clusterGroup)
       clusterGroupRef.current = clusterGroup
+
+      // Desenganche del follow ante interacción MANUAL del usuario.
+      // `dragstart` solo lo dispara el arrastre del usuario (nunca setView/flyTo
+      // programáticos), así que siempre desengancha. `zoomstart` también lo
+      // disparan los centrados programáticos, por eso se filtra con la marca.
+      const map = mapRef.current
+      map.on('dragstart', () => { followRef.current = false })
+      map.on('zoomstart', () => { if (!programmaticRef.current) followRef.current = false })
+      map.on('moveend', () => { programmaticRef.current = false })
     }
 
     // Guard: if container has no height yet, defer init to next paint frame
@@ -335,18 +350,35 @@ export default function FleetMap({ vehicles, statuses, firingAlerts = [], rules 
         initialFitDoneRef.current = true
       } catch { /* ignore */ }
     }
+
+    // Follow: mientras esté activo, recentra (sin tocar el zoom) en la nueva
+    // posición del vehículo seleccionado a cada actualización de estado.
+    if (followRef.current && selectedId) {
+      const sel = statuses.get(selectedId)
+      if (sel?.lat != null && sel?.lon != null) {
+        programmaticRef.current = true
+        map.panTo([sel.lat, sel.lon], { animate: true, duration: 0.5 })
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statuses, vehicles])
 
-  // Fly to selected vehicle
+  // (Re)selección de vehículo → activa el follow y centra una vez.
+  // Depende de `selectTick` (no de `statuses`) para que vuelva a engancharse al
+  // re-seleccionar el MISMO vehículo, sin re-centrar en cada parpadeo de GPS
+  // (de eso se encarga el recentrado continuo del efecto de marcadores).
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !selectedId) return
+    if (!map) return
+    if (!selectedId) { followRef.current = false; return }
+    followRef.current = true
     const status = statuses.get(selectedId)
     if (status?.lat != null && status?.lon != null) {
+      programmaticRef.current = true
       map.flyTo([status.lat, status.lon], 14, { duration: 0.8 })
     }
-  }, [selectedId, statuses])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, selectTick])
 
   // Geofence polygons from alert rules
   useEffect(() => {
