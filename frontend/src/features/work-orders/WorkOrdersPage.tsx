@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import L from 'leaflet'
 import { apiClient } from '../../lib/apiClient'
@@ -536,6 +537,7 @@ function StatusBadge({ status }: { status: WorkOrderStatus }) {
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function WorkOrdersPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const confirmAsk = useConfirm()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const [filter, setFilter] = useState<WorkOrderStatus | 'all'>('all')
@@ -587,7 +589,7 @@ export default function WorkOrdersPage() {
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
       <div style={S.header}>
         <h1 style={S.title}>Órdenes de trabajo</h1>
-        {isAdmin && <button style={S.btn} onClick={() => { setEditing(null); setShowModal(true) }}>
+        {isAdmin && <button style={S.btn} onClick={() => navigate('/work-orders/nuevo')}>
           + Nueva orden
         </button>}
       </div>

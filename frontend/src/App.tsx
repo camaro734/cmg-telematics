@@ -69,6 +69,7 @@ const VehicleTypesPage   = lazy(() => import('./features/vehicles/VehicleTypesPa
 const BlockTemplatesPage = lazy(() => import('./features/templates/BlockTemplatesPage'))
 const DriversPage      = lazy(() => import('./features/drivers/DriversPage'))
 const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPage'))
+const NewWorkOrderPage = lazy(() => import('./features/work-orders/NewWorkOrderPage'))
 const GeofencesPage    = lazy(() => import('./features/geofences/GeofencesPage'))
 const ClientPortalPage    = lazy(() => import('./features/portal/ClientPortalPage'))
 const ForgotPasswordPage  = lazy(() => import('./features/auth/ForgotPasswordPage'))
@@ -93,6 +94,14 @@ function RequireRules({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
   const can = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
   if (!can) return <Navigate to="/alerts" replace />
+  return <>{children}</>
+}
+
+// Crear órdenes: solo admin/jefe de flota (no subclient, no driver/otros).
+function RequireOrderCreate({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(s => s.user)
+  const can = user?.role === 'admin' && user?.tenant_tier !== 'subclient'
+  if (!can) return <Navigate to="/work-orders" replace />
   return <>{children}</>
 }
 
@@ -135,6 +144,7 @@ export default function App() {
                 <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
                 <Route path="drivers"          element={<SectionErrorBoundary label="Drivers"><DriversPage /></SectionErrorBoundary>} />
                 <Route path="work-orders"     element={<RequireModule module="work-orders"><SectionErrorBoundary label="WorkOrders"><WorkOrdersPage /></SectionErrorBoundary></RequireModule>} />
+                <Route path="work-orders/nuevo" element={<RequireModule module="work-orders"><RequireOrderCreate><SectionErrorBoundary label="NewWorkOrder"><NewWorkOrderPage /></SectionErrorBoundary></RequireOrderCreate></RequireModule>} />
                 <Route path="geofences"       element={<SectionErrorBoundary label="Geofences"><GeofencesPage /></SectionErrorBoundary>} />
                 <Route path="dashboard"       element={<Navigate to="/fleet" replace />} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
