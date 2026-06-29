@@ -101,9 +101,16 @@ export function StopMap({
 
   // Reflejar cambios de la parada activa (lat/lon) venidos del formulario: mover el
   // pin y centrar. Si el cambio fue interno (drag/click), solo mover el pin.
+  // Si la parada activa no tiene ubicación, retirar el pin/círculo anteriores.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || lat == null || lon == null) return
+    if (!map) return
+    if (lat == null || lon == null) {
+      if (markerRef.current) { markerRef.current.remove(); markerRef.current = null }
+      if (circleRef.current) { circleRef.current.remove(); circleRef.current = null }
+      internalRef.current = false
+      return
+    }
     setOrMovePin(lat, lon)
     if (internalRef.current) { internalRef.current = false; return }
     map.setView([lat, lon], Math.max(map.getZoom(), 15), { animate: true })
