@@ -692,7 +692,12 @@ class TestLocationPrivacyNewEndpoints:
     # ── 6. GET /work-orders/{id} ──────────────────────────────────────────────
 
     def test_work_order_detail_hides_location_from_cmg(self):
-        """GET /work-orders/{id} no devuelve location_lat/lon a CMG sin grant."""
+        """GET /work-orders/{id}: CMG no accede al parte de otro tenant → 404.
+
+        Los partes son privados del tenant creador: CMG ya no los ve (garantía más
+        fuerte que ocultar solo la ubicación). Un 404 implica que ningún dato del
+        parte —incluida la ubicación— llega a CMG.
+        """
         vehicle = _make_vehicle()
         _override_user(CMG_USER)
         _override_privacy_redis(can_see=False)
@@ -741,14 +746,16 @@ class TestLocationPrivacyNewEndpoints:
         with TestClient(app) as client:
             resp = client.get(f"/api/v1/work-orders/{order_id}")
 
-        assert resp.status_code == 200, resp.text
-        leaks = _find_location_leak(resp.json())
-        assert not leaks, f"FUGA en GET /work-orders/{{id}} (CMG): {leaks}"
+        # Parte privado: CMG no ve la OT de otro tenant (no revela existencia).
+        assert resp.status_code == 404, resp.text
 
     # ── 7. GET /work-orders/{id}/stops ────────────────────────────────────────
 
     def test_work_order_stops_hides_location_from_cmg(self):
-        """GET /work-orders/{id}/stops no devuelve lat/lon a CMG sin grant."""
+        """GET /work-orders/{id}/stops: CMG no accede a las paradas de otro tenant → 404.
+
+        Parte privado: el acceso a las paradas requiere ver la OT, que CMG ya no ve.
+        """
         from app.models.work_order import WorkOrder as WorkOrderModel
 
         vehicle = _make_vehicle()
@@ -804,9 +811,8 @@ class TestLocationPrivacyNewEndpoints:
         with TestClient(app) as client:
             resp = client.get(f"/api/v1/work-orders/{order_id}/stops")
 
-        assert resp.status_code == 200, resp.text
-        leaks = _find_location_leak(resp.json())
-        assert not leaks, f"FUGA en GET /work-orders/{{id}}/stops (CMG): {leaks}"
+        # Parte privado: CMG no ve la OT → tampoco sus paradas.
+        assert resp.status_code == 404, resp.text
 
     # ── 8. GET /work-cycles ───────────────────────────────────────────────────
 
