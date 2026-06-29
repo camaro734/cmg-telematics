@@ -8,7 +8,7 @@ import { Select } from '../../shared/ui/Select'
 import Shell from '../../shared/ui/Shell'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { AddressAutocomplete } from './AddressAutocomplete'
-import { StopMap } from './StopMap'
+import { StopMap, type MapStop } from './StopMap'
 import type { WorkOrderOut, VehicleOut, DriverOut, WorkOrderPriority } from '../../lib/types'
 
 // Detecta viewport estrecho para apilar las dos columnas (mapa debajo del formulario).
@@ -162,9 +162,13 @@ export default function NewWorkOrderPage() {
 
   // ── Punto/handlers del mapa grande según la parada activa ──
   const activeStop = activeStopId === PRIMARY ? null : extraStops.find(s => s._id === activeStopId) ?? null
-  const mapLat    = activeStop ? activeStop.lat : lat
-  const mapLon    = activeStop ? activeStop.lon : lon
   const mapRadius = activeStop ? activeStop.arrival_radius_m : 50
+
+  // Todas las paradas con coordenadas, numeradas según su orden (1 = dirección del servicio).
+  const mapStops: MapStop[] = [
+    { id: PRIMARY, lat, lon, n: 1 },
+    ...extraStops.map((s, i) => ({ id: s._id, lat: s.lat, lon: s.lon, n: i + 2 })),
+  ].filter((s): s is MapStop => s.lat != null && s.lon != null)
   const activeIdx = activeStop ? extraStops.findIndex(s => s._id === activeStopId) : -1
   const activeLabel = activeStop
     ? `Parada ${activeIdx + 2}${activeStop.title.trim() ? ` · ${activeStop.title.trim()}` : ''}`
@@ -357,8 +361,8 @@ export default function NewWorkOrderPage() {
       <p style={S.mapLabel}>Ubicación · {activeLabel}</p>
       <div style={{ flex: 1, minHeight: 0, borderRadius: 6, overflow: 'hidden' }}>
         <StopMap
-          lat={mapLat} lon={mapLon} arrivalRadiusM={mapRadius}
-          onPick={onMapPick} onAddressChange={onMapAddress}
+          stops={mapStops} activeId={activeStopId} activeRadiusM={mapRadius}
+          onPick={onMapPick} onAddressChange={onMapAddress} onSelectStop={setActiveStopId}
         />
       </div>
       <p style={{ ...S.hint, margin: 0 }}>
