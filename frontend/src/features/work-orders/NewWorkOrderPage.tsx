@@ -288,8 +288,13 @@ export default function NewWorkOrderPage() {
                 </div>
                 <input style={{ ...S.input, fontSize: 'var(--fs-md)' }} placeholder="Cliente / empresa"
                   value={stop.client_name} onChange={e => updateStop(stop._id, { client_name: e.target.value })} />
-                <input style={{ ...S.input, fontSize: 'var(--fs-md)' }} placeholder="Dirección"
-                  value={stop.address} onChange={e => updateStop(stop._id, { address: e.target.value })} />
+                {/* Mismo buscador Valhalla que la dirección del servicio: fija address+lat/lon de ESTA parada. */}
+                <AddressAutocomplete
+                  value={stop.address}
+                  onChange={(q) => { updateStop(stop._id, { address: q }); setActiveStopId(stop._id) }}
+                  onSelect={(r) => { updateStop(stop._id, { address: r.label, lat: r.lat, lon: r.lon }); setActiveStopId(stop._id) }}
+                  placeholder="Busca la dirección de la parada"
+                />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
                   <label style={{ ...S.hint, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     Radio (m)
