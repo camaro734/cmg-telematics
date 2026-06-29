@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Literal
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,12 +16,15 @@ from app.schemas.work_order import (
 )
 from app.models.work_order import WorkOrder
 from app.models.work_order_stop import WorkOrderStop
+from app.models.tenant import Tenant
 from app.models.vehicle import Vehicle
 from app.models.vehicle_type import VehicleType
 from app.models.driver import Driver
 from app.models.work_report import WorkReport
 from app.schemas.driver import AssignDriverRequest
+from app.schemas.destination import RouteInfo
 from app.services.doc_numbers import assign_doc_number
+from app.services.routing import valhalla_route_multi
 
 router = APIRouter(tags=["work_orders"], dependencies=[Depends(require_module("work-orders"))])
 
@@ -365,6 +369,56 @@ async def list_stops(
             return stops_out
 
     return stops_orm
+
+
+@router.get("/work-orders/{order_id}/route", response_model=RouteInfo)
+async def get_work_order_route(
+    order_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ruta por carretera de una orden (para dibujarla): base → paradas → base.
+
+    No reordena ni persiste nada: une las paradas guardadas EN SU ORDEN actual.
+    Usa la base del tenant dueño como origen y destino (si está configurada).
+    Acotado al scoping de partes (dueño-exacto / chofer) vía _get_order_for_tenant.
+    """
+    order = await _get_order_for_tenant(db, order_id, user)
+    result = await db.execute(
+        select(WorkOrderStop)
+        .where(WorkOrderStop.work_order_id == order_id)
+        .order_by(WorkOrderStop.order_index)
+    )
+    stops = [s for s in result.scalars().all() if s.lat is not None and s.lon is not None]
+
+    tenant = await db.get(Tenant, order.tenant_id)
+    base = (
+        (tenant.base_lat, tenant.base_lon)
+        if tenant and tenant.base_lat is not None and tenant.base_lon is not None
+        else None
+    )
+
+    points: list[tuple[float, float]] = []
+    if base:
+        points.append(base)
+    points.extend((s.lat, s.lon) for s in stops)
+    if base:
+        points.append(base)
+
+    if len(points) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La orden no tiene paradas suficientes para trazar una ruta.",
+        )
+
+    try:
+        route = await valhalla_route_multi(points)
+    except (httpx.HTTPError, KeyError):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo calcular la ruta ahora mismo. Inténtalo de nuevo.",
+        )
+    return RouteInfo(distance_m=route.distance_m, duration_s=route.duration_s, geometry=route.geometry)
 
 
 @router.post("/work-orders/{order_id}/stops", response_model=WorkOrderStopOut, status_code=201)
