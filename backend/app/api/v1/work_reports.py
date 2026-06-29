@@ -222,7 +222,9 @@ async def _get_order_authorized(
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    if user.tenant_tier != "cmg" and str(order.tenant_id) != str(user.tenant_id):
+    # Partes privados: dueño-exacto, sin bypass cmg/manufacturer (ningún nivel
+    # superior accede al parte de otro tenant).
+    if str(order.tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=403, detail="Sin acceso")
     # El chofer (rol driver) solo accede al parte de sus propias OTs.
     if user.role == "driver":
