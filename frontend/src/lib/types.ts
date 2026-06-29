@@ -131,6 +131,9 @@ export interface TenantOut {
   brand_tokens: BrandTokens | null
   business_cif: string | null
   business_address: string | null
+  base_address: string | null
+  base_lat: number | null
+  base_lon: number | null
   manufacturer_can_view_operations: boolean
   manufacturer_can_view_can_data: boolean
   manufacturer_can_create_rules: boolean

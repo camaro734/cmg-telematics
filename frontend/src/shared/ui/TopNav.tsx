@@ -412,6 +412,10 @@ export default function TopNav() {
   const isManufacturer = user?.tenant_tier === 'manufacturer'
   const isAdmin        = user?.role === 'admin'
   const canManageClients = isCmg && isAdmin
+  // Visibilidad del menú «Cuenta → Ajustes». Incluye al admin de cliente/subcliente
+  // (jefe de flota) para que llegue a Ajustes (Mi base, Usuarios, Ciclos). NO usa
+  // canManageClients porque ese gate gobierna además el TenantSelector (solo CMG).
+  const showAdminMenu = canManageClients || (isAdmin && !isCmg && !isManufacturer)
 
   const { data: profile } = useMyProfile()
   const mfrCanManageClients = profile?.manufacturer_can_manage_clients ?? false
@@ -601,7 +605,7 @@ export default function TopNav() {
               adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
               adminLabel={isCmg ? 'Administración' : 'Cuenta'}
               operatorItems={operatorMenuItems as unknown as typeof OPERATOR_ITEMS}
-              showAdmin={canManageClients}
+              showAdmin={showAdminMenu}
               showOperator={isAdmin || user?.role === 'operator'}
               userEmail={user?.email}
               onClose={() => setDrawerOpen(false)}
@@ -669,14 +673,14 @@ export default function TopNav() {
               </div>
             )}
 
-            {canManageClients && (
+            {showAdminMenu && (
               <div ref={adminRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => { setAdminOpen(o => !o); setOperatorOpen(false); setUserOpen(false) }}
                   style={btnBase}
                 >
                   <IconAjustes width={15} height={15}/>
-                  {isCmg ? 'Admin' : 'Mis clientes'}
+                  {isCmg ? 'Admin' : 'Cuenta'}
                   <Chevron open={adminOpen}/>
                 </button>
                 {adminOpen && (
