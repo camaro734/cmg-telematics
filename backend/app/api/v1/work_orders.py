@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
-from app.api.v1.deps import get_current_user, get_redis, require_module, visible_tenant_ids, assert_tenant_visible
+from app.api.v1.deps import get_current_user, get_redis, require_module
 from app.api.v1.access_v2 import user_can_see_vehicle_location, strip_location
 from app.schemas.auth import CurrentUser
 from app.schemas.work_order import (
@@ -33,7 +33,8 @@ _STATUS_TRANSITIONS: dict[str, list[str]] = {
 
 
 def _check_tenant(user: CurrentUser, tenant_id: uuid.UUID) -> None:
-    if user.tenant_tier != "cmg" and str(tenant_id) != str(user.tenant_id):
+    # Partes privados: dueño-exacto, sin bypass cmg/manufacturer ni jerarquía.
+    if str(tenant_id) != str(user.tenant_id):
         raise HTTPException(status_code=404, detail="No encontrado")
 
 
@@ -48,12 +49,16 @@ async def _driver_id_for_user(db: AsyncSession, user: CurrentUser) -> uuid.UUID 
 
 
 async def _assert_order_visible(db: AsyncSession, user: CurrentUser, order: WorkOrder) -> None:
-    """Control de acceso a una OT concreta: subárbol de tenant + propiedad del chofer.
+    """Control de acceso a una OT concreta: dueño-exacto + propiedad del chofer.
 
+    Los partes (OT/parte) son PRIVADOS del tenant que los crea: ningún nivel
+    superior (cmg/manufacturer) los ve, y no se desciende a subclients. Por eso
+    NO se usa `assert_tenant_visible` (jerárquica, con bypass cmg) sino igualdad
+    estricta de tenant.
     - El chofer (rol `driver`) solo accede a sus propias OTs (`order.driver_id`
       == su `driver.id`); su `driver_id` ya lo confina a su tenant.
-    - El resto accede a las OTs de su subárbol de tenants (su tenant + descendientes,
-      vía `visible_tenant_ids`): así el jefe de flota ve también las de sus subclients.
+    - El resto accede solo a las OTs de su propio tenant
+      (`order.tenant_id` == `user.tenant_id`).
     Cualquier OT fuera de alcance responde 404 (no revela existencia).
     """
     if user.role == "driver":
@@ -61,7 +66,8 @@ async def _assert_order_visible(db: AsyncSession, user: CurrentUser, order: Work
         if own_driver_id is None or str(order.driver_id) != str(own_driver_id):
             raise HTTPException(status_code=404, detail="Orden no encontrada")
         return
-    await assert_tenant_visible(user, order.tenant_id, db, detail="Orden no encontrada")
+    if str(order.tenant_id) != str(user.tenant_id):
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
 
 
 async def _enrich(
@@ -102,12 +108,9 @@ async def list_work_orders(
             return []  # chofer sin ficha vinculada → ninguna OT
         q = q.where(WorkOrder.driver_id == own_driver_id)
     else:
-        # Jefe de flota (admin client) ve su tenant + subclients; cmg ve todo.
-        visible = await visible_tenant_ids(user, db)
-        if visible is not None:
-            q = q.where(WorkOrder.tenant_id.in_(visible))
-        elif tenant_id is not None:
-            q = q.where(WorkOrder.tenant_id == tenant_id)
+        # Partes privados: cada tenant ve SOLO sus propias OTs (sin jerarquía ni
+        # bypass cmg/manufacturer). El query param `tenant_id` se ignora a propósito.
+        q = q.where(WorkOrder.tenant_id == user.tenant_id)
         if driver_id:
             q = q.where(WorkOrder.driver_id == driver_id)
     if status_filter:
