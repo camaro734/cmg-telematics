@@ -42,11 +42,13 @@ type ExtraStop = {
 
 const PRIMARY = 'primary'
 
+// Contenedor centrado (se pasa a ancho completo en el commit de estilo).
+const FRAME: React.CSSProperties = { maxWidth: 1440, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+
 // ── Estilos con TOKENS del sistema (fuente grande y clara; sin px inline sueltos) ──
 const S = {
-  page:    { maxWidth: 1440, margin: '0 auto', padding: 'var(--space-6) var(--space-6) var(--space-10)' } as const,
   title:   { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-2xl)', fontWeight: 700, color: 'var(--fg-primary)', margin: '0 0 var(--space-2)' } as const,
-  sub:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', color: 'var(--fg-muted)', margin: '0 0 var(--space-6)' } as const,
+  sub:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', color: 'var(--fg-muted)', margin: 0 } as const,
   form:    { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-6)' },
   field:   { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)' },
   label:   { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--fg-secondary)' } as const,
@@ -70,7 +72,13 @@ const S = {
   editBtn: { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-sm)', fontWeight: 600, padding: 'var(--space-2) var(--space-4)', borderRadius: 8, cursor: 'pointer', background: 'var(--bg-elevated)', color: 'var(--fg-secondary)', border: '1px solid var(--border)' } as const,
   activeBadge: { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--info)' } as const,
   moreBtn: { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, padding: 'var(--space-2) 0', background: 'none', border: 'none', color: 'var(--fg-secondary)', cursor: 'pointer', textAlign: 'left' as const } as const,
-  footer:  { display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-8)' },
+  // Barra de acciones: SIEMPRE visible (nunca se pierde al hacer scroll del formulario).
+  footer:  {
+    flexShrink: 0,
+    display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)',
+    paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)',
+    borderTop: '1px solid var(--border)', background: 'var(--bg-base)',
+  } as const,
   btn:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, padding: 'var(--space-3) var(--space-6)', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--cmg-teal)', color: '#fff' } as const,
   btnGhost:{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, padding: 'var(--space-3) var(--space-6)', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-elevated)', color: 'var(--fg-muted)' } as const,
   delBtn:  { background: 'transparent', border: 'none', color: 'var(--danger)', fontSize: 'var(--fs-xl)', cursor: 'pointer', lineHeight: 1, padding: '0 4px' } as const,
@@ -206,165 +214,197 @@ export default function NewWorkOrderPage() {
     onError: (e) => toast.error((e as Error).message || 'No se pudo crear la orden'),
   })
 
-  return (
-    <Shell title="Nueva orden de trabajo">
-      <div style={S.page}>
-        <h1 style={S.title}>Nueva orden de trabajo</h1>
-        <p style={S.sub}>Rellena lo mínimo para crear el parte. El resto puede completarse después.</p>
+  // ── Contenido reutilizable (mismo en escritorio y en estrecho) ──
+  const formContent = (
+    <div style={S.form}>
+      {/* 1 · Cliente del servicio */}
+      <div style={S.field}>
+        <label style={S.label} htmlFor="wo-client">Cliente del servicio</label>
+        <input id="wo-client" style={S.input} value={clientName}
+          placeholder="Nombre o razón social"
+          onChange={e => setClientName(e.target.value)} />
+      </div>
 
-        {/* Dos columnas: formulario (izq) + mapa grande siempre visible (der).
-            En viewports estrechos se apilan (mapa debajo del formulario). */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 0.92fr) minmax(0, 1.12fr)',
-          gap: 'var(--space-8)',
-          alignItems: 'start',
-        }}>
-          {/* ── Columna izquierda: formulario ── */}
-          <div>
-            <div style={S.form}>
-              {/* 1 · Cliente del servicio */}
-              <div style={S.field}>
-                <label style={S.label} htmlFor="wo-client">Cliente del servicio</label>
-                <input id="wo-client" style={S.input} value={clientName}
-                  placeholder="Nombre o razón social"
-                  onChange={e => setClientName(e.target.value)} />
-              </div>
+      {/* 2 · Dirección (Valhalla) = parada 1 */}
+      <div style={S.field}>
+        <label style={S.label}>Dirección del servicio</label>
+        <AddressAutocomplete
+          value={address}
+          onChange={(q) => { setAddress(q); setActiveStopId(PRIMARY) }}
+          onSelect={(r) => { setAddress(r.label); setLat(r.lat); setLon(r.lon); setActiveStopId(PRIMARY) }}
+          placeholder="Busca la dirección y selecciónala"
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          {lat != null && lon != null
+            ? <span style={S.ok}>✓ Ubicación fijada · {lat.toFixed(5)}, {lon.toFixed(5)}</span>
+            : <span style={S.hint}>Selecciona una dirección o haz clic en el mapa →</span>}
+          {activeStopId === PRIMARY
+            ? <span style={S.activeBadge}>● Editando en el mapa</span>
+            : <button type="button" style={S.editBtn} onClick={() => setActiveStopId(PRIMARY)}>Editar en el mapa</button>}
+        </div>
+      </div>
 
-              {/* 2 · Dirección (Valhalla) = parada 1 */}
-              <div style={S.field}>
-                <label style={S.label}>Dirección del servicio</label>
-                <AddressAutocomplete
-                  value={address}
-                  onChange={(q) => { setAddress(q); setActiveStopId(PRIMARY) }}
-                  onSelect={(r) => { setAddress(r.label); setLat(r.lat); setLon(r.lon); setActiveStopId(PRIMARY) }}
-                  placeholder="Busca la dirección y selecciónala"
-                />
+      {/* 3 · Vehículo + Chofer */}
+      <div style={S.row2}>
+        <Select label="Vehículo" style={S.selectBig} value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
+          <option value="">— Sin asignar —</option>
+          {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </Select>
+        <Select label="Chofer" style={S.selectBig} value={driverId} onChange={e => setDriverId(e.target.value)}>
+          <option value="">— Sin asignar —</option>
+          {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+        </Select>
+      </div>
+
+      {/* 4 · Paradas adicionales — la ubicación se ajusta en el mapa grande */}
+      <div>
+        <h2 style={S.sectionHd}>Paradas adicionales</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {extraStops.map((stop, i) => {
+            const active = activeStopId === stop._id
+            return (
+              <div key={stop._id} style={stopCardStyle(active)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--cmg-teal)' }}>
+                    {i + 2}
+                  </span>
+                  <input style={{ ...S.input, fontSize: 'var(--fs-md)', flex: 1 }} placeholder="Título de la parada"
+                    value={stop.title} onChange={e => updateStop(stop._id, { title: e.target.value })} />
+                  <button type="button" style={S.delBtn} title="Eliminar parada" onClick={() => removeStop(stop._id)}>×</button>
+                </div>
+                <input style={{ ...S.input, fontSize: 'var(--fs-md)' }} placeholder="Cliente / empresa"
+                  value={stop.client_name} onChange={e => updateStop(stop._id, { client_name: e.target.value })} />
+                <input style={{ ...S.input, fontSize: 'var(--fs-md)' }} placeholder="Dirección"
+                  value={stop.address} onChange={e => updateStop(stop._id, { address: e.target.value })} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-                  {lat != null && lon != null
-                    ? <span style={S.ok}>✓ Ubicación fijada · {lat.toFixed(5)}, {lon.toFixed(5)}</span>
-                    : <span style={S.hint}>Selecciona una dirección o haz clic en el mapa →</span>}
-                  {activeStopId === PRIMARY
+                  <label style={{ ...S.hint, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    Radio (m)
+                    <input type="number" min={10} max={2000} step={10} style={S.radius}
+                      value={stop.arrival_radius_m}
+                      onChange={e => updateStop(stop._id, { arrival_radius_m: Math.max(10, parseInt(e.target.value) || 50) })} />
+                  </label>
+                  {active
                     ? <span style={S.activeBadge}>● Editando en el mapa</span>
-                    : <button type="button" style={S.editBtn} onClick={() => setActiveStopId(PRIMARY)}>Editar en el mapa</button>}
+                    : <button type="button" style={S.editBtn} onClick={() => setActiveStopId(stop._id)}>Editar en el mapa</button>}
+                  {stop.lat != null && <span style={S.ok}>✓ {stop.lat.toFixed(4)}, {stop.lon?.toFixed(4)}</span>}
                 </div>
               </div>
+            )
+          })}
+        </div>
+        <button type="button" style={{ ...S.addBtn, marginTop: 'var(--space-3)' }} onClick={addStop}>
+          + Añadir parada
+        </button>
+      </div>
 
-              {/* 3 · Vehículo + Chofer */}
-              <div style={S.row2}>
-                <Select label="Vehículo" style={S.selectBig} value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
-                  <option value="">— Sin asignar —</option>
-                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
-                <Select label="Chofer" style={S.selectBig} value={driverId} onChange={e => setDriverId(e.target.value)}>
-                  <option value="">— Sin asignar —</option>
-                  {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                </Select>
-              </div>
-
-              {/* 4 · Paradas adicionales — la ubicación se ajusta en el mapa grande */}
-              <div>
-                <h2 style={S.sectionHd}>Paradas adicionales</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  {extraStops.map((stop, i) => {
-                    const active = activeStopId === stop._id
-                    return (
-                      <div key={stop._id} style={stopCardStyle(active)}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--cmg-teal)' }}>
-                            {i + 2}
-                          </span>
-                          <input style={{ ...S.input, fontSize: 'var(--fs-md)', flex: 1 }} placeholder="Título de la parada"
-                            value={stop.title} onChange={e => updateStop(stop._id, { title: e.target.value })} />
-                          <button type="button" style={S.delBtn} title="Eliminar parada" onClick={() => removeStop(stop._id)}>×</button>
-                        </div>
-                        <input style={{ ...S.input, fontSize: 'var(--fs-md)' }} placeholder="Cliente / empresa"
-                          value={stop.client_name} onChange={e => updateStop(stop._id, { client_name: e.target.value })} />
-                        <input style={{ ...S.input, fontSize: 'var(--fs-md)' }} placeholder="Dirección"
-                          value={stop.address} onChange={e => updateStop(stop._id, { address: e.target.value })} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-                          <label style={{ ...S.hint, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                            Radio (m)
-                            <input type="number" min={10} max={2000} step={10} style={S.radius}
-                              value={stop.arrival_radius_m}
-                              onChange={e => updateStop(stop._id, { arrival_radius_m: Math.max(10, parseInt(e.target.value) || 50) })} />
-                          </label>
-                          {active
-                            ? <span style={S.activeBadge}>● Editando en el mapa</span>
-                            : <button type="button" style={S.editBtn} onClick={() => setActiveStopId(stop._id)}>Editar en el mapa</button>}
-                          {stop.lat != null && <span style={S.ok}>✓ {stop.lat.toFixed(4)}, {stop.lon?.toFixed(4)}</span>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <button type="button" style={{ ...S.addBtn, marginTop: 'var(--space-3)' }} onClick={addStop}>
-                  + Añadir parada
-                </button>
-              </div>
-
-              {/* 5 · Más opciones (plegado) */}
-              <div>
-                <button type="button" style={S.moreBtn} onClick={() => setShowMore(v => !v)}>
-                  {showMore ? '▲ Menos opciones' : '▼ Más opciones'}
-                </button>
-                {showMore && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
-                    <div style={S.row2}>
-                      <Select label="Prioridad" style={S.selectBig} value={priority} onChange={e => setPriority(e.target.value as WorkOrderPriority)}>
-                        {(Object.entries(PRIORITY_LABELS) as [WorkOrderPriority, string][]).map(([k, l]) => (
-                          <option key={k} value={k}>{l}</option>
-                        ))}
-                      </Select>
-                      <div style={S.field}>
-                        <label style={S.label} htmlFor="wo-sched">Fecha programada</label>
-                        <input id="wo-sched" type="datetime-local" style={S.input}
-                          value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} />
-                      </div>
-                    </div>
-                    <div style={S.field}>
-                      <label style={S.label} htmlFor="wo-desc">Descripción</label>
-                      <textarea id="wo-desc" style={S.textarea} value={description} onChange={e => setDescription(e.target.value)} />
-                    </div>
-                    <div style={S.field}>
-                      <label style={S.label} htmlFor="wo-notes">Notas internas</label>
-                      <textarea id="wo-notes" style={S.textarea} value={notes} onChange={e => setNotes(e.target.value)} />
-                    </div>
-                    <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)', margin: 0 }}>
-                      El auto-cierre por señal/geocerca se configura editando la orden desde el listado.
-                    </p>
-                  </div>
-                )}
+      {/* 5 · Más opciones (plegado) */}
+      <div>
+        <button type="button" style={S.moreBtn} onClick={() => setShowMore(v => !v)}>
+          {showMore ? '▲ Menos opciones' : '▼ Más opciones'}
+        </button>
+        {showMore && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
+            <div style={S.row2}>
+              <Select label="Prioridad" style={S.selectBig} value={priority} onChange={e => setPriority(e.target.value as WorkOrderPriority)}>
+                {(Object.entries(PRIORITY_LABELS) as [WorkOrderPriority, string][]).map(([k, l]) => (
+                  <option key={k} value={k}>{l}</option>
+                ))}
+              </Select>
+              <div style={S.field}>
+                <label style={S.label} htmlFor="wo-sched">Fecha programada</label>
+                <input id="wo-sched" type="datetime-local" style={S.input}
+                  value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} />
               </div>
             </div>
-
-            <div style={S.footer}>
-              <button type="button" style={S.btnGhost} onClick={() => navigate('/work-orders')}>Cancelar</button>
-              <button type="button" style={{ ...S.btn, opacity: isPending ? 0.6 : 1 }} disabled={isPending} onClick={() => save()}>
-                {isPending ? 'Guardando…' : 'Crear orden'}
-              </button>
+            <div style={S.field}>
+              <label style={S.label} htmlFor="wo-desc">Descripción</label>
+              <textarea id="wo-desc" style={S.textarea} value={description} onChange={e => setDescription(e.target.value)} />
             </div>
-          </div>{/* /columna izquierda */}
-
-          {/* ── Columna derecha: mapa grande, siempre visible, refleja la parada activa ── */}
-          <div style={{
-            position: isNarrow ? 'static' : 'sticky',
-            top: 'var(--space-4)',
-            display: 'flex', flexDirection: 'column',
-            height: isNarrow ? 420 : 'calc(100vh - var(--topbar-h) - var(--space-12))',
-          }}>
-            <p style={S.mapLabel}>Ubicación · {activeLabel}</p>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <StopMap
-                lat={mapLat} lon={mapLon} arrivalRadiusM={mapRadius}
-                onPick={onMapPick} onAddressChange={onMapAddress}
-              />
+            <div style={S.field}>
+              <label style={S.label} htmlFor="wo-notes">Notas internas</label>
+              <textarea id="wo-notes" style={S.textarea} value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
-            <p style={{ ...S.hint, margin: 'var(--space-2) 0 0' }}>
-              Haz clic en el mapa o arrastra el pin para fijar la ubicación de la parada activa.
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-sm)', color: 'var(--fg-muted)', margin: 0 }}>
+              El auto-cierre por señal/geocerca se configura editando la orden desde el listado.
             </p>
           </div>
-        </div>{/* /grid */}
+        )}
+      </div>
+    </div>
+  )
+
+  const mapContent = (
+    <>
+      <p style={S.mapLabel}>Ubicación · {activeLabel}</p>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <StopMap
+          lat={mapLat} lon={mapLon} arrivalRadiusM={mapRadius}
+          onPick={onMapPick} onAddressChange={onMapAddress}
+        />
+      </div>
+      <p style={{ ...S.hint, margin: 'var(--space-2) 0 0' }}>
+        Haz clic en el mapa o arrastra el pin para fijar la ubicación de la parada activa.
+      </p>
+    </>
+  )
+
+  const footerButtons = (
+    <>
+      <button type="button" style={S.btnGhost} onClick={() => navigate('/work-orders')}>Cancelar</button>
+      <button type="button" style={{ ...S.btn, opacity: isPending ? 0.6 : 1 }} disabled={isPending} onClick={() => save()}>
+        {isPending ? 'Guardando…' : 'Crear orden'}
+      </button>
+    </>
+  )
+
+  return (
+    <Shell title="Nueva orden de trabajo">
+      {/* Raíz de altura completa: cabecera fija + cuerpo con scroll + botones siempre visibles. */}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* Cabecera fija */}
+        <div style={{ ...FRAME, flexShrink: 0, padding: 'var(--space-6) var(--space-6) var(--space-4)' }}>
+          <h1 style={S.title}>Nueva orden de trabajo</h1>
+          <p style={S.sub}>Rellena lo mínimo para crear el parte. El resto puede completarse después.</p>
+        </div>
+
+        {isNarrow ? (
+          /* Estrecho: columnas apiladas; toda la página hace scroll; botones fijos al pie. */
+          <>
+            <div style={{ ...FRAME, flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 var(--space-6) var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+              {formContent}
+              <div style={{ display: 'flex', flexDirection: 'column', height: 420 }}>
+                {mapContent}
+              </div>
+            </div>
+            <div style={{ ...S.footer, ...FRAME, padding: 'var(--space-4) var(--space-6) var(--space-6)', marginTop: 0 }}>
+              {footerButtons}
+            </div>
+          </>
+        ) : (
+          /* Escritorio: dos columnas a altura completa. El FORMULARIO hace scroll;
+             el mapa rellena su columna; los botones quedan fijos al pie de la izquierda. */
+          <div style={{
+            ...FRAME, flex: 1, minHeight: 0, display: 'grid',
+            gridTemplateColumns: 'minmax(0, 0.92fr) minmax(0, 1.12fr)',
+            gridTemplateRows: 'minmax(0, 1fr)',
+            gap: 'var(--space-8)', padding: '0 var(--space-6) var(--space-6)', overflow: 'hidden',
+          }}>
+            {/* Columna izquierda: scroll del formulario + barra de acciones fija */}
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 'var(--space-3)', paddingBottom: 'var(--space-4)' }}>
+                {formContent}
+              </div>
+              <div style={S.footer}>
+                {footerButtons}
+              </div>
+            </div>
+
+            {/* Columna derecha: mapa grande, refleja la parada activa */}
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              {mapContent}
+            </div>
+          </div>
+        )}
       </div>
     </Shell>
   )
