@@ -31,9 +31,14 @@ router = APIRouter(tags=["work_cycle_reports"])
 
 
 def _resolve_scope(user: CurrentUser, client_id: uuid.UUID | None) -> uuid.UUID | None:
-    """Resuelve el tenant_scope read-only según rol/tier (CMG ve todo; resto su tenant)."""
-    if user.tenant_tier == "cmg" and user.role == "admin":
-        return None  # CMG admin: sin restricción (client_id filtra opcionalmente)
+    """Resuelve el tenant_scope read-only del reporte de partes/intervenciones.
+
+    Los partes son PRIVADOS del tenant creador: ningún nivel superior
+    (cmg/manufacturer) los ve. Por eso el scope es SIEMPRE `user.tenant_id` —sin
+    rama None para cmg—. Como `tenant_scope` nunca es None, el filtro
+    `v.tenant_id = :scope` del SQL siempre aplica y cierra la fuga del LEFT JOIN
+    a `work_order`.
+    """
     return user.tenant_id
 
 
