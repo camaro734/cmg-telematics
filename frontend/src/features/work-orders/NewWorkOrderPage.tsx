@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
@@ -9,7 +9,22 @@ import Shell from '../../shared/ui/Shell'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { AddressAutocomplete } from './AddressAutocomplete'
 import { StopLocationPicker } from './StopLocationPicker'
+import { StopMap } from './StopMap'
 import type { WorkOrderOut, VehicleOut, DriverOut, WorkOrderPriority } from '../../lib/types'
+
+// Detecta viewport estrecho para apilar las dos columnas (mapa debajo del formulario).
+function useIsNarrow(maxWidthPx = 980): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(`(max-width: ${maxWidthPx}px)`).matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidthPx}px)`)
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [maxWidthPx])
+  return narrow
+}
 
 const PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
   low: 'Baja', normal: 'Normal', high: 'Alta', urgent: 'Urgente',
@@ -29,9 +44,10 @@ type ExtraStop = {
 
 // ── Estilos con TOKENS del sistema (fuente grande y clara; sin px inline sueltos) ──
 const S = {
-  page:    { maxWidth: 640, margin: '0 auto', padding: 'var(--space-6) var(--space-4) var(--space-12)' } as const,
+  page:    { maxWidth: 1440, margin: '0 auto', padding: 'var(--space-6) var(--space-6) var(--space-10)' } as const,
   title:   { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-2xl)', fontWeight: 700, color: 'var(--fg-primary)', margin: '0 0 var(--space-2)' } as const,
-  sub:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', color: 'var(--fg-muted)', margin: '0 0 var(--space-7)' } as const,
+  sub:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', color: 'var(--fg-muted)', margin: '0 0 var(--space-6)' } as const,
+  // Columna del formulario; el mapa va en la otra columna del grid.
   form:    { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-6)' },
   field:   { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)' },
   label:   { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--fg-secondary)' } as const,
@@ -63,6 +79,7 @@ export default function NewWorkOrderPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { activeTenantId } = useTenantContext()
+  const isNarrow = useIsNarrow()
 
   const [clientName, setClientName] = useState('')
   const [vehicleId, setVehicleId]   = useState('')
@@ -160,6 +177,16 @@ export default function NewWorkOrderPage() {
         <h1 style={S.title}>Nueva orden de trabajo</h1>
         <p style={S.sub}>Rellena lo mínimo para crear el parte. El resto puede completarse después.</p>
 
+        {/* Dos columnas: formulario (izq) + mapa grande siempre visible (der).
+            En viewports estrechos se apilan (mapa debajo del formulario). */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 0.92fr) minmax(0, 1.12fr)',
+          gap: 'var(--space-8)',
+          alignItems: 'start',
+        }}>
+          {/* ── Columna izquierda: formulario ── */}
+          <div>
         <div style={S.form}>
           {/* 1 · Cliente del servicio */}
           <div style={S.field}>
@@ -268,12 +295,27 @@ export default function NewWorkOrderPage() {
           </div>
         </div>
 
-        <div style={S.footer}>
-          <button type="button" style={S.btnGhost} onClick={() => navigate('/work-orders')}>Cancelar</button>
-          <button type="button" style={{ ...S.btn, opacity: isPending ? 0.6 : 1 }} disabled={isPending} onClick={() => save()}>
-            {isPending ? 'Guardando…' : 'Crear orden'}
-          </button>
-        </div>
+            <div style={S.footer}>
+              <button type="button" style={S.btnGhost} onClick={() => navigate('/work-orders')}>Cancelar</button>
+              <button type="button" style={{ ...S.btn, opacity: isPending ? 0.6 : 1 }} disabled={isPending} onClick={() => save()}>
+                {isPending ? 'Guardando…' : 'Crear orden'}
+              </button>
+            </div>
+          </div>{/* /columna izquierda */}
+
+          {/* ── Columna derecha: mapa grande, siempre visible ── */}
+          <div style={{
+            position: isNarrow ? 'static' : 'sticky',
+            top: 'var(--space-4)',
+            height: isNarrow ? 380 : 'calc(100vh - var(--topbar-h) - var(--space-12))',
+          }}>
+            <StopMap
+              lat={lat} lon={lon} arrivalRadiusM={50}
+              onPick={(la, lo) => { setLat(la); setLon(lo) }}
+              onAddressChange={(addr) => setAddress(addr)}
+            />
+          </div>
+        </div>{/* /grid */}
       </div>
     </Shell>
   )
