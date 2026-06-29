@@ -7,6 +7,7 @@ import { toast } from '../../shared/ui/Toast'
 import { Select } from '../../shared/ui/Select'
 import Shell from '../../shared/ui/Shell'
 import { useTenantContext } from '../../lib/useTenantContext'
+import { AddressAutocomplete } from './AddressAutocomplete'
 import type { WorkOrderOut, VehicleOut, DriverOut } from '../../lib/types'
 
 // ── Estilos con TOKENS del sistema (fuente grande y clara; sin px inline sueltos) ──
@@ -37,6 +38,10 @@ export default function NewWorkOrderPage() {
   const [clientName, setClientName] = useState('')
   const [vehicleId, setVehicleId]   = useState('')
   const [driverId, setDriverId]     = useState('')
+  // Dirección del servicio = dirección de la parada 1 (se geolocaliza con Valhalla).
+  const [address, setAddress] = useState('')
+  const [lat, setLat] = useState<number | null>(null)
+  const [lon, setLon] = useState<number | null>(null)
 
   // Mismas queries que el listado: el backend filtra por el tenant del jefe de flota.
   const { data: vehicles = [] } = useQuery({
@@ -57,6 +62,7 @@ export default function NewWorkOrderPage() {
         vehicle_id: vehicleId || null,
         driver_id: driverId || null,
         final_client_name: clientName.trim() || null,
+        final_client_address: address.trim() || null,
       }
       return apiClient.post<WorkOrderOut>('/api/v1/work-orders', payload)
     },
@@ -82,6 +88,25 @@ export default function NewWorkOrderPage() {
               placeholder="Nombre o razón social"
               onChange={e => setClientName(e.target.value)}
             />
+          </div>
+
+          <div style={S.field}>
+            <label style={S.label}>Dirección del servicio</label>
+            <AddressAutocomplete
+              value={address}
+              onChange={setAddress}
+              onSelect={(r) => {
+                setAddress(r.label)
+                setLat(r.lat)
+                setLon(r.lon)
+              }}
+              placeholder="Busca la dirección y selecciónala"
+            />
+            {lat != null && lon != null && (
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-sm)', color: 'var(--ok)' }}>
+                ✓ Ubicación fijada · {lat.toFixed(5)}, {lon.toFixed(5)}
+              </span>
+            )}
           </div>
 
           <div style={S.row2}>
