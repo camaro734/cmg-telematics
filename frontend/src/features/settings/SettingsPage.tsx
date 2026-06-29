@@ -7,6 +7,35 @@ import SmtpSection from './SmtpSection'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useNavigate } from 'react-router-dom'
 
+// ── Estilos con TOKENS del sistema, mismo lenguaje que la ficha de vehículo ──
+// Contenedor a ancho completo con margen lateral pequeño (sin maxWidth ni hueco).
+const PAGE: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', height: '100%', overflowY: 'auto',
+  padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)',
+}
+
+// Tarjeta oscura con borde sutil y acento teal arriba (igual que telemetría/parte).
+const CARD: React.CSSProperties = {
+  background: 'var(--bg-surface)', border: '1px solid var(--border)',
+  borderTop: '2px solid var(--cmg-teal)', borderRadius: 8,
+  padding: 'var(--space-5)', boxSizing: 'border-box',
+}
+
+const CARD_HD: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-section-hd)', fontWeight: 700,
+  letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-muted)', margin: '0 0 var(--space-4)',
+}
+
+const CARD_TEXT: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', color: 'var(--fg-muted)', margin: '0 0 var(--space-4)',
+}
+
+const CARD_BTN: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600,
+  background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 8,
+  padding: 'var(--space-3) var(--space-5)', cursor: 'pointer',
+}
+
 export default function SettingsPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
@@ -16,25 +45,22 @@ export default function SettingsPage() {
 
   return (
     <Shell title="Ajustes">
-      <div style={{ padding: 24, overflowY: 'auto', height: '100%', display: 'flex', flexDirection: 'column', gap: 32 }}>
-        <NotificationSettings />
-        {isAdmin && !isCmg && <MyBaseSection />}
-        {isAdmin && <UsersSection />}
-        {isAdmin && <WorkCycleDefinitionsSection />}
-        {isCmgAdmin && <SmtpSection />}
+      <div style={PAGE}>
+        <section style={CARD}><NotificationSettings /></section>
+        {isAdmin && !isCmg && <section style={CARD}><MyBaseSection /></section>}
+        {isAdmin && <section style={CARD}><UsersSection /></section>}
+        {isAdmin && <section style={CARD}><WorkCycleDefinitionsSection /></section>}
+        {isCmgAdmin && <section style={CARD}><SmtpSection /></section>}
         {isCmgAdmin && (
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg-primary)', marginBottom: 8 }}>Configuración de vehículos</div>
-            <p style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 12 }}>
+          <section style={CARD}>
+            <h2 style={CARD_HD}>Configuración de vehículos</h2>
+            <p style={CARD_TEXT}>
               Los sensores, métricas de reportes, alertas y ciclos de trabajo se configuran en <strong>Plantillas</strong>.
             </p>
-            <button
-              onClick={() => navigate('/tipos-vehiculo')}
-              style={{ background: 'var(--cmg-teal)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-            >
+            <button onClick={() => navigate('/tipos-vehiculo')} style={CARD_BTN}>
               Ir a Plantillas →
             </button>
-          </div>
+          </section>
         )}
       </div>
     </Shell>
