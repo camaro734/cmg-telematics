@@ -23,6 +23,9 @@ class TenantOut(BaseModel):
     enabled_modules: list[str] = []
     business_cif: str | None = None
     business_address: str | None = None
+    base_address: str | None = None
+    base_lat: float | None = None
+    base_lon: float | None = None
     manufacturer_can_view_operations: bool = True
     manufacturer_can_view_can_data: bool = True
     manufacturer_can_create_rules: bool = True
@@ -57,6 +60,17 @@ class TenantUpdate(BaseModel):
     manufacturer_can_manage_clients: bool | None = None
     manufacturer_can_transfer_vehicles: bool | None = None
     can_actuate_controls: bool | None = None
+
+
+class TenantBaseUpdate(BaseModel):
+    """Self-service: el admin del cliente fija SOLO la base de su empresa.
+
+    Acotado a base_*; no permite tocar name/slug/módulos/flags. Lo consume el
+    endpoint PATCH /me/tenant/base sobre el propio tenant del usuario.
+    """
+    base_address: str | None = None
+    base_lat: float | None = None
+    base_lon: float | None = None
 
 
 class BrandTokensUpdate(BaseModel):

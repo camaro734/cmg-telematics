@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, CheckConstraint, Text, ARRAY
+from sqlalchemy import String, ForeignKey, DateTime, Boolean, CheckConstraint, Text, ARRAY, Float
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -29,6 +29,12 @@ class Tenant(Base):
     portal_access_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     business_cif: Mapped[str | None] = mapped_column(String(20), nullable=True)
     business_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Base de la empresa: dirección + coordenadas de salida/llegada por defecto
+    # para la optimización de rutas. Una base por tenant; nullable hasta que el
+    # admin del cliente la configure desde Ajustes → Mi base.
+    base_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    base_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    base_lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     manufacturer_can_view_operations: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     manufacturer_can_view_can_data: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     manufacturer_can_create_rules: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
