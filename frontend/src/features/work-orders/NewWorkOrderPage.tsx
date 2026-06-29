@@ -42,14 +42,24 @@ type ExtraStop = {
 
 const PRIMARY = 'primary'
 
-// Contenedor centrado (se pasa a ancho completo en el commit de estilo).
-const FRAME: React.CSSProperties = { maxWidth: 1440, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+// Ancho completo con margen lateral pequeño, como la ficha de vehículo (sin maxWidth).
+const FRAME: React.CSSProperties = { width: '100%', boxSizing: 'border-box' }
 
 // ── Estilos con TOKENS del sistema (fuente grande y clara; sin px inline sueltos) ──
 const S = {
   title:   { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-2xl)', fontWeight: 700, color: 'var(--fg-primary)', margin: '0 0 var(--space-2)' } as const,
   sub:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', color: 'var(--fg-muted)', margin: 0 } as const,
-  form:    { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-6)' },
+  form:    { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-5)' },
+  // Tarjeta oscura con borde sutil y acento teal arriba (mismo lenguaje que la telemetría).
+  card:    {
+    background: 'var(--bg-surface)', border: '1px solid var(--border)',
+    borderTop: '2px solid var(--cmg-teal)', borderRadius: 8,
+    padding: 'var(--space-5)', display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-5)',
+  } as const,
+  cardHd:  {
+    fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-section-hd)', fontWeight: 700,
+    letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: 'var(--fg-muted)', margin: 0,
+  } as const,
   field:   { display: 'flex', flexDirection: 'column' as const, gap: 'var(--space-2)' },
   label:   { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--fg-secondary)' } as const,
   input:   {
@@ -217,6 +227,9 @@ export default function NewWorkOrderPage() {
   // ── Contenido reutilizable (mismo en escritorio y en estrecho) ──
   const formContent = (
     <div style={S.form}>
+      {/* Datos del servicio */}
+      <div style={S.card}>
+        <h2 style={S.cardHd}>Datos del servicio</h2>
       {/* 1 · Cliente del servicio */}
       <div style={S.field}>
         <label style={S.label} htmlFor="wo-client">Cliente del servicio</label>
@@ -255,10 +268,11 @@ export default function NewWorkOrderPage() {
           {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
         </Select>
       </div>
+      </div>{/* /tarjeta Datos del servicio */}
 
       {/* 4 · Paradas adicionales — la ubicación se ajusta en el mapa grande */}
-      <div>
-        <h2 style={S.sectionHd}>Paradas adicionales</h2>
+      <div style={S.card}>
+        <h2 style={S.cardHd}>Paradas adicionales</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {extraStops.map((stop, i) => {
             const active = activeStopId === stop._id
@@ -292,13 +306,13 @@ export default function NewWorkOrderPage() {
             )
           })}
         </div>
-        <button type="button" style={{ ...S.addBtn, marginTop: 'var(--space-3)' }} onClick={addStop}>
+        <button type="button" style={{ ...S.addBtn, alignSelf: 'flex-start' }} onClick={addStop}>
           + Añadir parada
         </button>
-      </div>
+      </div>{/* /tarjeta Paradas adicionales */}
 
       {/* 5 · Más opciones (plegado) */}
-      <div>
+      <div style={{ ...S.card, gap: 'var(--space-3)' }}>
         <button type="button" style={S.moreBtn} onClick={() => setShowMore(v => !v)}>
           {showMore ? '▲ Menos opciones' : '▼ Más opciones'}
         </button>
@@ -334,18 +348,18 @@ export default function NewWorkOrderPage() {
   )
 
   const mapContent = (
-    <>
+    <div style={{ ...S.card, gap: 'var(--space-3)', flex: 1, minHeight: 0 }}>
       <p style={S.mapLabel}>Ubicación · {activeLabel}</p>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, borderRadius: 6, overflow: 'hidden' }}>
         <StopMap
           lat={mapLat} lon={mapLon} arrivalRadiusM={mapRadius}
           onPick={onMapPick} onAddressChange={onMapAddress}
         />
       </div>
-      <p style={{ ...S.hint, margin: 'var(--space-2) 0 0' }}>
+      <p style={{ ...S.hint, margin: 0 }}>
         Haz clic en el mapa o arrastra el pin para fijar la ubicación de la parada activa.
       </p>
-    </>
+    </div>
   )
 
   const footerButtons = (
