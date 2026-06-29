@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user, require_tier, assert_can_manage_tenant
 from app.schemas.auth import CurrentUser
-from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, BrandTokensUpdate, GrantOut, GrantCreate
+from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, TenantBaseUpdate, BrandTokensUpdate, GrantOut, GrantCreate
 from app.schemas.user import UserOut, UserCreate
 from app.models.tenant import Tenant
 from app.models.permission_grant import PermissionGrant
@@ -246,6 +246,47 @@ async def patch_tenant(
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slug ya existe")
+    return tenant
+
+
+@router.get("/me/tenant/base", response_model=TenantOut)
+async def get_my_tenant_base(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve el tenant del usuario autenticado (incluye base_address/lat/lon).
+
+    Self-service: opera siempre sobre el propio tenant del usuario. Lo consume
+    la sección «Mi base» de Ajustes para mostrar la base actual.
+    """
+    tenant = await db.get(Tenant, user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    return tenant
+
+
+@router.patch("/me/tenant/base", response_model=TenantOut)
+async def patch_my_tenant_base(
+    body: TenantBaseUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Self-service: el admin fija la BASE de SU propio tenant (base_* solamente).
+
+    Acotado a `user.tenant_id` y a los campos base_address/base_lat/base_lon; no
+    permite tocar name/slug/módulos/flags. Distinto del PATCH /tenants/{id}
+    general, cuyo control de ownership bloquea editar el propio tenant.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    tenant = await db.get(Tenant, user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
+    # Solo los campos base_*; nada más es editable por esta vía.
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(tenant, field, value)
+    await db.commit()
+    await db.refresh(tenant)
     return tenant
 
 
