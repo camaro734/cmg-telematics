@@ -103,9 +103,12 @@ export function VehicleListPanel({ vehicles, selectedId, onSelect, topSlot }: Ve
       <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border-soft)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-primary)' }}>Vehículos</span>
-          <button onClick={() => setOpen(false)} title="Colapsar panel"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 2, fontSize: 16 }}>
-            ‹
+          <button onClick={() => setOpen(false)} title="Colapsar panel" aria-label="Colapsar panel"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 2, display: 'flex', alignItems: 'center' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
           </button>
         </div>
         <Input
