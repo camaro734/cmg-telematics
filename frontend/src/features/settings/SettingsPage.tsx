@@ -41,8 +41,12 @@ const CARD_BTN: React.CSSProperties = {
 // La barra de pestañas puede desbordar en pantallas estrechas → scroll horizontal.
 const TABBAR: React.CSSProperties = { flexShrink: 0, overflowX: 'auto' }
 
-// Apila las tarjetas dentro de una misma pestaña con separación uniforme.
-const STACK: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }
+// "Mi empresa" agrupa dos tarjetas (Datos de empresa + Mi base): rejilla de 2
+// columnas cuando caben, apilan en estrecho (auto-fit nativo, sin JS).
+const COMPANY_GRID: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))',
+  gap: 'var(--space-5)', alignItems: 'start',
+}
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -57,7 +61,7 @@ export default function SettingsPage() {
     {
       id: 'empresa', label: 'Mi empresa', show: !!isAdmin && !isCmg,
       content: (
-        <div style={STACK}>
+        <div style={COMPANY_GRID}>
           <section style={CARD}><CompanySection /></section>
           <section style={CARD}><MyBaseSection /></section>
         </div>
