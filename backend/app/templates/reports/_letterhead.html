@@ -1,0 +1,25 @@
+{#
+  Membrete del EMISOR reutilizable por el reporte agregado y el parte individual.
+  Estilos INLINE autocontenidos: no depende del CSS de la plantilla que lo incluye.
+  `issuer` viene de app.services.report_branding.build_issuer(tenant).
+  `accent` (opcional) = color de acento del nombre (por defecto gris oscuro).
+#}
+{% macro letterhead(issuer, accent="#374151") %}
+<div style="display:flex; align-items:center; gap:14px;">
+  {% if issuer.logo_src %}
+    <img src="{{ issuer.logo_src }}" style="max-height:46px; max-width:170px; object-fit:contain;">
+  {% endif %}
+  <div style="line-height:1.35;">
+    <div style="font-size:14pt; font-weight:700; color:{{ accent }};">{{ issuer.legal_name }}</div>
+    <div style="font-size:8pt; color:#6b7280;">
+      {% set parts = [] %}
+      {% if issuer.cif %}{% set _ = parts.append('CIF: ' ~ issuer.cif) %}{% endif %}
+      {% if issuer.address %}{% set _ = parts.append(issuer.address) %}{% endif %}
+      {% if issuer.phone %}{% set _ = parts.append('Tel: ' ~ issuer.phone) %}{% endif %}
+      {% if issuer.email %}{% set _ = parts.append(issuer.email) %}{% endif %}
+      {% if issuer.website %}{% set _ = parts.append(issuer.website) %}{% endif %}
+      {{ parts | join(' · ') }}
+    </div>
+  </div>
+</div>
+{% endmacro %}
