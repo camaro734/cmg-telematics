@@ -587,6 +587,8 @@ export interface OptimizeIn {
   origin: RoutePointReq
   stops: { lat: number; lon: number }[]
   destination: RoutePointReq
+  // Índices 0-based de `stops` FIJAS (candado): no se reordenan. Omitir = optimizar todas.
+  pinned?: number[]
 }
 
 export interface OptimizeResult {

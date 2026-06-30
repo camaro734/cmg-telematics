@@ -295,15 +295,17 @@ export default function NewWorkOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coordSig])
 
-  // Paradas con coordenadas (la dirección del servicio es una más). Solo el origen
-  // (salida) y el destino (llegada) se anclan al optimizar; estas son todas
-  // intermedias y se reordenan libremente.
-  const optStops: { key: string; lat: number; lon: number }[] = [
-    ...(lat != null && lon != null ? [{ key: PRIMARY, lat, lon }] : []),
-    ...extraStops
-      .map(s => ({ key: s._id, lat: s.lat, lon: s.lon }))
-      .filter((s): s is { key: string; lat: number; lon: number } => s.lat != null && s.lon != null),
-  ]
+  // Paradas con coordenadas, EN ORDEN DE VISITA actual (para que `pinned` sean los
+  // índices correctos). La dirección del servicio es una más; origen/destino se
+  // anclan aparte. Las fijas (candado) mantendrán su posición al optimizar.
+  const coordByKey = new Map<string, { lat: number; lon: number }>()
+  if (lat != null && lon != null) coordByKey.set(PRIMARY, { lat, lon })
+  for (const s of extraStops) {
+    if (s.lat != null && s.lon != null) coordByKey.set(s._id, { lat: s.lat, lon: s.lon })
+  }
+  const optStops: { key: string; lat: number; lon: number }[] = effectiveOrder
+    .filter(k => coordByKey.has(k))
+    .map(k => ({ key: k, ...coordByKey.get(k)! }))
   const canOptimize = optStops.length >= 2 && !optimize.isPending
 
   async function optimizeRoute() {
@@ -316,10 +318,16 @@ export default function NewWorkOrderPage() {
       return
     }
     try {
+      // Índices (en el orden enviado) de las paradas fijas: el backend no las mueve.
+      const pinned = optStops.reduce<number[]>((acc, s, i) => {
+        if (pinnedKeys.has(s.key)) acc.push(i)
+        return acc
+      }, [])
       const res = await optimize.mutateAsync({
         origin: originType === 'base' ? { type: 'base' } : { type: 'vehicle', vehicle_id: vehicleId },
         stops: optStops.map(s => ({ lat: s.lat, lon: s.lon })),
         destination: destType === 'base' ? { type: 'base' } : { type: 'coords', lat: destLat!, lon: destLon! },
+        pinned,
       })
       // `order` = índices 0-based de optStops en orden óptimo. Reordena TODAS las
       // paradas (incluida la dirección del servicio): guardamos el orden de visita
@@ -558,7 +566,7 @@ export default function NewWorkOrderPage() {
           <h1 style={S.title}>Nueva orden de trabajo</h1>
           <p style={S.sub}>Rellena lo mínimo para crear el parte. El resto puede completarse después.</p>
 
-          {/* Optimización de ruta: salida, llegada y resultado (la parada 1 queda fija primera). */}
+          {/* Optimización de ruta: salida, llegada y resultado. Respeta las paradas con candado. */}
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--space-4)', flexWrap: 'wrap', marginTop: 'var(--space-4)' }}>
             <div style={{ minWidth: 180 }}>
               <Select label="Salida" style={S.selectBig} value={originType}
