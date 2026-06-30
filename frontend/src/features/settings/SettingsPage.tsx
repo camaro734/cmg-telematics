@@ -57,7 +57,9 @@ export default function SettingsPage() {
 
   // Pestañas: cada una con su condición de visibilidad por rol (las MISMAS de antes,
   // solo trasladadas a "qué pestaña se muestra") y su contenido. Se muestra una a la vez.
-  const TABS: { id: string; label: string; show: boolean; content: React.ReactNode }[] = [
+  // Las pestañas con `to` (Conductores, Geocercas) no embeben contenido —esas páginas
+  // tienen su propio layout—, sino que navegan a su ruta: "solo cambia desde dónde se llega".
+  const TABS: { id: string; label: string; show: boolean; content?: React.ReactNode; to?: string }[] = [
     {
       id: 'empresa', label: 'Mi empresa', show: !!isAdmin && !isCmg,
       content: (
@@ -85,14 +87,26 @@ export default function SettingsPage() {
         </section>
       ),
     },
+    // Conductores y Geocercas salieron del desplegable "Operaciones" a Ajustes. Visibles
+    // para el admin (el operador las alcanza por su menú "Cuenta"). Navegan a su ruta.
+    { id: 'conductores', label: 'Conductores', show: !!isAdmin, to: '/drivers' },
+    { id: 'geocercas',   label: 'Geocercas',   show: !!isAdmin, to: '/geofences' },
   ]
 
   const visible = TABS.filter(t => t.show)
-  // "Mi empresa" por defecto: es la primera del array, así que para el admin de cliente
-  // visible[0] es 'empresa'. Para CMG / no-admin, la primera pestaña que sí ven.
-  const [activeTab, setActiveTab] = useState<string>(() => visible[0]?.id ?? '')
-  // Si la activa deja de estar visible (cambio de rol), cae a la primera visible.
-  const active = visible.find(t => t.id === activeTab) ?? visible[0]
+  // Pestaña por defecto: la primera con contenido embebido (las de navegación nunca
+  // quedan "activas", solo redirigen). Para el admin de cliente es 'empresa'; para CMG, 'usuarios'.
+  const firstContent = visible.find(t => t.content)
+  const [activeTab, setActiveTab] = useState<string>(() => firstContent?.id ?? '')
+  // Si la activa deja de estar visible (cambio de rol), cae a la primera con contenido.
+  const active = visible.find(t => t.id === activeTab && t.content) ?? firstContent
+
+  // Las pestañas con `to` navegan a su ruta; el resto cambian el contenido embebido.
+  const handleTab = (id: string) => {
+    const tab = TABS.find(t => t.id === id)
+    if (tab?.to) { navigate(tab.to); return }
+    setActiveTab(id)
+  }
 
   return (
     <Shell title="Ajustes">
@@ -101,7 +115,7 @@ export default function SettingsPage() {
           <Tabs
             tabs={visible.map(t => ({ id: t.id, label: t.label }))}
             activeTab={active?.id ?? ''}
-            onTabChange={setActiveTab}
+            onTabChange={handleTab}
           />
         </div>
         {active?.content}

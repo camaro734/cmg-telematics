@@ -62,10 +62,19 @@ const CMG_ADMIN_ITEMS = [
   { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
 ] as const
 
-// Subset para tier=client en el dropdown "Admin": solo Ajustes
-// (la gestión de subclientes vive en Operaciones → Mis clientes)
+// Subset para tier=client en el dropdown "Cuenta": solo Ajustes
+// (Conductores y Geocercas son pestañas dentro de Ajustes para el admin).
 const CLIENT_ADMIN_ITEMS = [
   { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
+] as const
+
+// Menú "Cuenta" del OPERADOR (no admin): Conductores y Geocercas salieron del
+// desplegable "Operaciones" y ahora cuelgan de aquí como enlaces directos. Conservan
+// ruta y visibilidad; solo cambia desde dónde se llega (el admin las ve como pestañas
+// de Ajustes; el operador no entra a Ajustes, así que accede directo a cada sección).
+const OPERATOR_ACCOUNT_ITEMS = [
+  { label: 'Conductores',         to: '/drivers',        Icon: IconConductores },
+  { label: 'Geocercas',           to: '/geofences',      Icon: IconGeocercas },
 ] as const
 
 // ── Shared hook: close dropdown when clicking outside ────────────────────────
@@ -414,11 +423,24 @@ export default function TopNav() {
   const isCmg          = user?.tenant_tier === 'cmg'
   const isManufacturer = user?.tenant_tier === 'manufacturer'
   const isAdmin        = user?.role === 'admin'
+  const isOperator     = user?.role === 'operator'
   const canManageClients = isCmg && isAdmin
-  // Visibilidad del menú «Cuenta → Ajustes». Incluye al admin de cliente/subcliente
-  // (jefe de flota) para que llegue a Ajustes (Mi base, Usuarios, Ciclos). NO usa
-  // canManageClients porque ese gate gobierna además el TenantSelector (solo CMG).
-  const showAdminMenu = canManageClients || (isAdmin && !isCmg && !isManufacturer)
+  // Visibilidad del menú «Cuenta». Lo ven todos menos el fabricante (que conserva su
+  // propio desplegable "Operaciones"): el admin llega a Ajustes (Mi base, Usuarios,
+  // Ciclos + pestañas Conductores/Geocercas); el operador a Conductores/Geocercas
+  // (enlaces directos), que antes vivían en "Operaciones".
+  const showAdminMenu = !isManufacturer && (isAdmin || isOperator)
+
+  // Contenido del menú «Cuenta» según rol:
+  //  - CMG admin → administración completa (CMG_ADMIN_ITEMS, incluye Ajustes)
+  //  - admin cliente/subcliente → solo Ajustes (allí están las pestañas Conductores/Geocercas)
+  //  - operador (no admin) → enlaces directos a Conductores y Geocercas
+  const accountItems = (isCmg && isAdmin)
+    ? CMG_ADMIN_ITEMS
+    : isAdmin
+      ? CLIENT_ADMIN_ITEMS
+      : OPERATOR_ACCOUNT_ITEMS
+  const accountLabel = (isCmg && isAdmin) ? 'Admin' : 'Cuenta'
 
   const { data: profile } = useMyProfile()
   const mfrCanManageClients = profile?.manufacturer_can_manage_clients ?? false
@@ -624,11 +646,11 @@ export default function TopNav() {
           {drawerOpen && (
             <MobileDrawer
               visibleModules={barLinks as unknown as typeof MODULES[number][]}
-              adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
-              adminLabel={isCmg ? 'Administración' : 'Cuenta'}
+              adminItems={accountItems as unknown as typeof CMG_ADMIN_ITEMS}
+              adminLabel={isCmg && isAdmin ? 'Administración' : 'Cuenta'}
               operatorItems={operatorMenuItems as unknown as typeof OPERATOR_ITEMS}
               showAdmin={showAdminMenu}
-              showOperator={isAdmin || user?.role === 'operator'}
+              showOperator={isManufacturer && (isAdmin || isOperator)}
               userEmail={user?.email}
               onClose={() => setDrawerOpen(false)}
               onLogout={logout}
@@ -676,7 +698,7 @@ export default function TopNav() {
 
             {canManageClients && <TenantSelector />}
 
-            {(isAdmin || user?.role === 'operator') && (
+            {isManufacturer && (isAdmin || isOperator) && (
               <div ref={operatorRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => { setOperatorOpen(o => !o); setAdminOpen(false); setUserOpen(false) }}
@@ -702,12 +724,12 @@ export default function TopNav() {
                   style={btnBase}
                 >
                   <IconAjustes width={15} height={15}/>
-                  {isCmg ? 'Admin' : 'Cuenta'}
+                  {accountLabel}
                   <Chevron open={adminOpen}/>
                 </button>
                 {adminOpen && (
                   <DropdownMenu
-                    items={isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS}
+                    items={accountItems}
                     onClose={() => setAdminOpen(false)}
                   />
                 )}
