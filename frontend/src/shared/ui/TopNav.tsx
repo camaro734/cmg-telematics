@@ -36,15 +36,18 @@ const MODULES = [
   { key: 'reports',     label: 'Reportes',       Icon: IconReportes,     to: '/reports' },
 ] as const
 
-// Items base de Operaciones — visible para admin/operator de cualquier tenant
+// Items base de Operaciones — visible para admin/operator de cualquier tenant.
+// "Órdenes de trabajo" salió de aquí y ahora es un enlace suelto en la barra.
 const OPERATOR_ITEMS_BASE = [
-  { label: 'Órdenes de trabajo', to: '/work-orders', Icon: IconOrdenes },
   { label: 'Conductores',        to: '/drivers',      Icon: IconConductores },
   { label: 'Geocercas',          to: '/geofences',    Icon: IconGeocercas },
 ] as const
 
-// Item extra para admins client (gestión de subclientes propios)
-const MIS_CLIENTES_ITEM = { label: 'Mis clientes', to: '/clientes', Icon: IconClientes } as const
+// Enlaces SUELTOS de la barra (fuera del desplegable), con su condición de rol/módulo
+// propia (se calcula en el componente). Conservan la visibilidad que tenían dentro
+// de los desplegables; solo cambia su ubicación.
+const WORK_ORDERS_LINK = { key: 'work-orders', label: 'Órdenes de trabajo', to: '/work-orders', Icon: IconOrdenes } as const
+const CLIENTES_LINK    = { key: 'clientes',    label: 'Clientes',           to: '/clientes',     Icon: IconClientes } as const
 
 // Mantenemos OPERATOR_ITEMS como alias para tipos que ya lo referencian
 const OPERATOR_ITEMS = OPERATOR_ITEMS_BASE
@@ -484,22 +487,41 @@ export default function TopNav() {
 
   const visibleModules = MODULES.filter(m => isCmg || isManufacturer || enabledModules.includes(m.key))
 
-  // work-orders requiere módulo habilitado; conductores y geocercas son siempre visibles para operadores
-  const visibleOperatorBase = isCmg || isManufacturer
-    ? OPERATOR_ITEMS_BASE
-    : OPERATOR_ITEMS_BASE.filter(item => item.to !== '/work-orders' || enabledModules.includes('work-orders'))
+  // Conductores y geocercas son siempre visibles para operadores/admin (no dependen de módulo).
+  const visibleOperatorBase = OPERATOR_ITEMS_BASE
 
   // Menú de Operaciones. Un fabricante admin gestiona su flota y sus dispositivos
-  // (para crear vehículos de clientes y transferir cajitas), y "Mis clientes" si tiene
-  // habilitada la gestión de clientes.
+  // (para crear vehículos de clientes y transferir cajitas). "Mis clientes" salió a
+  // enlace suelto (CLIENTES_LINK) con su misma condición.
   const mfrSelfServiceItems = isManufacturer && isAdmin
     ? [
         { label: 'Flota', to: '/vehiculos', Icon: IconVehiculos },
         { label: 'Dispositivos', to: '/devices', Icon: IconDispositivos },
-        ...(mfrCanManageClients ? [MIS_CLIENTES_ITEM] : []),
       ]
     : []
   const operatorMenuItems = [...visibleOperatorBase, ...mfrSelfServiceItems]
+
+  // ── Enlaces SUELTOS de la barra, en el orden de la maqueta ──
+  // Flota · Órdenes de trabajo · Clientes · Alertas · Mantenimiento · Reportes.
+  // Cada uno conserva EXACTAMENTE la visibilidad que tenía dentro de su desplegable:
+  //  - Órdenes de trabajo: el desplegable Operaciones se mostraba a (admin|operator) y
+  //    el item exigía el módulo 'work-orders' salvo para cmg/fabricante.
+  //  - Clientes: era "Mis clientes", solo para fabricante admin con gestión de clientes.
+  const showWorkOrders = (isAdmin || user?.role === 'operator')
+    && (isCmg || isManufacturer || enabledModules.includes('work-orders'))
+  const showClientesLink = isManufacturer && isAdmin && mfrCanManageClients
+  type BarLink = { key: string; label: string; to: string; Icon: React.ComponentType<React.SVGProps<SVGSVGElement>> }
+  const barLinks: BarLink[] = []
+  const pushModule = (key: string) => {
+    const m = visibleModules.find(x => x.key === key)
+    if (m) barLinks.push(m)
+  }
+  pushModule('fleet')
+  if (showWorkOrders) barLinks.push(WORK_ORDERS_LINK)
+  if (showClientesLink) barLinks.push(CLIENTES_LINK)
+  pushModule('alerts')
+  pushModule('maintenance')
+  pushModule('reports')
 
   const btnBase: React.CSSProperties = {
     display: 'flex',
@@ -601,7 +623,7 @@ export default function TopNav() {
 
           {drawerOpen && (
             <MobileDrawer
-              visibleModules={visibleModules as unknown as typeof MODULES[number][]}
+              visibleModules={barLinks as unknown as typeof MODULES[number][]}
               adminItems={(isCmg ? CMG_ADMIN_ITEMS : CLIENT_ADMIN_ITEMS) as unknown as typeof CMG_ADMIN_ITEMS}
               adminLabel={isCmg ? 'Administración' : 'Cuenta'}
               operatorItems={operatorMenuItems as unknown as typeof OPERATOR_ITEMS}
@@ -622,7 +644,7 @@ export default function TopNav() {
             gap: 2,
             flex: 1,
           }}>
-            {visibleModules.map(({ key, label, Icon, to }) => (
+            {barLinks.map(({ key, label, Icon, to }) => (
               <NavLink
                 key={key}
                 to={to}
