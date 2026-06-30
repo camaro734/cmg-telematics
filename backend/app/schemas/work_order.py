@@ -27,6 +27,9 @@ class WorkOrderOut(BaseModel):
     notes: str | None = None
     final_client_name: str | None = None
     final_client_address: str | None = None
+    final_client_cif: str | None = None
+    final_client_phone: str | None = None
+    final_client_email: str | None = None
     doc_number: str | None = None
     created_by: uuid.UUID | None = None
     created_at: datetime
@@ -49,6 +52,9 @@ class WorkOrderCreate(BaseModel):
     notes: str | None = None
     final_client_name: str | None = None
     final_client_address: str | None = None
+    final_client_cif: str | None = None
+    final_client_phone: str | None = None
+    final_client_email: str | None = None
     auto_close_config: dict | None = None
 
 
@@ -66,6 +72,9 @@ class WorkOrderUpdate(BaseModel):
     notes: str | None = None
     final_client_name: str | None = None
     final_client_address: str | None = None
+    final_client_cif: str | None = None
+    final_client_phone: str | None = None
+    final_client_email: str | None = None
     auto_close_config: dict | None = None
 
 

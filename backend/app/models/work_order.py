@@ -30,6 +30,10 @@ class WorkOrder(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_client_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     final_client_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # CIF y contacto del cliente final para el bloque destinatario del reporte.
+    final_client_cif: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    final_client_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    final_client_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     doc_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
