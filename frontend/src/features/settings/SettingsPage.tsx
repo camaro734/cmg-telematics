@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import Shell from '../../shared/ui/Shell'
+import Tabs from '../../shared/ui/Tabs'
 import NotificationSettings from './NotificationSettings'
 import UsersSection from './UsersSection'
 import WorkCycleDefinitionsSection from './WorkCycleDefinitionsSection'
@@ -9,7 +11,6 @@ import { useAuthStore } from '../auth/useAuthStore'
 import { useNavigate } from 'react-router-dom'
 
 // ── Estilos con TOKENS del sistema, mismo lenguaje que la ficha de vehículo ──
-// Contenedor a ancho completo con margen lateral pequeño (sin maxWidth ni hueco).
 const PAGE: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', height: '100%', overflowY: 'auto',
   padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)',
@@ -37,12 +38,11 @@ const CARD_BTN: React.CSSProperties = {
   padding: 'var(--space-3) var(--space-5)', cursor: 'pointer',
 }
 
-// Rejilla de los formularios cortos: 2 columnas cuando caben, apila en estrecho
-// (auto-fit nativo, sin JS). Con un solo elemento (p.ej. CMG sin Mi base) ocupa el ancho.
-const TOP_GRID: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))',
-  gap: 'var(--space-5)', alignItems: 'start',
-}
+// La barra de pestañas puede desbordar en pantallas estrechas → scroll horizontal.
+const TABBAR: React.CSSProperties = { flexShrink: 0, overflowX: 'auto' }
+
+// Apila las tarjetas dentro de una misma pestaña con separación uniforme.
+const STACK: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -51,30 +51,56 @@ export default function SettingsPage() {
   const isCmgAdmin = isCmg && isAdmin
   const navigate = useNavigate()
 
+  // Pestañas: cada una con su condición de visibilidad por rol (las MISMAS de antes,
+  // solo trasladadas a "qué pestaña se muestra") y su contenido. Se muestra una a la vez.
+  const TABS: { id: string; label: string; show: boolean; content: React.ReactNode }[] = [
+    {
+      id: 'empresa', label: 'Mi empresa', show: !!isAdmin && !isCmg,
+      content: (
+        <div style={STACK}>
+          <section style={CARD}><CompanySection /></section>
+          <section style={CARD}><MyBaseSection /></section>
+        </div>
+      ),
+    },
+    { id: 'usuarios', label: 'Usuarios', show: !!isAdmin, content: <section style={CARD}><UsersSection /></section> },
+    { id: 'notificaciones', label: 'Notificaciones', show: true, content: <section style={CARD}><NotificationSettings /></section> },
+    { id: 'ciclos', label: 'Ciclos de trabajo', show: !!isAdmin, content: <section style={CARD}><WorkCycleDefinitionsSection /></section> },
+    { id: 'smtp', label: 'SMTP', show: isCmgAdmin, content: <section style={CARD}><SmtpSection /></section> },
+    {
+      id: 'vehiculos', label: 'Config. vehículos', show: isCmgAdmin,
+      content: (
+        <section style={CARD}>
+          <h2 style={CARD_HD}>Configuración de vehículos</h2>
+          <p style={CARD_TEXT}>
+            Los sensores, métricas de reportes, alertas y ciclos de trabajo se configuran en <strong>Plantillas</strong>.
+          </p>
+          <button onClick={() => navigate('/tipos-vehiculo')} style={CARD_BTN}>
+            Ir a Plantillas →
+          </button>
+        </section>
+      ),
+    },
+  ]
+
+  const visible = TABS.filter(t => t.show)
+  // "Mi empresa" por defecto: es la primera del array, así que para el admin de cliente
+  // visible[0] es 'empresa'. Para CMG / no-admin, la primera pestaña que sí ven.
+  const [activeTab, setActiveTab] = useState<string>(() => visible[0]?.id ?? '')
+  // Si la activa deja de estar visible (cambio de rol), cae a la primera visible.
+  const active = visible.find(t => t.id === activeTab) ?? visible[0]
+
   return (
     <Shell title="Ajustes">
       <div style={PAGE}>
-        {/* Formularios cortos arriba, en 2 columnas (apilan en estrecho) */}
-        <div style={TOP_GRID}>
-          <section style={CARD}><NotificationSettings /></section>
-          {isAdmin && !isCmg && <section style={CARD}><CompanySection /></section>}
-          {isAdmin && !isCmg && <section style={CARD}><MyBaseSection /></section>}
+        <div style={TABBAR}>
+          <Tabs
+            tabs={visible.map(t => ({ id: t.id, label: t.label }))}
+            activeTab={active?.id ?? ''}
+            onTabChange={setActiveTab}
+          />
         </div>
-        {/* Tablas / secciones anchas, a ancho completo debajo */}
-        {isAdmin && <section style={CARD}><UsersSection /></section>}
-        {isAdmin && <section style={CARD}><WorkCycleDefinitionsSection /></section>}
-        {isCmgAdmin && <section style={CARD}><SmtpSection /></section>}
-        {isCmgAdmin && (
-          <section style={CARD}>
-            <h2 style={CARD_HD}>Configuración de vehículos</h2>
-            <p style={CARD_TEXT}>
-              Los sensores, métricas de reportes, alertas y ciclos de trabajo se configuran en <strong>Plantillas</strong>.
-            </p>
-            <button onClick={() => navigate('/tipos-vehiculo')} style={CARD_BTN}>
-              Ir a Plantillas →
-            </button>
-          </section>
-        )}
+        {active?.content}
       </div>
     </Shell>
   )

@@ -65,6 +65,8 @@ describe('SettingsPage', () => {
     vi.mocked(useAuthStore).mockImplementation(makeStoreMock(clientAdminUser) as unknown as typeof useAuthStore)
     mockGetForClientAdmin()
     renderPage()
+    // Ajustes ahora son pestañas: Notificaciones vive en su propia pestaña.
+    fireEvent.click(screen.getByRole('tab', { name: 'Notificaciones' }))
     expect(screen.getByText('Notificaciones por email')).toBeInTheDocument()
   })
 
@@ -76,6 +78,7 @@ describe('SettingsPage', () => {
       return Promise.resolve([]) as never
     })
     renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: 'Notificaciones' }))
     expect(screen.getByText('Tenant')).toBeInTheDocument()
   })
 
@@ -95,6 +98,7 @@ describe('SettingsPage', () => {
       </QueryClientProvider>
     )
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Notificaciones' }))
     const input = getByRole('textbox')
     fireEvent.change(input, { target: { value: 'new@test.com' } })
     fireEvent.click(screen.getByText('Guardar'))
