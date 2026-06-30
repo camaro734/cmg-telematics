@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
-from jinja2 import Environment, BaseLoader
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from weasyprint import HTML
@@ -21,9 +21,13 @@ from app.models.work_order_stop import WorkOrderStop
 from app.models.work_report import WorkReport
 from app.schemas.auth import CurrentUser
 from app.schemas.work_report import WorkReportCreate, WorkReportOut
+from app.services.report_branding import build_issuer
 from app.services.stop_metrics import build_schema_index, compute_stop_sensor_metrics
 
 router = APIRouter(prefix="/work-orders", tags=["work-reports"])
+
+# Directorio de plantillas (para importar la macro de membrete compartida).
+_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "templates"
 
 UPLOADS_DIR = (
     Path("/app/uploads/work_reports")
@@ -49,7 +53,7 @@ def format_metric(value, fmt: str, unit: str) -> str:
     return f"{value} {unit}"
 
 
-_PDF_TEMPLATE = """
+_PDF_TEMPLATE = """{% import "reports/_letterhead.html" as lh %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -106,31 +110,25 @@ _PDF_TEMPLATE = """
 </head>
 <body>
   <div class="header">
-    <div class="brand">
-      {% if logo_url %}<img class="brand-logo" src="{{ logo_url }}"/>{% endif %}
-      <div>
-        <div class="brand-name">{{ brand_name }}</div>
-        <div class="brand-sub">Parte de servicio</div>
-      </div>
-    </div>
+    {# Membrete del emisor (logo + datos de empresa) compartido con el reporte agregado #}
+    {{ lh.letterhead(issuer, primary_color) }}
     <div class="doc-info">
       {% if doc_number %}<span class="num">{{ doc_number }}</span>{% endif %}
+      <div class="brand-sub">Parte de servicio</div>
       {{ completed_date or '—' }}
       {% if completed_time %}<br>{{ completed_time }}{% endif %}
     </div>
   </div>
 
-  <div class="parties">
-    <div>
-      <div class="party-label">Emite</div>
-      <div class="party-line"><b>{{ brand_name }}</b></div>
-      {% if business_cif %}<div class="party-line">CIF: {{ business_cif }}</div>{% endif %}
-      {% if business_address %}<div class="party-line">{{ business_address }}</div>{% endif %}
-    </div>
+  {# Destinatario (cliente final). El emisor va en el membrete superior. #}
+  <div class="parties" style="grid-template-columns: 1fr;">
     <div>
       <div class="party-label">Cliente</div>
       <div class="party-line"><b>{{ final_client_name or '—' }}</b></div>
+      {% if final_client_cif %}<div class="party-line">CIF: {{ final_client_cif }}</div>{% endif %}
       {% if final_client_address %}<div class="party-line">{{ final_client_address }}</div>{% endif %}
+      {% if final_client_phone %}<div class="party-line">Tel: {{ final_client_phone }}</div>{% endif %}
+      {% if final_client_email %}<div class="party-line">{{ final_client_email }}</div>{% endif %}
     </div>
   </div>
 
@@ -206,7 +204,9 @@ _PDF_TEMPLATE = """
 </html>
 """
 
-_jinja_env = Environment(loader=BaseLoader())
+# FileSystemLoader (no BaseLoader) para que el template inline pueda importar la
+# macro de membrete compartida con el reporte agregado (reports/_letterhead.html).
+_jinja_env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)))
 _jinja_env.globals['format_metric'] = format_metric
 _template = _jinja_env.from_string(_PDF_TEMPLATE)
 
@@ -377,8 +377,8 @@ async def download_pdf(
     tr = await db.execute(select(Tenant).where(Tenant.id == order.tenant_id))
     tenant = tr.scalar_one_or_none()
     brand_name = (tenant.brand_name or tenant.name) if tenant else "CMG Track"
-    business_cif = tenant.business_cif if tenant else None
-    business_address = tenant.business_address if tenant else None
+    # Membrete del emisor (logo embebido + datos de empresa), compartido con el agregado.
+    issuer = build_issuer(tenant)
     # primary_color: prioriza brand_tokens.primary_color, luego brand_tokens.brand_color
     # (formato de BrandTokensEditor), luego tenant.brand_color (columna), fallback naranja CMG.
     if tenant:
@@ -391,7 +391,6 @@ async def download_pdf(
         )
     else:
         primary_color = "#F97316"
-    logo_url = tenant.logo_url if tenant else None
 
     # Vehicle + tipo (para pdf_metrics) + label
     vehicle = None
@@ -465,14 +464,11 @@ async def download_pdf(
 
     photo_file_urls = [_to_file_url(u) for u in (report.photo_urls or []) if u]
     sig_file_url = _to_file_url(report.signature_url)
-    logo_file_url = _to_file_url(logo_url)
 
     html_str = _template.render(
+        issuer=issuer,
         brand_name=brand_name,
-        business_cif=business_cif,
-        business_address=business_address,
         primary_color=primary_color,
-        logo_url=logo_file_url,
         doc_number=order.doc_number,
         order_title=order.title,
         completed_date=completed_date,
@@ -489,6 +485,9 @@ async def download_pdf(
         unsigned_reason=report.unsigned_reason,
         final_client_name=order.final_client_name,
         final_client_address=order.final_client_address,
+        final_client_cif=order.final_client_cif,
+        final_client_phone=order.final_client_phone,
+        final_client_email=order.final_client_email,
         pdf_metrics=pdf_metrics,
         stops=stops,
     )
