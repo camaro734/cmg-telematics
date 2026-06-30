@@ -12,18 +12,19 @@ export type RouteStop = {
 }
 
 function makeNumericIcon(num: number) {
+  // Pin grande con número legible (círculo blanco amplio + texto con peso).
   return L.divIcon({
-    html: `<div style="position:relative;width:28px;height:36px">
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.45))">
-        <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z" fill="var(--energy-orange)"/>
-        <circle cx="14" cy="14" r="6" fill="white"/>
-        <text x="14" y="18" text-anchor="middle" font-size="8" font-weight="700" fill="var(--energy-orange)" font-family="monospace">${num}</text>
+    html: `<div style="position:relative;width:38px;height:50px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="38" height="50" viewBox="0 0 36 47" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 29 18 29s18-15.5 18-29C36 8.06 27.94 0 18 0z" fill="var(--energy-orange)" stroke="white" stroke-width="1.5"/>
+        <circle cx="18" cy="18" r="12.5" fill="white"/>
+        <text x="18" y="24" text-anchor="middle" font-size="18" font-weight="800" fill="var(--energy-orange)" font-family="var(--font-sans), sans-serif">${num}</text>
       </svg>
     </div>`,
     className: '',
-    iconSize: [28, 36],
-    iconAnchor: [14, 36],
-    popupAnchor: [0, -38],
+    iconSize: [38, 50],
+    iconAnchor: [19, 50],
+    popupAnchor: [0, -52],
   })
 }
 

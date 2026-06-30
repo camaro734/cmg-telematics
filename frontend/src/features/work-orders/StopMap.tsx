@@ -11,18 +11,19 @@ export type MapStop = {
 }
 
 // Pin numerado: naranja y más grande para la parada activa, teal para el resto.
-// El número se coloca sobre el círculo blanco del pin, con el color del pin.
+// El número va sobre el círculo blanco del pin, grande y con peso para que se lea.
 function makeNumIcon(n: number, active: boolean): L.DivIcon {
   const fill = active ? 'var(--energy-orange)' : '#1D9E75'
-  const w = active ? 34 : 28
-  const h = active ? 44 : 38
+  const w = active ? 46 : 38
+  const h = active ? 60 : 50
+  // viewBox 36x47 con círculo blanco amplio (r=12.5) para que quepa un número grande.
   return L.divIcon({
     html: `<div style="position:relative;width:${w}px;height:${h}px">
-      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 28 36" style="display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.5))">
-        <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z" fill="${fill}"/>
-        <circle cx="14" cy="14" r="7" fill="white"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 36 47" style="display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.55))">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 29 18 29s18-15.5 18-29C36 8.06 27.94 0 18 0z" fill="${fill}" stroke="white" stroke-width="1.5"/>
+        <circle cx="18" cy="18" r="12.5" fill="white"/>
       </svg>
-      <span style="position:absolute;top:${active ? 6 : 5}px;left:0;width:${w}px;text-align:center;font-family:var(--font-sans);font-weight:700;font-size:${active ? 14 : 12}px;color:${fill};line-height:1">${n}</span>
+      <span style="position:absolute;top:${active ? 9 : 7}px;left:0;width:${w}px;text-align:center;font-family:var(--font-sans);font-weight:800;font-size:${active ? 22 : 19}px;color:${fill};line-height:1">${n}</span>
     </div>`,
     className: '',
     iconSize: [w, h],
