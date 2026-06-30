@@ -18,6 +18,8 @@ import { useConfirm } from '../../shared/ui/ConfirmDialog'
 import { CARTO_TILES_URL } from '../../lib/mapConfig'
 import { WorkOrderModal } from './WorkOrderModal'
 import { StopLocationPicker } from './StopLocationPicker'
+import { StopsRouteMap } from './StopsRouteMap'
+import { useWorkOrderRoute } from '../fleet/useDestination'
 
 async function downloadOrderPdf(order: WorkOrderOut) {
   const token = useAuthStore.getState().accessToken
@@ -174,6 +176,15 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
     refetchInterval: 15_000,
   })
 
+  // Ruta por carretera (base → paradas → base) para dibujarla; no reordena nada.
+  const { data: route } = useWorkOrderRoute(order.id)
+  const mapStops = stops
+    .filter(s => s.lat != null && s.lon != null)
+    .map((s, i) => ({
+      _id: s.id, lat: s.lat as number, lon: s.lon as number,
+      arrival_radius_m: s.arrival_radius_m, title: s.title, cardIndex: i + 1,
+    }))
+
   // Título derivado: si no se escribe, usa dirección / cliente / "Parada N".
   const derivedStopTitle = () =>
     (newStop.title ?? '').trim() || (newStop.address ?? '').trim() || (newStop.client_name ?? '').trim() || `Parada ${stops.length + 1}`
@@ -238,6 +249,19 @@ function StopsPanel({ order, onClose, onReportStop }: { order: WorkOrderOut; onC
           ×
         </button>
       </div>
+
+      {/* Mapa de la ruta (paradas numeradas + línea por carretera si hay) */}
+      {mapStops.length > 0 && (
+        <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
+          <StopsRouteMap stops={mapStops} routeGeometry={route?.geometry} />
+          {route && (
+            <div style={{ display: 'flex', gap: 16, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+              <span style={{ color: 'var(--cmg-teal)' }}>{(route.distance_m / 1000).toFixed(1)} km</span>
+              <span style={{ color: 'var(--info)' }}>{Math.round(route.duration_s / 60)} min</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Lista de paradas */}
       <div style={{ padding: '12px 20px', flex: 1 }}>

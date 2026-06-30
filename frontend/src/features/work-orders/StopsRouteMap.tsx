@@ -31,7 +31,11 @@ const GEOCIRCLE: L.CircleOptions = {
   color: '#1D9E75', fillColor: '#1D9E75', fillOpacity: 0.12, weight: 2,
 }
 
-export function StopsRouteMap({ stops }: { stops: RouteStop[] }) {
+export function StopsRouteMap({ stops, routeGeometry }: {
+  stops: RouteStop[]
+  // Polyline de la ruta por carretera (lista de [lat, lon]); si se omite, no se dibuja.
+  routeGeometry?: [number, number][]
+}) {
   const containerRef  = useRef<HTMLDivElement>(null)
   const mapRef        = useRef<L.Map | null>(null)
   const layerGroupRef = useRef<L.LayerGroup | null>(null)
@@ -71,12 +75,20 @@ export function StopsRouteMap({ stops }: { stops: RouteStop[] }) {
       L.circle(latlng, { ...GEOCIRCLE, radius: stop.arrival_radius_m }).addTo(group)
     }
 
-    if (coords.length === 1) {
-      map.setView(coords[0], 14)
-    } else {
-      map.fitBounds(L.latLngBounds(coords), { padding: [30, 30], maxZoom: 16 })
+    // Polyline de la ruta por carretera. Resuelve --cmg-teal en runtime (white-label).
+    if (routeGeometry && routeGeometry.length > 1) {
+      const teal = getComputedStyle(document.documentElement).getPropertyValue('--cmg-teal').trim() || '#1D9E75'
+      L.polyline(routeGeometry, { color: teal, weight: 4, opacity: 0.85 }).addTo(group)
     }
-  }, [stops])
+
+    // Encaja la vista a la ruta completa si existe (incluye base), si no a las paradas.
+    const fitTo = routeGeometry && routeGeometry.length > 1 ? routeGeometry : coords
+    if (fitTo.length === 1) {
+      map.setView(fitTo[0], 14)
+    } else {
+      map.fitBounds(L.latLngBounds(fitTo), { padding: [30, 30], maxZoom: 16 })
+    }
+  }, [stops, routeGeometry])
 
   return (
     <div ref={containerRef} style={{
