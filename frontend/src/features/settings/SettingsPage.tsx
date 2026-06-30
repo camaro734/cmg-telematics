@@ -7,8 +7,10 @@ import WorkCycleDefinitionsSection from './WorkCycleDefinitionsSection'
 import MyBaseSection from './MyBaseSection'
 import CompanySection from './CompanySection'
 import SmtpSection from './SmtpSection'
+import DriversPage from '../drivers/DriversPage'
+import GeofencesPage from '../geofences/GeofencesPage'
 import { useAuthStore } from '../auth/useAuthStore'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 // ── Estilos con TOKENS del sistema, mismo lenguaje que la ficha de vehículo ──
 const PAGE: React.CSSProperties = {
@@ -51,15 +53,17 @@ const COMPANY_GRID: React.CSSProperties = {
 export default function SettingsPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
+  const isOperator = user?.role === 'operator'
   const isCmg = user?.tenant_tier === 'cmg'
   const isCmgAdmin = isCmg && isAdmin
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
-  // Pestañas: cada una con su condición de visibilidad por rol (las MISMAS de antes,
-  // solo trasladadas a "qué pestaña se muestra") y su contenido. Se muestra una a la vez.
-  // Las pestañas con `to` (Conductores, Geocercas) no embeben contenido —esas páginas
-  // tienen su propio layout—, sino que navegan a su ruta: "solo cambia desde dónde se llega".
-  const TABS: { id: string; label: string; show: boolean; content?: React.ReactNode; to?: string }[] = [
+  // Pestañas: cada una con su condición de visibilidad por rol y su contenido. Se muestra
+  // una a la vez. Conductores y Geocercas se embeben (DriversPage/GeofencesPage con
+  // `embedded`, que omite su Shell propio) → se ven CON la barra de pestañas, igual que
+  // las demás; ya no saltan a /drivers ni /geofences (esas rutas redirigen aquí).
+  const TABS: { id: string; label: string; show: boolean; content: React.ReactNode }[] = [
     {
       id: 'empresa', label: 'Mi empresa', show: !!isAdmin && !isCmg,
       content: (
@@ -70,7 +74,7 @@ export default function SettingsPage() {
       ),
     },
     { id: 'usuarios', label: 'Usuarios', show: !!isAdmin, content: <section style={CARD}><UsersSection /></section> },
-    { id: 'notificaciones', label: 'Notificaciones', show: true, content: <section style={CARD}><NotificationSettings /></section> },
+    { id: 'notificaciones', label: 'Notificaciones', show: !!isAdmin, content: <section style={CARD}><NotificationSettings /></section> },
     { id: 'ciclos', label: 'Ciclos de trabajo', show: !!isAdmin, content: <section style={CARD}><WorkCycleDefinitionsSection /></section> },
     { id: 'smtp', label: 'SMTP', show: isCmgAdmin, content: <section style={CARD}><SmtpSection /></section> },
     {
@@ -87,26 +91,21 @@ export default function SettingsPage() {
         </section>
       ),
     },
-    // Conductores y Geocercas salieron del desplegable "Operaciones" a Ajustes. Visibles
-    // para el admin (el operador las alcanza por su menú "Cuenta"). Navegan a su ruta.
-    { id: 'conductores', label: 'Conductores', show: !!isAdmin, to: '/drivers' },
-    { id: 'geocercas',   label: 'Geocercas',   show: !!isAdmin, to: '/geofences' },
+    // Conductores y Geocercas: embebidos como pestañas (admin y operador no-fabricante,
+    // que es quien las veía en "Operaciones"). Las rutas /drivers y /geofences redirigen aquí.
+    { id: 'conductores', label: 'Conductores', show: !!isAdmin || isOperator, content: <DriversPage embedded /> },
+    { id: 'geocercas',   label: 'Geocercas',   show: !!isAdmin || isOperator, content: <GeofencesPage embedded /> },
   ]
 
   const visible = TABS.filter(t => t.show)
-  // Pestaña por defecto: la primera con contenido embebido (las de navegación nunca
-  // quedan "activas", solo redirigen). Para el admin de cliente es 'empresa'; para CMG, 'usuarios'.
-  const firstContent = visible.find(t => t.content)
-  const [activeTab, setActiveTab] = useState<string>(() => firstContent?.id ?? '')
-  // Si la activa deja de estar visible (cambio de rol), cae a la primera con contenido.
-  const active = visible.find(t => t.id === activeTab && t.content) ?? firstContent
-
-  // Las pestañas con `to` navegan a su ruta; el resto cambian el contenido embebido.
-  const handleTab = (id: string) => {
-    const tab = TABS.find(t => t.id === id)
-    if (tab?.to) { navigate(tab.to); return }
-    setActiveTab(id)
-  }
+  // Pestaña inicial: `?tab=` si apunta a una visible (lo usa el redirect de /drivers y
+  // /geofences); si no, la primera visible ('empresa' para admin de cliente, 'usuarios'
+  // para CMG, 'conductores' para el operador).
+  const tabParam = searchParams.get('tab')
+  const initial = (tabParam && visible.some(t => t.id === tabParam)) ? tabParam : (visible[0]?.id ?? '')
+  const [activeTab, setActiveTab] = useState<string>(() => initial)
+  // Si la activa deja de estar visible (cambio de rol), cae a la primera visible.
+  const active = visible.find(t => t.id === activeTab) ?? visible[0]
 
   return (
     <Shell title="Ajustes">
@@ -115,7 +114,7 @@ export default function SettingsPage() {
           <Tabs
             tabs={visible.map(t => ({ id: t.id, label: t.label }))}
             activeTab={active?.id ?? ''}
-            onTabChange={handleTab}
+            onTabChange={setActiveTab}
           />
         </div>
         {active?.content}

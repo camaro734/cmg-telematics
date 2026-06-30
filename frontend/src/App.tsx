@@ -67,10 +67,8 @@ const CanScannerPage   = lazy(() => import('./features/diagnostics/CanScannerPag
 const VehiclesPage     = lazy(() => import('./features/vehicles/VehiclesPage'))
 const VehicleTypesPage   = lazy(() => import('./features/vehicles/VehicleTypesPage'))
 const BlockTemplatesPage = lazy(() => import('./features/templates/BlockTemplatesPage'))
-const DriversPage      = lazy(() => import('./features/drivers/DriversPage'))
 const WorkOrdersPage   = lazy(() => import('./features/work-orders/WorkOrdersPage'))
 const NewWorkOrderPage = lazy(() => import('./features/work-orders/NewWorkOrderPage'))
-const GeofencesPage    = lazy(() => import('./features/geofences/GeofencesPage'))
 const ClientPortalPage    = lazy(() => import('./features/portal/ClientPortalPage'))
 const ForgotPasswordPage  = lazy(() => import('./features/auth/ForgotPasswordPage'))
 const ResetPasswordPage   = lazy(() => import('./features/auth/ResetPasswordPage'))
@@ -142,10 +140,10 @@ export default function App() {
                 <Route path="plantillas-bloques" element={<SectionErrorBoundary label="BlockTemplates"><BlockTemplatesPage /></SectionErrorBoundary>} />
                 <Route path="devices"          element={<SectionErrorBoundary label="Devices"><DevicesPage /></SectionErrorBoundary>} />
                 <Route path="can-scanner"      element={<SectionErrorBoundary label="CanScanner"><CanScannerPage /></SectionErrorBoundary>} />
-                <Route path="drivers"          element={<SectionErrorBoundary label="Drivers"><DriversPage /></SectionErrorBoundary>} />
+                <Route path="drivers"          element={<Navigate to="/settings?tab=conductores" replace />} />
                 <Route path="work-orders"     element={<RequireModule module="work-orders"><SectionErrorBoundary label="WorkOrders"><WorkOrdersPage /></SectionErrorBoundary></RequireModule>} />
                 <Route path="work-orders/nuevo" element={<RequireModule module="work-orders"><RequireOrderCreate><SectionErrorBoundary label="NewWorkOrder"><NewWorkOrderPage /></SectionErrorBoundary></RequireOrderCreate></RequireModule>} />
-                <Route path="geofences"       element={<SectionErrorBoundary label="Geofences"><GeofencesPage /></SectionErrorBoundary>} />
+                <Route path="geofences"       element={<Navigate to="/settings?tab=geocercas" replace />} />
                 <Route path="dashboard"       element={<Navigate to="/fleet" replace />} />
                 <Route path="*"                  element={<Navigate to="/fleet" replace />} />
               </Routes>

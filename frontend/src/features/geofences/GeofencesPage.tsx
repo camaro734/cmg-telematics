@@ -37,7 +37,7 @@ function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
   )
 }
 
-export default function GeofencesPage() {
+export default function GeofencesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const confirmAsk = useConfirm()
@@ -102,8 +102,7 @@ export default function GeofencesPage() {
     borderRadius: 7, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   }
 
-  return (
-    <Shell title="Geocercas">
+  const body = (
       <div style={{ padding: '20px 24px', maxWidth: 820 }}>
 
         {/* Header */}
@@ -207,6 +206,7 @@ export default function GeofencesPage() {
           </div>
         )}
       </div>
-    </Shell>
   )
+
+  return embedded ? body : <Shell title="Geocercas">{body}</Shell>
 }

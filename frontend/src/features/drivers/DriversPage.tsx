@@ -163,7 +163,7 @@ function DriverModal({ initial, onClose, onSaved }: ModalProps) {
 }
 
 // ── Página principal ──────────────────────────────────────────────────────────
-export default function DriversPage() {
+export default function DriversPage({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient()
   const confirmAsk = useConfirm()
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
@@ -184,8 +184,7 @@ export default function DriversPage() {
 
   const handleSaved = () => qc.invalidateQueries({ queryKey: keys.drivers() })
 
-  return (
-    <Shell title="Conductores">
+  const body = (
       <div style={{ padding: 24, height: '100%', overflowY: 'auto' }}>
       <div style={S.header}>
         <h1 style={S.title}>Conductores</h1>
@@ -294,6 +293,7 @@ export default function DriversPage() {
         />
       )}
       </div>
-    </Shell>
   )
+
+  return embedded ? body : <Shell title="Conductores">{body}</Shell>
 }
