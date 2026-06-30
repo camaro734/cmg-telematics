@@ -93,6 +93,10 @@ const S = {
   btn:     { fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, padding: 'var(--space-3) var(--space-6)', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--cmg-teal)', color: '#fff' } as const,
   btnGhost:{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, padding: 'var(--space-3) var(--space-6)', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-elevated)', color: 'var(--fg-muted)' } as const,
   delBtn:  { background: 'transparent', border: 'none', color: 'var(--danger)', fontSize: 'var(--fs-xl)', cursor: 'pointer', lineHeight: 1, padding: '0 4px' } as const,
+  // Botones ↑/↓ para reordenar la parada (sin librería de drag-and-drop).
+  moveBtn: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--fg-secondary)', borderRadius: 6, cursor: 'pointer', fontSize: 'var(--fs-md)', lineHeight: 1, padding: 'var(--space-1) var(--space-2)', minWidth: 28 } as const,
+  // Número de visita (1..n) como chip mono, acento teal.
+  visitNum:{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--cmg-teal)', minWidth: 18, textAlign: 'center' as const } as const,
   mapLabel:{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)', fontWeight: 600, color: 'var(--fg-primary)', margin: '0 0 var(--space-2)' } as const,
   radius:  { ...{ fontFamily: 'var(--font-sans)', fontSize: 'var(--fs-md)' }, width: 96, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--fg-primary)', padding: 'var(--space-2) var(--space-3)', boxSizing: 'border-box' as const } as const,
 }
@@ -137,6 +141,9 @@ export default function NewWorkOrderPage() {
   // la optimización. Reordena la numeración y el guardado de TODAS las paradas (la
   // dirección del servicio es una más, no queda fija). null = orden natural.
   const [visitOrder, setVisitOrder] = useState<string[] | null>(null)
+  // Paradas FIJAS (candado): claves de parada que el optimizador no moverá.
+  // Estado LOCAL de edición, no se persiste (solo instruye a "Optimizar ruta").
+  const [pinnedKeys, setPinnedKeys] = useState<Set<string>>(new Set())
   const optimize = useOptimizeRoute()
 
   // "Más opciones" — plegado por defecto.
@@ -170,6 +177,12 @@ export default function NewWorkOrderPage() {
   function removeStop(_id: string) {
     setExtraStops(s => s.filter(d => d._id !== _id))
     if (activeStopId === _id) setActiveStopId(PRIMARY)
+    setPinnedKeys(prev => {
+      if (!prev.has(_id)) return prev
+      const next = new Set(prev)
+      next.delete(_id)
+      return next
+    })
   }
 
   const stopHasContent = (s: ExtraStop) => !!(s.title.trim() || s.address.trim() || s.lat != null)
@@ -179,10 +192,72 @@ export default function NewWorkOrderPage() {
   const activeStop = activeStopId === PRIMARY ? null : extraStops.find(s => s._id === activeStopId) ?? null
   const mapRadius = activeStop ? activeStop.arrival_radius_m : 50
 
-  // Número de visita de una parada (1..n) según el orden óptimo; si no se ha
-  // optimizado, usa el orden natural (fallback).
-  const visitNumberOf = (id: string, fallback: number) =>
-    visitOrder && visitOrder.indexOf(id) >= 0 ? visitOrder.indexOf(id) + 1 : fallback
+  // Claves de todas las paradas presentes (dirección del servicio + adicionales)
+  // en orden natural. Base para reordenar a mano y numerar.
+  const naturalKeys = [
+    ...(hasPrimaryStop ? [PRIMARY] : []),
+    ...extraStops.map(s => s._id),
+  ]
+  // Orden de VISITA efectivo: visitOrder reconciliado con las paradas presentes
+  // (quita las que ya no existen, añade nuevas al final). Sin visitOrder → natural.
+  const effectiveOrder = visitOrder
+    ? [...visitOrder.filter(k => naturalKeys.includes(k)), ...naturalKeys.filter(k => !visitOrder.includes(k))]
+    : naturalKeys
+
+  // Número de visita de una parada (1..n) según el orden efectivo (manual u óptimo);
+  // si la clave no está presente, usa el fallback.
+  const visitNumberOf = (id: string, fallback: number) => {
+    const i = effectiveOrder.indexOf(id)
+    return i >= 0 ? i + 1 : fallback
+  }
+
+  // Sube/baja una parada una posición en el orden de visita (mutando visitOrder).
+  function moveStop(key: string, dir: 'up' | 'down') {
+    const base = effectiveOrder
+    const i = base.indexOf(key)
+    if (i < 0) return
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= base.length) return
+    const next = [...base]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setVisitOrder(next)
+  }
+  // Alterna el candado (fija/libera) de una parada. Solo estado local de edición.
+  function togglePin(key: string) {
+    setPinnedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // Controles de cada parada: número de visita + ↑/↓ (reordenar) + candado (fijar).
+  // Reutilizado por la dirección del servicio y por cada parada adicional.
+  const stopControls = (key: string) => {
+    const pos = effectiveOrder.indexOf(key)
+    const isFirst = pos <= 0
+    const isLast = pos === effectiveOrder.length - 1
+    const pinned = pinnedKeys.has(key)
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+        <span style={S.visitNum} title="Orden de visita">{pos >= 0 ? pos + 1 : '·'}</span>
+        <button type="button" disabled={isFirst} title="Subir"
+          style={{ ...S.moveBtn, opacity: isFirst ? 0.4 : 1, cursor: isFirst ? 'not-allowed' : 'pointer' }}
+          onClick={() => moveStop(key, 'up')}>↑</button>
+        <button type="button" disabled={isLast} title="Bajar"
+          style={{ ...S.moveBtn, opacity: isLast ? 0.4 : 1, cursor: isLast ? 'not-allowed' : 'pointer' }}
+          onClick={() => moveStop(key, 'down')}>↓</button>
+        <button type="button" aria-pressed={pinned}
+          title={pinned ? 'Parada fija: no se moverá al optimizar (clic para liberar)' : 'Fijar parada en su posición'}
+          style={{ ...S.moveBtn,
+            color: pinned ? 'var(--warn)' : 'var(--fg-secondary)',
+            borderColor: pinned ? 'var(--warn)' : 'var(--border)',
+            background: pinned ? 'color-mix(in srgb, var(--warn) 18%, transparent)' : 'var(--bg-elevated)' }}
+          onClick={() => togglePin(key)}>{pinned ? '🔒' : '🔓'}</button>
+      </div>
+    )
+  }
 
   // Todas las paradas con coordenadas, numeradas según el orden de VISITA (óptimo si
   // se ha optimizado; natural si no). La dirección del servicio no tiene número fijo.
@@ -334,14 +409,10 @@ export default function NewWorkOrderPage() {
 
       {/* 2 · Dirección (Valhalla) = una parada más (su nº de visita lo fija la optimización) */}
       <div style={S.field}>
-        <label style={S.label}>
-          Dirección del servicio
-          {visitOrder && lat != null && lon != null && (
-            <span style={{ marginLeft: 'var(--space-2)', color: 'var(--cmg-teal)', fontWeight: 700 }}>
-              · parada {visitNumberOf(PRIMARY, 1)}
-            </span>
-          )}
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+          <label style={S.label}>Dirección del servicio</label>
+          {hasPrimaryStop && stopControls(PRIMARY)}
+        </div>
         <AddressAutocomplete
           value={address}
           onChange={(q) => { setAddress(q); setActiveStopId(PRIMARY) }}
@@ -375,14 +446,14 @@ export default function NewWorkOrderPage() {
       <div style={S.card}>
         <h2 style={S.cardHd}>Paradas adicionales</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          {extraStops.map((stop, i) => {
+          {[...extraStops]
+            .sort((a, b) => effectiveOrder.indexOf(a._id) - effectiveOrder.indexOf(b._id))
+            .map((stop) => {
             const active = activeStopId === stop._id
             return (
               <div key={stop._id} style={stopCardStyle(active)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--cmg-teal)' }}>
-                    {stop.lat != null && stop.lon != null ? visitNumberOf(stop._id, i + 2) : i + 2}
-                  </span>
+                  {stopControls(stop._id)}
                   <input style={{ ...S.input, fontSize: 'var(--fs-md)', flex: 1 }} placeholder="Título de la parada"
                     value={stop.title} onChange={e => updateStop(stop._id, { title: e.target.value })} />
                   <button type="button" style={S.delBtn} title="Eliminar parada" onClick={() => removeStop(stop._id)}>×</button>
