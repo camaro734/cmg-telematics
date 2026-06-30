@@ -2,7 +2,7 @@
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RoutePoint(BaseModel):
@@ -27,6 +27,9 @@ class OptimizeIn(BaseModel):
     origin: RoutePoint
     stops: list[LatLon]
     destination: RoutePoint
+    # Índices 0-based de ``stops`` que están FIJAS (candado): mantienen su posición;
+    # solo se reordenan las paradas libres entre ellas. Vacío = optimizar todas.
+    pinned: list[int] = Field(default_factory=list)
 
 
 class OptimizeOut(BaseModel):

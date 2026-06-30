@@ -17,7 +17,7 @@ from app.core.database import get_db
 from app.models.tenant import Tenant
 from app.schemas.auth import CurrentUser
 from app.schemas.route import OptimizeIn, OptimizeOut, RoutePoint
-from app.services.routing import valhalla_optimize
+from app.services.routing import valhalla_optimize_pinned
 
 router = APIRouter(tags=["routes"])
 logger = logging.getLogger(__name__)
@@ -70,8 +70,9 @@ async def optimize_route(
     """Reordena las paradas por el camino más corto entre origen y destino.
 
     El origen y el destino quedan fijos; solo se reordenan las paradas intermedias.
-    Devuelve el orden óptimo de las paradas, la distancia/tiempo totales y la
-    geometría de la ruta (ya decodificada) para dibujarla.
+    Las paradas marcadas en ``pinned`` (candado) mantienen su posición: solo se
+    reordenan las libres entre ellas. Devuelve el orden óptimo de las paradas, la
+    distancia/tiempo totales y la geometría de la ruta (ya decodificada) para dibujarla.
     """
     if len(body.stops) < 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Añade al menos una parada para optimizar")
@@ -81,7 +82,7 @@ async def optimize_route(
     stops = [(s.lat, s.lon) for s in body.stops]
 
     try:
-        order, result = await valhalla_optimize(origin, stops, dest)
+        order, result = await valhalla_optimize_pinned(origin, stops, dest, body.pinned)
     except (httpx.HTTPError, KeyError) as exc:
         logger.warning("optimize_route: fallo Valhalla: %s", exc)
         raise HTTPException(
