@@ -23,6 +23,10 @@ class TenantOut(BaseModel):
     enabled_modules: list[str] = []
     business_cif: str | None = None
     business_address: str | None = None
+    business_legal_name: str | None = None
+    business_phone: str | None = None
+    business_email: str | None = None
+    business_website: str | None = None
     base_address: str | None = None
     base_lat: float | None = None
     base_lon: float | None = None
@@ -54,6 +58,10 @@ class TenantUpdate(BaseModel):
     enabled_modules: list[str] | None = None
     business_cif: str | None = None
     business_address: str | None = None
+    business_legal_name: str | None = None
+    business_phone: str | None = None
+    business_email: str | None = None
+    business_website: str | None = None
     manufacturer_can_view_operations: bool | None = None
     manufacturer_can_view_can_data: bool | None = None
     manufacturer_can_create_rules: bool | None = None
@@ -71,6 +79,22 @@ class TenantBaseUpdate(BaseModel):
     base_address: str | None = None
     base_lat: float | None = None
     base_lon: float | None = None
+
+
+class TenantCompanyUpdate(BaseModel):
+    """Self-service: el admin del cliente edita los DATOS DE EMPRESA de su tenant.
+
+    Acotado a los campos del membrete del emisor (razón social, CIF, dirección y
+    contacto); no permite tocar name/slug/módulos/flags. Lo consume el endpoint
+    PATCH /me/tenant/company sobre el propio tenant del usuario, porque el PATCH
+    /tenants/{id} general bloquea editar el propio tenant (control de ownership).
+    """
+    business_legal_name: str | None = None
+    business_cif: str | None = None
+    business_address: str | None = None
+    business_phone: str | None = None
+    business_email: str | None = None
+    business_website: str | None = None
 
 
 class BrandTokensUpdate(BaseModel):

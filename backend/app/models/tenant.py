@@ -29,6 +29,11 @@ class Tenant(Base):
     portal_access_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     business_cif: Mapped[str | None] = mapped_column(String(20), nullable=True)
     business_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Datos de contacto del emisor para el membrete del reporte (cabecera tipo factura).
+    business_legal_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    business_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    business_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    business_website: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Base de la empresa: dirección + coordenadas de salida/llegada por defecto
     # para la optimización de rutas. Una base por tenant; nullable hasta que el
     # admin del cliente la configure desde Ajustes → Mi base.

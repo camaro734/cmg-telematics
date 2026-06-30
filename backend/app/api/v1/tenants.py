@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import get_db
 from app.api.v1.deps import get_current_user, require_tier, assert_can_manage_tenant
 from app.schemas.auth import CurrentUser
-from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, TenantBaseUpdate, BrandTokensUpdate, GrantOut, GrantCreate
+from app.schemas.tenant import TenantOut, TenantCreate, TenantUpdate, TenantBaseUpdate, TenantCompanyUpdate, BrandTokensUpdate, GrantOut, GrantCreate
 from app.schemas.user import UserOut, UserCreate
 from app.models.tenant import Tenant
 from app.models.permission_grant import PermissionGrant
@@ -283,6 +283,31 @@ async def patch_my_tenant_base(
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
     # Solo los campos base_*; nada más es editable por esta vía.
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(tenant, field, value)
+    await db.commit()
+    await db.refresh(tenant)
+    return tenant
+
+
+@router.patch("/me/tenant/company", response_model=TenantOut)
+async def patch_my_tenant_company(
+    body: TenantCompanyUpdate,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Self-service: el admin edita los DATOS DE EMPRESA de SU propio tenant.
+
+    Acotado a `user.tenant_id` y a los campos de empresa del membrete (razón
+    social, CIF, dirección y contacto); no permite tocar name/slug/módulos/flags.
+    Distinto del PATCH /tenants/{id} general, cuyo control de ownership bloquea
+    editar el propio tenant. El logo se sube aparte por POST /tenants/{id}/logo.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol admin")
+    tenant = await db.get(Tenant, user.tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant no encontrado")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(tenant, field, value)
     await db.commit()
