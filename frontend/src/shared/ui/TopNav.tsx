@@ -59,23 +59,11 @@ const CMG_ADMIN_ITEMS = [
   { label: 'Plantillas',           to: '/tipos-vehiculo',    Icon: IconVehiculos },
   { label: 'Dispositivos',         to: '/devices',            Icon: IconDispositivos },
   { label: 'CAN Scanner',         to: '/can-scanner',    Icon: IconCanScanner },
-  { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
 ] as const
 
-// Subset para tier=client en el dropdown "Cuenta": solo Ajustes
-// (Conductores y Geocercas son pestañas dentro de Ajustes para el admin).
-const CLIENT_ADMIN_ITEMS = [
-  { label: 'Ajustes',             to: '/settings',       Icon: IconAjustes },
-] as const
-
-// Menú "Cuenta" del OPERADOR (no admin): Conductores y Geocercas salieron del
-// desplegable "Operaciones" y ahora cuelgan de aquí como enlaces directos. Conservan
-// ruta y visibilidad; solo cambia desde dónde se llega (el admin las ve como pestañas
-// de Ajustes; el operador no entra a Ajustes, así que accede directo a cada sección).
-const OPERATOR_ACCOUNT_ITEMS = [
-  { label: 'Conductores',         to: '/drivers',        Icon: IconConductores },
-  { label: 'Geocercas',           to: '/geofences',      Icon: IconGeocercas },
-] as const
+// "Ajustes" es un enlace SUELTO de la barra (ya no un desplegable "Cuenta"): un clic
+// lleva a SettingsPage, donde Conductores y Geocercas viven como pestañas embebidas.
+const SETTINGS_LINK = { key: 'settings', label: 'Ajustes', to: '/settings', Icon: IconAjustes } as const
 
 // ── Shared hook: close dropdown when clicking outside ────────────────────────
 
@@ -425,22 +413,13 @@ export default function TopNav() {
   const isAdmin        = user?.role === 'admin'
   const isOperator     = user?.role === 'operator'
   const canManageClients = isCmg && isAdmin
-  // Visibilidad del menú «Cuenta». Lo ven todos menos el fabricante (que conserva su
-  // propio desplegable "Operaciones"): el admin llega a Ajustes (Mi base, Usuarios,
-  // Ciclos + pestañas Conductores/Geocercas); el operador a Conductores/Geocercas
-  // (enlaces directos), que antes vivían en "Operaciones".
-  const showAdminMenu = !isManufacturer && (isAdmin || isOperator)
-
-  // Contenido del menú «Cuenta» según rol:
-  //  - CMG admin → administración completa (CMG_ADMIN_ITEMS, incluye Ajustes)
-  //  - admin cliente/subcliente → solo Ajustes (allí están las pestañas Conductores/Geocercas)
-  //  - operador (no admin) → enlaces directos a Conductores y Geocercas
-  const accountItems = (isCmg && isAdmin)
-    ? CMG_ADMIN_ITEMS
-    : isAdmin
-      ? CLIENT_ADMIN_ITEMS
-      : OPERATOR_ACCOUNT_ITEMS
-  const accountLabel = (isCmg && isAdmin) ? 'Admin' : 'Cuenta'
+  // "Ajustes" (enlace directo): lo ven admins y operadores no-fabricante. El admin
+  // gestiona Mi empresa/Usuarios/Ciclos + Conductores/Geocercas; el operador entra y
+  // solo ve las pestañas Conductores/Geocercas. El fabricante conserva "Operaciones".
+  const showSettingsLink = !isManufacturer && (isAdmin || isOperator)
+  // Desplegable "Admin" (solo CMG admin): gestión global multi-tenant (Clientes, Flota
+  // de todos, Plantillas, Dispositivos, CAN Scanner). Ajustes ya no cuelga de aquí.
+  const showCmgAdminMenu = isCmg && isAdmin
 
   const { data: profile } = useMyProfile()
   const mfrCanManageClients = profile?.manufacturer_can_manage_clients ?? false
@@ -545,6 +524,10 @@ export default function TopNav() {
   pushModule('maintenance')
   pushModule('reports')
 
+  // En móvil, "Ajustes" va con los módulos de la lista principal del drawer (en desktop
+  // es un enlace propio a la derecha, junto al desplegable Admin del CMG).
+  const mobileLinks = showSettingsLink ? [...barLinks, SETTINGS_LINK] : barLinks
+
   const btnBase: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -645,11 +628,11 @@ export default function TopNav() {
 
           {drawerOpen && (
             <MobileDrawer
-              visibleModules={barLinks as unknown as typeof MODULES[number][]}
-              adminItems={accountItems as unknown as typeof CMG_ADMIN_ITEMS}
-              adminLabel={isCmg && isAdmin ? 'Administración' : 'Cuenta'}
+              visibleModules={mobileLinks as unknown as typeof MODULES[number][]}
+              adminItems={CMG_ADMIN_ITEMS}
+              adminLabel="Administración"
               operatorItems={operatorMenuItems as unknown as typeof OPERATOR_ITEMS}
-              showAdmin={showAdminMenu}
+              showAdmin={showCmgAdminMenu}
               showOperator={isManufacturer && (isAdmin || isOperator)}
               userEmail={user?.email}
               onClose={() => setDrawerOpen(false)}
@@ -717,23 +700,37 @@ export default function TopNav() {
               </div>
             )}
 
-            {showAdminMenu && (
+            {showCmgAdminMenu && (
               <div ref={adminRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => { setAdminOpen(o => !o); setOperatorOpen(false); setUserOpen(false) }}
                   style={btnBase}
                 >
-                  <IconAjustes width={15} height={15}/>
-                  {accountLabel}
+                  Admin
                   <Chevron open={adminOpen}/>
                 </button>
                 {adminOpen && (
                   <DropdownMenu
-                    items={accountItems}
+                    items={CMG_ADMIN_ITEMS}
                     onClose={() => setAdminOpen(false)}
                   />
                 )}
               </div>
+            )}
+
+            {showSettingsLink && (
+              <NavLink
+                to="/settings"
+                style={({ isActive }) => ({
+                  ...btnBase,
+                  textDecoration: 'none',
+                  color: isActive ? 'var(--cmg-teal)' : 'var(--fg-tertiary)',
+                  borderColor: isActive ? 'var(--cmg-teal)' : 'var(--border)',
+                })}
+              >
+                <IconAjustes width={15} height={15}/>
+                Ajustes
+              </NavLink>
             )}
 
             {/* ── KPI chips + WS dot — solo desktop ─────────────────── */}
