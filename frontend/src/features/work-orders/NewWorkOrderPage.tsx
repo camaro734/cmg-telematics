@@ -133,6 +133,10 @@ export default function NewWorkOrderPage() {
   const [destLon, setDestLon] = useState<number | null>(null)
   const [routeGeometry, setRouteGeometry] = useState<[number, number][] | undefined>(undefined)
   const [routeInfo, setRouteInfo] = useState<{ distance_m: number; duration_s: number } | null>(null)
+  // Orden de visita óptimo: claves de parada (PRIMARY o _id) en el orden devuelto por
+  // la optimización. Reordena la numeración y el guardado de TODAS las paradas (la
+  // dirección del servicio es una más, no queda fija). null = orden natural.
+  const [visitOrder, setVisitOrder] = useState<string[] | null>(null)
   const optimize = useOptimizeRoute()
 
   // "Más opciones" — plegado por defecto.
@@ -175,15 +179,23 @@ export default function NewWorkOrderPage() {
   const activeStop = activeStopId === PRIMARY ? null : extraStops.find(s => s._id === activeStopId) ?? null
   const mapRadius = activeStop ? activeStop.arrival_radius_m : 50
 
-  // Todas las paradas con coordenadas, numeradas según su orden (1 = dirección del servicio).
+  // Número de visita de una parada (1..n) según el orden óptimo; si no se ha
+  // optimizado, usa el orden natural (fallback).
+  const visitNumberOf = (id: string, fallback: number) =>
+    visitOrder && visitOrder.indexOf(id) >= 0 ? visitOrder.indexOf(id) + 1 : fallback
+
+  // Todas las paradas con coordenadas, numeradas según el orden de VISITA (óptimo si
+  // se ha optimizado; natural si no). La dirección del servicio no tiene número fijo.
   const mapStops: MapStop[] = [
-    { id: PRIMARY, lat, lon, n: 1 },
-    ...extraStops.map((s, i) => ({ id: s._id, lat: s.lat, lon: s.lon, n: i + 2 })),
-  ].filter((s): s is MapStop => s.lat != null && s.lon != null)
+    { id: PRIMARY, lat, lon },
+    ...extraStops.map(s => ({ id: s._id, lat: s.lat, lon: s.lon })),
+  ]
+    .filter((s): s is { id: string; lat: number; lon: number } => s.lat != null && s.lon != null)
+    .map((s, idx) => ({ ...s, n: visitNumberOf(s.id, idx + 1) }))
   const activeIdx = activeStop ? extraStops.findIndex(s => s._id === activeStopId) : -1
   const activeLabel = activeStop
-    ? `Parada ${activeIdx + 2}${activeStop.title.trim() ? ` · ${activeStop.title.trim()}` : ''}`
-    : 'Parada 1 · dirección del servicio'
+    ? `Parada ${visitNumberOf(activeStop._id, activeIdx + 2)}${activeStop.title.trim() ? ` · ${activeStop.title.trim()}` : ''}`
+    : `Parada ${visitNumberOf(PRIMARY, 1)} · dirección del servicio`
 
   function onMapPick(la: number, lo: number) {
     if (activeStopId === PRIMARY) { setLat(la); setLon(lo) }
@@ -204,16 +216,18 @@ export default function NewWorkOrderPage() {
   useEffect(() => {
     setRouteGeometry(undefined)
     setRouteInfo(null)
+    setVisitOrder(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coordSig])
 
-  // Paradas con coordenadas, en orden actual (parada 1 primero). Marca cuál es la
-  // parada 1 para mantenerla fija al aplicar el orden óptimo.
-  const optStops: { isPrimary: boolean; extraIdx: number; lat: number; lon: number }[] = [
-    ...(lat != null && lon != null ? [{ isPrimary: true, extraIdx: -1, lat, lon }] : []),
+  // Paradas con coordenadas (la dirección del servicio es una más). Solo el origen
+  // (salida) y el destino (llegada) se anclan al optimizar; estas son todas
+  // intermedias y se reordenan libremente.
+  const optStops: { key: string; lat: number; lon: number }[] = [
+    ...(lat != null && lon != null ? [{ key: PRIMARY, lat, lon }] : []),
     ...extraStops
-      .map((s, i) => ({ isPrimary: false, extraIdx: i, lat: s.lat, lon: s.lon }))
-      .filter((s): s is { isPrimary: false; extraIdx: number; lat: number; lon: number } => s.lat != null && s.lon != null),
+      .map(s => ({ key: s._id, lat: s.lat, lon: s.lon }))
+      .filter((s): s is { key: string; lat: number; lon: number } => s.lat != null && s.lon != null),
   ]
   const canOptimize = optStops.length >= 2 && !optimize.isPending
 
@@ -232,20 +246,13 @@ export default function NewWorkOrderPage() {
         stops: optStops.map(s => ({ lat: s.lat, lon: s.lon })),
         destination: destType === 'base' ? { type: 'base' } : { type: 'coords', lat: destLat!, lon: destLon! },
       })
-      // `order` = índices 0-based de optStops en orden óptimo. Mantenemos la parada 1
-      // fija primera: extraemos solo el orden relativo de las paradas adicionales.
-      const extraOrder = res.order
-        .map(i => optStops[i])
-        .filter(s => s && !s.isPrimary)
-        .map(s => s.extraIdx)
-      if (extraOrder.length > 0) {
-        setExtraStops(prev => {
-          const reordered = extraOrder.map(idx => prev[idx]).filter(Boolean)
-          // Conserva al final las paradas sin coordenadas (no entran en la optimización).
-          const rest = prev.filter((_, idx) => !extraOrder.includes(idx))
-          return [...reordered, ...rest]
-        })
-      }
+      // `order` = índices 0-based de optStops en orden óptimo. Reordena TODAS las
+      // paradas (incluida la dirección del servicio): guardamos el orden de visita
+      // por clave; la numeración y el guardado lo aplican.
+      const newVisitOrder = res.order
+        .map(i => optStops[i]?.key)
+        .filter((k): k is string => !!k)
+      setVisitOrder(newVisitOrder)
       setRouteGeometry(res.geometry as [number, number][])
       setRouteInfo({ distance_m: res.distance_m, duration_s: res.duration_s })
       toast.success('Ruta optimizada')
@@ -270,24 +277,36 @@ export default function NewWorkOrderPage() {
         final_client_address: address.trim() || null,
       })
 
-      // Parada 1 = dirección del servicio (si se indicó algo).
-      let idx = 0
-      if (hasPrimaryStop) {
-        await apiClient.post(`/api/v1/work-orders/${order.id}/stops`, {
-          order_index: idx++, title: address.trim() || clientName.trim() || 'Parada 1',
-          client_name: clientName.trim() || null, address: address.trim() || null,
-          lat, lon, arrival_radius_m: 50, notes: null,
-        })
-      }
-      // Paradas adicionales con contenido.
+      // Paradas a crear (la dirección del servicio es una más, sin posición fija).
+      type SaveStop = { key: string; kind: 'primary' | 'extra'; extra?: ExtraStop }
+      const toSave: SaveStop[] = []
+      if (hasPrimaryStop) toSave.push({ key: PRIMARY, kind: 'primary' })
       for (const s of extraStops) {
-        if (!stopHasContent(s)) continue
-        await apiClient.post(`/api/v1/work-orders/${order.id}/stops`, {
-          order_index: idx++,
-          title: s.title.trim() || s.address.trim() || s.client_name.trim() || `Parada ${idx}`,
-          client_name: s.client_name.trim() || null, address: s.address.trim() || null,
-          lat: s.lat, lon: s.lon, arrival_radius_m: s.arrival_radius_m, notes: s.notes.trim() || null,
-        })
+        if (stopHasContent(s)) toSave.push({ key: s._id, kind: 'extra', extra: s })
+      }
+      // Orden de creación = orden de visita óptimo (si se optimizó); las paradas sin
+      // coordenadas (no optimizadas) van al final manteniendo su orden relativo.
+      if (visitOrder) {
+        const rank = (k: string) => { const i = visitOrder.indexOf(k); return i < 0 ? Number.MAX_SAFE_INTEGER : i }
+        toSave.sort((a, b) => rank(a.key) - rank(b.key))
+      }
+      let idx = 0
+      for (const item of toSave) {
+        const n = idx + 1
+        const body = item.kind === 'primary'
+          ? {
+              title: address.trim() || clientName.trim() || `Parada ${n}`,
+              client_name: clientName.trim() || null, address: address.trim() || null,
+              lat, lon, arrival_radius_m: 50, notes: null,
+            }
+          : {
+              title: item.extra!.title.trim() || item.extra!.address.trim() || item.extra!.client_name.trim() || `Parada ${n}`,
+              client_name: item.extra!.client_name.trim() || null, address: item.extra!.address.trim() || null,
+              lat: item.extra!.lat, lon: item.extra!.lon,
+              arrival_radius_m: item.extra!.arrival_radius_m, notes: item.extra!.notes.trim() || null,
+            }
+        await apiClient.post(`/api/v1/work-orders/${order.id}/stops`, { ...body, order_index: idx })
+        idx++
       }
       return order
     },
@@ -313,9 +332,16 @@ export default function NewWorkOrderPage() {
           onChange={e => setClientName(e.target.value)} />
       </div>
 
-      {/* 2 · Dirección (Valhalla) = parada 1 */}
+      {/* 2 · Dirección (Valhalla) = una parada más (su nº de visita lo fija la optimización) */}
       <div style={S.field}>
-        <label style={S.label}>Dirección del servicio</label>
+        <label style={S.label}>
+          Dirección del servicio
+          {visitOrder && lat != null && lon != null && (
+            <span style={{ marginLeft: 'var(--space-2)', color: 'var(--cmg-teal)', fontWeight: 700 }}>
+              · parada {visitNumberOf(PRIMARY, 1)}
+            </span>
+          )}
+        </label>
         <AddressAutocomplete
           value={address}
           onChange={(q) => { setAddress(q); setActiveStopId(PRIMARY) }}
@@ -355,7 +381,7 @@ export default function NewWorkOrderPage() {
               <div key={stop._id} style={stopCardStyle(active)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--cmg-teal)' }}>
-                    {i + 2}
+                    {stop.lat != null && stop.lon != null ? visitNumberOf(stop._id, i + 2) : i + 2}
                   </span>
                   <input style={{ ...S.input, fontSize: 'var(--fs-md)', flex: 1 }} placeholder="Título de la parada"
                     value={stop.title} onChange={e => updateStop(stop._id, { title: e.target.value })} />
