@@ -9,7 +9,8 @@ import Shell from '../../shared/ui/Shell'
 import { useTenantContext } from '../../lib/useTenantContext'
 import { AddressAutocomplete } from './AddressAutocomplete'
 import { StopMap, type MapStop } from './StopMap'
-import type { WorkOrderOut, VehicleOut, DriverOut, WorkOrderPriority } from '../../lib/types'
+import { useOptimizeRoute } from '../fleet/useDestination'
+import type { WorkOrderOut, VehicleOut, DriverOut, WorkOrderPriority, GeoResult } from '../../lib/types'
 
 // Detecta viewport estrecho para apilar las dos columnas (mapa debajo del formulario).
 function useIsNarrow(maxWidthPx = 980): boolean {
@@ -124,6 +125,16 @@ export default function NewWorkOrderPage() {
   // Parada que se ve/edita en el mapa grande de la derecha.
   const [activeStopId, setActiveStopId] = useState<string>(PRIMARY)
 
+  // ── Optimización de ruta: salida, llegada y resultado (geometría + totales) ──
+  const [originType, setOriginType] = useState<'base' | 'vehicle'>('base')
+  const [destType, setDestType] = useState<'base' | 'address'>('base')
+  const [destAddress, setDestAddress] = useState('')
+  const [destLat, setDestLat] = useState<number | null>(null)
+  const [destLon, setDestLon] = useState<number | null>(null)
+  const [routeGeometry, setRouteGeometry] = useState<[number, number][] | undefined>(undefined)
+  const [routeInfo, setRouteInfo] = useState<{ distance_m: number; duration_s: number } | null>(null)
+  const optimize = useOptimizeRoute()
+
   // "Más opciones" — plegado por defecto.
   const [showMore, setShowMore] = useState(false)
   const [priority, setPriority] = useState<WorkOrderPriority>('normal')
@@ -181,6 +192,66 @@ export default function NewWorkOrderPage() {
   function onMapAddress(addr: string) {
     if (activeStopId === PRIMARY) setAddress(addr)
     else updateStop(activeStopId, { address: addr })
+  }
+
+  // Firma de SOLO coordenadas (no del orden): si cambian las ubicaciones o el
+  // conjunto de paradas, la ruta dibujada queda obsoleta y se descarta. Reordenar
+  // (que no cambia coords) la conserva.
+  const coordSig = [
+    lat != null && lon != null ? `p:${lat},${lon}` : '',
+    ...extraStops.map(s => (s.lat != null && s.lon != null ? `${s._id}:${s.lat},${s.lon}` : '')),
+  ].join('|')
+  useEffect(() => {
+    setRouteGeometry(undefined)
+    setRouteInfo(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coordSig])
+
+  // Paradas con coordenadas, en orden actual (parada 1 primero). Marca cuál es la
+  // parada 1 para mantenerla fija al aplicar el orden óptimo.
+  const optStops: { isPrimary: boolean; extraIdx: number; lat: number; lon: number }[] = [
+    ...(lat != null && lon != null ? [{ isPrimary: true, extraIdx: -1, lat, lon }] : []),
+    ...extraStops
+      .map((s, i) => ({ isPrimary: false, extraIdx: i, lat: s.lat, lon: s.lon }))
+      .filter((s): s is { isPrimary: false; extraIdx: number; lat: number; lon: number } => s.lat != null && s.lon != null),
+  ]
+  const canOptimize = optStops.length >= 2 && !optimize.isPending
+
+  async function optimizeRoute() {
+    if (originType === 'vehicle' && !vehicleId) {
+      toast.error('Selecciona un vehículo para usar su posición como salida')
+      return
+    }
+    if (destType === 'address' && (destLat == null || destLon == null)) {
+      toast.error('Busca y selecciona la dirección de llegada')
+      return
+    }
+    try {
+      const res = await optimize.mutateAsync({
+        origin: originType === 'base' ? { type: 'base' } : { type: 'vehicle', vehicle_id: vehicleId },
+        stops: optStops.map(s => ({ lat: s.lat, lon: s.lon })),
+        destination: destType === 'base' ? { type: 'base' } : { type: 'coords', lat: destLat!, lon: destLon! },
+      })
+      // `order` = índices 0-based de optStops en orden óptimo. Mantenemos la parada 1
+      // fija primera: extraemos solo el orden relativo de las paradas adicionales.
+      const extraOrder = res.order
+        .map(i => optStops[i])
+        .filter(s => s && !s.isPrimary)
+        .map(s => s.extraIdx)
+      if (extraOrder.length > 0) {
+        setExtraStops(prev => {
+          const reordered = extraOrder.map(idx => prev[idx]).filter(Boolean)
+          // Conserva al final las paradas sin coordenadas (no entran en la optimización).
+          const rest = prev.filter((_, idx) => !extraOrder.includes(idx))
+          return [...reordered, ...rest]
+        })
+      }
+      setRouteGeometry(res.geometry as [number, number][])
+      setRouteInfo({ distance_m: res.distance_m, duration_s: res.duration_s })
+      toast.success('Ruta optimizada')
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudo optimizar la ruta')
+    }
   }
 
   const { mutate: save, isPending } = useMutation({
@@ -363,6 +434,7 @@ export default function NewWorkOrderPage() {
         <StopMap
           stops={mapStops} activeId={activeStopId} activeRadiusM={mapRadius}
           onPick={onMapPick} onAddressChange={onMapAddress} onSelectStop={setActiveStopId}
+          routeGeometry={routeGeometry}
         />
       </div>
       <p style={{ ...S.hint, margin: 0 }}>
@@ -388,6 +460,50 @@ export default function NewWorkOrderPage() {
         <div style={{ ...FRAME, flexShrink: 0, padding: 'var(--space-6) var(--space-6) var(--space-4)' }}>
           <h1 style={S.title}>Nueva orden de trabajo</h1>
           <p style={S.sub}>Rellena lo mínimo para crear el parte. El resto puede completarse después.</p>
+
+          {/* Optimización de ruta: salida, llegada y resultado (la parada 1 queda fija primera). */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--space-4)', flexWrap: 'wrap', marginTop: 'var(--space-4)' }}>
+            <div style={{ minWidth: 180 }}>
+              <Select label="Salida" style={S.selectBig} value={originType}
+                onChange={e => setOriginType(e.target.value as 'base' | 'vehicle')}>
+                <option value="base">Mi base</option>
+                <option value="vehicle">Posición del camión</option>
+              </Select>
+            </div>
+            <div style={{ minWidth: 180 }}>
+              <Select label="Llegada" style={S.selectBig} value={destType}
+                onChange={e => setDestType(e.target.value as 'base' | 'address')}>
+                <option value="base">Mi base</option>
+                <option value="address">Otra dirección</option>
+              </Select>
+            </div>
+            {destType === 'address' && (
+              <div style={{ minWidth: 240, flex: 1 }}>
+                <label style={S.label}>Dirección de llegada</label>
+                <AddressAutocomplete
+                  value={destAddress}
+                  onChange={setDestAddress}
+                  onSelect={(r: GeoResult) => { setDestAddress(r.label); setDestLat(r.lat); setDestLon(r.lon) }}
+                  placeholder="Busca la dirección de llegada"
+                />
+              </div>
+            )}
+            <button type="button" style={{ ...S.btn, opacity: canOptimize ? 1 : 0.6, cursor: canOptimize ? 'pointer' : 'not-allowed' }}
+              disabled={!canOptimize} onClick={() => optimizeRoute()}>
+              {optimize.isPending ? 'Optimizando…' : '⚡ Optimizar ruta'}
+            </button>
+            {routeInfo && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)' }}>
+                <span style={{ color: 'var(--cmg-teal)' }}>{(routeInfo.distance_m / 1000).toFixed(1)} km</span>
+                <span style={{ color: 'var(--info)' }}>{Math.round(routeInfo.duration_s / 60)} min</span>
+              </div>
+            )}
+          </div>
+          {optStops.length < 2 && (
+            <p style={{ ...S.hint, margin: 'var(--space-2) 0 0' }}>
+              Añade al menos dos paradas con ubicación para optimizar la ruta.
+            </p>
+          )}
         </div>
 
         {isNarrow ? (

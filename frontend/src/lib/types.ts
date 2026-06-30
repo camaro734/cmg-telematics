@@ -575,6 +575,28 @@ export interface RouteInfo {
   geometry: [number, number][]
 }
 
+// Origen/destino de una optimización: base del tenant, posición del camión o coords.
+export interface RoutePointReq {
+  type: 'base' | 'vehicle' | 'coords' | 'address'
+  vehicle_id?: string
+  lat?: number
+  lon?: number
+}
+
+export interface OptimizeIn {
+  origin: RoutePointReq
+  stops: { lat: number; lon: number }[]
+  destination: RoutePointReq
+}
+
+export interface OptimizeResult {
+  // Índices 0-based de `stops` (de la petición) en el orden óptimo.
+  order: number[]
+  distance_m: number
+  duration_s: number
+  geometry: [number, number][]
+}
+
 export interface DestinationOut {
   vehicle_id: string
   label: string

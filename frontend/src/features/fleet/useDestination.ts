@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/apiClient'
 import { keys } from '../../lib/queryKeys'
 import { useWsConnected } from '../../lib/useWsConnected'
-import type { GeoResult, DestinationOut, RouteInfo } from '../../lib/types'
+import type { GeoResult, DestinationOut, RouteInfo, OptimizeIn, OptimizeResult } from '../../lib/types'
 
 /**
  * Búsqueda geocodificada de una dirección. Se modela como mutation porque
@@ -26,6 +26,32 @@ export function useRoutePreview() {
       apiClient.get<RouteInfo>(
         `/api/v1/route?from_lat=${p.fromLat}&from_lon=${p.fromLon}&to_lat=${p.toLat}&to_lon=${p.toLon}`,
       ),
+  })
+}
+
+/**
+ * Optimiza el orden de las paradas (camino más corto) entre un origen y un
+ * destino dados. Mutation: se dispara al pulsar «Optimizar ruta». Devuelve el
+ * orden óptimo de las paradas + distancia/tiempo + geometría para dibujar.
+ */
+export function useOptimizeRoute() {
+  return useMutation({
+    mutationFn: (body: OptimizeIn) =>
+      apiClient.post<OptimizeResult>('/api/v1/routes/optimize', body),
+  })
+}
+
+/**
+ * Ruta por carretera de una orden guardada (base → paradas → base) para
+ * dibujarla al ver la orden. No reordena ni persiste nada.
+ */
+export function useWorkOrderRoute(orderId: string | null) {
+  return useQuery({
+    queryKey: ['work-order-route', orderId],
+    queryFn: () => apiClient.get<RouteInfo>(`/api/v1/work-orders/${orderId}/route`),
+    enabled: !!orderId,
+    staleTime: 60_000,
+    retry: false,
   })
 }
 

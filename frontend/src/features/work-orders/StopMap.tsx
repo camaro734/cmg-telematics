@@ -35,7 +35,7 @@ const GEOCIRCLE: L.CircleOptions = {
 }
 
 export function StopMap({
-  stops, activeId, activeRadiusM, onPick, onAddressChange, onSelectStop,
+  stops, activeId, activeRadiusM, onPick, onAddressChange, onSelectStop, routeGeometry,
 }: {
   stops: MapStop[]
   activeId: string
@@ -45,11 +45,16 @@ export function StopMap({
   onAddressChange?: (address: string) => void
   // Click en un pin no-activo → seleccionar esa parada como activa.
   onSelectStop?: (id: string) => void
+  // Polyline de la ruta optimizada (lista de [lat, lon]); si se omite, no se dibuja.
+  routeGeometry?: [number, number][]
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef       = useRef<L.Map | null>(null)
   const markersRef   = useRef<Map<string, L.Marker>>(new Map())
   const circleRef    = useRef<L.Circle | null>(null)
+  const routeLineRef = useRef<L.Polyline | null>(null)
+  const routeRef     = useRef(routeGeometry)
+  routeRef.current = routeGeometry
 
   const onPickRef    = useRef(onPick)
   const onAddrRef    = useRef(onAddressChange)
@@ -93,6 +98,7 @@ export function StopMap({
       mapRef.current = null
       markersRef.current.clear()
       circleRef.current = null
+      routeLineRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -155,9 +161,23 @@ export function StopMap({
       circleRef.current = null
     }
 
+    // Polyline de la ruta optimizada. Resuelve --cmg-teal en runtime (white-label).
+    const route = routeRef.current
+    if (route && route.length > 1) {
+      const teal = getComputedStyle(document.documentElement).getPropertyValue('--cmg-teal').trim() || '#1D9E75'
+      if (routeLineRef.current) routeLineRef.current.setLatLngs(route)
+      else routeLineRef.current = L.polyline(route, { color: teal, weight: 4, opacity: 0.85 }).addTo(map)
+    } else if (routeLineRef.current) {
+      routeLineRef.current.remove()
+      routeLineRef.current = null
+    }
+
     // Encaje de la vista: salta si el cambio fue interno (click/drag del propio mapa).
     if (internalRef.current) { internalRef.current = false; return }
-    if (list.length >= 2) {
+    // Con ruta dibujada, encaja a la ruta completa (incluye origen/destino base).
+    if (routeLineRef.current) {
+      map.fitBounds(routeLineRef.current.getBounds(), { padding: [48, 48], maxZoom: 16 })
+    } else if (list.length >= 2) {
       map.fitBounds(L.latLngBounds(list.map(s => [s.lat, s.lon] as [number, number])), { padding: [48, 48], maxZoom: 16 })
     } else if (list.length === 1) {
       map.setView([list[0].lat, list[0].lon], Math.max(map.getZoom(), 15), { animate: true })
@@ -167,10 +187,11 @@ export function StopMap({
   // "Firma" estable: cambia solo si varían coordenadas, orden o el conjunto de paradas
   // (no al teclear texto de dirección, que no afecta al mapa).
   const sig = stops.map(s => `${s.id}:${s.lat.toFixed(6)},${s.lon.toFixed(6)}:${s.n}`).join('|')
+  const routeSig = routeGeometry ? `${routeGeometry.length}:${routeGeometry[0]?.join(',')}` : ''
   useEffect(() => {
     reconcile()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig, activeId])
+  }, [sig, activeId, routeSig])
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 320, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }} />
 }
