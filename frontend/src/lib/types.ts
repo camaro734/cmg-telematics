@@ -131,6 +131,10 @@ export interface TenantOut {
   brand_tokens: BrandTokens | null
   business_cif: string | null
   business_address: string | null
+  business_legal_name: string | null
+  business_phone: string | null
+  business_email: string | null
+  business_website: string | null
   base_address: string | null
   base_lat: number | null
   base_lon: number | null

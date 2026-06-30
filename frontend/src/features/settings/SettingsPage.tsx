@@ -3,6 +3,7 @@ import NotificationSettings from './NotificationSettings'
 import UsersSection from './UsersSection'
 import WorkCycleDefinitionsSection from './WorkCycleDefinitionsSection'
 import MyBaseSection from './MyBaseSection'
+import CompanySection from './CompanySection'
 import SmtpSection from './SmtpSection'
 import { useAuthStore } from '../auth/useAuthStore'
 import { useNavigate } from 'react-router-dom'
@@ -56,6 +57,7 @@ export default function SettingsPage() {
         {/* Formularios cortos arriba, en 2 columnas (apilan en estrecho) */}
         <div style={TOP_GRID}>
           <section style={CARD}><NotificationSettings /></section>
+          {isAdmin && !isCmg && <section style={CARD}><CompanySection /></section>}
           {isAdmin && !isCmg && <section style={CARD}><MyBaseSection /></section>}
         </div>
         {/* Tablas / secciones anchas, a ancho completo debajo */}
