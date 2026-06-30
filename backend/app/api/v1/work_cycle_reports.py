@@ -15,8 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, require_module
 from app.core.database import get_db
+from app.models.tenant import Tenant
 from app.schemas.auth import CurrentUser
 from app.services.cycle_detector import recompute_cycles_for_report
+from app.services.report_branding import build_issuer
 from app.services.work_cycle_report import (
     generate_report_data,
     render_report_pdf,
@@ -99,7 +101,9 @@ async def get_report_pdf(
     """Descarga del reporte de intervenciones en PDF (formato VPS)."""
     report = await _report_payload(db, user, desde, hasta, vehicle_id, client_id)
     subtitle = "Detección automática de intervenciones (work_cycle)"
-    pdf = await asyncio.to_thread(render_report_pdf, report, subtitle=subtitle)
+    # Membrete del emisor: el propio tenant del usuario (los partes son privados).
+    issuer = build_issuer(await db.get(Tenant, user.tenant_id))
+    pdf = await asyncio.to_thread(render_report_pdf, report, subtitle=subtitle, issuer=issuer)
     fname = _filename("parte_trabajos", desde, hasta, "pdf")
     return StreamingResponse(
         iter([pdf]),

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.geo import haversine_m
 from app.services.geocoding import nominatim_reverse
+from app.services.report_branding import build_issuer
 from app.services.routing import valhalla_trace_distance_m
 
 logger = logging.getLogger(__name__)
@@ -318,17 +319,28 @@ def _periodo_label(report: dict) -> str:
     return f"{desde} – {hasta}"
 
 
-def render_report_pdf(report: dict, *, title: str = "Parte de trabajos", subtitle: str = "") -> bytes:
-    """Renderiza el reporte a PDF (formato VPS) con WeasyPrint. Función síncrona."""
+def render_report_pdf(
+    report: dict,
+    *,
+    title: str = "Parte de trabajos",
+    subtitle: str = "",
+    issuer: dict | None = None,
+) -> bytes:
+    """Renderiza el reporte a PDF (formato VPS) con WeasyPrint. Función síncrona.
+
+    ``issuer`` = membrete del emisor (build_issuer(tenant)); si None, cae a CMG.
+    """
     import weasyprint
 
+    if issuer is None:
+        issuer = build_issuer(None)
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
     template = env.get_template("reports/work_cycle_report.html")
     html = template.render(
         report=report,
         title=title,
         subtitle=subtitle,
-        logo_b64=_logo_b64(),
+        issuer=issuer,
         periodo=_periodo_label(report),
         generated_at=datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
     )

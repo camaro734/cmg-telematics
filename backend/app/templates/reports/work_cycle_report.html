@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% import "reports/_letterhead.html" as lh %}<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -56,12 +56,11 @@
 </head>
 <body>
   <div class="header">
-    <div>
+    {# Membrete del emisor (logo + datos de empresa) compartido con el parte individual #}
+    {{ lh.letterhead(issuer) }}
+    <div class="header-right">
       <div class="header-title">{{ title }}</div>
       <div class="header-sub">{{ subtitle }}</div>
-    </div>
-    {% if logo_b64 %}<img class="header-logo" src="data:image/png;base64,{{ logo_b64 }}">{% endif %}
-    <div class="header-right">
       <div>Periodo: {{ periodo }}</div>
       <div>Generado: {{ generated_at }}</div>
     </div>
