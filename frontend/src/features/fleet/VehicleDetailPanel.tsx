@@ -4,6 +4,7 @@ import { useVehicleLive } from '../../lib/useVehicleLive'
 import type { VehicleTypeOut, SensorDef, GeoResult, DestinationOut, RouteInfo } from '../../lib/types'
 import { sensorDisplayValue } from './popupHtml'
 import { useSetDestination, useCancelDestination, useReverseGeocode } from './useDestination'
+import { useWorkOrdersByVehicle, useCurrentStop } from './useVehicleWorkOrders'
 
 interface VehicleDetailPanelProps {
   vehicleId: string | null
@@ -49,6 +50,13 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
   // El hook redondea lat/lon y cachea → no llama a Nominatim en cada tick.
   const { data: geo } = useReverseGeocode(status?.lat, status?.lon)
   const address = geo?.address ?? null
+
+  // Órdenes de trabajo vigentes (pendientes/en curso) del vehículo. La parada
+  // actual solo se pide para la OT en curso, no para todas.
+  const { data: orders } = useWorkOrdersByVehicle(vehicleId)
+  const activeOrders = orders ?? []
+  const inProgressOrder = activeOrders.find(o => o.status === 'in_progress') ?? null
+  const { data: currentStop } = useCurrentStop(inProgressOrder?.id ?? null)
 
   // Hooks de mutación para enviar/cancelar destino
   const setDest = useSetDestination(vehicleId ?? '')
@@ -168,6 +176,64 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
                 )}
               </>
             )}
+
+            {/* Órdenes de trabajo vigentes (pendientes/en curso) del vehículo */}
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
+              <div style={{ fontSize: 10, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                Órdenes de trabajo
+              </div>
+              {activeOrders.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Sin órdenes activas</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {activeOrders.map(o => {
+                    const isCurrent = o.status === 'in_progress'
+                    // Destino = parada actual de la OT en curso; si no hay paradas,
+                    // cae a la dirección general de la orden.
+                    const destText = isCurrent
+                      ? (currentStop?.address ?? currentStop?.title ?? o.location_address)
+                      : null
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() => navigate('/work-orders')}
+                        style={{
+                          textAlign: 'left', cursor: 'pointer', width: '100%',
+                          padding: '9px 10px', borderRadius: 8,
+                          background: isCurrent ? 'var(--cmg-teal-soft)' : 'var(--bg-elevated)',
+                          border: `1px solid ${isCurrent ? 'var(--cmg-teal-line)' : 'var(--border)'}`,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4,
+                            padding: '1px 6px', borderRadius: 4,
+                            color: isCurrent ? 'var(--cmg-teal)' : 'var(--fg-muted)',
+                            background: isCurrent ? 'var(--cmg-teal-line)' : 'var(--border)',
+                          }}>
+                            {isCurrent ? 'En curso' : 'Pendiente'}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {o.title}
+                          </span>
+                        </div>
+                        {o.final_client_name && (
+                          <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{o.final_client_name}</div>
+                        )}
+                        {o.location_address && (
+                          <div style={{ fontSize: 11, color: 'var(--fg-dim)', lineHeight: 1.3 }}>{o.location_address}</div>
+                        )}
+                        {isCurrent && destText && (
+                          <div style={{ fontSize: 11, color: 'var(--cmg-teal)', marginTop: 3, fontWeight: 600 }}>
+                            → Destino: {destText}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sección de destino y ETA */}
