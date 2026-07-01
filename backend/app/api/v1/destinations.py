@@ -14,8 +14,8 @@ from app.api.v1.deps import get_current_user, get_redis
 from app.core.database import get_db
 from app.models.vehicle_destination import VehicleDestination
 from app.schemas.auth import CurrentUser
-from app.schemas.destination import DestinationIn, DestinationOut, RouteInfo
-from app.services.geocoding import GeoResult, nominatim_search
+from app.schemas.destination import DestinationIn, DestinationOut, ReverseGeoOut, RouteInfo
+from app.services.geocoding import GeoResult, nominatim_reverse, nominatim_search
 from app.services.routing import valhalla_route
 
 router = APIRouter()
@@ -190,6 +190,45 @@ async def geocode(
 ) -> list[GeoResult]:
     """Proxy a Nominatim: búsqueda de ubicación por texto libre."""
     return await nominatim_search(q, limit=limit)
+
+
+@router.get("/reverse-geocode", response_model=ReverseGeoOut)
+async def reverse_geocode(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    user: CurrentUser = Depends(get_current_user),
+    redis=Depends(get_redis),
+) -> ReverseGeoOut:
+    """Proxy a Nominatim (inverso): (lat, lon) → dirección textual.
+
+    Cachea en Redis por coordenada redondeada a 5 decimales (~1 m) para no
+    repetir peticiones sobre la misma posición y respetar el rate-limit de
+    Nominatim. Si Nominatim falla, devuelve address vacío (nunca 500).
+    """
+    # Redondeo a 5 decimales: agrupa jitter GPS y maximiza aciertos de caché.
+    cache_key = f"revgeo:{lat:.5f}:{lon:.5f}"
+    try:
+        cached = await redis.get(cache_key)
+    except Exception as exc:  # noqa: BLE001 — Redis caído no debe romper el geocode
+        logger.warning("revgeo_cache_read_failed error=%s", exc)
+        cached = None
+    if cached is not None:
+        return ReverseGeoOut(address=cached or None)
+
+    try:
+        address = await nominatim_reverse(lat, lon)
+    except Exception as exc:  # noqa: BLE001 — Nominatim caído → dirección vacía, no 500
+        logger.warning("reverse_geocode_failed lat=%s lon=%s error=%s", lat, lon, exc)
+        address = None
+
+    # Cachea también el "sin resultado" (cadena vacía) para no reintentar en bucle.
+    # TTL 1 día: una dirección física no cambia; ahorra peticiones a Nominatim.
+    try:
+        await redis.set(cache_key, address or "", ex=86400)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("revgeo_cache_write_failed error=%s", exc)
+
+    return ReverseGeoOut(address=address)
 
 
 @router.get("/route", response_model=RouteInfo)

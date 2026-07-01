@@ -26,3 +26,8 @@ class DestinationOut(BaseModel):
     route: RouteInfo | None = None          # ruta restante desde la posición actual
     remaining_distance_m: float | None = None
     remaining_duration_s: float | None = None
+
+
+class ReverseGeoOut(BaseModel):
+    # Dirección textual de una coordenada; address None/"" si Nominatim no resuelve.
+    address: str | None = None
