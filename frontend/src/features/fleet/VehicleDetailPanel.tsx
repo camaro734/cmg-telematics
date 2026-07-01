@@ -3,7 +3,7 @@ import { isEffectivelyOnline, statusStamp } from '../../lib/staleStatus'
 import { useVehicleLive } from '../../lib/useVehicleLive'
 import type { VehicleTypeOut, SensorDef, GeoResult, DestinationOut, RouteInfo } from '../../lib/types'
 import { sensorDisplayValue } from './popupHtml'
-import { useSetDestination, useCancelDestination } from './useDestination'
+import { useSetDestination, useCancelDestination, useReverseGeocode } from './useDestination'
 
 interface VehicleDetailPanelProps {
   vehicleId: string | null
@@ -44,6 +44,11 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
   const navigate = useNavigate()
 
   const { data: status } = useVehicleLive(vehicleId)
+
+  // Dirección textual en vivo (calle) por geocode inverso de la posición actual.
+  // El hook redondea lat/lon y cachea → no llama a Nominatim en cada tick.
+  const { data: geo } = useReverseGeocode(status?.lat, status?.lon)
+  const address = geo?.address ?? null
 
   // Hooks de mutación para enviar/cancelar destino
   const setDest = useSetDestination(vehicleId ?? '')
@@ -118,6 +123,17 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
             {stale && status?.last_seen && (
               <div style={{ fontSize: 11, color: statusStamp(status).color, marginBottom: 10, padding: '5px 0 8px', borderBottom: '1px solid var(--border-soft)' }}>
                 {statusStamp(status).text}
+              </div>
+            )}
+            {/* Ubicación: dirección textual (calle) o, si no resuelve, lat/lon */}
+            {status?.lat != null && status?.lon != null && (
+              <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--border-soft)' }}>
+                <div style={{ fontSize: 10, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>
+                  Ubicación
+                </div>
+                <div style={{ fontSize: 12, color: stale ? 'var(--fg-muted)' : 'var(--fg-primary)', lineHeight: 1.35 }}>
+                  {address ?? `${status.lat.toFixed(5)}, ${status.lon.toFixed(5)}`}
+                </div>
               </div>
             )}
             {panelSensors.length > 0 ? (

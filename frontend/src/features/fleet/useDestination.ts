@@ -114,3 +114,23 @@ export function useCancelDestination(vehicleId: string) {
     },
   })
 }
+
+/**
+ * Dirección textual (calle) de una coordenada por geocodificación inversa.
+ * El backend cachea por coordenada, y aquí redondeamos lat/lon a 4 decimales
+ * (~11 m) para la queryKey: así solo se refetch cuando el vehículo se mueve de
+ * verdad, no en cada tick de telemetría (evita llamar a Nominatim en exceso).
+ */
+export function useReverseGeocode(lat: number | null | undefined, lon: number | null | undefined) {
+  const hasCoords = lat != null && lon != null
+  const rLat = hasCoords ? Math.round(lat * 1e4) / 1e4 : null
+  const rLon = hasCoords ? Math.round(lon * 1e4) / 1e4 : null
+  return useQuery({
+    queryKey: ['reverse-geocode', rLat, rLon],
+    queryFn: () =>
+      apiClient.get<{ address: string | null }>(`/api/v1/reverse-geocode?lat=${rLat}&lon=${rLon}`),
+    enabled: hasCoords,
+    staleTime: 30 * 60_000,   // una dirección física no cambia; 30 min sobra
+    retry: false,
+  })
+}
