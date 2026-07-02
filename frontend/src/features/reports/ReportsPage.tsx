@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useIsMobile } from '../../lib/useIsMobile'
 import {
   LineChart, Line,
+  ComposedChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
 } from 'recharts'
@@ -54,8 +55,6 @@ const btnSecondary: React.CSSProperties = {
   background: 'var(--bg-card)', color: 'var(--fg-primary)',
   display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
 }
-
-const CHART_COLORS = ['var(--energy-orange)', 'var(--ok)', 'var(--info)', 'var(--warn)', 'var(--chart-4)']
 
 // Paleta para gráficos multi-serie agrupados
 const GROUP_COLORS = ['var(--energy-orange)', 'var(--info)', 'var(--ok)', 'var(--warn)', 'var(--danger)', 'var(--chart-4)']
@@ -127,23 +126,32 @@ function buildAvlSeriesData(
     }))
 }
 
-function buildMultiSeriesData(
-  kpis: KpiHour[],
-  period: Period,
-  metrics: { key: string; label: string; transform: number }[],
-): Record<string, string | number>[] {
-  if (metrics.length === 0 || kpis.length === 0) return []
-  const labelMap = new Map<string, Record<string, number>>()
-  for (const metric of metrics) {
-    const series = groupByPeriod(kpis, period, metric.key, metric.transform)
-    for (const pt of series) {
-      if (!labelMap.has(pt.label)) labelMap.set(pt.label, {})
-      labelMap.get(pt.label)![metric.key] = pt.value
+// Fila de la gráfica de actividad (barras apiladas Motor/PTO por bucket).
+// PTO ⊆ Motor: la barra total = motor, con el tramo PTO apilado dentro y el
+// resto ("motor sin PTO") como base. En vista día el bucket es 1 hora; en
+// semana/mes se agrega por día (suma de minutos).
+type ActivityRow = {
+  label: string
+  engine_on_minutes: number
+  pto_active_minutes: number
+  motor_sin_pto: number
+}
+
+function buildActivityData(kpis: KpiHour[], period: Period): ActivityRow[] {
+  if (kpis.length === 0) return []
+  const eng = groupByPeriod(kpis, period, 'engine_on_minutes', 1)
+  const pto = groupByPeriod(kpis, period, 'pto_active_minutes', 1)
+  const ptoByLabel = new Map(pto.map(p => [p.label, p.value]))
+  return eng.map(e => {
+    const motor = e.value
+    const p = ptoByLabel.get(e.label) ?? 0
+    return {
+      label: e.label,
+      engine_on_minutes: motor,
+      pto_active_minutes: p,
+      motor_sin_pto: Math.max(0, motor - p),
     }
-  }
-  return Array.from(labelMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, vals]) => ({ label, ...vals } as Record<string, string | number>))
+  })
 }
 
 /**
@@ -163,6 +171,29 @@ function mergeSeriesByLabel(
   return Array.from(labelMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([label, vals]) => ({ label, ...vals } as Record<string, string | number>))
+}
+
+// Tooltip de la gráfica de actividad: motor · PTO · % por barra.
+function ActivityTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+  if (!active || !payload?.length) return null
+  const row = payload[0]?.payload as ActivityRow | undefined
+  if (!row) return null
+  const motor = Math.round(row.engine_on_minutes ?? 0)
+  const pto = Math.round(row.pto_active_minutes ?? 0)
+  const pct = motor > 0 ? Math.round((pto / motor) * 100) : 0
+  return (
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--fg-primary)' }}>
+      <div style={{ color: 'var(--fg-muted)', marginBottom: 5 }}>{row.label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--cmg-teal)', flexShrink: 0 }} />
+        <span>Motor: <strong>{motor} min</strong></span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--energy-orange)', flexShrink: 0 }} />
+        <span>PTO: <strong>{pto} min</strong> · {pct}%</span>
+      </div>
+    </div>
+  )
 }
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -327,21 +358,12 @@ function HistoricoTab({
     exportToCsv(`historico-${vehicleId}-${period}.csv`, rows)
   }
 
-  // Multi-series line chart — only line-type metrics
-  const allLineMetrics = [
-    ...lineMetrics,
-    // Add motor/PTO as fallback only if no line metrics configured
-    ...(lineMetrics.length === 0 && kpis.some(h => h.engine_on_minutes != null) && !lineMetrics.find(m => m.key === 'engine_on_minutes')
-      ? [{ key: 'engine_on_minutes', label: 'H. Motor', color: 'var(--ok)', unit: 'min', transform: 1 }]
-      : []),
-    ...(lineMetrics.length === 0 && kpis.some(h => h.pto_active_minutes != null) && !lineMetrics.find(m => m.key === 'pto_active_minutes')
-      ? [{ key: 'pto_active_minutes', label: 'H. PTO', color: 'var(--energy-orange)', unit: 'min', transform: 1 }]
-      : []),
-  ]
-  // KpiHour columns always use kpis[], even if avl_id is set in the metric config
-  const kpiLineMetrics = allLineMetrics.filter(m => KPI_HOUR_KEYS.has(m.key) || !(m as any).avl_id)
-  const avlLineMetrics = allLineMetrics.filter(m => !KPI_HOUR_KEYS.has(m.key) && (m as any).avl_id !== undefined)
-  const lineData = buildMultiSeriesData(kpis, period, kpiLineMetrics)
+  // Gráfica de actividad — barras apiladas Motor/PTO (Motor y PTO salen siempre
+  // de telemetry_1h vía /kpis, sin depender de la config de historic_metrics).
+  const activityData = buildActivityData(kpis, period)
+
+  // Métricas AVL configuradas (line-type con avl_id) — tarjetas propias abajo.
+  const avlLineMetrics = lineMetrics.filter(m => !KPI_HOUR_KEYS.has(m.key) && (m as any).avl_id !== undefined && (m as any).avl_id !== null)
   // Datos individuales por cada métrica AVL — se usan para agrupación o gráfico solitario
   const avlLineData = avlLineMetrics.map(m => ({
     metric: m,
@@ -438,41 +460,28 @@ function HistoricoTab({
           </div>
         </div>
 
-        {lineData.length === 0 ? (
-          <div style={{ height: isMobile ? 140 : 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)', fontSize: 12, gap: 6 }}>
-            {metrics.length === 0 ? (
-              <>
-                <span>Sin métricas de línea configuradas.</span>
-                <span style={{ fontSize: 11, opacity: 0.7 }}>
-                  Ve a <strong style={{ color: 'var(--cmg-teal)' }}>Plantillas</strong> y añade métricas con tipo gráfico Línea o Barra.
-                </span>
-              </>
-            ) : (
-              'Sin datos para este período'
-            )}
+        {activityData.length === 0 ? (
+          <div style={{ height: isMobile ? 140 : 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)', fontSize: 12 }}>
+            Sin datos para este período
           </div>
         ) : (
           <div style={{ height: isMobile ? 160 : 240 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--offline)' }} />
-                <Tooltip {...tooltipStyle} />
+              <ComposedChart data={activityData} margin={{ top: 4, right: 16, bottom: 0, left: -16 }} barCategoryGap={period === 'dia' ? '12%' : '24%'}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} interval="preserveStartEnd" />
+                <YAxis
+                  tick={{ fontSize: 10, fill: 'var(--offline)' }}
+                  domain={period === 'dia' ? [0, 60] : [0, 'auto']}
+                  allowDecimals={false}
+                  unit=" min"
+                />
+                <Tooltip content={<ActivityTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Legend wrapperStyle={{ fontSize: 11, color: 'var(--fg-muted)' }} />
-                {kpiLineMetrics.map((m, i) => (
-                  <Line
-                    key={m.key}
-                    type="monotone"
-                    dataKey={m.key}
-                    name={m.label}
-                    stroke={m.color || CHART_COLORS[i % CHART_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
-                ))}
-              </LineChart>
+                {/* PTO ⊆ Motor: la barra total = motor; base "sin PTO" (teal) + PTO (naranja) apilado dentro */}
+                <Bar dataKey="motor_sin_pto" name="Motor (sin PTO)" stackId="min" fill="var(--cmg-teal)" maxBarSize={40} />
+                <Bar dataKey="pto_active_minutes" name="PTO" stackId="min" fill="var(--energy-orange)" maxBarSize={40} radius={[3, 3, 0, 0]} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}
