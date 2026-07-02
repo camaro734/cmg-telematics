@@ -17,6 +17,14 @@ const ZONE_TEXT: Record<string, string> = {
   nodata: 'var(--fg-dim)',
 }
 
+// Color del VALOR del sensor: destacado en ok (fg-primary), acento en warn/crit.
+const ZONE_VALUE: Record<string, string> = {
+  crit: 'var(--accent-crit)',
+  warn: 'var(--accent-warn)',
+  ok: 'var(--fg-primary)',
+  nodata: 'var(--fg-dim)',
+}
+
 interface SystemBlockCardProps {
   block: SystemBlock
   schema: SensorDef[]
@@ -99,20 +107,33 @@ export function SystemBlockCard({ block, schema, status, derived, alerts, onDeta
             const scaled = applyTransform(raw, sensor)
             const sz = sensorSeverity(sensor, scaled) ?? 'nodata'
             const dotColor = isStale ? ZONE_BORDER.nodata : (ZONE_BORDER[sz] ?? ZONE_BORDER.nodata)
-            const formatted = formatSensorValue(scaled) ?? '—'
+            const noData = scaled === null
+            const valueColor = isStale ? 'var(--fg-muted)' : (ZONE_VALUE[sz] ?? ZONE_VALUE.nodata)
+            const formatted = formatSensorValue(scaled)
             return (
               <div
                 key={sensor.key}
                 data-testid="sensor-compact-row"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)' }}
+                style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)' }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--fs-panel-label)' }}>
-                  {sensor.label}:{' '}
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-panel-value)', color: isStale ? 'var(--fg-muted)' : 'var(--fg-primary)' }}>
-                    {formatted}{sensor.unit ? ` ${sensor.unit}` : ''}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--fs-2xs)', color: 'var(--fg-muted)' }}>
+                    {sensor.label}
                   </span>
                 </span>
+                {noData ? (
+                  <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--fg-dim)', fontStyle: 'italic', flexShrink: 0 }}>
+                    Sin datos
+                  </span>
+                ) : (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-panel-value)', fontWeight: 600, color: valueColor, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    {formatted}
+                    {sensor.unit && (
+                      <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 500, color: 'var(--fg-tertiary)', marginLeft: 2 }}>{sensor.unit}</span>
+                    )}
+                  </span>
+                )}
               </div>
             )
           })}

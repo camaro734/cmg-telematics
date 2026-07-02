@@ -165,6 +165,11 @@ export function BlockDetailSection({
                     derived={derived}
                     isStale={isStale}
                   />
+                ) : scaled === null ? (
+                  // Sin lectura: mensaje discreto, no un guion grande.
+                  <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', fontStyle: 'italic', marginTop: 2 }}>
+                    Sin datos
+                  </div>
                 ) : (
                   // Sensores de sistema (sin histórico CAN): valor + indicador
                   <>

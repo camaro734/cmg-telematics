@@ -135,21 +135,29 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
 
   return (
     <div ref={containerRef} data-testid="sensor-mini-chart">
-      {/* Valor actual — layout fijo: siempre visible, nunca "—" si hay histórico */}
+      {/* Valor actual — número héroe + unidad pequeña; "Sin datos" discreto en vez de "—" */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 'var(--fs-sensor-hero)',
-          fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'],
-          color: valueColor,
-          lineHeight: 1.1,
-        }}>
-          {displayFormatted}
-        </span>
-        {sensor.unit && displayScaled !== null && !isNA && (
-          <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            {sensor.unit}
+        {displayScaled === null && !isNA ? (
+          <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: 'var(--font-sans)' }}>
+            Sin datos
           </span>
+        ) : (
+          <>
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--fs-sensor-hero)',
+              fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'],
+              color: valueColor,
+              lineHeight: 1.1,
+            }}>
+              {displayFormatted}
+            </span>
+            {sensor.unit && displayScaled !== null && !isNA && (
+              <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                {sensor.unit}
+              </span>
+            )}
+          </>
         )}
         {staleAgeLabel && (
           <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)', marginLeft: 2 }}>
