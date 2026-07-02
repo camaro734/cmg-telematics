@@ -40,6 +40,9 @@ type SensorFormState = {
   show_in_fleet_panel: boolean
   is_report: boolean
   report_aggregate: 'max' | 'min' | 'avg' | 'last'
+  // Widget de presentación del valor en vivo (tarjetas de la ficha)
+  display_widget: 'number' | 'gauge' | 'bar' | 'temp_bar'
+  display_min: string; display_max: string
 }
 const emptySensorForm: SensorFormState = {
   avl_id: '', key: '', label: '', unit: '', mode: 'byte', gauge_type: 'numeric',
@@ -52,6 +55,8 @@ const emptySensorForm: SensorFormState = {
   show_in_fleet_panel: false,
   is_report: false,
   report_aggregate: 'last',
+  display_widget: 'number',
+  display_min: '', display_max: '',
 }
 
 function sensorDefToForm(def: SensorDef): SensorFormState {
@@ -87,6 +92,9 @@ function sensorDefToForm(def: SensorDef): SensorFormState {
     show_in_fleet_panel: def.show_in_fleet_panel === true,
     is_report: def.is_report === true,
     report_aggregate: def.report_aggregate ?? 'last',
+    display_widget: def.display_widget ?? 'number',
+    display_min: def.display_min?.toString() ?? '',
+    display_max: def.display_max?.toString() ?? '',
   }
 }
 
@@ -132,6 +140,12 @@ function formToSensorDef(f: SensorFormState): SensorDef {
   def.show_in_fleet_panel = f.show_in_fleet_panel
   def.is_report = f.is_report
   if (f.is_report) def.report_aggregate = f.report_aggregate
+  // Widget de presentación (solo byte; el bit usa LED). display_min/max opcionales.
+  if (f.mode === 'byte' && f.display_widget !== 'number') {
+    def.display_widget = f.display_widget
+    if (f.display_min !== '') def.display_min = parseFloat(f.display_min)
+    if (f.display_max !== '') def.display_max = parseFloat(f.display_max)
+  }
   return def
 }
 
@@ -886,6 +900,37 @@ export default function VehicleTypesPage() {
                     <Input type="number" step="any" value={sensorForm.max}
                       onChange={e => setSensorForm(f => ({ ...f, max: e.target.value }))} placeholder="300" />
                   </div>
+                </div>
+              )}
+
+              {/* Widget de presentación del valor en vivo en la ficha del vehículo */}
+              <div style={{ display: 'grid', gridTemplateColumns: sensorForm.display_widget === 'number' ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>WIDGET EN VIVO</label>
+                  <Select value={sensorForm.display_widget}
+                    onChange={e => setSensorForm(f => ({ ...f, display_widget: e.target.value as SensorFormState['display_widget'] }))}>
+                    <option value="number">Número</option>
+                    <option value="gauge">Gauge (cuentarrevoluciones)</option>
+                    <option value="bar">Barra</option>
+                    <option value="temp_bar">Barra temperatura (zonas)</option>
+                  </Select>
+                </div>
+                {sensorForm.display_widget !== 'number' && (<>
+                  <div>
+                    <label style={labelStyle}>WIDGET MÍN</label>
+                    <Input type="number" step="any" value={sensorForm.display_min}
+                      onChange={e => setSensorForm(f => ({ ...f, display_min: e.target.value }))} placeholder="0" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>WIDGET MÁX</label>
+                    <Input type="number" step="any" value={sensorForm.display_max}
+                      onChange={e => setSensorForm(f => ({ ...f, display_max: e.target.value }))} placeholder="3000" />
+                  </div>
+                </>)}
+              </div>
+              {sensorForm.display_widget === 'temp_bar' && (
+                <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+                  Las zonas verde/ámbar/rojo salen de los umbrales <b>WARN &gt;</b> y <b>CRÍT &gt;</b> de abajo.
                 </div>
               )}
 

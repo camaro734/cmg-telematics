@@ -7,6 +7,7 @@ import { sortByOrder, moveItem } from '../../../lib/sensorOrder'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { SensorMiniChart } from './SensorMiniChart'
 import { SensorDetailModal } from './SensorDetailModal'
+import { LiveSensorWidget, hasVisualWidget } from './LiveSensorWidget'
 
 interface BlockDetailSectionProps {
   block: SystemBlock
@@ -165,6 +166,15 @@ export function BlockDetailSection({
                     derived={derived}
                     isStale={isStale}
                   />
+                ) : hasVisualWidget(sensor) ? (
+                  // Widget visual configurado (gauge/bar/temp_bar) — muestra el valor;
+                  // en gris si no hay lectura. Sin histórico CAN debajo.
+                  <>
+                    <LiveSensorWidget sensor={sensor} value={scaled} isStale={isStale} />
+                    <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', marginTop: 4, fontStyle: 'italic' }}>
+                      Sin histórico
+                    </div>
+                  </>
                 ) : scaled === null ? (
                   // Sin lectura: mensaje discreto, no un guion grande.
                   <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', fontStyle: 'italic', marginTop: 2 }}>

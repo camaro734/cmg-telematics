@@ -186,6 +186,12 @@ export interface SensorDef {
   color?: string
   widget_size?: 'sm' | 'md' | 'lg'
   category?: 'maquina' | 'chasis'
+  // Widget de presentación del valor en vivo en las tarjetas de la ficha.
+  // 'number' (defecto) = valor grande; 'gauge' = arco tipo cuentarrevoluciones;
+  // 'bar' = barra horizontal; 'temp_bar' = barra con zonas de color.
+  display_widget?: 'number' | 'gauge' | 'bar' | 'temp_bar'
+  display_min?: number
+  display_max?: number
 }
 
 export type WsMessage =

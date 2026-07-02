@@ -9,6 +9,7 @@ import {
 } from '../../../lib/avlSeries'
 import { sensorSeverity } from '../../../lib/sensorSeverity'
 import { resolveRawValue, applyTransform, formatSensorValue, isJ1939NA } from '../../../lib/sensorValue'
+import { LiveSensorWidget, hasVisualWidget } from './LiveSensorWidget'
 
 const ZONE_COLOR: Record<string, string> = {
   ok: 'var(--ok)',
@@ -132,39 +133,51 @@ export function SensorMiniChart({ sensor, vehicleId, status, derived, isStale }:
   })()
 
   const gradientId = `smg-${sensor.key.replace(/[^a-z0-9]/gi, '_')}`
+  const useWidget = hasVisualWidget(sensor)
 
   return (
     <div ref={containerRef} data-testid="sensor-mini-chart">
-      {/* Valor actual — número héroe + unidad pequeña; "Sin datos" discreto en vez de "—" */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
-        {displayScaled === null && !isNA ? (
-          <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: 'var(--font-sans)' }}>
-            Sin datos
-          </span>
-        ) : (
-          <>
-            <span style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--fs-sensor-hero)',
-              fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'],
-              color: valueColor,
-              lineHeight: 1.1,
-            }}>
-              {displayFormatted}
+      {/* Valor actual — widget visual (gauge/bar/temp_bar) o número héroe según schema */}
+      {useWidget ? (
+        <div>
+          <LiveSensorWidget sensor={sensor} value={isNA ? null : displayScaled} isStale={isStale} />
+          {staleAgeLabel && (
+            <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)' }}>
+              {staleAgeLabel}
             </span>
-            {sensor.unit && displayScaled !== null && !isNA && (
-              <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                {sensor.unit}
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
+          {displayScaled === null && !isNA ? (
+            <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--fg-dim)', fontStyle: 'italic', fontFamily: 'var(--font-sans)' }}>
+              Sin datos
+            </span>
+          ) : (
+            <>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'var(--fs-sensor-hero)',
+                fontWeight: 'var(--fw-sensor-hero)' as React.CSSProperties['fontWeight'],
+                color: valueColor,
+                lineHeight: 1.1,
+              }}>
+                {displayFormatted}
               </span>
-            )}
-          </>
-        )}
-        {staleAgeLabel && (
-          <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)', marginLeft: 2 }}>
-            {staleAgeLabel}
-          </span>
-        )}
-      </div>
+              {sensor.unit && displayScaled !== null && !isNA && (
+                <span style={{ fontSize: 'var(--fs-panel-label)', fontWeight: 600, color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  {sensor.unit}
+                </span>
+              )}
+            </>
+          )}
+          {staleAgeLabel && (
+            <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-sans)', marginLeft: 2 }}>
+              {staleAgeLabel}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Sparkline con altura fija — auto-zoom sobre los datos */}
       <div style={{ height: SPARKLINE_H, marginTop: 4 }}>
