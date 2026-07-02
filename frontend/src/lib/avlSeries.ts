@@ -1,9 +1,12 @@
 import { applyTransform, J1939_NA, type TransformInput } from './sensorValue'
 
 export type Period = 'dia' | 'semana' | 'mes'
-export type AvlPoint = { bucket: string; value: number | null }
+// El endpoint avl-series devuelve avg (value) + banda min/máx del bucket (vmin/vmax).
+// vmin/vmax son opcionales: consumidores antiguos y respuestas previas al cambio
+// de endpoint siguen funcionando solo con value.
+export type AvlPoint = { bucket: string; value: number | null; vmin?: number | null; vmax?: number | null }
 export type ChartPoint = { label: string; value: number }
-export type ChartPointTime = { ts: number; label: string; value: number | null }
+export type ChartPointTime = { ts: number; label: string; value: number | null; vmin?: number | null; vmax?: number | null }
 
 // Extraído de KpiChart — transforma serie cruda (multiplicando por transform)
 export function buildAvlSeries(
@@ -44,6 +47,7 @@ export function buildSensorSeries(
   raw: AvlPoint[],
   sensor: TransformInput,
 ): ChartPointTime[] {
+  const round2 = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100)
   const sorted = raw.slice().sort((a, b) => (a.bucket < b.bucket ? -1 : a.bucket > b.bucket ? 1 : 0))
   return sorted.map(d => {
     const ts = new Date(d.bucket).getTime()
@@ -52,7 +56,10 @@ export function buildSensorSeries(
     if (J1939_NA.has(d.value) || sensor.invalid_values?.includes(d.value)) return { ts, label, value: null }
     const v = applyTransform(d.value, sensor)
     if (v === null) return { ts, label, value: null }
-    return { ts, label, value: Math.round(v * 100) / 100 }
+    // Banda min/máx del bucket, transformada igual que el valor (si el endpoint la sirve).
+    const vmin = d.vmin != null ? round2(applyTransform(d.vmin, sensor)) : undefined
+    const vmax = d.vmax != null ? round2(applyTransform(d.vmax, sensor)) : undefined
+    return { ts, label, value: round2(v), vmin, vmax }
   })
 }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import type { SensorDef } from '../../../lib/types'
 import { apiClient } from '../../../lib/apiClient'
@@ -57,7 +57,14 @@ function fmtTooltipLabel(ts: number, hours: number): string {
 // 80-100 ºC ocupa toda la altura en vez de quedar aplastado arriba), pero
 // tampoco baja de 0 si el dato es no-negativo (evita negativos espurios).
 function niceYDomain(data: ChartPointTime[]): [number, number] {
-  const vals = data.filter(d => d.value !== null).map(d => d.value as number)
+  const vals: number[] = []
+  for (const d of data) {
+    if (d.value === null) continue
+    vals.push(d.value)
+    // La banda min/máx puede exceder la media: incluirla para no recortarla.
+    if (d.vmin != null) vals.push(d.vmin)
+    if (d.vmax != null) vals.push(d.vmax)
+  }
   if (vals.length === 0) return [0, 100]
   const mx = Math.max(...vals)
   const mn = Math.min(...vals)
@@ -70,6 +77,28 @@ function niceYDomain(data: ChartPointTime[]): [number, number] {
   const high = mx + pad
   if (mn >= 0 && low < 0) low = 0
   return [Math.floor(low), Math.ceil(high)]
+}
+
+// Tooltip del bucket: hora + media (y min/máx de la banda si existe).
+function BucketTooltip({ active, payload, hours, unitLabel, isBoolean }: {
+  active?: boolean; payload?: any[]; hours: number; unitLabel: string; isBoolean: boolean
+}) {
+  if (!active || !payload?.length) return null
+  const p = payload.find(x => x.dataKey === 'value') ?? payload[0]
+  const row = p?.payload as ChartPointTime | undefined
+  if (!row || row.value == null) return null
+  const fmt = (v: number) => isBoolean ? (v === 1 ? 'ON' : 'OFF') : `${v}${unitLabel}`
+  return (
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: 'var(--fg-primary)' }}>
+      <div style={{ color: 'var(--fg-muted)', marginBottom: 4, fontSize: 11 }}>{fmtTooltipLabel(row.ts, hours)}</div>
+      <div>Media: <strong style={{ fontFamily: 'var(--font-mono)' }}>{fmt(row.value)}</strong></div>
+      {!isBoolean && row.vmin != null && row.vmax != null && row.vmax !== row.vmin && (
+        <div style={{ color: 'var(--fg-dim)', fontSize: 11, marginTop: 2 }}>
+          mín {row.vmin}{unitLabel} · máx {row.vmax}{unitLabel}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function StatBox({ label, value, muted, accent }: { label: string; value: string; muted?: boolean; accent?: string }) {
@@ -124,20 +153,36 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     enabled: sensor.avl_id != null,
   })
 
-  // paddedData: null en domainStart + serie + null en domainEnd para forzar el dominio X completo.
+  // Serie + banda min/máx. El eje X se recorta a la extensión REAL de los datos
+  // (no las 24h fijas): así no queda 80% vacío si solo hay 3h con datos.
   // Sensores derivativos usan buildDerivativeSeries (tasa 1h rodante); resto injectGaps normal.
-  const { paddedData, domainStart, domainEnd } = useMemo(() => {
-    const domainEnd = Date.now()
-    const domainStart = domainEnd - hours * 60 * 60 * 1000
+  const { chartData, domainStart, domainEnd, hasBand } = useMemo(() => {
+    const reqEnd = Date.now()
+    const reqStart = reqEnd - hours * 60 * 60 * 1000
     const series = sensor.derivative
       ? buildDerivativeSeries(raw, sensor)
       : injectGaps(buildSensorSeries(raw, sensor), hours)
-    const paddedData: ChartPointTime[] = [
-      { ts: domainStart, label: '', value: null },
-      ...series,
-      { ts: domainEnd, label: '', value: null },
-    ]
-    return { paddedData, domainStart, domainEnd }
+    // Cada punto lleva `band: [vmin, vmax]` para el Area de rango (solo si hay banda).
+    let hasBand = false
+    const chartData = series.map(d => {
+      if (d.value !== null && d.vmin != null && d.vmax != null) {
+        hasBand = true
+        return { ...d, band: [d.vmin, d.vmax] as [number, number] }
+      }
+      return { ...d, band: undefined }
+    })
+    // Extensión real de los datos válidos → dominio X con ~3% de margen.
+    const validTs = series.filter(d => d.value !== null).map(d => d.ts)
+    let domainStart = reqStart
+    let domainEnd = reqEnd
+    if (validTs.length >= 2) {
+      const first = validTs[0]
+      const last = validTs[validTs.length - 1]
+      const pad = Math.max((last - first) * 0.03, 60_000)
+      domainStart = first - pad
+      domainEnd = Math.min(reqEnd, last + pad)
+    }
+    return { chartData, domainStart, domainEnd, hasBand }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raw, hours, sensor.scale, sensor.offset, sensor.transform, sensor.derivative])
 
@@ -145,6 +190,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
     () => buildChartTicks(domainStart, domainEnd, hours),
     [domainStart, domainEnd, hours],
   )
+  const paddedData = chartData
   const yDomain = isBoolean ? ([0, 1] as [number, number]) : niceYDomain(paddedData)
 
   const hasData = paddedData.filter(d => d.value !== null).length >= 2
@@ -241,13 +287,13 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
+              <ComposedChart
                 data={paddedData}
                 margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
               >
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={strokeColor} stopOpacity={0.25} />
+                    <stop offset="5%" stopColor={strokeColor} stopOpacity={0.22} />
                     <stop offset="95%" stopColor={strokeColor} stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -274,30 +320,42 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                 />
                 <Tooltip
                   cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
-                  contentStyle={{
-                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                    borderRadius: 6, fontSize: 12,
-                  }}
-                  itemStyle={{ color: 'var(--fg-primary)' }}
-                  formatter={(v) => {
-                    const val = v as number | null
-                    if (val === null) return ['sin datos', sensor.label]
-                    if (isBoolean) return [val === 1 ? 'ON' : 'OFF', sensor.label]
-                    return [`${val}${unitLabel}`, sensor.label]
-                  }}
-                  labelFormatter={(ts: number) => fmtTooltipLabel(ts, hours)}
+                  content={<BucketTooltip hours={hours} unitLabel={unitLabel} isBoolean={isBoolean} />}
                 />
+                {/* Banda min-máx del bucket (relleno tenue, sin línea) — solo si el endpoint la sirve */}
+                {!isBoolean && hasBand && (
+                  <Area
+                    type="monotone"
+                    dataKey="band"
+                    stroke="none"
+                    fill={strokeColor}
+                    fillOpacity={0.14}
+                    isAnimationActive={false}
+                    connectNulls={false}
+                    activeDot={false}
+                  />
+                )}
+                {/* Relleno degradado bajo la media */}
                 <Area
+                  type={isBoolean ? 'stepAfter' : 'monotone'}
+                  dataKey="value"
+                  stroke="none"
+                  fill={`url(#${gradientId})`}
+                  isAnimationActive={false}
+                  connectNulls={false}
+                  activeDot={false}
+                />
+                {/* Línea de la media (encima de la banda) */}
+                <Line
                   type={isBoolean ? 'stepAfter' : 'monotone'}
                   dataKey="value"
                   stroke={strokeColor}
                   strokeWidth={2.5}
-                  fill={`url(#${gradientId})`}
                   dot={false}
                   isAnimationActive={false}
                   connectNulls={false}
                 />
-              </AreaChart>
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>

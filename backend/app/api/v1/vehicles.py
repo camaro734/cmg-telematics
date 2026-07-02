@@ -1925,44 +1925,46 @@ async def get_vehicle_avl_series(
     key = f"avl_{avl_id}"
     range_hours = (until - since).total_seconds() / 3600.0
 
-    # Para rangos > 24h agregamos por hora con time_bucket — evita devolver decenas
-    # de miles de puntos crudos y aprovecha la hypertable.
-    if range_hours > 24:
-        rows = await db.execute(
-            text("""
-                SELECT time_bucket('1 hour', time) AS bucket,
-                       AVG((can_data->>:key)::numeric) AS value
-                FROM telemetry_record
-                WHERE vehicle_id = :vid
-                  AND time >= :since
-                  AND time <= :until
-                  AND can_data ? :key
-                  AND (can_data->>:key) IS NOT NULL
-                GROUP BY bucket
-                ORDER BY bucket ASC
-                LIMIT 5000
-            """),
-            {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
-        )
+    # Resolución del bucket según el rango pedido: densa en corto, gruesa en largo.
+    # Evita devolver decenas de miles de puntos crudos (la "sierra") y aprovecha la
+    # hypertable. El literal sale de esta lista fija (no de entrada de usuario),
+    # así que es seguro incrustarlo en el time_bucket().
+    if range_hours <= 6:
+        bucket_interval = "1 minute"
+    elif range_hours <= 24:
+        bucket_interval = "5 minutes"
+    elif range_hours <= 168:
+        bucket_interval = "30 minutes"
     else:
-        rows = await db.execute(
-            text("""
-                SELECT time AS bucket,
-                       (can_data->>:key)::numeric AS value
-                FROM telemetry_record
-                WHERE vehicle_id = :vid
-                  AND time >= :since
-                  AND time <= :until
-                  AND can_data ? :key
-                  AND (can_data->>:key) IS NOT NULL
-                ORDER BY time ASC
-                LIMIT 5000
-            """),
-            {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
-        )
+        bucket_interval = "2 hours"
+
+    # AVG = línea; MIN/MAX = banda sombreada de la dispersión dentro del bucket.
+    rows = await db.execute(
+        text(f"""
+            SELECT time_bucket('{bucket_interval}', time) AS bucket,
+                   AVG((can_data->>:key)::numeric) AS value,
+                   MIN((can_data->>:key)::numeric) AS vmin,
+                   MAX((can_data->>:key)::numeric) AS vmax
+            FROM telemetry_record
+            WHERE vehicle_id = :vid
+              AND time >= :since
+              AND time <= :until
+              AND can_data ? :key
+              AND (can_data->>:key) IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket ASC
+            LIMIT 5000
+        """),
+        {"vid": str(vehicle_id), "key": key, "since": since, "until": until},
+    )
     data = rows.fetchall()
     return [
-        {"bucket": r[0].isoformat(), "value": float(r[1]) if r[1] is not None else None}
+        {
+            "bucket": r[0].isoformat(),
+            "value": float(r[1]) if r[1] is not None else None,
+            "vmin": float(r[2]) if r[2] is not None else None,
+            "vmax": float(r[3]) if r[3] is not None else None,
+        }
         for r in data
     ]
 
