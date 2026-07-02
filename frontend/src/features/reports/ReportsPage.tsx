@@ -70,32 +70,6 @@ function fmtHours(min: number) {
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
 
-function groupByPeriod(
-  kpis: KpiHour[],
-  period: Period,
-  metricKey: string,
-  transform: number,
-): { label: string; value: number }[] {
-  if (period === 'dia') {
-    return kpis.map(h => ({
-      label: new Date(h.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      value: Math.round(((h[metricKey as keyof KpiHour] as number) ?? 0) * transform * 100) / 100,
-    }))
-  }
-  const byDay = new Map<string, number>()
-  for (const h of kpis) {
-    const day = h.bucket.slice(0, 10)
-    const v = (h[metricKey as keyof KpiHour] as number) ?? 0
-    byDay.set(day, (byDay.get(day) ?? 0) + v)
-  }
-  return Array.from(byDay.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, total]) => ({
-      label: day.slice(5).replace('-', '/'),
-      value: Math.round(total * transform * 100) / 100,
-    }))
-}
-
 function buildAvlSeriesData(
   avlData: {bucket: string; value: number | null}[],
   period: Period,
@@ -126,32 +100,84 @@ function buildAvlSeriesData(
     }))
 }
 
-// Fila de la gráfica de actividad (barras apiladas Motor/PTO por bucket).
+// Catálogo genérico de métricas que expone el endpoint /kpis (columnas de
+// telemetry_1h por bucket). 'minutes' → barras apiladas (eje izq); 'scalar' →
+// línea superpuesta en eje Y secundario. `agg` define cómo se agrega al pasar
+// de hora a día (Semana/Mes). Si el endpoint añadiese más columnas por bucket
+// (velocidad, km…), basta con listarlas aquí y el selector las mostrará.
+type KpiMetricKind = 'minutes' | 'scalar'
+type KpiAgg = 'sum' | 'avg'
+interface KpiMetricDef {
+  key: keyof KpiHour
+  label: string
+  unit: string
+  color: string
+  kind: KpiMetricKind
+  agg: KpiAgg
+}
+
+const KPI_METRICS: KpiMetricDef[] = [
+  { key: 'engine_on_minutes',  label: 'Motor',              unit: 'min', color: 'var(--cmg-teal)',     kind: 'minutes', agg: 'sum' },
+  { key: 'pto_active_minutes', label: 'PTO',                unit: 'min', color: 'var(--energy-orange)', kind: 'minutes', agg: 'sum' },
+  { key: 'avg_pressure_1',     label: 'Presión media',      unit: 'bar', color: 'var(--info)',          kind: 'scalar',  agg: 'avg' },
+  { key: 'max_pressure_1',     label: 'Presión máx',        unit: 'bar', color: 'var(--chart-4)',       kind: 'scalar',  agg: 'avg' },
+  { key: 'avg_oil_temp',       label: 'Temp. aceite media', unit: '°C',  color: 'var(--warn)',          kind: 'scalar',  agg: 'avg' },
+  { key: 'max_oil_temp',       label: 'Temp. aceite máx',   unit: '°C',  color: 'var(--danger)',        kind: 'scalar',  agg: 'avg' },
+  { key: 'record_count',       label: 'Registros',          unit: '',    color: 'var(--offline)',       kind: 'scalar',  agg: 'sum' },
+]
+const KPI_METRIC_BY_KEY = new Map(KPI_METRICS.map(m => [m.key as string, m]))
+
+// Fila de la gráfica de actividad (barras apiladas Motor/PTO + escalares por bucket).
 // PTO ⊆ Motor: la barra total = motor, con el tramo PTO apilado dentro y el
 // resto ("motor sin PTO") como base. En vista día el bucket es 1 hora; en
-// semana/mes se agrega por día (suma de minutos).
+// semana/mes se agrega por día (minutos=suma, escalares=media, registros=suma).
+// label/motor_sin_pto fijos; el resto (engine_on_minutes, pto_active_minutes y
+// escalares) entra por el index signature — minutos siempre numéricos, escalares
+// null cuando no hay dato en el bucket.
 type ActivityRow = {
   label: string
-  engine_on_minutes: number
-  pto_active_minutes: number
   motor_sin_pto: number
+  [key: string]: string | number | null
+}
+
+function aggregate(values: number[], agg: KpiAgg): number {
+  if (values.length === 0) return 0
+  const sum = values.reduce((s, v) => s + v, 0)
+  return agg === 'sum' ? sum : sum / values.length
+}
+
+function rowFromBuckets(label: string, hrs: KpiHour[]): ActivityRow {
+  const row: ActivityRow = { label, motor_sin_pto: 0 }
+  for (const m of KPI_METRICS) {
+    const vals = hrs.map(h => h[m.key]).filter((v): v is number => v != null)
+    // Minutos siempre numéricos (0 si no hay); escalares null cuando no hay dato (hueco en la línea).
+    row[m.key] = vals.length ? Math.round(aggregate(vals, m.agg) * 100) / 100 : (m.kind === 'minutes' ? 0 : null)
+  }
+  const motor = Number(row.engine_on_minutes) || 0
+  const pto = Number(row.pto_active_minutes) || 0
+  row.motor_sin_pto = Math.max(0, motor - pto)
+  return row
 }
 
 function buildActivityData(kpis: KpiHour[], period: Period): ActivityRow[] {
   if (kpis.length === 0) return []
-  const eng = groupByPeriod(kpis, period, 'engine_on_minutes', 1)
-  const pto = groupByPeriod(kpis, period, 'pto_active_minutes', 1)
-  const ptoByLabel = new Map(pto.map(p => [p.label, p.value]))
-  return eng.map(e => {
-    const motor = e.value
-    const p = ptoByLabel.get(e.label) ?? 0
-    return {
-      label: e.label,
-      engine_on_minutes: motor,
-      pto_active_minutes: p,
-      motor_sin_pto: Math.max(0, motor - p),
-    }
-  })
+  if (period === 'dia') {
+    return [...kpis]
+      .sort((a, b) => a.bucket.localeCompare(b.bucket))
+      .map(h => rowFromBuckets(
+        new Date(h.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        [h],
+      ))
+  }
+  const byDay = new Map<string, KpiHour[]>()
+  for (const h of kpis) {
+    const day = h.bucket.slice(0, 10)
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day)!.push(h)
+  }
+  return Array.from(byDay.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, hrs]) => rowFromBuckets(day.slice(5).replace('-', '/'), hrs))
 }
 
 /**
@@ -173,25 +199,42 @@ function mergeSeriesByLabel(
     .map(([label, vals]) => ({ label, ...vals } as Record<string, string | number>))
 }
 
-// Tooltip de la gráfica de actividad: motor · PTO · % por barra.
+// Tooltip de la gráfica de actividad: motor · PTO · % por barra + escalares activas.
 function ActivityTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
   if (!active || !payload?.length) return null
   const row = payload[0]?.payload as ActivityRow | undefined
   if (!row) return null
-  const motor = Math.round(row.engine_on_minutes ?? 0)
-  const pto = Math.round(row.pto_active_minutes ?? 0)
+  const motor = Math.round(Number(row.engine_on_minutes ?? 0))
+  const pto = Math.round(Number(row.pto_active_minutes ?? 0))
   const pct = motor > 0 ? Math.round((pto / motor) * 100) : 0
+  // ¿hay barras de motor/PTO visibles en este punto?
+  const hasBars = payload.some(p => ['motor_sin_pto', 'engine_on_minutes', 'pto_active_minutes'].includes(p.dataKey))
+  // Series escalares superpuestas (líneas) presentes en el payload.
+  const scalars = payload.filter(p => KPI_METRIC_BY_KEY.get(p.dataKey)?.kind === 'scalar')
   return (
     <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--fg-primary)' }}>
       <div style={{ color: 'var(--fg-muted)', marginBottom: 5 }}>{row.label}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--cmg-teal)', flexShrink: 0 }} />
-        <span>Motor: <strong>{motor} min</strong></span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--energy-orange)', flexShrink: 0 }} />
-        <span>PTO: <strong>{pto} min</strong> · {pct}%</span>
-      </div>
+      {hasBars && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--cmg-teal)', flexShrink: 0 }} />
+            <span>Motor: <strong>{motor} min</strong></span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--energy-orange)', flexShrink: 0 }} />
+            <span>PTO: <strong>{pto} min</strong> · {pct}%</span>
+          </div>
+        </>
+      )}
+      {scalars.map(p => {
+        const m = KPI_METRIC_BY_KEY.get(p.dataKey)!
+        return (
+          <div key={p.dataKey} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: m.color, flexShrink: 0 }} />
+            <span>{m.label}: <strong>{p.value}{m.unit ? ` ${m.unit}` : ''}</strong></span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -227,6 +270,16 @@ function HistoricoTab({
   const isMobile = useIsMobile()
   const hours = periodToHours(period, customFrom ?? '', customTo ?? '')
   const [pickerOpen, setPickerOpen] = useState(false)
+  // Selector de métricas visibles en la gráfica de actividad (base: Motor + PTO).
+  const [visibleMetrics, setVisibleMetrics] = useState<Set<string>>(
+    () => new Set<string>(['engine_on_minutes', 'pto_active_minutes']),
+  )
+  const toggleMetric = (key: string) =>
+    setVisibleMetrics(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
   const { data: prefs } = useUserPreferences()
   const patchPrefs = usePatchUserPreferences()
 
@@ -362,6 +415,14 @@ function HistoricoTab({
   // de telemetry_1h vía /kpis, sin depender de la config de historic_metrics).
   const activityData = buildActivityData(kpis, period)
 
+  // Métricas del endpoint /kpis disponibles (con algún dato en el rango). El
+  // selector se construye dinámicamente; si el endpoint expone más columnas por
+  // bucket, aparecen aquí sin más cambios.
+  const availableMetrics = KPI_METRICS.filter(m => kpis.some(h => h[m.key] != null))
+  const motorOn = visibleMetrics.has('engine_on_minutes')
+  const ptoOn = visibleMetrics.has('pto_active_minutes')
+  const activeScalars = availableMetrics.filter(m => m.kind === 'scalar' && visibleMetrics.has(m.key as string))
+
   // Métricas AVL configuradas (line-type con avl_id) — tarjetas propias abajo.
   const avlLineMetrics = lineMetrics.filter(m => !KPI_HOUR_KEYS.has(m.key) && (m as any).avl_id !== undefined && (m as any).avl_id !== null)
   // Datos individuales por cada métrica AVL — se usan para agrupación o gráfico solitario
@@ -465,25 +526,85 @@ function HistoricoTab({
             Sin datos para este período
           </div>
         ) : (
-          <div style={{ height: isMobile ? 160 : 240 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={activityData} margin={{ top: 4, right: 16, bottom: 0, left: -16 }} barCategoryGap={period === 'dia' ? '12%' : '24%'}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} interval="preserveStartEnd" />
-                <YAxis
-                  tick={{ fontSize: 10, fill: 'var(--offline)' }}
-                  domain={period === 'dia' ? [0, 60] : [0, 'auto']}
-                  allowDecimals={false}
-                  unit=" min"
-                />
-                <Tooltip content={<ActivityTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--fg-muted)' }} />
-                {/* PTO ⊆ Motor: la barra total = motor; base "sin PTO" (teal) + PTO (naranja) apilado dentro */}
-                <Bar dataKey="motor_sin_pto" name="Motor (sin PTO)" stackId="min" fill="var(--cmg-teal)" maxBarSize={40} />
-                <Bar dataKey="pto_active_minutes" name="PTO" stackId="min" fill="var(--energy-orange)" maxBarSize={40} radius={[3, 3, 0, 0]} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            {/* Selector de métricas (chips) — Motor/PTO en minutos (barras); el resto
+                se superpone como línea en eje secundario */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {availableMetrics.map(m => {
+                const on = visibleMetrics.has(m.key as string)
+                return (
+                  <button
+                    key={m.key as string}
+                    onClick={() => toggleMetric(m.key as string)}
+                    title={m.kind === 'scalar' ? `${m.label} (${m.unit || 'valor'}, eje secundario)` : m.label}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '3px 10px', borderRadius: 14, fontSize: 11, fontWeight: 600,
+                      fontFamily: 'var(--font-sans)', cursor: 'pointer', transition: 'all 0.12s',
+                      border: `1px solid ${on ? m.color : 'var(--border)'}`,
+                      background: on ? 'var(--bg-card)' : 'transparent',
+                      color: on ? 'var(--fg-primary)' : 'var(--fg-muted)',
+                    }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: m.kind === 'minutes' ? 2 : 6, background: on ? m.color : 'var(--fg-dim)', flexShrink: 0 }} />
+                    {m.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ height: isMobile ? 160 : 240 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={activityData} margin={{ top: 4, right: activeScalars.length ? 4 : 16, bottom: 0, left: -16 }} barCategoryGap={period === 'dia' ? '12%' : '24%'}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--offline)' }} interval="preserveStartEnd" />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 10, fill: 'var(--offline)' }}
+                    domain={period === 'dia' ? [0, 60] : [0, 'auto']}
+                    allowDecimals={false}
+                    unit=" min"
+                  />
+                  {activeScalars.length > 0 && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: 'var(--offline)' }}
+                      domain={[0, 'auto']}
+                      width={38}
+                    />
+                  )}
+                  <Tooltip content={<ActivityTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                  {/* PTO ⊆ Motor: la barra total = motor; base "sin PTO" (teal) + PTO (naranja) apilado dentro */}
+                  {motorOn && ptoOn && (
+                    <>
+                      <Bar yAxisId="left" dataKey="motor_sin_pto" name="Motor (sin PTO)" stackId="min" fill="var(--cmg-teal)" maxBarSize={40} />
+                      <Bar yAxisId="left" dataKey="pto_active_minutes" name="PTO" stackId="min" fill="var(--energy-orange)" maxBarSize={40} radius={[3, 3, 0, 0]} />
+                    </>
+                  )}
+                  {motorOn && !ptoOn && (
+                    <Bar yAxisId="left" dataKey="engine_on_minutes" name="Motor" fill="var(--cmg-teal)" maxBarSize={40} radius={[3, 3, 0, 0]} />
+                  )}
+                  {!motorOn && ptoOn && (
+                    <Bar yAxisId="left" dataKey="pto_active_minutes" name="PTO" fill="var(--energy-orange)" maxBarSize={40} radius={[3, 3, 0, 0]} />
+                  )}
+                  {activeScalars.map(m => (
+                    <Line
+                      key={m.key as string}
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey={m.key as string}
+                      name={m.label}
+                      stroke={m.color}
+                      strokeWidth={2}
+                      dot={false}
+                      connectNulls
+                    />
+                  ))}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </>
         )}
       </div>
 
