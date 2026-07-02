@@ -5,6 +5,8 @@ import type { VehicleTypeOut, SensorDef, GeoResult, DestinationOut, RouteInfo } 
 import { sensorDisplayValue } from './popupHtml'
 import { useSetDestination, useCancelDestination, useReverseGeocode } from './useDestination'
 import { useWorkOrdersByVehicle, useCurrentStop } from './useVehicleWorkOrders'
+import { resolveRawValue, applyTransform } from '../../lib/sensorValue'
+import { LiveSensorWidget, hasVisualWidget } from '../vehicle/diagnostic/LiveSensorWidget'
 
 interface VehicleDetailPanelProps {
   vehicleId: string | null
@@ -145,15 +147,27 @@ export function VehicleDetailPanel({ vehicleId, plate, vehicleName, vehicleType,
               </div>
             )}
             {panelSensors.length > 0 ? (
-              panelSensors.map(s => (
-                <KpiRow
-                  key={s.key}
-                  label={s.label}
-                  value={<span style={{ color: stale ? 'var(--fg-muted)' : undefined }}>
-                    {status ? sensorDisplayValue(s, status) : '—'}
-                  </span>}
-                />
-              ))
+              panelSensors.map(s => {
+                // Sensor con widget visual → mismo componente que la ficha (label + widget).
+                if (hasVisualWidget(s)) {
+                  const scaled = status ? applyTransform(resolveRawValue(s, status, {}), s) : null
+                  return (
+                    <div key={s.key} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-soft)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 4 }}>{s.label}</div>
+                      <LiveSensorWidget sensor={s} value={scaled} isStale={stale} />
+                    </div>
+                  )
+                }
+                return (
+                  <KpiRow
+                    key={s.key}
+                    label={s.label}
+                    value={<span style={{ color: stale ? 'var(--fg-muted)' : undefined }}>
+                      {status ? sensorDisplayValue(s, status) : '—'}
+                    </span>}
+                  />
+                )
+              })
             ) : (
               <>
                 <KpiRow label="Ignición" value={
