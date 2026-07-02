@@ -37,7 +37,9 @@ export function buildAvlSeries(
 // Para SensorMiniChart — aplica scale+offset (J1939 offset correcto).
 // Ordena siempre ASC por bucket (el API devuelve DESC) para que injectGaps
 // y calcBrushRange reciban los datos en orden cronológico.
-// Excluye centinelas J1939 "not available" (0xFF, 0xFFFF, 0xFFFFFFFF).
+// Excluye centinelas J1939 "not available" (0xFF, 0xFFFF, 0xFFFFFFFF) y los
+// invalid_values del sensor (p.ej. raw 0 en un sensor con offset -40, que si no
+// se pintaría como -40 y contaminaría stats/eje) → hueco (null), no falso cero.
 export function buildSensorSeries(
   raw: AvlPoint[],
   sensor: TransformInput,
@@ -47,7 +49,7 @@ export function buildSensorSeries(
     const ts = new Date(d.bucket).getTime()
     const label = new Date(d.bucket).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
     if (d.value === null) return { ts, label, value: null }
-    if (J1939_NA.has(d.value)) return { ts, label, value: null }
+    if (J1939_NA.has(d.value) || sensor.invalid_values?.includes(d.value)) return { ts, label, value: null }
     const v = applyTransform(d.value, sensor)
     if (v === null) return { ts, label, value: null }
     return { ts, label, value: Math.round(v * 100) / 100 }
@@ -67,7 +69,7 @@ export function buildDerivativeSeries(
   sensor: TransformInput,
 ): ChartPointTime[] {
   const sorted = raw
-    .filter(d => d.value !== null && !J1939_NA.has(d.value as number))
+    .filter(d => d.value !== null && !J1939_NA.has(d.value as number) && !sensor.invalid_values?.includes(d.value as number))
     .slice()
     .sort((a, b) => (a.bucket < b.bucket ? -1 : a.bucket > b.bucket ? 1 : 0))
 

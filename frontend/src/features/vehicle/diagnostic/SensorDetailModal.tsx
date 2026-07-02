@@ -52,32 +52,44 @@ function fmtTooltipLabel(ts: number, hours: number): string {
   return d.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-// Dominio Y con cero como base y techo redondeado; padding ~10% superior.
+// Dominio Y sensato para el sensor: ajusta el rango a los datos con ~12% de
+// margen. NO fuerza el 0 como base cuando el dato vive lejos de cero (p.ej.
+// 80-100 ºC ocupa toda la altura en vez de quedar aplastado arriba), pero
+// tampoco baja de 0 si el dato es no-negativo (evita negativos espurios).
 function niceYDomain(data: ChartPointTime[]): [number, number] {
   const vals = data.filter(d => d.value !== null).map(d => d.value as number)
   if (vals.length === 0) return [0, 100]
   const mx = Math.max(...vals)
   const mn = Math.min(...vals)
-  if (mx <= 0) return [Math.min(mn * 1.1, -1), 1]
-  const mag = Math.pow(10, Math.floor(Math.log10(mx || 1)))
-  const high = Math.ceil(mx * 1.1 / mag) * mag
-  const low = mn >= 0 ? 0 : Math.floor(mn / mag) * mag
-  return [low, high]
+  if (mx === mn) {
+    const p = Math.max(Math.abs(mx) * 0.1, 1)
+    return [Math.floor(mn - p), Math.ceil(mx + p)]
+  }
+  const pad = (mx - mn) * 0.12
+  let low = mn - pad
+  const high = mx + pad
+  if (mn >= 0 && low < 0) low = 0
+  return [Math.floor(low), Math.ceil(high)]
 }
 
-function StatBox({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function StatBox({ label, value, muted, accent }: { label: string; value: string; muted?: boolean; accent?: string }) {
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-      background: 'var(--bg-elevated)', borderRadius: 8, padding: '8px 16px', minWidth: 80,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+      background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 18px', minWidth: 92,
+      border: '1px solid var(--border)',
+      borderTop: `2px solid ${accent ?? 'var(--border)'}`,
     }}>
       <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700,
-        color: muted ? 'var(--fg-muted)' : 'var(--fg-primary)',
+        fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, lineHeight: 1,
+        color: muted ? 'var(--fg-muted)' : (accent ?? 'var(--fg-primary)'),
       }}>
         {value}
       </span>
-      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-dim)' }}>
+      <span style={{
+        fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600,
+        letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-dim)',
+      }}>
         {label}
       </span>
     </div>
@@ -279,7 +291,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                   type={isBoolean ? 'stepAfter' : 'monotone'}
                   dataKey="value"
                   stroke={strokeColor}
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   fill={`url(#${gradientId})`}
                   dot={false}
                   isAnimationActive={false}
@@ -298,6 +310,7 @@ export function SensorDetailModal({ sensor, vehicleId, onClose }: SensorDetailMo
                 <StatBox
                   label="Último"
                   value={stats.last !== null ? `${stats.last}${unitLabel}` : '—'}
+                  accent="var(--cmg-teal)"
                 />
                 <StatBox
                   label="Mín"

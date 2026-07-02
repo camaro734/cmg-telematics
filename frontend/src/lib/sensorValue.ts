@@ -42,7 +42,9 @@ export function applyScaleOffset(
 
 // Campos de un sensor que definen su transformación. Subconjunto de SensorDef
 // para que cualquier consumidor (incluido buildSensorSeries) pueda transformar.
-export type TransformInput = Pick<SensorDef, 'scale' | 'offset' | 'transform'>
+// `invalid_values` permite que las series históricas descarten los mismos
+// centinelas de "sin dato" que ya filtra resolveRawValue en el valor en vivo.
+export type TransformInput = Pick<SensorDef, 'scale' | 'offset' | 'transform' | 'invalid_values'>
 
 // Transforma el valor crudo del sensor a su valor físico.
 // 'linear_range' = interpolación lineal de 2 puntos (entrada → salida);

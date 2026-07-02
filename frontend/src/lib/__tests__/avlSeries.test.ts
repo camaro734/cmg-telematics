@@ -69,6 +69,15 @@ describe('buildSensorSeries — sentinels J1939', () => {
     })
     expect(result[0].value).toBeCloseTo(4.5)
   })
+
+  it('raw en invalid_values → null (no falso cero -40 con offset -40)', () => {
+    // Temperatura Refrigerante: offset -40, invalid_values [0]. Un raw 0 NO debe
+    // pintarse como -40 ni contaminar stats/eje: pasa a hueco (null).
+    const raw: AvlPoint[] = [avlPt(epoch(0), 0), avlPt(epoch(60), 127)]
+    const result = buildSensorSeries(raw, { scale: 1, offset: -40, invalid_values: [0] })
+    expect(result[0].value).toBeNull()
+    expect(result[1].value).toBeCloseTo(87) // 127 - 40
+  })
 })
 
 // ─── buildDerivativeSeries ───────────────────────────────────────────────────
